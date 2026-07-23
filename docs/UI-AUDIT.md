@@ -101,6 +101,13 @@ l'agrégat host reste un ruban compact. Le héros de la page est l'**état**, pa
 | « Apply configuration » | interaction signature à garder | conservée = déclencheur du job-queue typé |
 | NetData iframe (Bootstrap 3) | dashboard host séparé | gardé pour l'œil host ; l'état **par-user** vit dans le portail |
 
+**Apps vendored gardées — the owner les utilise** (« j'utilise webmin seedbox manager cakebox etc »,
+2026-07-23) : Cakebox, Seedbox-Manager, Webmin, ShellInABox, NetData, ruTorrent restent
+**liées/iframées** depuis le portail KoBox. Le portail est un **shell / launcher** qui unifie
+l'admin KoBox-natif (users, trackers, fair-use, sync…) — il n'absorbe **pas** ces apps et ne
+supprime **aucun** accès existant. La signal strip et les vues rôle-scopées s'ajoutent ; les
+liens vers les UIs tierces restent.
+
 **Plancher qualité** : responsive jusqu'au mobile, `<meta viewport>`, focus clavier visible,
 `prefers-reduced-motion` respecté, thème-aware (light/dark), zéro chrome image-sliced, aucune
 largeur fixe.
