@@ -34,8 +34,22 @@ desktop-only**. Preuves (assets) :
    opérationnel (santé, bande passante, quota par user). C'est exactement ce qui a laissé passer user-h.
 
 **À conserver (the owner reconnaît l'accès)** : l'URL/entrée `https://seedbox.example:8189` + auth,
-et l'interaction signature **« Apply configuration »** (on empile des changements puis on applique
-— mappe le job-queue KoBox). Le reste du look est libre (décision §7 de `AUDIT.md`).
+et l'interaction signature **« Appliquer les modifications »** (on empile des changements puis on
+applique — mappe le job-queue KoBox ; grisée quand rien n'est en attente, bonne affordance à
+garder). Le reste du look est libre (décision §7 de `AUDIT.md`).
+
+**Confirmé par capture réelle (home de `user-f`, fournie 2026-07-23)** — 3 constats que les assets
+seuls ne montraient pas :
+1. **La home récite des fonctionnalités au lieu de montrer un état** : « En tant qu'utilisateur
+   normal, vous *diposez* des fonctionnalités suivantes : [7 puces] » (+ vrai bug de copie
+   *diposez → disposez*). C'est le système qui se décrit — une notice, pas un poste de travail.
+   Header = **photo bokeh floue** (stock, décorative, muette sur le sujet). Footer crédite la
+   stack : *CSS3_two · CMS Wolf · Medoo · GeoLite2*.
+2. **Seule télémétrie = un bandeau host en pastilles vertes** en bas (cpu/ram/swap/load,
+   toujours « vert »). **Host-wide, zéro attribution par user** = l'angle mort exact qui a caché
+   user-h (un uid sature l'upstream, le load agrégé reste calme). Déco déguisée en monitoring.
+3. **Ton chaleureux/personnel** (« Bonjour user-f, bienvenue ») — juste pour 8 potes. À **garder**
+   sur la home user ; la console froide convient à la vue owner/admin, pas à l'accueil user.
 
 ## 2. Direction design KoBox (token system)
 
@@ -66,6 +80,14 @@ fair-use (`AUDIT.md §3.7`) et du sujet « station de transmission ».
 **Réponse graduée visible in-place** : sur la voie en breach, l'auto-throttle est appliqué et
 **Suspend** est mis en file dans « Apply changes » (humain dans la boucle) — cohérent avec les
 décisions figées (`AUDIT.md §3.7`).
+
+**Home = poste de travail, par rôle** (leçon de la home legacy qui récite des features) :
+- **User** (ex. user-f) : sa **propre** signal strip en tête (débit/quota/torrents/état) + ses
+  actions réelles (rTorrent, catégories/sync, adresses autorisées, OpenVPN, mot de passe). Ton
+  **chaleureux** conservé (un bonjour personnel), pas de liste-notice.
+- **Owner/admin** (the owner) : la **Fleet console** (les 8 voies + fair-use).
+Le bandeau host « pastilles vertes » legacy est remplacé par les signal strips par-user ;
+l'agrégat host reste un ruban compact. Le héros de la page est l'**état**, pas une photo bokeh.
 
 ## 3. Décisions de composants (portail réécrit)
 
