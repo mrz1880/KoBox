@@ -19,6 +19,7 @@
     ]
   },
   "scripts": {
+    "prepare": "git config --local core.hooksPath kobox/.githooks || true",
     "lint": "eslint src test",
     "typecheck": "tsc --noEmit",
     "test": "vitest run test/unit test/component test/contract",
