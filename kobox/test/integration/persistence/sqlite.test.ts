@@ -29,10 +29,10 @@ describe('SqliteUserRepository', () => {
     const repo = new SqliteUserRepository(db);
 
     const saved = await repo.save(aUser().withQuota(Quota.gib(412)).build());
-    const found = await repo.findByUsername(Username.parse('user-f'));
+    const found = await repo.findByUsername(Username.parse('alice'));
 
     expect(saved.id?.value).toBeGreaterThan(0);
-    expect(found?.email.value).toBe('user-f@example.org');
+    expect(found?.email.value).toBe('alice@example.org');
     expect(found?.quota.toGib()).toBe(412);
     expect(found?.scgiPort.value).toBe(51101);
     expect(found?.status.isSuspended()).toBe(false);
@@ -94,7 +94,7 @@ describe('SqlitePortAllocator', () => {
     const first = await allocator.allocateScgiPort();
     await repo.save(aUser().withScgiPort(first.value).build());
 
-    await repo.delete(Username.parse('user-f'));
+    await repo.delete(Username.parse('alice'));
 
     expect((await allocator.allocateScgiPort()).value).toBe(first.value);
   });
@@ -103,8 +103,8 @@ describe('SqlitePortAllocator', () => {
 describe('SqliteJobQueue', () => {
   it('should_enqueue_claim_and_complete_a_job_fifo', async () => {
     const queue = new SqliteJobQueue(db);
-    await queue.enqueue(parseJob('suspend-user', { username: 'user-f' }));
-    await queue.enqueue(parseJob('resume-user', { username: 'user-f' }));
+    await queue.enqueue(parseJob('suspend-user', { username: 'alice' }));
+    await queue.enqueue(parseJob('resume-user', { username: 'alice' }));
 
     const claimed = await queue.claimNextPending();
 
@@ -116,7 +116,7 @@ describe('SqliteJobQueue', () => {
 
   it('should_not_hand_a_claimed_job_to_a_second_worker', async () => {
     const queue = new SqliteJobQueue(db);
-    await queue.enqueue(parseJob('suspend-user', { username: 'user-f' }));
+    await queue.enqueue(parseJob('suspend-user', { username: 'alice' }));
 
     const first = await queue.claimNextPending();
     const second = await queue.claimNextPending();
@@ -127,21 +127,21 @@ describe('SqliteJobQueue', () => {
 
   it('should_record_failures_with_their_error', async () => {
     const queue = new SqliteJobQueue(db);
-    await queue.enqueue(parseJob('suspend-user', { username: 'user-f' }));
+    await queue.enqueue(parseJob('suspend-user', { username: 'alice' }));
     const claimed = await queue.claimNextPending();
     if (!claimed) throw new Error('expected a job');
 
-    await queue.markFailed(claimed.id, 'user user-f not found');
+    await queue.markFailed(claimed.id, 'user alice not found');
 
     expect(await queue.claimNextPending()).toBeUndefined();
   });
 
   it('should_quarantine_tampered_payloads_and_serve_the_next_job', async () => {
     const queue = new SqliteJobQueue(db);
-    const poisoned = await queue.enqueue(parseJob('suspend-user', { username: 'user-f' }));
-    await queue.enqueue(parseJob('resume-user', { username: 'user-f' }));
+    const poisoned = await queue.enqueue(parseJob('suspend-user', { username: 'alice' }));
+    await queue.enqueue(parseJob('resume-user', { username: 'alice' }));
     db.raw.prepare('UPDATE jobs SET payload_json = ? WHERE id = ?').run(
-      JSON.stringify({ username: 'user-f; rm -rf /' }),
+      JSON.stringify({ username: 'alice; rm -rf /' }),
       poisoned,
     );
 
@@ -158,7 +158,7 @@ describe('SqliteJobQueue', () => {
 
   it('should_fail_stale_running_jobs_on_recovery', async () => {
     const queue = new SqliteJobQueue(db);
-    await queue.enqueue(parseJob('suspend-user', { username: 'user-f' }));
+    await queue.enqueue(parseJob('suspend-user', { username: 'alice' }));
     await queue.claimNextPending(); // now running, simulating a crashed worker
 
     const recovered = await queue.recoverStale();

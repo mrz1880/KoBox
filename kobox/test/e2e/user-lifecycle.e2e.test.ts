@@ -9,7 +9,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 // Requires: pnpm build, root, systemd (make e2e runs it inside the container).
 
 const onDebianAsRoot = process.platform === 'linux' && process.getuid?.() === 0;
-const E2E_USER = 'tonye2e';
+const E2E_USER = 'e2euser';
 const CLI = 'dist/interfaces/cli/main.js';
 const WORKER = 'dist/interfaces/worker/main.js';
 
@@ -66,7 +66,7 @@ describe.skipIf(!onDebianAsRoot)('E2E: create -> suspend -> resume -> delete', (
 
   it('should_provision_a_real_user_from_an_enqueued_typed_job', () => {
     const output = kobox(
-      ['create-user', E2E_USER, '--email', 'tonye2e@example.org', '--quota-gib', '10'],
+      ['create-user', E2E_USER, '--email', 'e2euser@example.org', '--quota-gib', '10'],
       's3cretpw\n',
     );
     expect(output).toMatch(/job 1 enqueued/);

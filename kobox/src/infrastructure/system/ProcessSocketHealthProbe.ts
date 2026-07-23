@@ -2,8 +2,8 @@ import { connect } from 'node:net';
 import type { HealthCheckResult, HealthProbePort } from '../../domain/user/ports.js';
 import type { CommandRunner } from './CommandRunner.js';
 
-// systemd "active" is not proof of life (prod: crashed rtorrent shown active,
-// Minio failed for 10 h unnoticed) — so probe the process table and the socket.
+// systemd "active" is not proof of life (a crashed rtorrent can still show
+// as "active", a failed service can look up) — probe the process and socket.
 export class ProcessSocketHealthProbe implements HealthProbePort {
   constructor(private readonly runner: CommandRunner) {}
 

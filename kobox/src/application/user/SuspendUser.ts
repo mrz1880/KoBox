@@ -20,7 +20,7 @@ interface Deps {
   readonly notifications: NotificationPort;
 }
 
-// Reversible kick (issue #39 / the user-h case): cut access, keep everything.
+// Reversible suspension (issue #39): cut all access, keep account and data.
 // Effects are re-applied even when already suspended so a partially failed
 // earlier run converges; only the state transition emits an event.
 export class SuspendUser {

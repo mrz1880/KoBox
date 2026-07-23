@@ -62,7 +62,7 @@ export interface HealthCheckResult {
   readonly detail?: string;
 }
 
-// Real probes (process alive, socket connects) — systemd "active" lied in prod
+// Real probes (process alive, socket connects) — systemd "active" is not proof
 // (crashed rtorrent still "active", Minio failed silently for 10 h).
 export interface HealthProbePort {
   checkProcess(processName: string): Promise<HealthCheckResult>;

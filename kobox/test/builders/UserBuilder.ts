@@ -6,8 +6,8 @@ import { SeedboxUser } from '../../src/domain/user/SeedboxUser.js';
 import { Username } from '../../src/domain/user/Username.js';
 
 export class UserBuilder {
-  private username = Username.parse('user-f');
-  private email = EmailAddress.parse('user-f@example.org');
+  private username = Username.parse('alice');
+  private email = EmailAddress.parse('alice@example.org');
   private readonly accountType = AccountType.normal;
   private quota = Quota.gib(412);
   private scgiPort = ScgiPort.parse(51101);

@@ -73,7 +73,7 @@ class FakePasswordHasher implements PasswordHasherPort {
   }
 }
 
-const user-f = Username.parse('user-f');
+const alice = Username.parse('alice');
 
 interface World {
   queue: InMemoryJobQueue;
@@ -124,8 +124,8 @@ describe('CLI enqueue -> root worker loop (the privilege seam)', () => {
   it('should_create_a_user_end_to_end_through_a_typed_job', async () => {
     const job = await buildJob.createUser(
       {
-        username: 'user-f',
-        email: 'user-f@example.org',
+        username: 'alice',
+        email: 'alice@example.org',
         accountType: 'normal',
         quotaGib: 412,
         proxyPort: 8080,
@@ -139,16 +139,16 @@ describe('CLI enqueue -> root worker loop (the privilege seam)', () => {
 
     expect(processed).toBe(true);
     expect(world.queue.statusOf(id)).toBe('done');
-    expect(await world.accounts.accountExists(user-f)).toBe(true);
+    expect(await world.accounts.accountExists(alice)).toBe(true);
     // rtorrent provisioning is Phase 1: create does not start a unit
-    expect(await world.services.isUserServiceRunning(user-f)).toBe(false);
+    expect(await world.services.isUserServiceRunning(alice)).toBe(false);
   });
 
   it('should_suspend_then_resume_via_jobs', async () => {
     const createJob = await buildJob.createUser(
       {
-        username: 'user-f',
-        email: 'user-f@example.org',
+        username: 'alice',
+        email: 'alice@example.org',
         accountType: 'normal',
         quotaGib: 412,
         proxyPort: 8080,
@@ -157,13 +157,13 @@ describe('CLI enqueue -> root worker loop (the privilege seam)', () => {
       world.hasher,
     );
     await world.queue.enqueue(createJob);
-    await world.queue.enqueue(buildJob.suspendUser({ username: 'user-f' }));
-    await world.queue.enqueue(buildJob.resumeUser({ username: 'user-f' }));
+    await world.queue.enqueue(buildJob.suspendUser({ username: 'alice' }));
+    await world.queue.enqueue(buildJob.resumeUser({ username: 'alice' }));
 
     await world.worker.drain();
 
-    expect(await world.accounts.isLocked(user-f)).toBe(false);
-    expect(await world.services.isUserServiceRunning(user-f)).toBe(true);
+    expect(await world.accounts.isLocked(alice)).toBe(false);
+    expect(await world.services.isUserServiceRunning(alice)).toBe(true);
   });
 
   it('should_mark_a_job_failed_with_its_error_and_keep_going', async () => {

@@ -47,13 +47,13 @@ class SequentialPortAllocator implements PortAllocatorPort {
   }
 }
 
-const user-f = Username.parse('user-f');
+const alice = Username.parse('alice');
 const aHash = HashedPassword.parse('$6$testsalt$0123456789abcdefghijklmnopqrstuv');
 
 function createUserCommand() {
   return {
-    username: user-f,
-    email: EmailAddress.parse('user-f@example.org'),
+    username: alice,
+    email: EmailAddress.parse('alice@example.org'),
     accountType: AccountType.normal,
     quota: Quota.gib(412),
     proxyPort: ProxyPort.parse(8080),
@@ -102,13 +102,13 @@ describe('CreateUser', () => {
 
     expect(user.id?.value).toBe(1);
     expect(user.scgiPort.value).toBe(51101);
-    expect(await world.accounts.accountExists(user-f)).toBe(true);
-    expect(world.accounts.passwordWasSetFor(user-f)).toBe(true);
-    expect(world.quota.quotaOf(user-f)?.toGib()).toBe(412);
-    expect(await world.sftp.isChrootAccessEnabled(user-f)).toBe(true);
+    expect(await world.accounts.accountExists(alice)).toBe(true);
+    expect(world.accounts.passwordWasSetFor(alice)).toBe(true);
+    expect(world.quota.quotaOf(alice)?.toGib()).toBe(412);
+    expect(await world.sftp.isChrootAccessEnabled(alice)).toBe(true);
     // Phase 0 does not provision rtorrent units — starting one is Phase 1's job
-    expect(await world.services.isUserServiceRunning(user-f)).toBe(false);
-    expect(world.notifications.published).toEqual([{ type: 'UserCreated', username: 'user-f' }]);
+    expect(await world.services.isUserServiceRunning(alice)).toBe(false);
+    expect(world.notifications.published).toEqual([{ type: 'UserCreated', username: 'alice' }]);
   });
 
   it('should_compensate_a_partial_failure_releasing_ports_and_account', async () => {
@@ -116,8 +116,8 @@ describe('CreateUser', () => {
 
     await expect(world.createUser.execute(createUserCommand())).rejects.toThrow(/exploded/);
 
-    expect(await world.accounts.accountExists(user-f)).toBe(false);
-    expect(await world.repo.findByUsername(user-f)).toBeUndefined();
+    expect(await world.accounts.accountExists(alice)).toBe(false);
+    expect(await world.repo.findByUsername(alice)).toBeUndefined();
 
     const retried = await world.createUser.execute(createUserCommand());
     expect(retried.scgiPort.value).toBe(51101); // released port is reusable
@@ -135,8 +135,8 @@ describe('CreateUser', () => {
     const first = await world.createUser.execute(createUserCommand());
     const second = await world.createUser.execute({
       ...createUserCommand(),
-      username: Username.parse('user-a'),
-      email: EmailAddress.parse('user-a@example.org'),
+      username: Username.parse('bob'),
+      email: EmailAddress.parse('bob@example.org'),
     });
 
     expect(second.scgiPort.equals(first.scgiPort)).toBe(false);
@@ -148,20 +148,20 @@ describe('DeleteUser', () => {
   it('should_tear_down_everything_and_notify', async () => {
     await world.createUser.execute(createUserCommand());
 
-    await world.deleteUser.execute({ username: user-f });
+    await world.deleteUser.execute({ username: alice });
 
-    expect(await world.accounts.accountExists(user-f)).toBe(false);
-    expect(await world.sftp.isChrootAccessEnabled(user-f)).toBe(false);
-    expect(await world.services.isUserServiceRunning(user-f)).toBe(false);
-    expect(await world.repo.findByUsername(user-f)).toBeUndefined();
+    expect(await world.accounts.accountExists(alice)).toBe(false);
+    expect(await world.sftp.isChrootAccessEnabled(alice)).toBe(false);
+    expect(await world.services.isUserServiceRunning(alice)).toBe(false);
+    expect(await world.repo.findByUsername(alice)).toBeUndefined();
     expect(world.notifications.published.at(-1)).toEqual({
       type: 'UserDeleted',
-      username: 'user-f',
+      username: 'alice',
     });
   });
 
   it('should_reject_deleting_an_unknown_user', async () => {
-    await expect(world.deleteUser.execute({ username: user-f })).rejects.toThrow(UserNotFoundError);
+    await expect(world.deleteUser.execute({ username: alice })).rejects.toThrow(UserNotFoundError);
   });
 });
 
@@ -169,17 +169,17 @@ describe('ChangePassword', () => {
   it('should_set_the_system_password_and_notify', async () => {
     await world.createUser.execute(createUserCommand());
 
-    await world.changePassword.execute({ username: user-f, passwordHash: aHash });
+    await world.changePassword.execute({ username: alice, passwordHash: aHash });
 
     expect(world.notifications.published.at(-1)).toEqual({
       type: 'PasswordChanged',
-      username: 'user-f',
+      username: 'alice',
     });
   });
 
   it('should_reject_unknown_users', async () => {
     await expect(
-      world.changePassword.execute({ username: user-f, passwordHash: aHash }),
+      world.changePassword.execute({ username: alice, passwordHash: aHash }),
     ).rejects.toThrow(UserNotFoundError);
   });
 });
@@ -188,49 +188,49 @@ describe('SuspendUser / ResumeUser', () => {
   it('should_suspend_reversibly_without_deleting_anything', async () => {
     await world.createUser.execute(createUserCommand());
 
-    await world.suspendUser.execute({ username: user-f });
+    await world.suspendUser.execute({ username: alice });
 
-    expect(await world.accounts.isLocked(user-f)).toBe(true);
-    expect(world.accounts.sessionsWereTerminatedFor(user-f)).toBe(true); // live SSH cut
-    expect(await world.sftp.isChrootAccessEnabled(user-f)).toBe(false);
-    expect(await world.services.isUserServiceRunning(user-f)).toBe(false);
-    expect(await world.accounts.accountExists(user-f)).toBe(true); // nothing deleted
-    expect((await world.repo.findByUsername(user-f))?.status.isSuspended()).toBe(true);
-    expect(world.quota.quotaOf(user-f)?.toGib()).toBe(412); // quota untouched
+    expect(await world.accounts.isLocked(alice)).toBe(true);
+    expect(world.accounts.sessionsWereTerminatedFor(alice)).toBe(true); // live SSH cut
+    expect(await world.sftp.isChrootAccessEnabled(alice)).toBe(false);
+    expect(await world.services.isUserServiceRunning(alice)).toBe(false);
+    expect(await world.accounts.accountExists(alice)).toBe(true); // nothing deleted
+    expect((await world.repo.findByUsername(alice))?.status.isSuspended()).toBe(true);
+    expect(world.quota.quotaOf(alice)?.toGib()).toBe(412); // quota untouched
     expect(world.notifications.published.at(-1)).toEqual({
       type: 'UserSuspended',
-      username: 'user-f',
+      username: 'alice',
     });
   });
 
   it('should_make_suspend_idempotent_and_convergent', async () => {
     await world.createUser.execute(createUserCommand());
-    await world.suspendUser.execute({ username: user-f });
+    await world.suspendUser.execute({ username: alice });
     const notificationCount = world.notifications.published.length;
 
-    await world.suspendUser.execute({ username: user-f });
+    await world.suspendUser.execute({ username: alice });
 
-    expect(await world.accounts.isLocked(user-f)).toBe(true);
+    expect(await world.accounts.isLocked(alice)).toBe(true);
     expect(world.notifications.published.length).toBe(notificationCount); // no duplicate event
   });
 
   it('should_resume_back_to_full_service', async () => {
     await world.createUser.execute(createUserCommand());
-    await world.suspendUser.execute({ username: user-f });
+    await world.suspendUser.execute({ username: alice });
 
-    await world.resumeUser.execute({ username: user-f });
+    await world.resumeUser.execute({ username: alice });
 
-    expect(await world.accounts.isLocked(user-f)).toBe(false);
-    expect(await world.sftp.isChrootAccessEnabled(user-f)).toBe(true);
-    expect(await world.services.isUserServiceRunning(user-f)).toBe(true);
-    expect((await world.repo.findByUsername(user-f))?.status.isSuspended()).toBe(false);
+    expect(await world.accounts.isLocked(alice)).toBe(false);
+    expect(await world.sftp.isChrootAccessEnabled(alice)).toBe(true);
+    expect(await world.services.isUserServiceRunning(alice)).toBe(true);
+    expect((await world.repo.findByUsername(alice))?.status.isSuspended()).toBe(false);
     expect(world.notifications.published.at(-1)).toEqual({
       type: 'UserResumed',
-      username: 'user-f',
+      username: 'alice',
     });
   });
 
   it('should_reject_suspending_an_unknown_user', async () => {
-    await expect(world.suspendUser.execute({ username: user-f })).rejects.toThrow(UserNotFoundError);
+    await expect(world.suspendUser.execute({ username: alice })).rejects.toThrow(UserNotFoundError);
   });
 });
