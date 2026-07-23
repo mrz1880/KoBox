@@ -311,6 +311,32 @@ sans runtime devient bloquante, réévaluer Go pour la seule couche CLI.
 runtime, langue non-native) ; **Python** (bon 2e choix ops+web, mais typage runtime < TS strict,
 langue non-native). **Rust/Elixir** : hors-scope (techno-showcase, viole boring-first).
 
+#### ADR perf & budget ressources (le runtime TS est-il un problème sur la seedbox ?)
+
+Question légitime : Node est-il trop lourd pour une seedbox « limitée » ? Réponse ancrée sur
+les mesures prod (`docs/PROD-INSPECTION.md`) et le fait que **le prochain serveur sera
+identique** (confirmé) : **15 GiO RAM / 4 vCPU, load 0.40**, et ce **déjà** avec 8× rtorrent +
+MariaDB + nginx + php-fpm + bind + dnscrypt + 3× OpenVPN + Samba + NFS + netdata + docker.
+
+- **Charge I/O-bound, pas CPU-bound.** KoBox orchestre (shell-out apt/systemctl/useradd/
+  iptables), rend des fichiers de conf, fait du CRUD et sert un admin à ~8 users. Le travail
+  lourd (transfert torrent, chiffrement VPN) est fait par rtorrent/openvpn/kernel — pas par
+  KoBox. Le runtime du langage n'influe quasiment pas sur le débit.
+- **Empreinte mémoire** : web + worker Node ≈ 100–150 Mo RSS ; un binaire Go ≈ 20–40 Mo. Sur
+  ~14 GiO dispo, le delta est du bruit (un seul rtorrent consomme davantage).
+- **Seul chemin perf-sensible** : les hooks d'événements rtorrent (`finished`/`inserted_new`)
+  qui peuvent tirer 100×/min ⇒ un cold-start Node par event serait coûteux. **Neutralisé par
+  l'archi** : les hooks sont des shims de 5 lignes qui parlent à un **daemon KoBox déjà chaud**
+  (socket/HTTP), pas un spawn Node par event → sub-ms.
+- **Escape hatch dans le langage** si le footprint devenait critique un jour : **Bun** ou
+  binaire compilé (`bun build --compile` / Node SEA) — avant même d'envisager Go.
+
+**Verdict** : sur les ressources seules, Go a un léger avantage (footprint/cold-start/binaire
+unique), mais **immatériel sur ce hardware** (identique au prochain serveur) et écrasé par le
+gain de maintenabilité TS. **Décision TypeScript verrouillée.** Le seul scénario qui l'aurait
+inversée — cibler une box beaucoup plus petite (VPS 512 Mo–1 Go) — est **écarté** (serveur
+cible identique).
+
 ### 3.2 Choix DB — argumenté
 
 Le domaine est **franchement relationnel** (27 tables MySQL avec FK, la file `commands`, les
