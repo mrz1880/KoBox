@@ -8,7 +8,7 @@ export class InvalidHashedPasswordError extends DomainError {
 
 // Only strong crypt(3) formats. Rejecting anything else guarantees a plaintext
 // can never end up in the persisted job queue or in usermod -p argv.
-const CRYPT_HASH_PATTERN = /^\$(6|y)\$[A-Za-z0-9./=,$-]+$/;
+export const CRYPT_HASH_PATTERN = /^\$(6|y)\$[A-Za-z0-9./=,$-]+$/;
 
 export class HashedPassword {
   private constructor(readonly value: string) {}

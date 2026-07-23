@@ -6,7 +6,7 @@ export class InvalidUsernameError extends DomainError {
   }
 }
 
-const USERNAME_PATTERN = /^[a-z][a-z0-9]{0,31}$/;
+export const USERNAME_PATTERN = /^[a-z][a-z0-9]{0,31}$/;
 
 export class Username {
   // Shell-safety relies on this charset: adapters pass the value as execFile argv,
