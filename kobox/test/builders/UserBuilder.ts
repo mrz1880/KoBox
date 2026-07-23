@@ -11,7 +11,7 @@ export class UserBuilder {
   private readonly accountType = AccountType.normal;
   private quota = Quota.gib(412);
   private scgiPort = ScgiPort.parse(51101);
-  private readonly rtorrentPort = RtorrentPort.parse(45000);
+  private rtorrentPort = RtorrentPort.parse(45000);
   private readonly proxyPort = ProxyPort.parse(8080);
 
   withUsername(raw: string): this {
@@ -31,6 +31,11 @@ export class UserBuilder {
 
   withScgiPort(port: number): this {
     this.scgiPort = ScgiPort.parse(port);
+    return this;
+  }
+
+  withRtorrentPort(port: number): this {
+    this.rtorrentPort = RtorrentPort.parse(port);
     return this;
   }
 
