@@ -205,8 +205,9 @@ Sept contextes, alignés sur le langage métier découvert. Chacun devient un mo
 | 4 | **Tracker & Blocklist** | Trackers, certs SSL par tracker, whitelist, blocklists | `Tracker`, `Blocklist` | **Core (signature)** |
 | 5 | **Security & Network** | Firewall, fail2ban, DynDNS restrict, VPN, DNS | `FirewallPolicy` | Core |
 | 6 | **Portal & Access** | Admin web, auth, dispatch des intentions | `AdminSession`, `Job` | Interface + Application |
-| 7 | **Maintenance & Ops** | Upgrades, backups, mail/outbox, cron, monitoring | `UpgradePlan`, `Outbox` | Support |
-| (7b) | **Billing** (candidat) | Renting, treasury, payments | `RentPeriod` | Generic (extractible) |
+| 7 | **Maintenance & Ops** | Upgrades, backups, mail/outbox, cron | `UpgradePlan`, `Outbox` | Support |
+| 8 | **Observability & Fair-use** | Métering par user, sondes de santé, politique fair-use, réponse graduée, alertes | `FairUsePolicy`, `HealthCheck` | **Core (le pain user-h)** |
+| (8b) | **Billing** (candidat) | Renting, treasury, payments | `RentPeriod` | Generic (extractible) |
 
 ### Value Objects candidats (no primitive obsession)
 
@@ -215,7 +216,10 @@ Sept contextes, alignés sur le langage métier découvert. Chacun devient un mo
 `ScgiPort`, `RtorrentPort`, `AccountType`, `EmailAddress`, `TrackerHost` (FQDN shell-safe),
 `TrackerProto` (http/https/udp), `CertExpiry`, `IpAddress`/`Cidr`, `DynDnsHost`, `BlocklistUrl`,
 `JailName`, `VpnConfig`, `Version` (semver-ish, `isNewerThan`), `Revision`, `CronSchedule`,
-`SmtpCredentials` (encapsule le secret), `MailUseCase` (enum fermé), `RentPeriod`, `Treasury`.
+`SmtpCredentials` (encapsule le secret), `MailUseCase` (enum fermé), `RentPeriod`, `Treasury`,
+`Bandwidth` (bit/s), `EgressRate`/`ConnectionRate` (fenêtre glissante), `FairUsePolicy` /
+`ResourceBudget` (par user : egress soutenu, taux conn, quota), `Threshold`, `UserStatus`
+(active/suspended), `HealthStatus`, `AlertChannel` (ntfy/email/discord).
 
 Règle : `string`/`int`/`bool` bruts **uniquement à la frontière I/O** (parse Zod → VO à
 l'entrée, VO → string à la sortie). « Parse, don't validate ».
@@ -442,6 +446,48 @@ Tout le reste (apt, systemctl, useradd, iptables, chmod/chown, openssl) devient 
 la logique métier sans toucher une vraie machine ; on teste les adapters en intégration dans un
 conteneur Debian 12 privilégié.
 
+### 3.7 Observabilité & gouvernance fair-use (le cas user-h)
+
+**Cause racine du cas user-h (2026-07-23)** : ce n'est **pas** l'absence de dashboard (NetData
+tournait) mais l'absence de **(1) attribution par utilisateur**, **(2) alerte push**, et
+**(3) réponse graduée automatique**. user-h a saturé l'upstream (1979 connexions SSH/jour, rsync
+en boucle) → throttling fair-use du provider → box dégradée → détecté seulement quand the owner s'est
+plaint, après des reboots. « Vraie observabilité » KoBox = **actionnable et par-user**, pas un
+dashboard de plus que personne ne regarde.
+
+**Trois couches** :
+
+1. **Instrumentation** (cross-cutting, fondation — dès Phase 0) : logs JSON structurés,
+   endpoint `/metrics` Prometheus (scrape optionnel), et **sondes de santé réelles**
+   (process + socket, pas l'état systemd) — aurait attrapé le `rtorrent` crashé-mais-« active »
+   et le **Minio `failed` silencieux 10 h** vus en prod. Ports : `ObservabilityPort`,
+   `MetricsPort`, `HealthProbePort`.
+2. **Métering par utilisateur** (contexte Security & Network) : `UsageMeterPort` lit l'usage
+   réel **par uid** — egress/ingress (compteurs iptables `-m owner` / stats tc), taux de
+   connexion & d'auth SSH (journald — **là où fail2ban est aveugle** car clé publique valide),
+   disque/quota, nb torrents. Rattaché à l'agrégat `SeedboxUser`.
+3. **Gouvernance fair-use** (le gain) : VO `FairUsePolicy`/`ResourceBudget` par user ; service
+   planifié `FairUseEvaluator` (domaine) compare observé vs policy → émet des events de domaine
+   (`FairUseBreached`, `AbnormalAuthRate`, `ServiceUnhealthy`) → politique de **réponse graduée**.
+
+**Décisions figées (the maintainer 2026-07-23)** :
+- **Réponse graduée** : `alerte` → (si persiste) `throttle auto` via `ShapingPort` (tc/HTB — le
+  script déjà testé sur user-h) → **la suspension reste manuelle** (`SuspendUser`, décidée par
+  the maintainer). Réversible et auditée (events + historique) ; évite de couper un user légitime sur
+  un faux positif (bus factor 1).
+- **Canaux d'alerte** : **ntfy + email + Discord** via `NotificationPort` multi-canal (email
+  réutilise le relais Postfix ; ntfy déjà utilisé sur le NAS ; Discord pour the owner/les users).
+
+**Honnêteté (anti-overkill)** : un stack complet Prometheus + Grafana + Loki + Alertmanager +
+tracing OTel pour **8 users / 1 mainteneur** est disproportionné. Reco **légère** : logs
+structurés + `/metrics` optionnel + `FairUseEvaluator` + push. On **garde NetData** (déjà en
+place) pour l'œil host ; Grafana/scrape Prometheus restent branchables plus tard sans rien
+réécrire (l'endpoint est là).
+
+**Placement** : instrumentation + sondes de santé en **Phase 0** (fondation) ; métering par-user
++ `FairUseEvaluator` + throttle en **Phase 3 (Security & Network)**, quand le contexte réseau
+existe. La suspension auto-déclenchable réutilise `SuspendUser` (Phase 0).
+
 ---
 
 ## 4. Stratégie de test
@@ -599,6 +645,9 @@ Livrables Phase 0 :
 - Use cases `CreateUser`/`DeleteUser`/`ChangePassword`/**`SuspendUser`/`ResumeUser`** avec
   pyramide de tests complète.
 - Le worker root + file de Jobs typée (le redesign §3.5) en germe.
+- **Instrumentation fondation** (§3.7 couche 1) : logs JSON structurés, `/metrics`, sondes de
+  santé réelles + `NotificationPort` multi-canal (ntfy/email/discord) — posé dès Phase 0 car
+  cross-cutting.
 - E2E : conteneur Debian 12 → `kobox create-user` → compte + quota + chroot vérifiés, puis
   `kobox suspend-user` → SSH/FTP/rTorrent coupés, `kobox resume-user` → tout restauré.
 
@@ -620,8 +669,10 @@ tranche.
    watch dirs, shims d'événements. (Valeur haute, ressenti user direct.)
 2. **Tracker & Blocklist** — la feature signature (cert par tracker) ; VO `TrackerHost`
    shell-safe ; supprime l'injection root §5.1.
-3. **Security & Network** — firewall/fail2ban déclaratifs, DynDNS restrict, VPN. (Risque haut :
-   ne pas se verrouiller dehors → E2E robustes d'abord.)
+3. **Security & Network + Observabilité fair-use** — firewall/fail2ban déclaratifs, DynDNS
+   restrict, VPN **+ métering par-user + `FairUseEvaluator` + throttle gradué** (§3.7 couches 2-3 ;
+   règle fail2ban « publickey flood »). (Risque haut : ne pas se verrouiller dehors → E2E robustes
+   d'abord.) → **c'est la tranche qui neutralise le cas user-h de bout en bout.**
 4. **Installation & Provisioning** — l'orchestrateur de composants en TS (remplace `MySB.bsh`).
 5. **Maintenance & Ops** — upgrades transactionnels, outbox mail, cron/worker, monitoring.
 6. **Portal & Access** — dernière tranche : le portail SSR complet remplace le thème Wolf CMS ;
