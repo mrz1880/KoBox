@@ -25,13 +25,25 @@ import { FakeSystemAccounts } from '../../../../src/infrastructure/system/fakes/
 class SequentialPortAllocator implements PortAllocatorPort {
   private nextScgi = 51101;
   private nextRtorrent = 45000;
+  private readonly freedScgi: number[] = [];
+  private readonly freedRtorrent: number[] = [];
 
   allocateScgiPort(): Promise<ScgiPort> {
-    return Promise.resolve(ScgiPort.parse(this.nextScgi++));
+    return Promise.resolve(ScgiPort.parse(this.freedScgi.shift() ?? this.nextScgi++));
   }
 
   allocateRtorrentPort(): Promise<RtorrentPort> {
-    return Promise.resolve(RtorrentPort.parse(this.nextRtorrent++));
+    return Promise.resolve(RtorrentPort.parse(this.freedRtorrent.shift() ?? this.nextRtorrent++));
+  }
+
+  releaseScgiPort(port: ScgiPort): Promise<void> {
+    this.freedScgi.push(port.value);
+    return Promise.resolve();
+  }
+
+  releaseRtorrentPort(port: RtorrentPort): Promise<void> {
+    this.freedRtorrent.push(port.value);
+    return Promise.resolve();
   }
 }
 
@@ -94,8 +106,21 @@ describe('CreateUser', () => {
     expect(world.accounts.passwordWasSetFor(user-f)).toBe(true);
     expect(world.quota.quotaOf(user-f)?.toGib()).toBe(412);
     expect(await world.sftp.isChrootAccessEnabled(user-f)).toBe(true);
-    expect(await world.services.isUserServiceRunning(user-f)).toBe(true);
+    // Phase 0 does not provision rtorrent units — starting one is Phase 1's job
+    expect(await world.services.isUserServiceRunning(user-f)).toBe(false);
     expect(world.notifications.published).toEqual([{ type: 'UserCreated', username: 'user-f' }]);
+  });
+
+  it('should_compensate_a_partial_failure_releasing_ports_and_account', async () => {
+    world.quota.failNextSetQuota('quota tooling exploded');
+
+    await expect(world.createUser.execute(createUserCommand())).rejects.toThrow(/exploded/);
+
+    expect(await world.accounts.accountExists(user-f)).toBe(false);
+    expect(await world.repo.findByUsername(user-f)).toBeUndefined();
+
+    const retried = await world.createUser.execute(createUserCommand());
+    expect(retried.scgiPort.value).toBe(51101); // released port is reusable
   });
 
   it('should_reject_duplicate_usernames', async () => {
@@ -166,6 +191,7 @@ describe('SuspendUser / ResumeUser', () => {
     await world.suspendUser.execute({ username: user-f });
 
     expect(await world.accounts.isLocked(user-f)).toBe(true);
+    expect(world.accounts.sessionsWereTerminatedFor(user-f)).toBe(true); // live SSH cut
     expect(await world.sftp.isChrootAccessEnabled(user-f)).toBe(false);
     expect(await world.services.isUserServiceRunning(user-f)).toBe(false);
     expect(await world.accounts.accountExists(user-f)).toBe(true); // nothing deleted

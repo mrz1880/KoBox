@@ -9,7 +9,6 @@ import type { Username } from '../../domain/user/Username.js';
 import type {
   NotificationPort,
   QuotaPort,
-  ServiceControlPort,
   SftpPort,
   SystemAccountPort,
   UserRepository,
@@ -30,7 +29,6 @@ interface Deps {
   readonly accounts: SystemAccountPort;
   readonly quota: QuotaPort;
   readonly sftp: SftpPort;
-  readonly services: ServiceControlPort;
   readonly notifications: NotificationPort;
   readonly allocator: PortAllocatorPort;
 }
@@ -39,14 +37,20 @@ export class CreateUser {
   constructor(private readonly deps: Deps) {}
 
   async execute(command: CreateUserCommand): Promise<SeedboxUser> {
-    const { repo, accounts, quota, sftp, services, notifications, allocator } = this.deps;
+    const { repo, accounts, quota, sftp, notifications, allocator } = this.deps;
 
     if (await repo.findByUsername(command.username)) {
       throw new UserAlreadyExistsError(command.username.value);
     }
 
     const scgiPort = await allocator.allocateScgiPort();
-    const rtorrentPort = await allocator.allocateRtorrentPort();
+    let rtorrentPort;
+    try {
+      rtorrentPort = await allocator.allocateRtorrentPort();
+    } catch (error) {
+      await allocator.releaseScgiPort(scgiPort);
+      throw error;
+    }
     const { user, event } = SeedboxUser.create({
       username: command.username,
       email: command.email,
@@ -57,13 +61,25 @@ export class CreateUser {
       proxyPort: command.proxyPort,
     });
 
-    await accounts.createAccount(user.username);
-    await accounts.setPassword(user.username, command.passwordHash);
-    await quota.setQuota(user.username, user.quota);
-    await sftp.enableChrootAccess(user.username);
-    await services.startUserService(user.username);
-    const saved = await repo.save(user);
-    await notifications.notify(event);
-    return saved;
+    // rtorrent unit start is deliberately absent: Phase 1 owns provisioning.
+    let accountCreated = false;
+    try {
+      await accounts.createAccount(user.username);
+      accountCreated = true;
+      await accounts.setPassword(user.username, command.passwordHash);
+      await quota.setQuota(user.username, user.quota);
+      await sftp.enableChrootAccess(user.username);
+      const saved = await repo.save(user);
+      await notifications.notify(event);
+      return saved;
+    } catch (error) {
+      // Compensate so a retry starts clean: no orphan account, no leaked port.
+      if (accountCreated) {
+        await accounts.deleteAccount(user.username).catch(() => undefined);
+      }
+      await allocator.releaseScgiPort(scgiPort).catch(() => undefined);
+      await allocator.releaseRtorrentPort(rtorrentPort).catch(() => undefined);
+      throw error;
+    }
   }
 }

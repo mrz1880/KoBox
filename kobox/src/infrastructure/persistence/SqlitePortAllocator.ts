@@ -18,6 +18,16 @@ export class SqlitePortAllocator implements PortAllocatorPort {
     return Promise.resolve(RtorrentPort.parse(this.claim('rtorrent', RTORRENT_BASE)));
   }
 
+  releaseScgiPort(port: ScgiPort): Promise<void> {
+    this.db.orm.delete(allocatedPorts).where(eq(allocatedPorts.port, port.value)).run();
+    return Promise.resolve();
+  }
+
+  releaseRtorrentPort(port: RtorrentPort): Promise<void> {
+    this.db.orm.delete(allocatedPorts).where(eq(allocatedPorts.port, port.value)).run();
+    return Promise.resolve();
+  }
+
   // Atomicity: the whole find-lowest-free + INSERT runs inside one immediate
   // (write-locked) transaction; the primary key on port is the final arbiter.
   private claim(kind: 'scgi' | 'rtorrent', base: number): number {

@@ -66,15 +66,26 @@ describe('SystemAccountAdapter', () => {
     expect(call?.stdin).toBe(`user-f:${aHash.value}\n`);
   });
 
-  it('should_lock_and_unlock_with_usermod', async () => {
+  it('should_lock_with_password_lock_plus_account_expiry_and_unlock_both', async () => {
     const runner = new RecordingRunner();
     const adapter = new SystemAccountAdapter(runner);
 
     await adapter.lockAccount(user-f);
     await adapter.unlockAccount(user-f);
 
-    expect(runner.calls.map((c) => [c.command, ...c.args].join(' '))).toContain('usermod -L user-f');
-    expect(runner.calls.map((c) => [c.command, ...c.args].join(' '))).toContain('usermod -U user-f');
+    const lines = runner.calls.map((c) => [c.command, ...c.args].join(' '));
+    // -e 1 expires the account: blocks pubkey SSH too, not just password auth
+    expect(lines).toContain('usermod -L -e 1 user-f');
+    expect(lines).toContain('usermod -U -e  user-f');
+  });
+
+  it('should_terminate_live_sessions_tolerating_none', async () => {
+    const runner = new RecordingRunner();
+    runner.onCommand('pkill', { exitCode: 1 }); // exit 1 = no processes matched
+    const adapter = new SystemAccountAdapter(runner);
+
+    await expect(adapter.terminateSessions(user-f)).resolves.toBeUndefined();
+    expect(runner.argvOf('pkill')).toEqual(['-KILL', '-u', 'user-f']);
   });
 
   it('should_report_lock_state_from_passwd_S', async () => {
@@ -169,6 +180,20 @@ describe('SystemdServiceControlAdapter', () => {
     const adapter = new SystemdServiceControlAdapter(runner);
 
     expect(await adapter.isUserServiceRunning(user-f)).toBe(false);
+  });
+
+  it('should_tolerate_a_missing_unit_but_fail_on_real_errors', async () => {
+    const missingUnit = new RecordingRunner();
+    missingUnit.onCommand('systemctl', { exitCode: 5, stderr: 'Unit not loaded.' });
+    const adapter = new SystemdServiceControlAdapter(missingUnit);
+    // Phase 0 has not provisioned rtorrent units yet (Phase 1 does)
+    await expect(adapter.stopUserService(user-f)).resolves.toBeUndefined();
+    await expect(adapter.startUserService(user-f)).resolves.toBeUndefined();
+
+    const realError = new RecordingRunner();
+    realError.onCommand('systemctl', { exitCode: 1, stderr: 'Failed to start' });
+    const failing = new SystemdServiceControlAdapter(realError);
+    await expect(failing.startUserService(user-f)).rejects.toThrow(/exit 1/);
   });
 });
 

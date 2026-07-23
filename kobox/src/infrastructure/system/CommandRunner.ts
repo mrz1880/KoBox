@@ -57,6 +57,9 @@ export class ExecFileRunner implements CommandRunner {
         },
       );
       if (request.stdin !== undefined) {
+        // EPIPE from a child that died before reading stdin must not crash us;
+        // the exit-code path already reports the failure
+        child.stdin?.on('error', () => undefined);
         child.stdin?.write(request.stdin);
         child.stdin?.end();
       }

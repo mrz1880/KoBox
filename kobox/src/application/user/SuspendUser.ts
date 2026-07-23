@@ -36,6 +36,7 @@ export class SuspendUser {
 
     const { user: suspended, event } = user.suspend();
     await accounts.lockAccount(suspended.username);
+    await accounts.terminateSessions(suspended.username);
     await sftp.disableChrootAccess(suspended.username);
     await services.stopUserService(suspended.username);
     await repo.save(suspended);

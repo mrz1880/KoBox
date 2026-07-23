@@ -30,11 +30,25 @@ export class SystemAccountAdapter implements SystemAccountPort {
   }
 
   async lockAccount(username: Username): Promise<void> {
-    await runOrThrow(this.runner, { command: 'usermod', args: ['-L', username.value] });
+    // -L locks the password; -e 1 expires the account so pubkey SSH is refused
+    // too (usermod -L alone leaves authorized_keys logins working).
+    await runOrThrow(this.runner, { command: 'usermod', args: ['-L', '-e', '1', username.value] });
   }
 
   async unlockAccount(username: Username): Promise<void> {
-    await runOrThrow(this.runner, { command: 'usermod', args: ['-U', username.value] });
+    // empty -e clears the expiry, restoring the exact pre-suspend state
+    await runOrThrow(this.runner, { command: 'usermod', args: ['-U', '-e', '', username.value] });
+  }
+
+  async terminateSessions(username: Username): Promise<void> {
+    const result = await this.runner.run({
+      command: 'pkill',
+      args: ['-KILL', '-u', username.value],
+    });
+    // exit 1 = no processes matched: an idle user is not an error
+    if (result.exitCode > 1) {
+      throw new Error(`pkill failed with exit ${String(result.exitCode)}: ${result.stderr}`);
+    }
   }
 
   async accountExists(username: Username): Promise<boolean> {

@@ -2,7 +2,6 @@
 import { Command } from 'commander';
 import { AccountType } from '../../domain/user/AccountType.js';
 import { EmailAddress } from '../../domain/user/EmailAddress.js';
-import { HashedPassword } from '../../domain/user/HashedPassword.js';
 import { Password } from '../../domain/user/Password.js';
 import { ProxyPort } from '../../domain/user/Port.js';
 import { Quota } from '../../domain/user/Quota.js';
@@ -60,7 +59,7 @@ program
         accountType: AccountType.parse(options.accountType ?? 'normal'),
         quota: Quota.gib(Number(options.quotaGib ?? '412')),
         proxyPort: ProxyPort.parse(Number(options.proxyPort ?? '8080')),
-        passwordHash: HashedPassword.parse(hash.value),
+        passwordHash: hash,
       });
       await done(c, `user ${username} created`);
       return;
@@ -146,7 +145,8 @@ program
     const c = container();
     const users = await c.repo.listAll();
     const checks = [];
-    for (const user of users) {
+    // suspended users' services are down on purpose — do not probe them
+    for (const user of users.filter((u) => !u.status.isSuspended())) {
       checks.push(await c.healthProbe.checkSocket('127.0.0.1', user.scgiPort.value));
     }
     checks.push(await c.healthProbe.checkProcess('rtorrent'));
