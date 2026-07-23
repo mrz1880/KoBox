@@ -1,0 +1,58 @@
+# CI for the kobox/ rewrite only — legacy MySB workflows are untouched.
+name: kobox-ci
+
+on:
+  push:
+    branches: ['**']
+    paths: ['kobox/**', '.github/workflows/kobox-ci.yml']
+  pull_request:
+    paths: ['kobox/**', '.github/workflows/kobox-ci.yml']
+
+defaults:
+  run:
+    working-directory: kobox
+
+jobs:
+  fast:
+    name: lint + typecheck + unit + component + contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: kobox/package.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: kobox/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm coverage
+      - run: pnpm build
+
+  debian12:
+    name: integration + e2e (Debian 12 privileged)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Debian 12 systemd image
+        run: docker compose -f docker/docker-compose.yml build
+      - name: Boot container
+        run: |
+          docker compose -f docker/docker-compose.yml up -d
+          sleep 5
+          docker exec kobox-dev systemctl is-system-running --wait || true
+      - name: Install dependencies in container
+        run: docker exec kobox-dev bash -lc 'cd /opt/KoBox/kobox && corepack enable pnpm && pnpm install --frozen-lockfile'
+      - name: Integration tests (real system adapters)
+        run: docker exec kobox-dev bash -lc 'cd /opt/KoBox/kobox && pnpm test:int'
+      - name: E2E (create -> suspend -> resume -> delete)
+        run: docker exec kobox-dev bash -lc 'cd /opt/KoBox/kobox && pnpm build && pnpm test:e2e'
+      - name: Teardown
+        if: always()
+        run: docker compose -f docker/docker-compose.yml down -v
