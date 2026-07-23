@@ -19,6 +19,9 @@ describe('FakeSystemAccounts', () => {
 
     await accounts.createAccount(user-f);
     expect(await accounts.accountExists(user-f)).toBe(true);
+    expect(await accounts.isLocked(user-f)).toBe(true); // Debian: no password yet
+
+    await accounts.setPassword(user-f, aHash);
     expect(await accounts.isLocked(user-f)).toBe(false);
 
     await accounts.lockAccount(user-f);
