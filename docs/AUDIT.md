@@ -680,3 +680,45 @@ Audit read-only mené par 6 explorations parallèles (installation, user managem
 lifecycle, security & network, portail, maintenance) + vérifications directes (schéma MySQL,
 grants sudo, CI GitLab, schémas SQLite). Aucun fichier de code modifié. Références `fichier:ligne`
 sur `MySB@083101d`.
+
+---
+
+## Annexe B — Leçons des issues upstream (bugs réels rapportés)
+
+Revue des issues GitHub `toulousain79/MySB` (19 ouvertes, projet abandonné — l'owner confirme
+en 2023 sur #122 qu'il n'y touche plus). Elles **corroborent l'audit avec des pannes vécues**
+et révèlent des features jamais livrées en 5 ans que KoBox doit intégrer d'emblée.
+
+**Bugs récurrents → confirment les anti-patterns §5** :
+
+| Issue(s) | Symptôme réel | Corrobore / implication KoBox |
+|---|---|---|
+| **#122** (open), #100, #119, #79, #51, #62, #64, #66, #67 | **Install brique le serveur** (Hetzner : plus de ping après 5 min ; échecs Debian 9/10, Kimsufi, « étape 14 », certbot, `/var/log/nginx` manquant, locales, DNS) | Le **#1 pain historique** = installeur destructif/fragile. Valide **E2E install en conteneur/VM privilégié + adapters idempotents** avant toute vraie machine (§4, §3.6) |
+| **#120** | Ajout torrent → « Action non autorisée » **et** règle iptables PGL bloque le sortant hors 80/443 (YGG :8080) | Couplage **command-bus (sudo) ↔ firewall/blocklist** = exactement §5.1 + §1.5. KoBox : worker typé + politique réseau découplée |
+| **#117** (open) | Listes de blocage à abonnement périmé **bloquent la MAJ des listes standards** ; pas d'alerte | Blocklist sans résilience/erreur (§5.6). KoBox : `Blocklist` VO + désactivation auto + alerte |
+| #101 | `rpc.rquotad` **100 % CPU** (régression quota IPv6 Buster, couplé NFS) | Sous-système quota fragile + couplé NFS. KoBox : `Quota` adapter testable, découplé |
+| #72 | **Calcul quota faux** : impossible de fixer un quota > espace libre car l'espace déjà utilisé par l'user n'est pas compté | Bug d'invariant. KoBox : `Quota` VO, max réglable = `used_by_user + free` |
+| #107, #91, #58 | **Synchro post-download flaky/partielle** | Confirme le drift `sync_mode` **live** (`PROD-INSPECTION.md §5`). Contexte Sync à rendre déterministe |
+| #114, #78, #112 | Upgrade / self-update fragile (process de fin inutile, reconstruction cron via GitHubRepoUpdate) | Confirme §5.6. KoBox : upgrades transactionnels/versionnés |
+| #95, #94, #106 | rTorrent/ruTorrent **mauvaise combinaison de versions**, perte temporaire de config SSL | Build-from-source fragile. KoBox : versions pinnées + packaging propre |
+
+**Features jamais livrées (5 ans) → à intégrer first-class dans KoBox** :
+
+- **#39 « Pouvoir suspendre un utilisateur »** → capability **User Management (Phase 0)**. C'est
+  exactement le cas *user-h* vécu (kick manuel réversible). Doit être une opération de domaine
+  `SuspendUser`/`ResumeUser`, pas un hack sudoers.
+- **#65 « Annuler une modification du portail »** → renforce le modèle **desired-state** + un
+  historique/undo. C'est le pendant exact de la régénération destructive (§5.2) : l'utilisateur
+  réclame un undo que l'architecture actuelle rend impossible.
+- **#56 / #69 / #43 « Table des ports exploités » + « modifier les ports »** → valide le VO
+  `Port` / `PortAllocator` explicite (§2), qui résout la primitive obsession + les races
+  d'allocation `max()+1` (§5.3).
+
+**Backlog post-v1 (demandes utiles, non bloquantes)** : #47 (faire transiter rTorrent par un
+VPN **client** type NordVPN — jamais résolu, l'owner s'y est cassé les dents sur le bridge/iptables),
+#49 (Plex multi-user), #50 (Pi-Hole), #38 (mail de rappel par user — lié au sous-domaine Billing),
+#44 (héberger un site perso), #42 (changer le FQDN).
+
+**Signal stratégique** : aucune issue ne contredit l'archi cible ; toutes pointent vers les
+mêmes causes racines (installeur non testable, couplages implicites, primitive obsession,
+régen sans undo). Le rewrite adresse la cause, pas les symptômes.
