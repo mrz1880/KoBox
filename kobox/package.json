@@ -1,0 +1,46 @@
+{
+  "name": "kobox",
+  "version": "0.0.1",
+  "private": true,
+  "description": "KoBox — multi-user seedbox manager (Phase 0: User Management)",
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "better-sqlite3",
+      "esbuild"
+    ]
+  },
+  "scripts": {
+    "lint": "eslint src test",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run test/unit test/component test/contract",
+    "test:unit": "vitest run test/unit",
+    "test:component": "vitest run test/component",
+    "test:contract": "vitest run test/contract",
+    "test:int": "vitest run test/integration",
+    "test:e2e": "vitest run test/e2e",
+    "coverage": "vitest run test/unit test/component test/contract --coverage",
+    "build": "tsc -p tsconfig.build.json"
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.4.1",
+    "commander": "^14.0.2",
+    "drizzle-orm": "^0.44.7",
+    "pino": "^10.1.0",
+    "zod": "^4.1.12"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^24.10.1",
+    "@vitest/coverage-v8": "^4.0.9",
+    "drizzle-kit": "^0.31.6",
+    "eslint": "^9.39.1",
+    "fast-check": "^4.5.3",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.46.4",
+    "vitest": "^4.0.9"
+  }
+}
