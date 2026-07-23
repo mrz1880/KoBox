@@ -644,35 +644,29 @@ Décisions à trancher (chacune bloque le scaffolding ou en change la forme) :
 
 ### Périmètre v1 figé (post-inspection prod)
 
-**KEEP — cœur, confirmé utilisé en prod** :
+**KEEP — cœur + tous les services** (directive the maintainer 2026-07-23 : « garde tous les
+services » ; Minio réparé ; NextCloud utilisé par certains) :
 rTorrent/ruTorrent + plugins (4283 torrents), Tracker & cert SSL par tracker (46 trackers
 privés), Blocklist/PeerGuardian, DNScrypt + Bind, Fail2ban **(+ nouvelle règle « publickey
 flood »)**, Let's Encrypt, Postfix/mail, **Portail réécrit** (même URL `:8189` + auth, design
 libre — voir ci-dessous), sFTP chroot, **Quota → hard** (aujourd'hui soft uniquement),
-Security/firewall, **NFS** (exports actifs user-a+user-b).
+Security/firewall, **NFS** (actif), **OpenVPN** (TUN/TAP, avec/sans GW), **Samba**,
+**Minio** (réparé), **NextCloud** (utilisé), **Docker** (capability — modules compose futurs),
+**NetData**.
 
-**DROP v1 — preuve dure d'inutilisation** :
+**PENDING the owner (question 2 : UIs alternatives) — défaut KEEP** en attendant sa réponse :
+Cakebox-Light, Seedbox-Manager, ShellInABox, Webmin. On ne drop rien tant que ce n'est pas
+tranché ; si the owner confirme le non-usage, candidats à retrait (redondants avec ruTorrent +
+portail ; ShellInABox = risque sécu remplaçable par SSH).
+
+**Hors-scope v1 — non-services, prouvés inutilisés (ré-ajoutables plus tard)** :
 
 | Feature | Preuve prod |
 |---|---|
-| Docker | 0 container / 0 image, bridges DOWN |
-| Plex / Tautulli | non installé |
-| **Billing / renting** | `tracking_rent_*` = 0 ligne |
-| Minio | service `failed` (cassé) |
+| Billing / renting | `tracking_rent_*` = 0 ligne (jamais utilisé) |
 | port_forwarding | 0 ligne |
-| **Wolf CMS** | disparaît par construction (le portail est réécrit) |
-
-**PENDING the owner — défaut appliqué si pas de réponse** :
-
-| Feature | Statut prod | Défaut v1 |
-|---|---|---|
-| OpenVPN (3 variantes) | 0 client connecté au snapshot, profils distribués | **KEEP, simplifié** (1-2 variantes au lieu de 3) |
-| Samba | 0 session active (NFS couvre le partage) | **DROP** |
-| ShellInABox | shell web, risque sécu | **DROP** (SSH suffit) |
-| Cakebox-Light | UI alternative à ruTorrent | **DROP** |
-| Seedbox-Manager | UI alternative + binaire setuid | **DROP** |
-| Webmin | panneau admin lourd | **DROP** (le portail KoBox couvre l'admin) |
-| NextCloud | `NextCloud_db` + `apps/nc` présents | **À confirmer** (lourd — KEEP seulement si réellement utilisé) |
+| Plex / Tautulli | non installé sur la box |
+| **Wolf CMS** | remplacé par construction (le portail est réécrit) |
 
 **Portail — décision de forme** : conserver l'**URL/entrée** actuelle (`https://seedbox.example:8189`
 + auth) pour que the owner reconnaisse l'accès, mais **re-design libre** du frontend (SSR propre). On
