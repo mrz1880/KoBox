@@ -1,0 +1,20 @@
+services:
+  kobox-dev:
+    build: .
+    container_name: kobox-dev
+    privileged: true
+    volumes:
+      - ../..:/opt/KoBox
+      # mask the host's node_modules: native modules differ between macOS and linux
+      - kobox_node_modules:/opt/KoBox/kobox/node_modules
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+    tmpfs:
+      - /tmp
+      - /run
+      - /run/lock
+    environment:
+      - KOBOX_DB=/var/lib/kobox/kobox.db
+    stop_signal: SIGRTMIN+3
+
+volumes:
+  kobox_node_modules:

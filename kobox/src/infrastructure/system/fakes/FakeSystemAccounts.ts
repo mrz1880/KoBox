@@ -14,7 +14,9 @@ export class FakeSystemAccounts implements SystemAccountPort {
     if (this.accounts.has(username.value)) {
       return Promise.reject(new Error(`account ${username.value} already exists`));
     }
-    this.accounts.set(username.value, { locked: false, hasPassword: false });
+    // Debian semantics: a fresh account has '!' in shadow -> reported locked
+    // until a password hash is set.
+    this.accounts.set(username.value, { locked: true, hasPassword: false });
     return Promise.resolve();
   }
 
@@ -26,7 +28,9 @@ export class FakeSystemAccounts implements SystemAccountPort {
 
   setPassword(username: Username, hash: HashedPassword): Promise<void> {
     return this.withAccount(username, (account) => {
+      // chpasswd -e replaces the whole shadow hash, clearing any '!' lock
       account.hasPassword = hash.value.length > 0;
+      account.locked = false;
     });
   }
 
