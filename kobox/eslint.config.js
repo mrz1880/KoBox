@@ -14,6 +14,7 @@ export default defineConfig(
     },
     rules: {
       '@typescript-eslint/no-explicit-any': 'error',
+      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
       '@typescript-eslint/prefer-optional-chain': 'error',
       '@typescript-eslint/prefer-readonly': 'error',
       '@typescript-eslint/explicit-module-boundary-types': 'error',
