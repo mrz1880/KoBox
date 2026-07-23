@@ -7,7 +7,7 @@ export class InvalidEmailAddressError extends DomainError {
 }
 
 // Pragmatic RFC-lite: local@domain with at least one dot in the domain.
-const EMAIL_PATTERN = /^[a-z0-9._%+-]+@[a-z0-9-]+(\.[a-z0-9-]+)+$/;
+export const EMAIL_PATTERN = /^[a-z0-9._%+-]+@[a-z0-9-]+(\.[a-z0-9-]+)+$/;
 
 export class EmailAddress {
   private constructor(readonly value: string) {}

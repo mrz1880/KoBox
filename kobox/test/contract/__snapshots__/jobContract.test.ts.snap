@@ -1,0 +1,113 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`job contract > should_keep_the_wire_contract_stable 1`] = `
+{
+  "change-password": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "passwordHash": {
+        "minLength": 16,
+        "pattern": "^\\$(6|y)\\$[A-Za-z0-9./=,$-]+$",
+        "type": "string",
+      },
+      "username": {
+        "pattern": "^[a-z][a-z0-9]{0,31}$",
+        "type": "string",
+      },
+    },
+    "required": [
+      "username",
+      "passwordHash",
+    ],
+    "type": "object",
+  },
+  "create-user": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "accountType": {
+        "enum": [
+          "normal",
+          "plex",
+        ],
+        "type": "string",
+      },
+      "email": {
+        "pattern": "^[a-z0-9._%+-]+@[a-z0-9-]+(\\.[a-z0-9-]+)+$",
+        "type": "string",
+      },
+      "passwordHash": {
+        "minLength": 16,
+        "pattern": "^\\$(6|y)\\$[A-Za-z0-9./=,$-]+$",
+        "type": "string",
+      },
+      "proxyPort": {
+        "maximum": 65535,
+        "minimum": 1,
+        "type": "integer",
+      },
+      "quotaBytes": {
+        "maximum": 9007199254740991,
+        "minimum": 0,
+        "type": "integer",
+      },
+      "username": {
+        "pattern": "^[a-z][a-z0-9]{0,31}$",
+        "type": "string",
+      },
+    },
+    "required": [
+      "username",
+      "email",
+      "accountType",
+      "quotaBytes",
+      "proxyPort",
+      "passwordHash",
+    ],
+    "type": "object",
+  },
+  "delete-user": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "username": {
+        "pattern": "^[a-z][a-z0-9]{0,31}$",
+        "type": "string",
+      },
+    },
+    "required": [
+      "username",
+    ],
+    "type": "object",
+  },
+  "resume-user": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "username": {
+        "pattern": "^[a-z][a-z0-9]{0,31}$",
+        "type": "string",
+      },
+    },
+    "required": [
+      "username",
+    ],
+    "type": "object",
+  },
+  "suspend-user": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "username": {
+        "pattern": "^[a-z][a-z0-9]{0,31}$",
+        "type": "string",
+      },
+    },
+    "required": [
+      "username",
+    ],
+    "type": "object",
+  },
+}
+`;
