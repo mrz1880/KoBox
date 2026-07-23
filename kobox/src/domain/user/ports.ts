@@ -18,8 +18,10 @@ export interface SystemAccountPort {
   createAccount(username: Username): Promise<void>;
   deleteAccount(username: Username): Promise<void>;
   setPassword(username: Username, hash: HashedPassword): Promise<void>;
+  // lock must block ALL auth paths (password AND ssh keys) — reversibly
   lockAccount(username: Username): Promise<void>;
   unlockAccount(username: Username): Promise<void>;
+  terminateSessions(username: Username): Promise<void>;
   accountExists(username: Username): Promise<boolean>;
   isLocked(username: Username): Promise<boolean>;
 }

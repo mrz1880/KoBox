@@ -5,8 +5,18 @@ import type { Username } from '../../../domain/user/Username.js';
 export class FakeQuota implements QuotaPort {
   private readonly quotas = new Map<string, Quota>();
   private readonly usages = new Map<string, Quota>();
+  private nextFailure: string | undefined;
+
+  failNextSetQuota(message: string): void {
+    this.nextFailure = message;
+  }
 
   setQuota(username: Username, quota: Quota): Promise<void> {
+    if (this.nextFailure !== undefined) {
+      const message = this.nextFailure;
+      this.nextFailure = undefined;
+      return Promise.reject(new Error(message));
+    }
     this.quotas.set(username.value, quota);
     return Promise.resolve();
   }

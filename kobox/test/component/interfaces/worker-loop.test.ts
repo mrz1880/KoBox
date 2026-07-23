@@ -54,6 +54,15 @@ class InMemoryJobQueue implements JobQueuePort {
   errorOf(id: number): string | undefined {
     return this.rows.find((r) => r.id === id)?.error;
   }
+
+  recoverStale(): Promise<number> {
+    const stale = this.rows.filter((r) => r.status === 'running');
+    for (const row of stale) {
+      row.status = 'failed';
+      row.error = 'interrupted: worker restarted';
+    }
+    return Promise.resolve(stale.length);
+  }
 }
 
 class FakePasswordHasher implements PasswordHasherPort {
@@ -97,6 +106,8 @@ beforeEach(() => {
         import('../../../src/domain/user/Port.js').then((m) => m.ScgiPort.parse(nextScgi++)),
       allocateRtorrentPort: () =>
         import('../../../src/domain/user/Port.js').then((m) => m.RtorrentPort.parse(nextRtorrent++)),
+      releaseScgiPort: () => Promise.resolve(),
+      releaseRtorrentPort: () => Promise.resolve(),
     },
   });
   const queue = new InMemoryJobQueue();
@@ -129,7 +140,8 @@ describe('CLI enqueue -> root worker loop (the privilege seam)', () => {
     expect(processed).toBe(true);
     expect(world.queue.statusOf(id)).toBe('done');
     expect(await world.accounts.accountExists(user-f)).toBe(true);
-    expect(await world.services.isUserServiceRunning(user-f)).toBe(true);
+    // rtorrent provisioning is Phase 1: create does not start a unit
+    expect(await world.services.isUserServiceRunning(user-f)).toBe(false);
   });
 
   it('should_suspend_then_resume_via_jobs', async () => {

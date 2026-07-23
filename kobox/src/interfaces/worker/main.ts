@@ -8,14 +8,25 @@ import { buildContainer } from '../composition.js';
 async function main(): Promise<void> {
   const once = process.argv.includes('--once');
   const c = buildContainer('kobox-worker');
+  const signal = { stopping: false };
+  const stop = (name: string) => {
+    c.logger.info({ signal: name }, 'stopping after current job');
+    signal.stopping = true;
+  };
+  process.on('SIGTERM', () => { stop('SIGTERM'); });
+  process.on('SIGINT', () => { stop('SIGINT'); });
   c.logger.info({ once }, 'kobox worker started');
   try {
+    const recovered = await c.queue.recoverStale();
+    if (recovered > 0) {
+      c.logger.warn({ recovered }, 'stale running jobs marked failed');
+    }
     if (once) {
       const count = await c.worker.drain();
       c.logger.info({ count }, 'queue drained');
       return;
     }
-    for (;;) {
+    while (!signal.stopping) {
       const processed = await c.worker.processNext();
       if (!processed) {
         await sleep(1000);

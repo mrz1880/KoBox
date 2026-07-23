@@ -5,6 +5,7 @@ import type { Username } from '../../../domain/user/Username.js';
 interface FakeAccount {
   locked: boolean;
   hasPassword: boolean;
+  sessionsTerminated: boolean;
 }
 
 export class FakeSystemAccounts implements SystemAccountPort {
@@ -16,7 +17,11 @@ export class FakeSystemAccounts implements SystemAccountPort {
     }
     // Debian semantics: a fresh account has '!' in shadow -> reported locked
     // until a password hash is set.
-    this.accounts.set(username.value, { locked: true, hasPassword: false });
+    this.accounts.set(username.value, {
+      locked: true,
+      hasPassword: false,
+      sessionsTerminated: false,
+    });
     return Promise.resolve();
   }
 
@@ -44,6 +49,16 @@ export class FakeSystemAccounts implements SystemAccountPort {
     return this.withAccount(username, (account) => {
       account.locked = false;
     });
+  }
+
+  terminateSessions(username: Username): Promise<void> {
+    return this.withAccount(username, (account) => {
+      account.sessionsTerminated = true;
+    });
+  }
+
+  sessionsWereTerminatedFor(username: Username): boolean {
+    return this.accounts.get(username.value)?.sessionsTerminated ?? false;
   }
 
   accountExists(username: Username): Promise<boolean> {

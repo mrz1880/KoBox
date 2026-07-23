@@ -31,6 +31,7 @@ function passwdStatus(): string {
   return sh('passwd', ['-S', E2E_USER]).split(/\s+/)[1] ?? '?';
 }
 
+
 function groupsOf(): string[] {
   return sh('id', ['-nG', E2E_USER]).trim().split(/\s+/);
 }
@@ -78,6 +79,11 @@ describe.skipIf(!onDebianAsRoot)('E2E: create -> suspend -> resume -> delete', (
     expect(groupsOf()).toEqual(expect.arrayContaining(['kobox-users', 'kobox-sftp']));
     expect(passwdStatus()).toBe('P');
     expect(sh('getent', ['shadow', E2E_USER])).toContain('$6$');
+    expect(unitState()).not.toBe('active'); // rtorrent provisioning is Phase 1
+
+    // simulate Phase 1 having provisioned and started the unit, so the
+    // suspend/resume steps below exercise the real service control path
+    sh('systemctl', ['start', `rtorrent-${E2E_USER}`]);
     expect(unitState()).toBe('active');
   });
 
@@ -85,7 +91,9 @@ describe.skipIf(!onDebianAsRoot)('E2E: create -> suspend -> resume -> delete', (
     kobox(['suspend-user', E2E_USER]);
     drainQueue();
 
-    expect(passwdStatus()).toBe('L'); // SSH/console auth refused
+    expect(passwdStatus()).toBe('L'); // password auth refused
+    const shadowExpiry = sh('getent', ['shadow', E2E_USER]).trim().split(':')[7];
+    expect(shadowExpiry).toBe('1'); // account expired: pubkey SSH refused too
     expect(groupsOf()).not.toContain('kobox-sftp'); // chroot sftp gone
     expect(unitState()).not.toBe('active'); // rtorrent stopped
     expect(userExists()).toBe(true); // account intact
@@ -97,6 +105,8 @@ describe.skipIf(!onDebianAsRoot)('E2E: create -> suspend -> resume -> delete', (
     drainQueue();
 
     expect(passwdStatus()).toBe('P');
+    const shadowExpiry = sh('getent', ['shadow', E2E_USER]).trim().split(':')[7];
+    expect(shadowExpiry ?? '').toBe(''); // expiry cleared: pubkey SSH restored
     expect(groupsOf()).toEqual(expect.arrayContaining(['kobox-users', 'kobox-sftp']));
     expect(unitState()).toBe('active');
   });

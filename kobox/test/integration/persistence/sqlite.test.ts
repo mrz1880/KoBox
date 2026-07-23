@@ -136,14 +136,39 @@ describe('SqliteJobQueue', () => {
     expect(await queue.claimNextPending()).toBeUndefined();
   });
 
-  it('should_reject_tampered_payloads_at_claim_time', async () => {
+  it('should_quarantine_tampered_payloads_and_serve_the_next_job', async () => {
     const queue = new SqliteJobQueue(db);
-    const id = await queue.enqueue(parseJob('suspend-user', { username: 'user-f' }));
+    const poisoned = await queue.enqueue(parseJob('suspend-user', { username: 'user-f' }));
+    await queue.enqueue(parseJob('resume-user', { username: 'user-f' }));
     db.raw.prepare('UPDATE jobs SET payload_json = ? WHERE id = ?').run(
       JSON.stringify({ username: 'user-f; rm -rf /' }),
-      id,
+      poisoned,
     );
 
-    await expect(queue.claimNextPending()).rejects.toThrow();
+    const claimed = await queue.claimNextPending();
+
+    expect(claimed?.job.type).toBe('resume-user'); // poisoned job skipped, not fatal
+    const row = db.raw.prepare('SELECT status, error FROM jobs WHERE id = ?').get(poisoned) as {
+      status: string;
+      error: string;
+    };
+    expect(row.status).toBe('failed');
+    expect(row.error).toMatch(/username/);
+  });
+
+  it('should_fail_stale_running_jobs_on_recovery', async () => {
+    const queue = new SqliteJobQueue(db);
+    await queue.enqueue(parseJob('suspend-user', { username: 'user-f' }));
+    await queue.claimNextPending(); // now running, simulating a crashed worker
+
+    const recovered = await queue.recoverStale();
+
+    expect(recovered).toBe(1);
+    const row = db.raw.prepare("SELECT status, error FROM jobs WHERE status = 'failed'").get() as {
+      status: string;
+      error: string;
+    };
+    expect(row.error).toMatch(/interrupted/);
+    expect(await queue.claimNextPending()).toBeUndefined();
   });
 });

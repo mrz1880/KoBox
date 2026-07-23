@@ -5,4 +5,7 @@ import type { RtorrentPort, ScgiPort } from './Port.js';
 export interface PortAllocatorPort {
   allocateScgiPort(): Promise<ScgiPort>;
   allocateRtorrentPort(): Promise<RtorrentPort>;
+  // Compensation path: a failed provisioning must hand its ports back.
+  releaseScgiPort(port: ScgiPort): Promise<void>;
+  releaseRtorrentPort(port: RtorrentPort): Promise<void>;
 }

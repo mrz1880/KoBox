@@ -28,7 +28,8 @@ const usernameOnly = z.strictObject({ username: usernameField });
 export const jobPayloadSchemas = {
   'create-user': z.strictObject({
     username: usernameField,
-    email: z.string().regex(EMAIL_PATTERN),
+    // case-insensitive on the wire; EmailAddress normalizes to lowercase
+    email: z.string().regex(new RegExp(EMAIL_PATTERN.source, 'i')),
     accountType: z.enum(['normal', 'plex']),
     quotaBytes: z.number().int().nonnegative(),
     proxyPort: z.number().int().min(1).max(65535),
