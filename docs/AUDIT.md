@@ -714,12 +714,12 @@ flood »)**, Let's Encrypt, Postfix/mail, **Portail réécrit** (même URL `:818
 libre — voir ci-dessous), sFTP chroot, **Quota → hard** (aujourd'hui soft uniquement),
 Security/firewall, **NFS** (actif), **OpenVPN** (TUN/TAP, avec/sans GW), **Samba**,
 **Minio** (réparé), **NextCloud** (utilisé), **Docker** (capability — modules compose futurs),
-**NetData**.
+**NetData**, **Webmin**, **Seedbox-Manager**, **Cakebox-Light**, **ShellInABox**.
 
-**PENDING the owner (question 2 : UIs alternatives) — défaut KEEP** en attendant sa réponse :
-Cakebox-Light, Seedbox-Manager, ShellInABox, Webmin. On ne drop rien tant que ce n'est pas
-tranché ; si the owner confirme le non-usage, candidats à retrait (redondants avec ruTorrent +
-portail ; ShellInABox = risque sécu remplaçable par SSH).
+**Scope v1 : FIGÉ à 100 %.** the owner (2026-07-23) : *« j'utilise webmin seedbox manager cakebox
+etc »* → les 4 UIs alternatives sont **KEEP** (apps vendored, gardées/liées-iframées comme
+ruTorrent). Plus aucun item en attente. Note : **ShellInABox** est déjà bindé `127.0.0.1:4200`
+derrière l'auth du portail — **à durcir** dans KoBox (localhost + auth), pas à retirer.
 
 **Hors-scope v1 — non-services, prouvés inutilisés (ré-ajoutables plus tard)** :
 
