@@ -1,0 +1,42 @@
+# Grouped updates keep the PR/CI-run count low on the Free plan: one PR per
+# ecosystem per week, minor+patch bundled together.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /kobox
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3
+    versioning-strategy: increase
+    groups:
+      kobox-dev:
+        dependency-type: development
+        update-types: [minor, patch]
+      kobox-prod:
+        dependency-type: production
+        update-types: [minor, patch]
+    commit-message:
+      prefix: chore
+      include: scope
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 2
+    groups:
+      actions:
+        patterns: ['*']
+    commit-message:
+      prefix: chore
+
+  - package-ecosystem: docker
+    directory: /kobox/docker
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 1
+    commit-message:
+      prefix: chore

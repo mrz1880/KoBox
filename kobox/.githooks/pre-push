@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# Heavy gate — the full local suite before anything leaves the machine, so a
+# push only reaches CI once it already passes here (saves Free-plan minutes).
+set -euo pipefail
+
+repo_root="$(git rev-parse --show-toplevel)"
+cd "$repo_root/kobox"
+
+echo "[pre-push] lint"
+pnpm lint
+echo "[pre-push] typecheck"
+pnpm typecheck
+echo "[pre-push] unit + component + contract (+ coverage gate)"
+pnpm coverage
+echo "[pre-push] build"
+pnpm build
+
+echo "[pre-push] OK — integration/e2e (Debian 12 container) run in CI on the PR"

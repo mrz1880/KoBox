@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# Fast gate — cheap checks that run on every commit. Keeps broken code out of
+# history and off CI (GitHub Free minutes are the constraint).
+set -euo pipefail
+
+repo_root="$(git rev-parse --show-toplevel)"
+cd "$repo_root/kobox"
+
+# Only run if kobox/ has staged changes — a docs-only commit skips the toolchain.
+if git diff --cached --name-only | grep -q '^kobox/'; then
+  echo "[pre-commit] lint + typecheck"
+  pnpm lint
+  pnpm typecheck
+  echo "[pre-commit] guard: no production/personal identifiers"
+  # Block obvious leaks from re-entering a public repo.
+  if git diff --cached -U0 --no-color -- 'src' 'test' \
+      | grep -nE '^\+' \
+      | grep -viE '^\+\+\+' \
+      | grep -inE 'kofamily|195\.154\.171|the-maintainer|\btonyz\b|\bleoneuf\b|\bludof?\b|\bromain\b'; then
+    echo "[pre-commit] BLOCKED: staged lines contain a production/personal identifier." >&2
+    exit 1
+  fi
+else
+  echo "[pre-commit] no kobox/ changes staged — skipping toolchain checks"
+fi
