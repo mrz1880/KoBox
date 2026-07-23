@@ -636,13 +636,47 @@ Décisions à trancher (chacune bloque le scaffolding ou en change la forme) :
 5. **Scope Phase 0** : tranche User Management en strangler à côté de MySB. Confirmer.
 6. **Rename & chemins** : nouveau code sous `/opt/kobox` (fresh) — quelle stratégie de cutover
    vs l'existant `/opt/MySB` en prod ? (Coexistence pendant transition.)
-7. **Périmètre features v1 — LA grande décision de scope.** La feature list de the owner est longue.
-   Plusieurs extras sont lourds et vendored : **Wolf CMS** (host actuel du portail),
-   **Cakebox-Light**, **Seedbox-Manager**, **Minio**, **NextCloud**, **Webmin**,
-   **ShellInABox**, **Plex/Tautulli**. Lesquels sont *must-keep* pour the owner vs *droppables* ?
-   Chaque drop réduit massivement la surface du rewrite. **À clarifier avec the owner/the maintainer.**
-8. **Billing** (renting/treasury/payments) : dans la v1 ou hors-scope ? (Sous-domaine
-   extractible, cf. zone grise §2.)
+7. **Périmètre features v1** — **figé ci-dessous** grâce à l'inspection prod
+   (`docs/PROD-INSPECTION.md`). Restent 6 items « idle » en attente de confirmation the owner
+   (défauts proposés, conservateurs).
+8. **Billing** (renting/treasury/payments) : **hors-scope v1** — `tracking_rent_*` = 0 ligne
+   en prod → sous-domaine inutilisé, extractible plus tard si besoin.
+
+### Périmètre v1 figé (post-inspection prod)
+
+**KEEP — cœur, confirmé utilisé en prod** :
+rTorrent/ruTorrent + plugins (4283 torrents), Tracker & cert SSL par tracker (46 trackers
+privés), Blocklist/PeerGuardian, DNScrypt + Bind, Fail2ban **(+ nouvelle règle « publickey
+flood »)**, Let's Encrypt, Postfix/mail, **Portail réécrit** (même URL `:8189` + auth, design
+libre — voir ci-dessous), sFTP chroot, **Quota → hard** (aujourd'hui soft uniquement),
+Security/firewall, **NFS** (exports actifs user-a+user-b).
+
+**DROP v1 — preuve dure d'inutilisation** :
+
+| Feature | Preuve prod |
+|---|---|
+| Docker | 0 container / 0 image, bridges DOWN |
+| Plex / Tautulli | non installé |
+| **Billing / renting** | `tracking_rent_*` = 0 ligne |
+| Minio | service `failed` (cassé) |
+| port_forwarding | 0 ligne |
+| **Wolf CMS** | disparaît par construction (le portail est réécrit) |
+
+**PENDING the owner — défaut appliqué si pas de réponse** :
+
+| Feature | Statut prod | Défaut v1 |
+|---|---|---|
+| OpenVPN (3 variantes) | 0 client connecté au snapshot, profils distribués | **KEEP, simplifié** (1-2 variantes au lieu de 3) |
+| Samba | 0 session active (NFS couvre le partage) | **DROP** |
+| ShellInABox | shell web, risque sécu | **DROP** (SSH suffit) |
+| Cakebox-Light | UI alternative à ruTorrent | **DROP** |
+| Seedbox-Manager | UI alternative + binaire setuid | **DROP** |
+| Webmin | panneau admin lourd | **DROP** (le portail KoBox couvre l'admin) |
+| NextCloud | `NextCloud_db` + `apps/nc` présents | **À confirmer** (lourd — KEEP seulement si réellement utilisé) |
+
+**Portail — décision de forme** : conserver l'**URL/entrée** actuelle (`https://seedbox.example:8189`
++ auth) pour que the owner reconnaisse l'accès, mais **re-design libre** du frontend (SSR propre). On
+ne préserve pas le thème Wolf CMS pixel-perfect.
 
 ---
 
