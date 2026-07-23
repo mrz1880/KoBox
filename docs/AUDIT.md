@@ -596,12 +596,23 @@ sftp ; worker root ; portail create-user) et c'est ce que les 8 users de the own
 Livrables Phase 0 :
 - Repo scaffoldé (arbo §3.4), toolchain TS strict, SQLite+Drizzle, CI GitHub Actions verte.
 - `infrastructure/system` avec 3-4 adapters réels + fakes (`AccountAdapter`, quota, sftp).
-- Use cases `CreateUser`/`DeleteUser`/`ChangePassword` avec pyramide de tests complète.
+- Use cases `CreateUser`/`DeleteUser`/`ChangePassword`/**`SuspendUser`/`ResumeUser`** avec
+  pyramide de tests complète.
 - Le worker root + file de Jobs typée (le redesign §3.5) en germe.
-- E2E : conteneur Debian 12 → `kobox create-user` → compte + quota + chroot vérifiés.
+- E2E : conteneur Debian 12 → `kobox create-user` → compte + quota + chroot vérifiés, puis
+  `kobox suspend-user` → SSH/FTP/rTorrent coupés, `kobox resume-user` → tout restauré.
 
-**Done Phase 0** : E2E vert sur fresh Debian 12 ; parité fonctionnelle create/delete/passwd ;
-le chemin MySB correspondant peut être désactivé pour cette tranche.
+**`SuspendUser`/`ResumeUser`** (issue upstream #39, jamais livrée — c'est le cas *user-h* vécu) :
+opération de domaine sur l'agrégat `SeedboxUser` avec un état explicite `status ∈ {active,
+suspended}`. Suspendre = **réversible et idempotent** : désactive l'accès SSH/SFTP (retire de
+`sshdusers`/coupe la clé), arrête `rtorrent-<user>`, coupe l'accès portail — **sans supprimer
+ni données ni compte**. Reprendre = restaure l'état d'avant. Aucun `mv authorized_keys.DISABLED`
+ni sudoers hack manuel : l'état vit dans le domaine, l'effet passe par les ports système
+(testables via fakes). C'est la version propre du kick/un-kick manuel documenté en mémoire.
+
+**Done Phase 0** : E2E vert sur fresh Debian 12 ; parité fonctionnelle create/delete/passwd
+**+ suspend/resume réversible** ; le chemin MySB correspondant peut être désactivé pour cette
+tranche.
 
 ### Phases 1-N (ordre par risque/valeur)
 
