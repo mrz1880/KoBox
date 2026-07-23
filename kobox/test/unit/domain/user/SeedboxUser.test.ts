@@ -9,8 +9,8 @@ import { Username } from '../../../../src/domain/user/Username.js';
 
 function aUserCreation() {
   return SeedboxUser.create({
-    username: Username.parse('user-f'),
-    email: EmailAddress.parse('user-f@example.org'),
+    username: Username.parse('alice'),
+    email: EmailAddress.parse('alice@example.org'),
     accountType: AccountType.normal,
     quota: Quota.gib(412),
     scgiPort: ScgiPort.parse(51101),
@@ -24,7 +24,7 @@ describe('SeedboxUser', () => {
     const { user, event } = aUserCreation();
 
     expect(user.status).toBe(UserStatus.active);
-    expect(event).toEqual({ type: 'UserCreated', username: 'user-f' });
+    expect(event).toEqual({ type: 'UserCreated', username: 'alice' });
   });
 
   it('should_suspend_by_returning_a_new_state_and_an_event', () => {
@@ -34,7 +34,7 @@ describe('SeedboxUser', () => {
 
     expect(suspended.status).toBe(UserStatus.suspended);
     expect(user.status).toBe(UserStatus.active); // original untouched (immutable)
-    expect(event).toEqual({ type: 'UserSuspended', username: 'user-f' });
+    expect(event).toEqual({ type: 'UserSuspended', username: 'alice' });
   });
 
   it('should_make_suspend_idempotent', () => {
@@ -55,7 +55,7 @@ describe('SeedboxUser', () => {
     expect(resumed.user.status).toBe(UserStatus.active);
     expect(resumed.user.quota.equals(user.quota)).toBe(true);
     expect(resumed.user.scgiPort.equals(user.scgiPort)).toBe(true);
-    expect(resumed.event).toEqual({ type: 'UserResumed', username: 'user-f' });
+    expect(resumed.event).toEqual({ type: 'UserResumed', username: 'alice' });
   });
 
   it('should_make_resume_idempotent_on_active_users', () => {

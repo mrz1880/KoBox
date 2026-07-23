@@ -23,7 +23,7 @@ describe('Username', () => {
   });
 
   it('should_reject_uppercase_and_symbols', () => {
-    for (const raw of ['Tonyz', 'tony z', 'tony-z', 'tony_z', 'tony.z', 'éuser-a', '9tonyz', '']) {
+    for (const raw of ['Alice', 'tony z', 'tony-z', 'tony_z', 'tony.z', 'éuser-a', '9alice', '']) {
       expect(() => Username.parse(raw)).toThrow(InvalidUsernameError);
     }
   });
@@ -46,7 +46,7 @@ describe('Username', () => {
   });
 
   it('should_compare_by_value', () => {
-    expect(Username.parse('user-f').equals(Username.parse('user-f'))).toBe(true);
-    expect(Username.parse('user-f').equals(Username.parse('user-a'))).toBe(false);
+    expect(Username.parse('alice').equals(Username.parse('alice'))).toBe(true);
+    expect(Username.parse('alice').equals(Username.parse('bob'))).toBe(false);
   });
 });

@@ -4,7 +4,7 @@ import type { PortAllocatorPort } from '../../domain/user/PortAllocatorPort.js';
 import type { KoboxDatabase } from './db.js';
 import { allocatedPorts } from './schema.js';
 
-const SCGI_BASE = 51101; // prod convention: 51101..51117 already in use
+const SCGI_BASE = 51101; // SCGI listeners for per-user rtorrent instances
 const RTORRENT_BASE = 45000;
 
 export class SqlitePortAllocator implements PortAllocatorPort {

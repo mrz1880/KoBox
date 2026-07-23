@@ -43,7 +43,7 @@ program
   .command('create-user')
   .argument('<username>')
   .requiredOption('--email <email>')
-  .option('--quota-gib <number>', 'disk quota in GiB', '412')
+  .option('--quota-gib <number>', 'disk quota in GiB', '500')
   .option('--account-type <type>', 'normal|plex', 'normal')
   .option('--proxy-port <port>', 'shared proxy port', '8080')
   .description('create a seedbox user (password read from stdin)')
@@ -57,7 +57,7 @@ program
         username: Username.parse(username),
         email: EmailAddress.parse(options.email ?? ''),
         accountType: AccountType.parse(options.accountType ?? 'normal'),
-        quota: Quota.gib(Number(options.quotaGib ?? '412')),
+        quota: Quota.gib(Number(options.quotaGib ?? '500')),
         proxyPort: ProxyPort.parse(Number(options.proxyPort ?? '8080')),
         passwordHash: hash,
       });
@@ -69,7 +69,7 @@ program
         username,
         email: options.email ?? '',
         accountType: options.accountType ?? 'normal',
-        quotaGib: Number(options.quotaGib ?? '412'),
+        quotaGib: Number(options.quotaGib ?? '500'),
         proxyPort: Number(options.proxyPort ?? '8080'),
       },
       password,

@@ -6,3 +6,4 @@ sources/
 thumbs.db
 .DS_Store
 TODO.md
+.pnpm-store/

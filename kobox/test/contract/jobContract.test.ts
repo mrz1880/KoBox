@@ -17,8 +17,8 @@ describe('job contract', () => {
 
   it('should_parse_a_valid_create_user_job', () => {
     const job = parseJob('create-user', {
-      username: 'user-f',
-      email: 'user-f@example.org',
+      username: 'alice',
+      email: 'alice@example.org',
       accountType: 'normal',
       quotaBytes: 412 * 1024 ** 3,
       proxyPort: 8080,
@@ -27,23 +27,23 @@ describe('job contract', () => {
 
     expect(job.type).toBe('create-user');
     if (job.type === 'create-user') {
-      expect(job.payload.username).toBe('user-f');
+      expect(job.payload.username).toBe('alice');
     }
   });
 
   it('should_reject_unknown_job_types', () => {
-    expect(() => parseJob('rm-rf', { username: 'user-f' })).toThrow(/unknown job type/);
+    expect(() => parseJob('rm-rf', { username: 'alice' })).toThrow(/unknown job type/);
   });
 
   it('should_reject_payloads_violating_domain_invariants', () => {
     expect(() => parseJob('suspend-user', { username: 'Tony Z; rm -rf /' })).toThrow();
     expect(() => parseJob('suspend-user', { username: 'root' })).toThrow();
     expect(() =>
-      parseJob('change-password', { username: 'user-f', passwordHash: 'plaintext' }),
+      parseJob('change-password', { username: 'alice', passwordHash: 'plaintext' }),
     ).toThrow();
     expect(() =>
       parseJob('create-user', {
-        username: 'user-f',
+        username: 'alice',
         email: 'not-an-email',
         accountType: 'normal',
         quotaBytes: 1,

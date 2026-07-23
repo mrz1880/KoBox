@@ -34,7 +34,7 @@ class RecordingRunner implements CommandRunner {
   }
 }
 
-const user-f = Username.parse('user-f');
+const alice = Username.parse('alice');
 const aHash = HashedPassword.parse('$6$testsalt$0123456789abcdefghijklmnopqrstuv');
 
 describe('SystemAccountAdapter', () => {
@@ -42,7 +42,7 @@ describe('SystemAccountAdapter', () => {
     const runner = new RecordingRunner();
     const adapter = new SystemAccountAdapter(runner);
 
-    await adapter.createAccount(user-f);
+    await adapter.createAccount(alice);
 
     expect(runner.argvOf('groupadd')).toEqual(['-f', 'kobox-users']);
     expect(runner.argvOf('useradd')).toEqual([
@@ -51,7 +51,7 @@ describe('SystemAccountAdapter', () => {
       '/bin/bash',
       '-G',
       'kobox-users',
-      'user-f',
+      'alice',
     ]);
   });
 
@@ -59,24 +59,24 @@ describe('SystemAccountAdapter', () => {
     const runner = new RecordingRunner();
     const adapter = new SystemAccountAdapter(runner);
 
-    await adapter.setPassword(user-f, aHash);
+    await adapter.setPassword(alice, aHash);
 
     const call = runner.calls.find((c) => c.command === 'chpasswd');
     expect(call?.args).toEqual(['-e']);
-    expect(call?.stdin).toBe(`user-f:${aHash.value}\n`);
+    expect(call?.stdin).toBe(`alice:${aHash.value}\n`);
   });
 
   it('should_lock_with_password_lock_plus_account_expiry_and_unlock_both', async () => {
     const runner = new RecordingRunner();
     const adapter = new SystemAccountAdapter(runner);
 
-    await adapter.lockAccount(user-f);
-    await adapter.unlockAccount(user-f);
+    await adapter.lockAccount(alice);
+    await adapter.unlockAccount(alice);
 
     const lines = runner.calls.map((c) => [c.command, ...c.args].join(' '));
     // -e 1 expires the account: blocks pubkey SSH too, not just password auth
-    expect(lines).toContain('usermod -L -e 1 user-f');
-    expect(lines).toContain('usermod -U -e  user-f');
+    expect(lines).toContain('usermod -L -e 1 alice');
+    expect(lines).toContain('usermod -U -e  alice');
   });
 
   it('should_terminate_live_sessions_tolerating_none', async () => {
@@ -84,16 +84,16 @@ describe('SystemAccountAdapter', () => {
     runner.onCommand('pkill', { exitCode: 1 }); // exit 1 = no processes matched
     const adapter = new SystemAccountAdapter(runner);
 
-    await expect(adapter.terminateSessions(user-f)).resolves.toBeUndefined();
-    expect(runner.argvOf('pkill')).toEqual(['-KILL', '-u', 'user-f']);
+    await expect(adapter.terminateSessions(alice)).resolves.toBeUndefined();
+    expect(runner.argvOf('pkill')).toEqual(['-KILL', '-u', 'alice']);
   });
 
   it('should_report_lock_state_from_passwd_S', async () => {
     const runner = new RecordingRunner();
-    runner.onCommand('passwd', { stdout: 'user-f L 07/23/2026 0 99999 7 -1\n' });
+    runner.onCommand('passwd', { stdout: 'alice L 07/23/2026 0 99999 7 -1\n' });
     const adapter = new SystemAccountAdapter(runner);
 
-    expect(await adapter.isLocked(user-f)).toBe(true);
+    expect(await adapter.isLocked(alice)).toBe(true);
   });
 
   it('should_fail_loudly_when_a_command_exits_non_zero', async () => {
@@ -101,7 +101,7 @@ describe('SystemAccountAdapter', () => {
     runner.onCommand('useradd', { exitCode: 9, stderr: 'useradd: user exists' });
     const adapter = new SystemAccountAdapter(runner);
 
-    await expect(adapter.createAccount(user-f)).rejects.toThrow(/useradd.*exit 9/);
+    await expect(adapter.createAccount(alice)).rejects.toThrow(/useradd.*exit 9/);
   });
 });
 
@@ -110,11 +110,11 @@ describe('QuotaAdapter', () => {
     const runner = new RecordingRunner();
     const adapter = new QuotaAdapter(runner, '/home');
 
-    await adapter.setQuota(user-f, Quota.gib(412));
+    await adapter.setQuota(alice, Quota.gib(412));
 
     expect(runner.argvOf('setquota')).toEqual([
       '-u',
-      'user-f',
+      'alice',
       '0',
       String(412 * 1024 * 1024),
       '0',
@@ -127,14 +127,14 @@ describe('QuotaAdapter', () => {
     const runner = new RecordingRunner();
     runner.onCommand('quota', {
       stdout:
-        'Disk quotas for user user-f (uid 1006):\n' +
+        'Disk quotas for user alice (uid 1001):\n' +
         '     Filesystem   blocks    quota    limit   grace   files   quota   limit   grace\n' +
         '      /dev/sda4  382730240  0  432013312       0  118292       0       0        \n',
       exitCode: 0,
     });
     const adapter = new QuotaAdapter(runner, '/home');
 
-    const usage = await adapter.getUsage(user-f);
+    const usage = await adapter.getUsage(alice);
 
     expect(usage.toBytes()).toBe(382730240 * 1024);
   });
@@ -145,19 +145,19 @@ describe('SftpAdapter', () => {
     const runner = new RecordingRunner();
     const adapter = new SftpAdapter(runner);
 
-    await adapter.enableChrootAccess(user-f);
-    await adapter.disableChrootAccess(user-f);
+    await adapter.enableChrootAccess(alice);
+    await adapter.disableChrootAccess(alice);
 
-    expect(runner.argvOf('usermod')).toEqual(['-aG', 'kobox-sftp', 'user-f']);
-    expect(runner.argvOf('gpasswd')).toEqual(['-d', 'user-f', 'kobox-sftp']);
+    expect(runner.argvOf('usermod')).toEqual(['-aG', 'kobox-sftp', 'alice']);
+    expect(runner.argvOf('gpasswd')).toEqual(['-d', 'alice', 'kobox-sftp']);
   });
 
   it('should_report_chroot_access_from_group_membership', async () => {
     const runner = new RecordingRunner();
-    runner.onCommand('id', { stdout: 'user-f kobox-users kobox-sftp\n' });
+    runner.onCommand('id', { stdout: 'alice kobox-users kobox-sftp\n' });
     const adapter = new SftpAdapter(runner);
 
-    expect(await adapter.isChrootAccessEnabled(user-f)).toBe(true);
+    expect(await adapter.isChrootAccessEnabled(alice)).toBe(true);
   });
 });
 
@@ -166,12 +166,12 @@ describe('SystemdServiceControlAdapter', () => {
     const runner = new RecordingRunner();
     const adapter = new SystemdServiceControlAdapter(runner);
 
-    await adapter.stopUserService(user-f);
-    await adapter.startUserService(user-f);
+    await adapter.stopUserService(alice);
+    await adapter.startUserService(alice);
 
     const lines = runner.calls.map((c) => [c.command, ...c.args].join(' '));
-    expect(lines).toContain('systemctl stop rtorrent-user-f');
-    expect(lines).toContain('systemctl start rtorrent-user-f');
+    expect(lines).toContain('systemctl stop rtorrent-alice');
+    expect(lines).toContain('systemctl start rtorrent-alice');
   });
 
   it('should_treat_is_active_exit_code_as_running_state', async () => {
@@ -179,7 +179,7 @@ describe('SystemdServiceControlAdapter', () => {
     runner.onCommand('systemctl', { exitCode: 3 });
     const adapter = new SystemdServiceControlAdapter(runner);
 
-    expect(await adapter.isUserServiceRunning(user-f)).toBe(false);
+    expect(await adapter.isUserServiceRunning(alice)).toBe(false);
   });
 
   it('should_tolerate_a_missing_unit_but_fail_on_real_errors', async () => {
@@ -187,13 +187,13 @@ describe('SystemdServiceControlAdapter', () => {
     missingUnit.onCommand('systemctl', { exitCode: 5, stderr: 'Unit not loaded.' });
     const adapter = new SystemdServiceControlAdapter(missingUnit);
     // Phase 0 has not provisioned rtorrent units yet (Phase 1 does)
-    await expect(adapter.stopUserService(user-f)).resolves.toBeUndefined();
-    await expect(adapter.startUserService(user-f)).resolves.toBeUndefined();
+    await expect(adapter.stopUserService(alice)).resolves.toBeUndefined();
+    await expect(adapter.startUserService(alice)).resolves.toBeUndefined();
 
     const realError = new RecordingRunner();
     realError.onCommand('systemctl', { exitCode: 1, stderr: 'Failed to start' });
     const failing = new SystemdServiceControlAdapter(realError);
-    await expect(failing.startUserService(user-f)).rejects.toThrow(/exit 1/);
+    await expect(failing.startUserService(alice)).rejects.toThrow(/exit 1/);
   });
 });
 

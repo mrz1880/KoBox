@@ -10,51 +10,51 @@ import { FakeSftp } from '../../../src/infrastructure/system/fakes/FakeSftp.js';
 import { FakeSystemAccounts } from '../../../src/infrastructure/system/fakes/FakeSystemAccounts.js';
 import { aUser } from '../../builders/UserBuilder.js';
 
-const user-f = Username.parse('user-f');
+const alice = Username.parse('alice');
 const aHash = HashedPassword.parse('$6$testsalt$0123456789abcdefghijklmnopqrstuv');
 
 describe('FakeSystemAccounts', () => {
   it('should_create_lock_unlock_and_delete_accounts', async () => {
     const accounts = new FakeSystemAccounts();
 
-    await accounts.createAccount(user-f);
-    expect(await accounts.accountExists(user-f)).toBe(true);
-    expect(await accounts.isLocked(user-f)).toBe(true); // Debian: no password yet
+    await accounts.createAccount(alice);
+    expect(await accounts.accountExists(alice)).toBe(true);
+    expect(await accounts.isLocked(alice)).toBe(true); // Debian: no password yet
 
-    await accounts.setPassword(user-f, aHash);
-    expect(await accounts.isLocked(user-f)).toBe(false);
+    await accounts.setPassword(alice, aHash);
+    expect(await accounts.isLocked(alice)).toBe(false);
 
-    await accounts.lockAccount(user-f);
-    expect(await accounts.isLocked(user-f)).toBe(true);
+    await accounts.lockAccount(alice);
+    expect(await accounts.isLocked(alice)).toBe(true);
 
-    await accounts.unlockAccount(user-f);
-    expect(await accounts.isLocked(user-f)).toBe(false);
+    await accounts.unlockAccount(alice);
+    expect(await accounts.isLocked(alice)).toBe(false);
 
-    await accounts.deleteAccount(user-f);
-    expect(await accounts.accountExists(user-f)).toBe(false);
+    await accounts.deleteAccount(alice);
+    expect(await accounts.accountExists(alice)).toBe(false);
   });
 
   it('should_reject_creating_a_duplicate_account', async () => {
     const accounts = new FakeSystemAccounts();
-    await accounts.createAccount(user-f);
+    await accounts.createAccount(alice);
 
-    await expect(accounts.createAccount(user-f)).rejects.toThrow(/already exists/);
+    await expect(accounts.createAccount(alice)).rejects.toThrow(/already exists/);
   });
 
   it('should_reject_operations_on_missing_accounts', async () => {
     const accounts = new FakeSystemAccounts();
 
-    await expect(accounts.lockAccount(user-f)).rejects.toThrow(/does not exist/);
-    await expect(accounts.setPassword(user-f, aHash)).rejects.toThrow(/does not exist/);
+    await expect(accounts.lockAccount(alice)).rejects.toThrow(/does not exist/);
+    await expect(accounts.setPassword(alice, aHash)).rejects.toThrow(/does not exist/);
   });
 
   it('should_record_that_a_password_hash_was_set', async () => {
     const accounts = new FakeSystemAccounts();
-    await accounts.createAccount(user-f);
+    await accounts.createAccount(alice);
 
-    await accounts.setPassword(user-f, aHash);
+    await accounts.setPassword(alice, aHash);
 
-    expect(accounts.passwordWasSetFor(user-f)).toBe(true);
+    expect(accounts.passwordWasSetFor(alice)).toBe(true);
   });
 });
 
@@ -62,10 +62,10 @@ describe('FakeQuota', () => {
   it('should_store_quota_and_report_usage_zero_by_default', async () => {
     const quota = new FakeQuota();
 
-    await quota.setQuota(user-f, Quota.gib(412));
+    await quota.setQuota(alice, Quota.gib(412));
 
-    expect(quota.quotaOf(user-f)?.toGib()).toBe(412);
-    expect((await quota.getUsage(user-f)).toBytes()).toBe(0);
+    expect(quota.quotaOf(alice)?.toGib()).toBe(412);
+    expect((await quota.getUsage(alice)).toBytes()).toBe(0);
   });
 });
 
@@ -73,12 +73,12 @@ describe('FakeSftp', () => {
   it('should_toggle_chroot_access_idempotently', async () => {
     const sftp = new FakeSftp();
 
-    await sftp.enableChrootAccess(user-f);
-    await sftp.enableChrootAccess(user-f);
-    expect(await sftp.isChrootAccessEnabled(user-f)).toBe(true);
+    await sftp.enableChrootAccess(alice);
+    await sftp.enableChrootAccess(alice);
+    expect(await sftp.isChrootAccessEnabled(alice)).toBe(true);
 
-    await sftp.disableChrootAccess(user-f);
-    expect(await sftp.isChrootAccessEnabled(user-f)).toBe(false);
+    await sftp.disableChrootAccess(alice);
+    expect(await sftp.isChrootAccessEnabled(alice)).toBe(false);
   });
 });
 
@@ -86,11 +86,11 @@ describe('FakeServiceControl', () => {
   it('should_track_per_user_service_state', async () => {
     const services = new FakeServiceControl();
 
-    await services.startUserService(user-f);
-    expect(await services.isUserServiceRunning(user-f)).toBe(true);
+    await services.startUserService(alice);
+    expect(await services.isUserServiceRunning(alice)).toBe(true);
 
-    await services.stopUserService(user-f);
-    expect(await services.isUserServiceRunning(user-f)).toBe(false);
+    await services.stopUserService(alice);
+    expect(await services.isUserServiceRunning(alice)).toBe(false);
   });
 });
 
@@ -98,9 +98,9 @@ describe('FakeNotifications', () => {
   it('should_record_published_events', async () => {
     const notifications = new FakeNotifications();
 
-    await notifications.notify({ type: 'UserCreated', username: 'user-f' });
+    await notifications.notify({ type: 'UserCreated', username: 'alice' });
 
-    expect(notifications.published).toEqual([{ type: 'UserCreated', username: 'user-f' }]);
+    expect(notifications.published).toEqual([{ type: 'UserCreated', username: 'alice' }]);
   });
 });
 
