@@ -1,3 +1,5 @@
+import type { HashedPassword } from './HashedPassword.js';
+import type { Password } from './Password.js';
 import type { Quota } from './Quota.js';
 import type { SeedboxUser } from './SeedboxUser.js';
 import type { UserEvent } from './events.js';
@@ -10,11 +12,12 @@ export interface UserRepository {
   delete(username: Username): Promise<void>;
 }
 
-// Secrets cross this boundary as opaque values and must never be logged.
+// Plaintext never crosses this boundary: passwords arrive pre-hashed so the
+// persisted job queue and process argv only ever see crypt(3) hashes.
 export interface SystemAccountPort {
   createAccount(username: Username): Promise<void>;
   deleteAccount(username: Username): Promise<void>;
-  setPassword(username: Username, password: string): Promise<void>;
+  setPassword(username: Username, hash: HashedPassword): Promise<void>;
   lockAccount(username: Username): Promise<void>;
   unlockAccount(username: Username): Promise<void>;
   accountExists(username: Username): Promise<boolean>;
@@ -38,6 +41,11 @@ export interface ServiceControlPort {
   stopUserService(username: Username): Promise<void>;
   startUserService(username: Username): Promise<void>;
   isUserServiceRunning(username: Username): Promise<boolean>;
+}
+
+// Hashing happens at the unprivileged boundary (CLI/web) so plaintext dies there.
+export interface PasswordHasherPort {
+  hash(password: Password): Promise<HashedPassword>;
 }
 
 export interface NotificationPort {
