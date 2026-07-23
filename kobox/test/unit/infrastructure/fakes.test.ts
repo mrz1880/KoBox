@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { HashedPassword } from '../../../src/domain/user/HashedPassword.js';
 import { Quota } from '../../../src/domain/user/Quota.js';
 import { Username } from '../../../src/domain/user/Username.js';
 import { InMemoryUserRepository } from '../../../src/infrastructure/persistence/InMemoryUserRepository.js';
@@ -10,6 +11,7 @@ import { FakeSystemAccounts } from '../../../src/infrastructure/system/fakes/Fak
 import { aUser } from '../../builders/UserBuilder.js';
 
 const user-f = Username.parse('user-f');
+const aHash = HashedPassword.parse('$6$testsalt$0123456789abcdefghijklmnopqrstuv');
 
 describe('FakeSystemAccounts', () => {
   it('should_create_lock_unlock_and_delete_accounts', async () => {
@@ -40,14 +42,14 @@ describe('FakeSystemAccounts', () => {
     const accounts = new FakeSystemAccounts();
 
     await expect(accounts.lockAccount(user-f)).rejects.toThrow(/does not exist/);
-    await expect(accounts.setPassword(user-f, 'x')).rejects.toThrow(/does not exist/);
+    await expect(accounts.setPassword(user-f, aHash)).rejects.toThrow(/does not exist/);
   });
 
-  it('should_record_passwords_without_exposing_them_in_events', async () => {
+  it('should_record_that_a_password_hash_was_set', async () => {
     const accounts = new FakeSystemAccounts();
     await accounts.createAccount(user-f);
 
-    await accounts.setPassword(user-f, 's3cret');
+    await accounts.setPassword(user-f, aHash);
 
     expect(accounts.passwordWasSetFor(user-f)).toBe(true);
   });

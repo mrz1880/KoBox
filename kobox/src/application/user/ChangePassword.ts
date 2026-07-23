@@ -1,11 +1,11 @@
-import type { Password } from '../../domain/user/Password.js';
+import type { HashedPassword } from '../../domain/user/HashedPassword.js';
 import type { Username } from '../../domain/user/Username.js';
 import type { NotificationPort, SystemAccountPort, UserRepository } from '../../domain/user/ports.js';
 import { UserNotFoundError } from './errors.js';
 
 export interface ChangePasswordCommand {
   readonly username: Username;
-  readonly password: Password;
+  readonly passwordHash: HashedPassword;
 }
 
 interface Deps {
@@ -25,7 +25,7 @@ export class ChangePassword {
       throw new UserNotFoundError(command.username.value);
     }
 
-    await accounts.setPassword(user.username, command.password.reveal());
+    await accounts.setPassword(user.username, command.passwordHash);
     await notifications.notify({ type: 'PasswordChanged', username: user.username.value });
   }
 }

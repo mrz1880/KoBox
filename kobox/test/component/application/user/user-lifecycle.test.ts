@@ -10,7 +10,7 @@ import {
 } from '../../../../src/application/user/errors.js';
 import { AccountType } from '../../../../src/domain/user/AccountType.js';
 import { EmailAddress } from '../../../../src/domain/user/EmailAddress.js';
-import { Password } from '../../../../src/domain/user/Password.js';
+import { HashedPassword } from '../../../../src/domain/user/HashedPassword.js';
 import { ProxyPort, RtorrentPort, ScgiPort } from '../../../../src/domain/user/Port.js';
 import type { PortAllocatorPort } from '../../../../src/domain/user/PortAllocatorPort.js';
 import { Quota } from '../../../../src/domain/user/Quota.js';
@@ -36,6 +36,7 @@ class SequentialPortAllocator implements PortAllocatorPort {
 }
 
 const user-f = Username.parse('user-f');
+const aHash = HashedPassword.parse('$6$testsalt$0123456789abcdefghijklmnopqrstuv');
 
 function createUserCommand() {
   return {
@@ -44,7 +45,7 @@ function createUserCommand() {
     accountType: AccountType.normal,
     quota: Quota.gib(412),
     proxyPort: ProxyPort.parse(8080),
-    password: Password.parse('s3cretpw'),
+    passwordHash: aHash,
   };
 }
 
@@ -143,7 +144,7 @@ describe('ChangePassword', () => {
   it('should_set_the_system_password_and_notify', async () => {
     await world.createUser.execute(createUserCommand());
 
-    await world.changePassword.execute({ username: user-f, password: Password.parse('newpass99') });
+    await world.changePassword.execute({ username: user-f, passwordHash: aHash });
 
     expect(world.notifications.published.at(-1)).toEqual({
       type: 'PasswordChanged',
@@ -153,7 +154,7 @@ describe('ChangePassword', () => {
 
   it('should_reject_unknown_users', async () => {
     await expect(
-      world.changePassword.execute({ username: user-f, password: Password.parse('newpass99') }),
+      world.changePassword.execute({ username: user-f, passwordHash: aHash }),
     ).rejects.toThrow(UserNotFoundError);
   });
 });

@@ -1,6 +1,6 @@
 import type { AccountType } from '../../domain/user/AccountType.js';
 import type { EmailAddress } from '../../domain/user/EmailAddress.js';
-import type { Password } from '../../domain/user/Password.js';
+import type { HashedPassword } from '../../domain/user/HashedPassword.js';
 import type { ProxyPort } from '../../domain/user/Port.js';
 import type { PortAllocatorPort } from '../../domain/user/PortAllocatorPort.js';
 import type { Quota } from '../../domain/user/Quota.js';
@@ -22,7 +22,7 @@ export interface CreateUserCommand {
   readonly accountType: AccountType;
   readonly quota: Quota;
   readonly proxyPort: ProxyPort;
-  readonly password: Password;
+  readonly passwordHash: HashedPassword;
 }
 
 interface Deps {
@@ -58,7 +58,7 @@ export class CreateUser {
     });
 
     await accounts.createAccount(user.username);
-    await accounts.setPassword(user.username, command.password.reveal());
+    await accounts.setPassword(user.username, command.passwordHash);
     await quota.setQuota(user.username, user.quota);
     await sftp.enableChrootAccess(user.username);
     await services.startUserService(user.username);

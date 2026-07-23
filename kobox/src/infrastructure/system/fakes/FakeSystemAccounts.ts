@@ -1,3 +1,4 @@
+import type { HashedPassword } from '../../../domain/user/HashedPassword.js';
 import type { SystemAccountPort } from '../../../domain/user/ports.js';
 import type { Username } from '../../../domain/user/Username.js';
 
@@ -23,9 +24,9 @@ export class FakeSystemAccounts implements SystemAccountPort {
     });
   }
 
-  setPassword(username: Username, password: string): Promise<void> {
+  setPassword(username: Username, hash: HashedPassword): Promise<void> {
     return this.withAccount(username, (account) => {
-      account.hasPassword = password.length > 0;
+      account.hasPassword = hash.value.length > 0;
     });
   }
 
