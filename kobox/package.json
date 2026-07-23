@@ -4,6 +4,10 @@
   "private": true,
   "description": "KoBox — multi-user seedbox manager (Phase 0: User Management)",
   "type": "module",
+  "bin": {
+    "kobox": "dist/interfaces/cli/main.js",
+    "kobox-worker": "dist/interfaces/worker/main.js"
+  },
   "engines": {
     "node": ">=24"
   },
