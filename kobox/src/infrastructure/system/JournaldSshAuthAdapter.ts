@@ -35,10 +35,10 @@ export class JournaldSshAuthAdapter implements SshAuthLogPort {
   async countAcceptedPublickey(username: Username, windowMinutes: number): Promise<number> {
     const result = await this.runner.run({
       command: 'journalctl',
+      // --identifier (not -u): matches the real sshd's syslog identifier AND
+      // fixture entries emitted via systemd-cat -t sshd
       args: [
-        '-u',
-        'ssh',
-        '-u',
+        '--identifier',
         'sshd',
         '--since',
         `-${String(windowMinutes)}min`,

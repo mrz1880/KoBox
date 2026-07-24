@@ -270,6 +270,10 @@ describe('JournaldSshAuthAdapter', () => {
     expect(call?.command).toBe('journalctl');
     expect(call?.args).toContain('--since');
     expect(call?.args).toContain('-60min');
+    // match by syslog identifier, not unit: it catches the real sshd AND
+    // journal entries emitted by fixtures (systemd-cat -t sshd)
+    expect(call?.args).toContain('--identifier');
+    expect(call?.args).toContain('sshd');
   });
 
   it('should_treat_the_no_entries_exit_code_as_zero', async () => {
