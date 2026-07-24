@@ -48,6 +48,17 @@ Notes :
   (défaut `/var/spool/kobox/events`, mode `1733`) ; le worker root en déduit l'identité
   depuis le propriétaire du fichier. `KOBOX_BIN` fixe la commande `kobox` insérée dans
   les shims rendus (défaut `/usr/local/bin/kobox`).
+- **Tracker & Blocklist (Phase 2)** : l'E2E héberge ses fixtures **en local** (aucun
+  réseau sortant) — un serveur TLS `tracker.example.org:8443` et un serveur HTTPS
+  `lists.example.net:8444`, tous deux sur `127.0.0.2` via `/etc/hosts` (posé par
+  `docker/e2e-setup.sh` ; pas `.1` : le domaine filtre les IP loopback comme le legacy).
+  Env utiles : `KOBOX_IBLOCKLIST_CATALOG_URL` (catalogue XML), `KOBOX_BLOCKLIST_CACHE`
+  (liste fusionnée), `KOBOX_CERTS_DIR` (défaut `/etc/ssl/certs`),
+  `KOBOX_IBLOCKLIST_USER`/`KOBOX_IBLOCKLIST_PIN` (abonnement, jamais en DB/logs),
+  `NODE_EXTRA_CA_CERTS` (CA de test pour les fixtures auto-signées).
+  ⚠️ Dans un test qui héberge un serveur fixture, lancer worker/CLI enfants en
+  **asynchrone** (`execFile` promisifié) : un `execFileSync` bloque la boucle
+  d'événements et gèle les handshakes TLS des fixtures.
 
 ## VM Multipass (validation full-stack, quotas ext4 réels)
 
