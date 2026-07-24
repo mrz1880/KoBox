@@ -1,0 +1,4 @@
+# KoBox-managed file for alice — DO NOT EDIT.
+ipv4_filter.load = /home/alice/blocklist/blocklist_rtorrent.txt, unwanted
+schedule2 = load_filter,0,24:00:00,"ipv4_filter.load = /home/alice/blocklist/blocklist_rtorrent.txt, unwanted"
+print = "IPv4 filter list size data:",(to_kb,(ipv4_filter.size_data))," kb."
