@@ -71,6 +71,10 @@ export const FairUseEvaluator = {
         username: username.value,
         rateBps: budget.throttleTo.bps,
       });
+    } else if (breach && input.level === 'throttled') {
+      // hold silently but RE-ASSERT through the idempotent shaper: tc state
+      // lost to a reboot gets repaired while the DB still says throttled
+      actions.push('throttle');
     } else if (!breach && input.level !== 'none') {
       nextLevel = 'none';
       if (input.level === 'throttled') {

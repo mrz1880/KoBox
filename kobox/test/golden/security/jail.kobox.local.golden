@@ -1,4 +1,6 @@
 # KoBox-managed fail2ban jails — DO NOT EDIT (rendered declaratively).
+# backend is set per-jail (not in DEFAULT): the journald backend fits
+# the ssh jails only — nginx jails keep their file-based default.
 [DEFAULT]
 ignoreip = 127.0.0.1/8 ::1 192.0.2.42 198.51.100.9
 

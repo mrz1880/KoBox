@@ -50,6 +50,8 @@ export class InMemoryUserAddressRepository
     const key = `${username.value}|${host.value}`;
     const existing = this.bindings.get(key);
     if (existing) {
+      // mirror the sqlite behavior: a redundant static row is absorbed
+      this.entries.delete(`${username.value}|${ip.value}`);
       this.bindings.set(key, { ...existing, resolvedIp: ip });
     }
     return Promise.resolve();

@@ -46,6 +46,12 @@ export class NetworkServiceAdapter implements NetworkServicePort, NetworkService
       args: ['list-unit-files', `${unit}.service`, '--no-legend'],
       timeoutMs: 5_000,
     });
+    // absence answers with an empty listing and a SILENT stderr; anything on
+    // stderr means systemctl itself failed (dbus down) — that must escalate,
+    // absence is the one tolerated case
+    if (result.stderr.trim().length > 0) {
+      throw new Error(`systemctl list-unit-files ${unit}: ${result.stderr.trim()}`);
+    }
     const exists = result.exitCode === 0 && result.stdout.trim().length > 0;
     if (!exists) {
       this.logger.warn({ unit }, 'unit not installed — reload skipped');

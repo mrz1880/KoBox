@@ -50,6 +50,12 @@ export class JournaldSshAuthAdapter implements SshAuthLogPort {
       ],
       timeoutMs: 10_000,
     });
+    // exit 1 + empty output = "no entries matched" (normal quiet window);
+    // anything else is a broken journal and must NOT read as calm — a blind
+    // meter is exactly how user-h went unnoticed
+    if (result.exitCode !== 0 && !(result.exitCode === 1 && result.stdout.trim() === '')) {
+      throw new Error(`journalctl failed (exit ${String(result.exitCode)}): ${result.stderr.trim()}`);
+    }
     return countAcceptedPublickeyLines(result.stdout, username.value);
   }
 }

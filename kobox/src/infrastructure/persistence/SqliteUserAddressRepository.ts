@@ -85,13 +85,28 @@ export class SqliteUserAddressRepository implements UserAddressRepository, DynDn
   }
 
   updateResolvedIp(username: Username, host: DynDnsHost, ip: IpAddress): Promise<void> {
-    this.db.orm
-      .update(userAddresses)
-      .set({ ipv4: ip.value })
-      .where(
-        and(eq(userAddresses.username, username.value), eq(userAddresses.hostname, host.value)),
-      )
-      .run();
+    this.db.raw.transaction(() => {
+      // absorb a redundant static row for the same address: the hostname
+      // binding tracks it from now on (and UNIQUE(username, ipv4) would
+      // otherwise fail this update forever — the static->dyndns migration)
+      this.db.orm
+        .delete(userAddresses)
+        .where(
+          and(
+            eq(userAddresses.username, username.value),
+            eq(userAddresses.ipv4, ip.value),
+            eq(userAddresses.checkBy, 'ipv4'),
+          ),
+        )
+        .run();
+      this.db.orm
+        .update(userAddresses)
+        .set({ ipv4: ip.value })
+        .where(
+          and(eq(userAddresses.username, username.value), eq(userAddresses.hostname, host.value)),
+        )
+        .run();
+    })();
     return Promise.resolve();
   }
 }

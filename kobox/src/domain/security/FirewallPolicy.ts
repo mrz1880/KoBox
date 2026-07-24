@@ -57,6 +57,14 @@ export class FirewallPolicy {
     assertPort(props.vpn.tapPort, 'vpn.tapPort');
     const seen = new Set<string>();
     for (const user of props.users) {
+      // iptables chain names cap at 28 chars; "kobox-u-" leaves 20 for the
+      // username — fail here, where the culprit can be named, instead of
+      // letting every iptables-restore die opaquely
+      if (user.username.value.length > 20) {
+        throw new InvalidFirewallPolicyError(
+          `username ${user.username.value} is too long for an iptables chain name (max 20)`,
+        );
+      }
       assertPort(user.rtorrentPort, `rtorrentPort of ${user.username.value}`);
       if (!Number.isInteger(user.uid) || user.uid < 1) {
         throw new InvalidFirewallPolicyError(

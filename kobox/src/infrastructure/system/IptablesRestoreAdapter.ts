@@ -6,9 +6,14 @@ import { runOrThrow, type CommandRunner } from './CommandRunner.js';
 
 const RESTORE_TIMEOUT_MS = 10_000;
 
+// A chain the renderer always emits: its presence in iptables-save is the
+// proof that the persisted file still describes the LIVE tables (they do not
+// survive a reboot — the file alone proves nothing).
+const SENTINEL_CHAIN = ':kobox-meter-out';
+
 // The anti-lockout guard. Ordering is the whole point:
-//   1. read the persisted ruleset — identical content means nothing to do
-//      (the file always describes the LIVE ruleset, see below);
+//   1. read the persisted ruleset — identical content AND a live sentinel
+//      chain means nothing to do;
 //   2. snapshot the running tables (iptables-save);
 //   3. iptables-restore the new ruleset from stdin (atomic per table);
 //   4. probe the SSH lifeline — sshd must still accept local connections;
@@ -24,15 +29,14 @@ export class IptablesRestoreAdapter implements FirewallApplyPort {
 
   async apply(rules: RenderedFile): Promise<FirewallApplyOutcome> {
     const current = await readFile(rules.path, 'utf8').catch(() => undefined);
-    if (current === rules.content) {
-      return 'unchanged';
-    }
-
     const snapshot = await runOrThrow(this.runner, {
       command: 'iptables-save',
       args: [],
       timeoutMs: RESTORE_TIMEOUT_MS,
     });
+    if (current === rules.content && snapshot.stdout.includes(SENTINEL_CHAIN)) {
+      return 'unchanged';
+    }
     await runOrThrow(this.runner, {
       command: 'iptables-restore',
       args: [],

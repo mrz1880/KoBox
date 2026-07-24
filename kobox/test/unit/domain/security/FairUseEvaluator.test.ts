@@ -76,10 +76,12 @@ describe('FairUseEvaluator — the frozen graduated response', () => {
     ]);
   });
 
-  it('should_hold_the_throttle_silently_while_the_breach_continues', () => {
+  it('should_hold_the_throttle_silently_but_reassert_it_while_the_breach_continues', () => {
+    // re-asserting through the idempotent shaper repairs tc state lost to a
+    // reboot while the DB still says throttled — silently: no event spam
     const decision = evaluate({ level: 'throttled', egress: heavyEgress });
     expect(decision.nextLevel).toBe('throttled');
-    expect(decision.actions).toEqual([]);
+    expect(decision.actions).toEqual(['throttle']);
     expect(decision.events).toEqual([]); // no notification spam
   });
 

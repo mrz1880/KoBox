@@ -113,14 +113,27 @@ describe('IptablesRestoreAdapter', () => {
     expect(readFileSync(rules.path, 'utf8')).toBe(rules.content);
   });
 
-  it('should_be_idempotent_when_the_persisted_rules_already_match', async () => {
+  it('should_be_idempotent_when_the_persisted_rules_already_match_the_live_tables', async () => {
     await adapter.apply(rules);
+    // the live tables carry our sentinel chain — nothing to do
+    runner.on('iptables-save', { stdout: '*filter\n:kobox-meter-out - [0:0]\nCOMMIT\n' });
     runner.calls.length = 0;
 
     const outcome = await adapter.apply(rules);
 
     expect(outcome).toBe('unchanged');
-    expect(runner.calls).toHaveLength(0); // no restore, no snapshot
+    expect(runner.calls.map((call) => call.command)).toEqual(['iptables-save']); // probe only
+  });
+
+  it('should_reapply_after_a_reboot_wiped_the_live_tables_despite_a_matching_file', async () => {
+    // iptables state does not survive reboot; the file alone is not proof
+    await adapter.apply(rules);
+    runner.calls.length = 0; // live tables still SNAPSHOT (no kobox chains)
+
+    const outcome = await adapter.apply(rules);
+
+    expect(outcome).toBe('applied');
+    expect(runner.calls.filter((call) => call.command === 'iptables-restore')).toHaveLength(1);
   });
 
   it('should_restore_the_snapshot_and_keep_the_old_file_when_the_probe_fails', async () => {
@@ -189,6 +202,18 @@ describe('NetworkServiceAdapter', () => {
       .commandLines()
       .filter((line) => !line.startsWith('systemctl list-unit-files'));
     expect(reloadCalls).toEqual([]);
+  });
+
+  it('should_escalate_when_systemctl_itself_fails_rather_than_treat_it_as_absent', async () => {
+    // absence is the ONE tolerated case; a dbus failure is not absence
+    const runner = new PrefixRunner();
+    runner.on('systemctl list-unit-files', {
+      exitCode: 1,
+      stderr: 'Failed to connect to bus: No such file or directory',
+    });
+    const adapter = new NetworkServiceAdapter(runner, logger);
+
+    await expect(adapter.reloadFail2ban()).rejects.toThrow('Failed to connect to bus');
   });
 
   it('should_reload_bind_via_rndc_and_dnscrypt_via_try_restart', async () => {
@@ -283,6 +308,17 @@ describe('JournaldSshAuthAdapter', () => {
     const authLog = new JournaldSshAuthAdapter(runner);
 
     expect(await authLog.countAcceptedPublickey(Username.parse('alice'), 60)).toBe(0);
+  });
+
+  it('should_escalate_a_broken_journald_instead_of_reading_it_as_calm', async () => {
+    // a dead journal must not silently blind the user-h detector
+    const runner = new PrefixRunner();
+    runner.on('journalctl', { exitCode: 2, stderr: 'Failed to open journal: Input/output error' });
+    const authLog = new JournaldSshAuthAdapter(runner);
+
+    await expect(authLog.countAcceptedPublickey(Username.parse('alice'), 60)).rejects.toThrow(
+      'Input/output error',
+    );
   });
 });
 

@@ -15,6 +15,9 @@ function chainOf(user: FirewallUser): string {
   return `kobox-u-${user.username.value}`;
 }
 
+// Deliberate legacy parity: a member's declared address is trusted for EVERY
+// service, ahead of the pgl filter (like the legacy user rules + allow.p2p
+// whitelisting). Per-service restriction would live in the kobox-u-* chains.
 function trustedRules(users: readonly FirewallUser[]): readonly string[] {
   return users.flatMap((user) =>
     [...user.addresses]
@@ -115,6 +118,8 @@ export function renderFail2banJails(
     path: '/etc/fail2ban/jail.d/kobox.local',
     content: [
       '# KoBox-managed fail2ban jails — DO NOT EDIT (rendered declaratively).',
+      '# backend is set per-jail (not in DEFAULT): the journald backend fits',
+      '# the ssh jails only — nginx jails keep their file-based default.',
       '[DEFAULT]',
       `ignoreip = ${ignoreLine}`,
       '',

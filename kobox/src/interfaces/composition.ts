@@ -68,9 +68,16 @@ import {
 } from './useCases.js';
 import type { SecuritySettings } from '../application/security/settings.js';
 
-function envPort(name: string, fallback: number): number {
+function envInt(name: string, fallback: number): number {
   const raw = process.env[name];
-  return raw === undefined ? fallback : Number(raw);
+  if (raw === undefined) {
+    return fallback;
+  }
+  const value = Number(raw);
+  if (!Number.isInteger(value) || value <= 0) {
+    throw new Error(`${name} must be a positive integer, got ${JSON.stringify(raw)}`);
+  }
+  return value;
 }
 
 // The frozen alert channels (ntfy + email via Postfix + Discord), each armed
@@ -99,22 +106,22 @@ function buildNotifier(
 
 export function fairUsePolicy(): FairUsePolicy {
   return FairUsePolicy.of({
-    sustainedEgress: Bandwidth.mbit(envPort('KOBOX_FAIRUSE_EGRESS_MBIT', 50)),
-    maxAuthPerHour: envPort('KOBOX_FAIRUSE_AUTH_PER_HOUR', 30),
-    throttleTo: Bandwidth.mbit(envPort('KOBOX_FAIRUSE_THROTTLE_MBIT', 5)),
+    sustainedEgress: Bandwidth.mbit(envInt('KOBOX_FAIRUSE_EGRESS_MBIT', 50)),
+    maxAuthPerHour: envInt('KOBOX_FAIRUSE_AUTH_PER_HOUR', 30),
+    throttleTo: Bandwidth.mbit(envInt('KOBOX_FAIRUSE_THROTTLE_MBIT', 5)),
   });
 }
 
 export function securitySettings(): SecuritySettings {
   const vpnRemote = process.env.KOBOX_VPN_REMOTE;
   return {
-    sshPort: envPort('KOBOX_SSH_PORT', 22),
-    portalPort: envPort('KOBOX_PORTAL_PORT', 8189),
+    sshPort: envInt('KOBOX_SSH_PORT', 22),
+    portalPort: envInt('KOBOX_PORTAL_PORT', 8189),
     ...(vpnRemote !== undefined && { vpnRemote: DynDnsHost.parse(vpnRemote) }),
     vpn: {
-      tunGwPort: envPort('KOBOX_VPN_TUN_GW_PORT', 8193),
-      tunPort: envPort('KOBOX_VPN_TUN_PORT', 8194),
-      tapPort: envPort('KOBOX_VPN_TAP_PORT', 8195),
+      tunGwPort: envInt('KOBOX_VPN_TUN_GW_PORT', 8193),
+      tunPort: envInt('KOBOX_VPN_TUN_PORT', 8194),
+      tapPort: envInt('KOBOX_VPN_TAP_PORT', 8195),
       tunGwSubnet: Cidr.parse(process.env.KOBOX_VPN_TUN_GW_SUBNET ?? '10.0.0.0/24'),
       tunSubnet: Cidr.parse(process.env.KOBOX_VPN_TUN_SUBNET ?? '10.0.1.0/24'),
       tapSubnet: Cidr.parse(process.env.KOBOX_VPN_TAP_SUBNET ?? '10.0.2.0/24'),

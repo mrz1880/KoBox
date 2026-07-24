@@ -74,6 +74,15 @@ describe('FirewallPolicy', () => {
   it('should_reject_duplicate_usernames', () => {
     expect(() => policyWith([users[0]!, users[0]!])).toThrow(InvalidFirewallPolicyError);
   });
+
+  it('should_reject_usernames_whose_chain_name_would_exceed_the_iptables_limit', () => {
+    // iptables chain names are capped at 28 chars; "kobox-u-" leaves 20.
+    // Failing at policy construction names the culprit instead of letting
+    // every iptables-restore die opaquely.
+    const tooLong = { ...users[0]!, username: Username.parse('a'.repeat(21)) };
+    expect(() => policyWith([tooLong])).toThrow(InvalidFirewallPolicyError);
+    expect(() => policyWith([{ ...users[0]!, username: Username.parse('a'.repeat(20)) }])).not.toThrow();
+  });
 });
 
 describe('renderFirewallRules', () => {

@@ -485,6 +485,22 @@ describe('SqliteUserAddressRepository', () => {
     expect((await repo.listHostnames())[0]?.resolvedIp?.value).toBe('203.0.113.9');
   });
 
+  it('should_absorb_a_static_row_when_a_hostname_resolves_to_the_same_ip', async () => {
+    // the static -> dyndns migration path: without absorption the UNIQUE
+    // (username, ipv4) constraint would fail resolve-dyndns forever
+    const repo = new SqliteUserAddressRepository(db);
+    const alice = Username.parse('alice');
+    const host = DynDnsHost.parse('dyn.example.org');
+    await repo.add(alice, IpAddress.parse('203.0.113.9'));
+    await repo.addHostname(alice, host);
+
+    await repo.updateResolvedIp(alice, host, IpAddress.parse('203.0.113.9'));
+
+    const all = await repo.listAll();
+    expect(all).toHaveLength(1); // the hostname row carries the address now
+    expect((await repo.listHostnames())[0]?.resolvedIp?.value).toBe('203.0.113.9');
+  });
+
   it('should_remove_hostname_bindings_idempotently', async () => {
     const repo = new SqliteUserAddressRepository(db);
     const alice = Username.parse('alice');

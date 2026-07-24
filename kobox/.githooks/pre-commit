@@ -6,24 +6,27 @@ set -euo pipefail
 repo_root="$(git rev-parse --show-toplevel)"
 cd "$repo_root/kobox"
 
-# Only run if kobox/ has staged changes — a docs-only commit skips the toolchain.
+# Only run the toolchain if kobox/ has staged changes — docs-only commits skip it.
 if git diff --cached --name-only | grep -q '^kobox/'; then
   echo "[pre-commit] lint + typecheck"
   pnpm lint
   pnpm typecheck
-  echo "[pre-commit] guard: no production/personal identifiers"
-  # The detection list is base64-encoded so the very identifiers we forbid do
-  # not appear in cleartext in this public repo. Decode at runtime only.
-  forbidden="$(printf '%s' \
-    'a29mYW1pbHl8MTk1XC4xNTRcLjE3MXxtcnoxODgwfFxiYW50aG9ueVxifFxibHVkb1xifFxibHVkb2ZcYnxcYmxlb25ldWZcYnxcYmp1bGllblxifFxidGl0aVxifFxidG9ueXpcYnxcYmZyZWRcYnxcYnJvbWFpblxi' \
-    | base64 -d)"
-  if git diff --cached -U0 --no-color -- 'src' 'test' \
-      | grep -nE '^\+' \
-      | grep -viE '^\+\+\+' \
-      | grep -inE "$forbidden"; then
-    echo "[pre-commit] BLOCKED: staged lines contain a production/personal identifier." >&2
-    exit 1
-  fi
 else
   echo "[pre-commit] no kobox/ changes staged — skipping toolchain checks"
+fi
+
+# The identifier guard runs on EVERY staged path (public repo): a stray doc or
+# handoff note leaks just as hard as source code.
+echo "[pre-commit] guard: no production/personal identifiers"
+# The detection list is base64-encoded so the very identifiers we forbid do
+# not appear in cleartext in this public repo. Decode at runtime only.
+forbidden="$(printf '%s' \
+  'a29mYW1pbHl8MTk1XC4xNTRcLjE3MXxtcnoxODgwfFxiYW50aG9ueVxifFxibHVkb1xifFxibHVkb2ZcYnxcYmxlb25ldWZcYnxcYmp1bGllblxifFxidGl0aVxifFxidG9ueXpcYnxcYmZyZWRcYnxcYnJvbWFpblxi' \
+  | base64 -d)"
+if git -C "$repo_root" diff --cached -U0 --no-color \
+    | grep -nE '^\+' \
+    | grep -viE '^\+\+\+' \
+    | grep -inE "$forbidden"; then
+  echo "[pre-commit] BLOCKED: staged lines contain a production/personal identifier." >&2
+  exit 1
 fi

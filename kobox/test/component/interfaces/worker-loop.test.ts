@@ -458,6 +458,35 @@ describe('security job chains (provision -> firewall)', () => {
     );
   });
 
+  it('should_refresh_firewall_and_fail2ban_on_static_address_changes_too', async () => {
+    // removing a compromised member IP must leave the LIVE firewall too,
+    // not only allow.p2p (review I2)
+    world.identity.setUid('alice', 1001);
+    await enqueueCreateAlice();
+    await world.worker.drain();
+    await world.queue.enqueue(
+      parseJob('add-user-address', { username: 'alice', ipv4: '198.51.100.7' }),
+    );
+    await world.worker.drain();
+
+    expect(world.firewall.applied.at(-1)?.content).toContain(
+      '-A INPUT -s 198.51.100.7 -m comment --comment "kobox:trusted:alice" -j ACCEPT',
+    );
+    expect(world.networkFiles.contentAt('/etc/fail2ban/jail.d/kobox.local')).toContain(
+      '198.51.100.7',
+    );
+
+    await world.queue.enqueue(
+      parseJob('remove-user-address', { username: 'alice', ipv4: '198.51.100.7' }),
+    );
+    await world.worker.drain();
+
+    expect(world.firewall.applied.at(-1)?.content).not.toContain('198.51.100.7');
+    expect(world.networkFiles.contentAt('/etc/fail2ban/jail.d/kobox.local')).not.toContain(
+      '198.51.100.7',
+    );
+  });
+
   it('should_not_chain_refreshes_while_the_hostname_stays_unresolved', async () => {
     await world.queue.enqueue(
       parseJob('add-user-hostname', { username: 'alice', hostname: 'dyn.example.org' }),

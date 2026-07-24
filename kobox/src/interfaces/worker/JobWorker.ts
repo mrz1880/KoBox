@@ -267,7 +267,13 @@ export class JobWorker {
           username: Username.parse(job.payload.username),
           ip: IpAddress.parse(job.payload.ipv4),
         });
-        return { whitelistDirty: report.whitelistDirty };
+        // a member address is rendered in three places: allow.p2p, the
+        // firewall trusted rules and fail2ban ignoreip — refresh all of them
+        return {
+          whitelistDirty: report.whitelistDirty,
+          firewallDirty: report.whitelistDirty,
+          fail2banDirty: report.whitelistDirty,
+        };
       }
     }
   }

@@ -1,5 +1,5 @@
 import { FairUseEvaluator } from '../../domain/security/FairUseEvaluator.js';
-import type { FairUsePolicy } from '../../domain/security/FairUsePolicy.js';
+import type { FairUsePolicy, ResourceBudget } from '../../domain/security/FairUsePolicy.js';
 import { ConnectionRate, EgressRate } from '../../domain/security/Rates.js';
 import type {
   FairUseRepository,
@@ -58,7 +58,11 @@ export class EvaluateFairUse {
         continue;
       }
       evaluated += 1;
-      const decision = await this.evaluateOne(user, counters.get(user.username.value), now);
+      const { decision, budget } = await this.evaluateOne(
+        user,
+        counters.get(user.username.value),
+        now,
+      );
       breaches += decision.events.some(
         (event) => event.type === 'FairUseBreached' || event.type === 'AbnormalAuthRate',
       )
@@ -67,7 +71,6 @@ export class EvaluateFairUse {
       throttled += decision.actions.includes('throttle') ? 1 : 0;
 
       for (const action of decision.actions) {
-        const budget = this.deps.policy.budgetFor(await fairUse.overridesFor(user.username));
         if (action === 'throttle') {
           await this.deps.shaping.throttle(user.username, uid, budget.throttleTo);
         } else {
@@ -86,7 +89,13 @@ export class EvaluateFairUse {
     user: SeedboxUser,
     counter: UsageCounter | undefined,
     now: string,
-  ): Promise<{ events: readonly SecurityEvent[]; actions: readonly ('throttle' | 'unthrottle')[] }> {
+  ): Promise<{
+    decision: {
+      events: readonly SecurityEvent[];
+      actions: readonly ('throttle' | 'unthrottle')[];
+    };
+    budget: ResourceBudget;
+  }> {
     const { fairUse, authLog, health } = this.deps;
     const username = user.username;
 
@@ -131,6 +140,6 @@ export class EvaluateFairUse {
         now,
       );
     }
-    return decision;
+    return { decision, budget };
   }
 }
