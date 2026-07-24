@@ -81,6 +81,13 @@ export interface IblocklistCatalogPort {
   fetchCatalog(): Promise<readonly CatalogEntry[]>;
 }
 
+// Durable merged-ranges cache: update-blocklists writes it, the per-user
+// filter render reads it — the two jobs stay decoupled through disk state.
+export interface BlocklistCachePort {
+  write(ranges: readonly string[]): Promise<void>;
+  read(): Promise<readonly string[]>;
+}
+
 export interface TrackerNotificationPort {
   notify(event: TrackerEvent): Promise<void>;
 }

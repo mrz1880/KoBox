@@ -1,3 +1,12 @@
+import { DiscoverTrackerFromTorrent } from '../application/tracker/DiscoverTrackerFromTorrent.js';
+import { FetchTrackerCert } from '../application/tracker/FetchTrackerCert.js';
+import { ImportBlocklistCatalog } from '../application/tracker/ImportBlocklistCatalog.js';
+import { ManageUserAddress } from '../application/tracker/ManageUserAddress.js';
+import { MarkTrackerDead } from '../application/tracker/MarkTrackerDead.js';
+import { RenderBlocklistFilters } from '../application/tracker/RenderBlocklistFilters.js';
+import { RenderWhitelist } from '../application/tracker/RenderWhitelist.js';
+import { RenewTrackerCerts } from '../application/tracker/RenewTrackerCerts.js';
+import { UpdateBlocklists, type IblocklistCredentials } from '../application/tracker/UpdateBlocklists.js';
 import { AddWatchDir } from '../application/torrent/AddWatchDir.js';
 import { DeprovisionRtorrentInstance } from '../application/torrent/DeprovisionRtorrentInstance.js';
 import { HandleTorrentEvent } from '../application/torrent/HandleTorrentEvent.js';
@@ -19,6 +28,20 @@ import type {
   UserScriptRunnerPort,
   WatchDirPort,
 } from '../domain/torrent/ports.js';
+import type { ManagedFilesPort } from '../domain/shared/files.js';
+import type {
+  BlocklistCachePort,
+  BlocklistDownloadPort,
+  BlocklistRepository,
+  CertStorePort,
+  DnsResolverPort,
+  IblocklistCatalogPort,
+  NetworkServiceReloadPort,
+  TrackerCertPort,
+  TrackerNotificationPort,
+  TrackerRepository,
+  UserAddressRepository,
+} from '../domain/tracker/ports.js';
 import type { RenderSettings, RtorrentTemplates } from '../domain/torrent/rendering.js';
 import type { PortAllocatorPort } from '../domain/user/PortAllocatorPort.js';
 import type {
@@ -80,6 +103,51 @@ export interface TorrentUseCases {
   readonly setSyncDisabled: SetSyncDisabled;
   readonly setAllowPublicTracker: SetAllowPublicTracker;
   readonly handleEvent: HandleTorrentEvent;
+}
+
+export interface TrackerUseCaseDeps {
+  readonly trackers: TrackerRepository;
+  readonly blocklists: BlocklistRepository;
+  readonly addresses: UserAddressRepository;
+  readonly users: UserRepository;
+  readonly instances: TorrentInstanceRepository;
+  readonly dns: DnsResolverPort;
+  readonly certPort: TrackerCertPort;
+  readonly certStore: CertStorePort;
+  readonly download: BlocklistDownloadPort;
+  readonly catalog: IblocklistCatalogPort;
+  readonly cache: BlocklistCachePort;
+  readonly files: ManagedFilesPort;
+  readonly reload: NetworkServiceReloadPort;
+  readonly notifications: TrackerNotificationPort;
+  readonly credentials?: IblocklistCredentials;
+}
+
+export interface TrackerUseCases {
+  readonly discover: DiscoverTrackerFromTorrent;
+  readonly fetchCert: FetchTrackerCert;
+  readonly renewCerts: RenewTrackerCerts;
+  readonly markDead: MarkTrackerDead;
+  readonly importCatalog: ImportBlocklistCatalog;
+  readonly updateBlocklists: UpdateBlocklists;
+  readonly renderWhitelist: RenderWhitelist;
+  readonly renderBlocklistFilters: RenderBlocklistFilters;
+  readonly manageUserAddress: ManageUserAddress;
+}
+
+export function buildTrackerUseCases(deps: TrackerUseCaseDeps): TrackerUseCases {
+  const fetchCert = new FetchTrackerCert(deps);
+  return {
+    discover: new DiscoverTrackerFromTorrent(deps),
+    fetchCert,
+    renewCerts: new RenewTrackerCerts({ trackers: deps.trackers, fetchCert }),
+    markDead: new MarkTrackerDead(deps),
+    importCatalog: new ImportBlocklistCatalog(deps),
+    updateBlocklists: new UpdateBlocklists(deps),
+    renderWhitelist: new RenderWhitelist(deps),
+    renderBlocklistFilters: new RenderBlocklistFilters(deps),
+    manageUserAddress: new ManageUserAddress(deps),
+  };
 }
 
 export function buildTorrentUseCases(deps: TorrentUseCaseDeps): TorrentUseCases {
