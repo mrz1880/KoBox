@@ -377,6 +377,38 @@ program
     await done(c, `job ${String(id)} enqueued: render-fail2ban`);
   });
 
+function userHostnameCommand(name: 'add-user-hostname' | 'remove-user-hostname'): void {
+  program
+    .command(name)
+    .argument('<username>')
+    .argument('<hostname>')
+    .description(
+      `${name === 'add-user-hostname' ? 'track' : 'stop tracking'} a DynDNS hostname for a user (restrict IP)`,
+    )
+    .action(async (rawUser: string, hostname: string) => {
+      const c = container();
+      const input = { username: Username.parse(rawUser).value, hostname };
+      const job =
+        name === 'add-user-hostname'
+          ? buildJob.addUserHostname(input)
+          : buildJob.removeUserHostname(input);
+      const id = await c.queue.enqueue(job);
+      await done(c, `job ${String(id)} enqueued: ${name} ${input.username} ${hostname}`);
+    });
+}
+
+userHostnameCommand('add-user-hostname');
+userHostnameCommand('remove-user-hostname');
+
+program
+  .command('resolve-dyndns')
+  .description('re-resolve DynDNS hostnames; refreshes whitelist/firewall/fail2ban on change')
+  .action(async () => {
+    const c = container();
+    const id = await c.queue.enqueue(buildJob.resolveDynDns());
+    await done(c, `job ${String(id)} enqueued: resolve-dyndns`);
+  });
+
 program
   .command('list-trackers')
   .description('print the tracker whitelist as JSON (operator view)')

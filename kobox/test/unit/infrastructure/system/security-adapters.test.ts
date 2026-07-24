@@ -12,6 +12,8 @@ import type {
   CommandResult,
   CommandRunner,
 } from '../../../../src/infrastructure/system/CommandRunner.js';
+import { DynDnsHost } from '../../../../src/domain/security/DynDnsHost.js';
+import { DynDnsLookupAdapter } from '../../../../src/infrastructure/system/DynDnsLookupAdapter.js';
 import { GetentUserIdentityAdapter } from '../../../../src/infrastructure/system/GetentUserIdentityAdapter.js';
 import { IptablesRestoreAdapter } from '../../../../src/infrastructure/system/IptablesRestoreAdapter.js';
 import { NetworkServiceAdapter } from '../../../../src/infrastructure/system/NetworkServiceAdapter.js';
@@ -206,6 +208,25 @@ describe('NetworkServiceAdapter', () => {
     await adapter.reloadPeerGuardian();
 
     expect(runner.commandLines()).toContain('pglcmd reload');
+  });
+});
+
+describe('DynDnsLookupAdapter', () => {
+  const host = DynDnsHost.parse('dyn.example.org');
+
+  it('should_resolve_ipv4_via_the_injected_lookup', async () => {
+    const adapter = new DynDnsLookupAdapter(() => Promise.resolve({ address: '203.0.113.9' }));
+    expect((await adapter.resolve(host))?.value).toBe('203.0.113.9');
+  });
+
+  it('should_return_undefined_on_nxdomain_or_lookup_failure', async () => {
+    const adapter = new DynDnsLookupAdapter(() => Promise.reject(new Error('ENOTFOUND')));
+    expect(await adapter.resolve(host)).toBeUndefined();
+  });
+
+  it('should_return_undefined_when_the_answer_is_not_a_usable_ipv4', async () => {
+    const adapter = new DynDnsLookupAdapter(() => Promise.resolve({ address: '::1' }));
+    expect(await adapter.resolve(host)).toBeUndefined();
   });
 });
 

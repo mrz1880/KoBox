@@ -1,5 +1,6 @@
 import { parseJob, type Job } from '../../application/jobs/contract.js';
 import type { JobQueuePort } from '../../application/jobs/JobQueuePort.js';
+import { DynDnsHost } from '../../domain/security/DynDnsHost.js';
 import { IpAddress } from '../../domain/shared/IpAddress.js';
 import { TrackerHost } from '../../domain/tracker/TrackerHost.js';
 import { EventHook } from '../../domain/torrent/EventHook.js';
@@ -19,6 +20,8 @@ interface ChainHints {
   readonly fetchCertHost?: string;
   readonly whitelistDirty?: boolean;
   readonly blocklistsUpdated?: boolean;
+  readonly firewallDirty?: boolean;
+  readonly fail2banDirty?: boolean;
 }
 
 function nowStamp(): string {
@@ -91,6 +94,12 @@ export class JobWorker {
     }
     if (hints?.blocklistsUpdated === true) {
       await this.queue.enqueue(parseJob('render-blocklist-filters', {}));
+    }
+    if (hints?.firewallDirty === true) {
+      await this.queue.enqueue(parseJob('apply-firewall', {}));
+    }
+    if (hints?.fail2banDirty === true) {
+      await this.queue.enqueue(parseJob('render-fail2ban', {}));
     }
   }
 
@@ -223,6 +232,21 @@ export class JobWorker {
       case 'render-fail2ban':
         await this.security.renderFail2ban.execute();
         return;
+      case 'add-user-hostname':
+      case 'remove-user-hostname':
+        return await this.security.manageUserHostname.execute({
+          action: job.type === 'add-user-hostname' ? 'add' : 'remove',
+          username: Username.parse(job.payload.username),
+          host: DynDnsHost.parse(job.payload.hostname),
+        });
+      case 'resolve-dyndns': {
+        const report = await this.security.resolveDynDns.execute();
+        return {
+          whitelistDirty: report.whitelistDirty,
+          firewallDirty: report.firewallDirty,
+          fail2banDirty: report.fail2banDirty,
+        };
+      }
       case 'add-user-address':
       case 'remove-user-address': {
         const report = await this.trackers.manageUserAddress.execute({

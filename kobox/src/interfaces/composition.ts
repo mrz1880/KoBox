@@ -23,6 +23,7 @@ import { FsBlocklistCacheAdapter } from '../infrastructure/system/FsBlocklistCac
 import { HttpsBlocklistDownloadAdapter } from '../infrastructure/system/HttpsBlocklistDownloadAdapter.js';
 import { IblocklistCatalogAdapter } from '../infrastructure/system/IblocklistCatalogAdapter.js';
 import { Cidr } from '../domain/security/Cidr.js';
+import { DynDnsLookupAdapter } from '../infrastructure/system/DynDnsLookupAdapter.js';
 import { GetentUserIdentityAdapter } from '../infrastructure/system/GetentUserIdentityAdapter.js';
 import { IptablesRestoreAdapter } from '../infrastructure/system/IptablesRestoreAdapter.js';
 import { NetworkServiceAdapter } from '../infrastructure/system/NetworkServiceAdapter.js';
@@ -163,10 +164,12 @@ export function buildContainer(name: string): Container {
   const securityUseCases = buildSecurityUseCases({
     users: repo,
     addresses: addressRepo,
+    bindings: addressRepo,
     identity: new GetentUserIdentityAdapter(runner),
     firewall: new IptablesRestoreAdapter(runner, networkFiles, healthProbe, settings.sshPort),
     files: networkFiles,
     reload: networkServices,
+    resolver: new DynDnsLookupAdapter(),
     notifications,
     settings,
   });

@@ -37,6 +37,7 @@ import { FakeUserScriptRunner } from '../../../src/infrastructure/system/fakes/F
 import { FakeWatchDirs } from '../../../src/infrastructure/system/fakes/FakeWatchDirs.js';
 import { loadRtorrentTemplates } from '../../../src/infrastructure/templates/TemplateProvider.js';
 import { Cidr } from '../../../src/domain/security/Cidr.js';
+import { FakeDynDnsResolver } from '../../../src/infrastructure/system/fakes/FakeDynDnsResolver.js';
 import { FakeFirewallApply } from '../../../src/infrastructure/system/fakes/FakeFirewallApply.js';
 import { FakeNetworkServices } from '../../../src/infrastructure/system/fakes/FakeNetworkServices.js';
 import { FakeUserIdentity } from '../../../src/infrastructure/system/fakes/FakeUserIdentity.js';
@@ -125,6 +126,7 @@ interface World {
   networkFiles: FakeRtorrentConfig;
   firewall: FakeFirewallApply;
   identity: FakeUserIdentity;
+  dyndns: FakeDynDnsResolver;
   worker: JobWorker;
   hasher: FakePasswordHasher;
 }
@@ -199,13 +201,16 @@ beforeEach(() => {
   });
   const firewall = new FakeFirewallApply();
   const identity = new FakeUserIdentity();
+  const dyndns = new FakeDynDnsResolver();
   const securityUseCases = buildSecurityUseCases({
     users: repo,
     addresses,
+    bindings: addresses,
     identity,
     firewall,
     files: networkFiles,
     reload: new FakeNetworkServices(),
+    resolver: dyndns,
     notifications,
     settings: {
       sshPort: 22,
@@ -237,6 +242,7 @@ beforeEach(() => {
     networkFiles,
     firewall,
     identity,
+    dyndns,
     hasher: new FakePasswordHasher(),
     worker: new JobWorker(queue, useCases, torrentUseCases, trackerUseCases, securityUseCases),
   };
@@ -386,6 +392,41 @@ describe('security job chains (provision -> firewall)', () => {
 
     expect(world.queue.statusOf(id)).toBe('done');
     expect(world.firewall.applied).toHaveLength(1);
+  });
+
+  it('should_refresh_whitelist_firewall_and_fail2ban_when_a_dyndns_address_changes', async () => {
+    world.identity.setUid('alice', 1001);
+    await enqueueCreateAlice();
+    await world.worker.drain();
+    world.dyndns.setAnswer('dyn.example.org', IpAddress.parse('203.0.113.9'));
+    await world.queue.enqueue(
+      parseJob('add-user-hostname', { username: 'alice', hostname: 'dyn.example.org' }),
+    );
+    await world.queue.enqueue(parseJob('resolve-dyndns', {}));
+
+    await world.worker.drain();
+
+    expect(world.networkFiles.contentAt('/etc/pgl/allow.p2p')).toContain(
+      'alice:203.0.113.9-255.255.255.255',
+    );
+    expect(world.networkFiles.contentAt('/etc/fail2ban/jail.d/kobox.local')).toContain(
+      '203.0.113.9',
+    );
+    expect(world.firewall.applied.at(-1)?.content).toContain(
+      '-A INPUT -s 203.0.113.9 -m comment --comment "kobox:trusted:alice" -j ACCEPT',
+    );
+  });
+
+  it('should_not_chain_refreshes_while_the_hostname_stays_unresolved', async () => {
+    await world.queue.enqueue(
+      parseJob('add-user-hostname', { username: 'alice', hostname: 'dyn.example.org' }),
+    );
+    await world.queue.enqueue(parseJob('resolve-dyndns', {}));
+
+    await world.worker.drain();
+
+    expect(world.firewall.applied).toHaveLength(0);
+    expect(world.networkFiles.contentAt('/etc/pgl/allow.p2p')).toBeUndefined();
   });
 });
 
