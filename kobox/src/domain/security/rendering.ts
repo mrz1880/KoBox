@@ -1,4 +1,5 @@
 import type { RenderedFile } from '../shared/files.js';
+import type { IpAddress } from '../shared/IpAddress.js';
 import type { FirewallPolicy, FirewallUser } from './FirewallPolicy.js';
 
 // Pure, deterministic render of the complete firewall desired state as one
@@ -96,5 +97,61 @@ export function renderFirewallRules(policy: FirewallPolicy): RenderedFile {
     mode: '0600',
     owner: 'root',
     group: 'root',
+  };
+}
+
+const ROOT_FILE = { mode: '0644', owner: 'root', group: 'root' } as const;
+
+// The jail no stock fail2ban setup has: it counts *accepted* publickey logins.
+// A valid key makes a flood invisible to every failure-based jail (the user-h
+// vector: 1979 connections/day) — abnormal success frequency IS the signal.
+export function renderFail2banJails(
+  ignoreIps: readonly IpAddress[],
+  sshPort: number,
+): RenderedFile {
+  const sorted = [...ignoreIps].sort((a, b) => ipSortKey(a.value) - ipSortKey(b.value));
+  const ignoreLine = ['127.0.0.1/8', '::1', ...sorted.map((ip) => ip.value)].join(' ');
+  return {
+    path: '/etc/fail2ban/jail.d/kobox.local',
+    content: [
+      '# KoBox-managed fail2ban jails — DO NOT EDIT (rendered declaratively).',
+      '[DEFAULT]',
+      `ignoreip = ${ignoreLine}`,
+      '',
+      '[sshd]',
+      'enabled = true',
+      'backend = systemd',
+      `port = ${String(sshPort)}`,
+      '',
+      '[nginx-http-auth]',
+      'enabled = true',
+      '',
+      '[kobox-publickey-flood]',
+      'enabled = true',
+      'backend = systemd',
+      'filter = kobox-publickey-flood',
+      `port = ${String(sshPort)}`,
+      'maxretry = 30',
+      'findtime = 3600',
+      'bantime = 3600',
+      '',
+    ].join('\n'),
+    ...ROOT_FILE,
+  };
+}
+
+export function renderPublickeyFloodFilter(): RenderedFile {
+  return {
+    path: '/etc/fail2ban/filter.d/kobox-publickey-flood.conf',
+    content: [
+      '# KoBox — bans a flood of *successful* publickey logins (abnormal auth',
+      '# frequency with a valid key, invisible to failure-based jails).',
+      '[Definition]',
+      'journalmatch = _SYSTEMD_UNIT=ssh.service + _COMM=sshd',
+      String.raw`failregex = ^.*Accepted publickey for \S+ from <HOST> port \d+.*$`,
+      'ignoreregex =',
+      '',
+    ].join('\n'),
+    ...ROOT_FILE,
   };
 }
