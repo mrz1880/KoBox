@@ -19,6 +19,8 @@ import { GetentUserIdentityAdapter } from '../../../../src/infrastructure/system
 import { IptablesRestoreAdapter } from '../../../../src/infrastructure/system/IptablesRestoreAdapter.js';
 import { IptablesUsageMeterAdapter } from '../../../../src/infrastructure/system/IptablesUsageMeterAdapter.js';
 import { JournaldSshAuthAdapter } from '../../../../src/infrastructure/system/JournaldSshAuthAdapter.js';
+import { TcShapingAdapter } from '../../../../src/infrastructure/system/TcShapingAdapter.js';
+import { Bandwidth } from '../../../../src/domain/security/Bandwidth.js';
 import { NetworkServiceAdapter } from '../../../../src/infrastructure/system/NetworkServiceAdapter.js';
 import { Username } from '../../../../src/domain/user/Username.js';
 import { createLogger } from '../../../../src/infrastructure/logging/logger.js';
@@ -277,6 +279,77 @@ describe('JournaldSshAuthAdapter', () => {
     const authLog = new JournaldSshAuthAdapter(runner);
 
     expect(await authLog.countAcceptedPublickey(Username.parse('alice'), 60)).toBe(0);
+  });
+});
+
+describe('TcShapingAdapter', () => {
+  const alice = Username.parse('alice');
+
+  it('should_create_the_htb_tree_mark_and_filter_on_first_throttle', async () => {
+    const runner = new PrefixRunner();
+    runner.on('iptables -t mangle -C', { exitCode: 1 }); // mark rule absent
+    const shaper = new TcShapingAdapter(runner, 'eth0');
+
+    await shaper.throttle(alice, 1001, Bandwidth.mbit(5));
+
+    expect(runner.commandLines()).toEqual([
+      'tc qdisc show dev eth0',
+      'tc qdisc add dev eth0 root handle 1: htb',
+      'tc class replace dev eth0 parent 1: classid 1:3e9 htb rate 5000kbit',
+      'tc filter replace dev eth0 parent 1: protocol ip prio 1 handle 0x3e9 fw flowid 1:3e9',
+      'iptables -t mangle -C OUTPUT -m owner --uid-owner 1001 -j MARK --set-mark 1001',
+      'iptables -t mangle -A OUTPUT -m owner --uid-owner 1001 -j MARK --set-mark 1001',
+    ]);
+  });
+
+  it('should_be_idempotent_when_the_qdisc_and_mark_already_exist', async () => {
+    const runner = new PrefixRunner();
+    runner.on('tc qdisc show', { stdout: 'qdisc htb 1: root refcnt 2\n' });
+    runner.on('iptables -t mangle -C', { exitCode: 0 });
+    const shaper = new TcShapingAdapter(runner, 'eth0');
+
+    await shaper.throttle(alice, 1001, Bandwidth.mbit(5));
+
+    const lines = runner.commandLines();
+    expect(lines).not.toContain('tc qdisc add dev eth0 root handle 1: htb');
+    expect(lines.filter((line) => line.startsWith('iptables -t mangle -A'))).toEqual([]);
+    // rate updates still go through (replace semantics)
+    expect(lines).toContain('tc class replace dev eth0 parent 1: classid 1:3e9 htb rate 5000kbit');
+  });
+
+  it('should_tear_down_filter_class_and_mark_on_unthrottle', async () => {
+    const runner = new PrefixRunner();
+    runner.on('tc class show', { stdout: 'class htb 1:3e9 root prio 0 rate 5Mbit\n' });
+    runner.on('iptables -t mangle -C', { exitCode: 0 });
+    const shaper = new TcShapingAdapter(runner, 'eth0');
+
+    await shaper.unthrottle(alice, 1001);
+
+    expect(runner.commandLines()).toEqual([
+      'tc class show dev eth0',
+      'tc filter del dev eth0 parent 1: protocol ip prio 1 handle 0x3e9 fw',
+      'tc class del dev eth0 parent 1: classid 1:3e9',
+      'iptables -t mangle -C OUTPUT -m owner --uid-owner 1001 -j MARK --set-mark 1001',
+      'iptables -t mangle -D OUTPUT -m owner --uid-owner 1001 -j MARK --set-mark 1001',
+    ]);
+  });
+
+  it('should_do_nothing_on_unthrottle_when_not_throttled', async () => {
+    const runner = new PrefixRunner();
+    const shaper = new TcShapingAdapter(runner, 'eth0');
+
+    await shaper.unthrottle(alice, 1001);
+
+    expect(runner.commandLines()).toEqual(['tc class show dev eth0']);
+  });
+
+  it('should_report_throttled_state_from_the_class_table', async () => {
+    const runner = new PrefixRunner();
+    runner.on('tc class show', { stdout: 'class htb 1:3e9 root prio 0 rate 5Mbit\n' });
+    const shaper = new TcShapingAdapter(runner, 'eth0');
+
+    expect(await shaper.isThrottled(1001)).toBe(true);
+    expect(await shaper.isThrottled(1002)).toBe(false);
   });
 });
 
