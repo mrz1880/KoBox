@@ -27,10 +27,17 @@ export function ensureSpoolDir(dir: string): void {
 export type TorrentEventSubmission = Record<string, string>;
 
 export class TorrentEventSpoolWriter {
+  // Monotonic per-process sequence: two submissions in the same millisecond
+  // must still sweep in submission order (the timestamp alone cannot).
+  private sequence = 0;
+
   constructor(private readonly dir: string) {}
 
   submit(submission: TorrentEventSubmission): string {
-    const name = `${String(Date.now()).padStart(15, '0')}-${randomBytes(4).toString('hex')}.json`;
+    this.sequence += 1;
+    const name =
+      `${String(Date.now()).padStart(15, '0')}-${String(this.sequence).padStart(6, '0')}` +
+      `-${randomBytes(4).toString('hex')}.json`;
     const path = join(this.dir, name);
     writeFileSync(`${path}.tmp`, JSON.stringify(submission));
     renameSync(`${path}.tmp`, path); // atomic: the sweeper never sees halves
