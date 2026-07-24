@@ -1,10 +1,13 @@
 import { createLogger, type Logger } from '../infrastructure/logging/logger.js';
 import { ConsoleNotificationAdapter } from '../infrastructure/notifications/ConsoleNotificationAdapter.js';
 import { KoboxDatabase } from '../infrastructure/persistence/db.js';
+import { SqliteBlocklistRepository } from '../infrastructure/persistence/SqliteBlocklistRepository.js';
 import { SqliteJobQueue } from '../infrastructure/persistence/SqliteJobQueue.js';
 import { SqlitePortAllocator } from '../infrastructure/persistence/SqlitePortAllocator.js';
 import { SqliteTorrentInstanceRepository } from '../infrastructure/persistence/SqliteTorrentInstanceRepository.js';
 import { SqliteTorrentRepository } from '../infrastructure/persistence/SqliteTorrentRepository.js';
+import { SqliteTrackerRepository } from '../infrastructure/persistence/SqliteTrackerRepository.js';
+import { SqliteUserAddressRepository } from '../infrastructure/persistence/SqliteUserAddressRepository.js';
 import { SqliteUserRepository } from '../infrastructure/persistence/SqliteUserRepository.js';
 import {
   DEFAULT_SPOOL_DIR,
@@ -13,7 +16,14 @@ import {
 } from '../infrastructure/spool/TorrentEventSpool.js';
 import { EnqueueAnnouncerSink } from '../infrastructure/jobs/EnqueueAnnouncerSink.js';
 import { BencodeMetainfoAdapter } from '../infrastructure/system/BencodeMetainfoAdapter.js';
+import { CertStoreAdapter } from '../infrastructure/system/CertStoreAdapter.js';
 import { ExecFileRunner } from '../infrastructure/system/CommandRunner.js';
+import { DnsLookupResolverAdapter } from '../infrastructure/system/DnsLookupResolverAdapter.js';
+import { FsBlocklistCacheAdapter } from '../infrastructure/system/FsBlocklistCacheAdapter.js';
+import { HttpsBlocklistDownloadAdapter } from '../infrastructure/system/HttpsBlocklistDownloadAdapter.js';
+import { IblocklistCatalogAdapter } from '../infrastructure/system/IblocklistCatalogAdapter.js';
+import { NetworkServiceReloadAdapter } from '../infrastructure/system/NetworkServiceReloadAdapter.js';
+import { OpensslTrackerCertAdapter } from '../infrastructure/system/OpensslTrackerCertAdapter.js';
 import { OpensslPasswordHasher } from '../infrastructure/system/OpensslPasswordHasher.js';
 import { ProcessSocketHealthProbe } from '../infrastructure/system/ProcessSocketHealthProbe.js';
 import { NoopQuotaAdapter, QuotaAdapter } from '../infrastructure/system/QuotaAdapter.js';
@@ -28,8 +38,10 @@ import { loadRtorrentTemplates } from '../infrastructure/templates/TemplateProvi
 import { JobWorker } from './worker/JobWorker.js';
 import {
   buildTorrentUseCases,
+  buildTrackerUseCases,
   buildUseCases,
   type TorrentUseCases,
+  type TrackerUseCases,
   type UseCases,
 } from './useCases.js';
 
@@ -45,10 +57,12 @@ export interface Container {
   readonly logger: Logger;
   readonly useCases: UseCases;
   readonly torrentUseCases: TorrentUseCases;
+  readonly trackerUseCases: TrackerUseCases;
   readonly queue: SqliteJobQueue;
   readonly worker: JobWorker;
   readonly hasher: OpensslPasswordHasher;
   readonly repo: SqliteUserRepository;
+  readonly trackerRepo: SqliteTrackerRepository;
   readonly healthProbe: ProcessSocketHealthProbe;
   readonly spoolSweeper: TorrentEventSpoolSweeper;
 }
@@ -90,15 +104,41 @@ export function buildContainer(name: string): Container {
     templates: loadRtorrentTemplates(),
     settings: { koboxBin: process.env.KOBOX_BIN ?? DEFAULT_KOBOX_BIN },
   });
+  const iblocklistUser = process.env.KOBOX_IBLOCKLIST_USER;
+  const iblocklistPin = process.env.KOBOX_IBLOCKLIST_PIN;
+  const networkFiles = new RtorrentConfigAdapter(runner);
+  const trackerRepo = new SqliteTrackerRepository(db);
+  const trackerUseCases = buildTrackerUseCases({
+    trackers: trackerRepo,
+    blocklists: new SqliteBlocklistRepository(db),
+    addresses: new SqliteUserAddressRepository(db),
+    users: repo,
+    instances: new SqliteTorrentInstanceRepository(db),
+    dns: new DnsLookupResolverAdapter(),
+    certPort: new OpensslTrackerCertAdapter(runner),
+    certStore: new CertStoreAdapter(networkFiles, runner, logger, process.env.KOBOX_CERTS_DIR),
+    download: new HttpsBlocklistDownloadAdapter(logger),
+    catalog: new IblocklistCatalogAdapter(logger, process.env.KOBOX_IBLOCKLIST_CATALOG_URL),
+    cache: new FsBlocklistCacheAdapter(process.env.KOBOX_BLOCKLIST_CACHE),
+    files: networkFiles,
+    reload: new NetworkServiceReloadAdapter(runner, logger),
+    notifications: new ConsoleNotificationAdapter(logger),
+    ...(iblocklistUser !== undefined &&
+      iblocklistPin !== undefined && {
+        credentials: { username: iblocklistUser, pin: iblocklistPin },
+      }),
+  });
   return {
     db,
     logger,
     useCases,
     torrentUseCases,
+    trackerUseCases,
     queue,
-    worker: new JobWorker(queue, useCases, torrentUseCases),
+    worker: new JobWorker(queue, useCases, torrentUseCases, trackerUseCases),
     hasher: new OpensslPasswordHasher(runner),
     repo,
+    trackerRepo,
     healthProbe: new ProcessSocketHealthProbe(runner),
     spoolSweeper: new TorrentEventSpoolSweeper(
       spoolDir(),

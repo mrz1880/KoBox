@@ -6,9 +6,24 @@ import { HashedPassword } from '../../../src/domain/user/HashedPassword.js';
 import { Password } from '../../../src/domain/user/Password.js';
 import type { PasswordHasherPort } from '../../../src/domain/user/ports.js';
 import { Username } from '../../../src/domain/user/Username.js';
+import { IpAddress } from '../../../src/domain/shared/IpAddress.js';
+import { Blocklist } from '../../../src/domain/tracker/Blocklist.js';
+import { BlocklistSource } from '../../../src/domain/tracker/BlocklistSource.js';
+import { BlocklistUrl } from '../../../src/domain/tracker/BlocklistUrl.js';
+import { TrackerHost } from '../../../src/domain/tracker/TrackerHost.js';
+import { InMemoryBlocklistRepository } from '../../../src/infrastructure/persistence/InMemoryBlocklistRepository.js';
 import { InMemoryTorrentInstanceRepository } from '../../../src/infrastructure/persistence/InMemoryTorrentInstanceRepository.js';
 import { InMemoryTorrentRepository } from '../../../src/infrastructure/persistence/InMemoryTorrentRepository.js';
+import { InMemoryTrackerRepository } from '../../../src/infrastructure/persistence/InMemoryTrackerRepository.js';
+import { InMemoryUserAddressRepository } from '../../../src/infrastructure/persistence/InMemoryUserAddressRepository.js';
 import { InMemoryUserRepository } from '../../../src/infrastructure/persistence/InMemoryUserRepository.js';
+import { FakeBlocklistCache } from '../../../src/infrastructure/system/fakes/FakeBlocklistCache.js';
+import { FakeBlocklistDownload } from '../../../src/infrastructure/system/fakes/FakeBlocklistDownload.js';
+import { FakeCertStore } from '../../../src/infrastructure/system/fakes/FakeCertStore.js';
+import { FakeDnsResolver } from '../../../src/infrastructure/system/fakes/FakeDnsResolver.js';
+import { FakeIblocklistCatalog } from '../../../src/infrastructure/system/fakes/FakeIblocklistCatalog.js';
+import { FakeNetworkServiceReload } from '../../../src/infrastructure/system/fakes/FakeNetworkServiceReload.js';
+import { FakeTrackerCert } from '../../../src/infrastructure/system/fakes/FakeTrackerCert.js';
 import { FakeAnnouncerSink } from '../../../src/infrastructure/system/fakes/FakeAnnouncerSink.js';
 import { FakeNotifications } from '../../../src/infrastructure/system/fakes/FakeNotifications.js';
 import { FakeQuota } from '../../../src/infrastructure/system/fakes/FakeQuota.js';
@@ -23,7 +38,11 @@ import { FakeWatchDirs } from '../../../src/infrastructure/system/fakes/FakeWatc
 import { loadRtorrentTemplates } from '../../../src/infrastructure/templates/TemplateProvider.js';
 import { buildJob } from '../../../src/interfaces/cli/buildJob.js';
 import { JobWorker } from '../../../src/interfaces/worker/JobWorker.js';
-import { buildTorrentUseCases, buildUseCases } from '../../../src/interfaces/useCases.js';
+import {
+  buildTorrentUseCases,
+  buildTrackerUseCases,
+  buildUseCases,
+} from '../../../src/interfaces/useCases.js';
 
 class InMemoryJobQueue implements JobQueuePort {
   private readonly rows: { id: number; job: Job; status: string; error?: string }[] = [];
@@ -92,6 +111,13 @@ interface World {
   instances: InMemoryTorrentInstanceRepository;
   torrents: InMemoryTorrentRepository;
   scripts: FakeUserScriptRunner;
+  trackers: InMemoryTrackerRepository;
+  blocklists: InMemoryBlocklistRepository;
+  dns: FakeDnsResolver;
+  certPort: FakeTrackerCert;
+  certStore: FakeCertStore;
+  download: FakeBlocklistDownload;
+  networkFiles: FakeRtorrentConfig;
   worker: JobWorker;
   hasher: FakePasswordHasher;
 }
@@ -140,6 +166,29 @@ beforeEach(() => {
     templates: loadRtorrentTemplates(),
     settings: { koboxBin: '/usr/local/bin/kobox' },
   });
+  const trackers = new InMemoryTrackerRepository();
+  const blocklists = new InMemoryBlocklistRepository();
+  const dns = new FakeDnsResolver();
+  const certPort = new FakeTrackerCert();
+  const certStore = new FakeCertStore();
+  const download = new FakeBlocklistDownload();
+  const networkFiles = new FakeRtorrentConfig();
+  const trackerUseCases = buildTrackerUseCases({
+    trackers,
+    blocklists,
+    addresses: new InMemoryUserAddressRepository(),
+    users: repo,
+    instances,
+    dns,
+    certPort,
+    certStore,
+    download,
+    catalog: new FakeIblocklistCatalog([]),
+    cache: new FakeBlocklistCache(),
+    files: networkFiles,
+    reload: new FakeNetworkServiceReload(),
+    notifications,
+  });
   const queue = new InMemoryJobQueue();
   world = {
     queue,
@@ -148,8 +197,15 @@ beforeEach(() => {
     instances,
     torrents,
     scripts,
+    trackers,
+    blocklists,
+    dns,
+    certPort,
+    certStore,
+    download,
+    networkFiles,
     hasher: new FakePasswordHasher(),
-    worker: new JobWorker(queue, useCases, torrentUseCases),
+    worker: new JobWorker(queue, useCases, torrentUseCases, trackerUseCases),
   };
 });
 
@@ -262,5 +318,104 @@ describe('CLI enqueue -> root worker loop (the privilege seam)', () => {
 
   it('should_report_nothing_to_do_on_an_empty_queue', async () => {
     expect(await world.worker.processNext()).toBe(false);
+  });
+});
+
+describe('tracker job chains (discover -> cert -> whitelist, blocklists -> filters)', () => {
+  it('should_chain_cert_fetch_and_whitelist_render_after_discovery', async () => {
+    world.dns.givenAddresses('tracker.example.org', [IpAddress.parse('192.0.2.10')]);
+    world.certPort.givenCert('tracker.example.org', { pem: 'PEM', expiresOn: '2026-09-15' });
+    await world.queue.enqueue(
+      parseJob('discover-tracker', {
+        url: 'https://tracker.example.org/announce',
+        privacy: 'private',
+      }),
+    );
+
+    await world.worker.drain();
+
+    const tracker = await world.trackers.findByHost(TrackerHost.parse('tracker.example.org'));
+    expect(tracker?.isSsl).toBe(true);
+    expect(world.certStore.installed.get('tracker.example.org')).toBe('PEM');
+    expect(world.networkFiles.contentAt('/etc/pgl/allow.p2p')).toContain(
+      'tracker.example.org:192.0.2.10-255.255.255.255',
+    );
+  });
+
+  it('should_not_chain_anything_for_an_unresolvable_unknown_host', async () => {
+    await world.queue.enqueue(
+      parseJob('discover-tracker', {
+        url: 'https://gone.example.net/announce',
+        privacy: 'private',
+      }),
+    );
+
+    await world.worker.drain();
+
+    expect(world.certPort.fetchedHosts).toEqual([]);
+    expect(world.networkFiles.contentAt('/etc/pgl/allow.p2p')).toBeUndefined();
+  });
+
+  it('should_render_the_whitelist_after_a_user_address_change', async () => {
+    await world.queue.enqueue(
+      parseJob('add-user-address', { username: 'alice', ipv4: '198.51.100.7' }),
+    );
+
+    await world.worker.drain();
+
+    expect(world.networkFiles.contentAt('/etc/pgl/allow.p2p')).toContain(
+      'alice:198.51.100.7-255.255.255.255',
+    );
+  });
+
+  it('should_chain_filter_rendering_after_a_blocklist_update', async () => {
+    await enqueueCreateAlice();
+    await world.worker.drain(); // create + provision chain
+    await world.blocklists.save(
+      Blocklist.create({
+        source: BlocklistSource.parse('personal'),
+        author: 'me',
+        name: 'mine',
+        url: BlocklistUrl.parse('https://lists.example.net/mine.gz'),
+        subscription: false,
+        enabled: true,
+      }),
+    );
+    world.download.givenList('https://lists.example.net/mine.gz', {
+      ranges: ['10.0.0.0/8'],
+      sha256: 'aa',
+    });
+    await world.queue.enqueue(parseJob('update-blocklists', {}));
+
+    await world.worker.drain();
+
+    expect(world.networkFiles.contentAt('/home/alice/blocklist/blocklist_rtorrent.txt')).toBe(
+      '10.0.0.0/8\n',
+    );
+    expect(
+      world.networkFiles.contentAt('/home/alice/rtorrent/config.d/80-blocklist.rc'),
+    ).toContain('ipv4_filter.load');
+  });
+
+  it('should_execute_renew_and_mark_dead_jobs', async () => {
+    world.dns.givenAddresses('tracker.example.org', [IpAddress.parse('192.0.2.10')]);
+    world.certPort.givenCert('tracker.example.org', { pem: 'PEM', expiresOn: '2026-09-15' });
+    await world.queue.enqueue(
+      parseJob('discover-tracker', {
+        url: 'https://tracker.example.org/announce',
+        privacy: 'private',
+      }),
+    );
+    await world.worker.drain();
+
+    await world.queue.enqueue(parseJob('mark-tracker-dead', { host: 'tracker.example.org' }));
+    await world.worker.drain();
+
+    const tracker = await world.trackers.findByHost(TrackerHost.parse('tracker.example.org'));
+    expect(tracker?.isDead).toBe(true);
+    expect(world.certStore.installed.size).toBe(0);
+    expect(world.networkFiles.contentAt('/etc/bind/kobox.zones.blacklists')).toContain(
+      'zone "tracker.example.org"',
+    );
   });
 });

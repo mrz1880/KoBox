@@ -242,6 +242,143 @@ program
     process.stdout.write(`event spooled: ${path}\n`);
   });
 
+// ---- Tracker & Blocklist (Phase 2) --------------------------------------
+
+program
+  .command('discover-tracker')
+  .argument('<url>', 'announce URL (http/https/udp)')
+  .option('--privacy <privacy>', 'public|private', 'private')
+  .description('register a tracker from an announce URL (resolves DNS, schedules cert check)')
+  .action(async (url: string, options: Record<string, string>) => {
+    const c = container();
+    const id = await c.queue.enqueue(
+      buildJob.discoverTracker({ url, privacy: options.privacy ?? 'private' }),
+    );
+    await done(c, `job ${String(id)} enqueued: discover-tracker ${url}`);
+  });
+
+function trackerHostCommand(
+  name: 'fetch-tracker-cert' | 'mark-tracker-dead',
+  description: string,
+): void {
+  program
+    .command(name)
+    .argument('<host>')
+    .description(description)
+    .action(async (host: string) => {
+      const c = container();
+      const job =
+        name === 'fetch-tracker-cert'
+          ? buildJob.fetchTrackerCert({ host })
+          : buildJob.markTrackerDead({ host });
+      const id = await c.queue.enqueue(job);
+      await done(c, `job ${String(id)} enqueued: ${name} ${host}`);
+    });
+}
+
+trackerHostCommand('fetch-tracker-cert', 'probe a tracker over TLS and install its certificate');
+trackerHostCommand(
+  'mark-tracker-dead',
+  'deactivate a tracker (blacklisted in DNS, removed from allow.p2p)',
+);
+
+program
+  .command('renew-tracker-certs')
+  .description('check every tracker whose certificate is due (cron entry point)')
+  .action(async () => {
+    const c = container();
+    const today = new Date().toISOString().slice(0, 10);
+    const id = await c.queue.enqueue(buildJob.renewTrackerCerts({ today }));
+    await done(c, `job ${String(id)} enqueued: renew-tracker-certs ${today}`);
+  });
+
+function parameterlessTrackerCommand(
+  name: 'import-blocklist-catalog' | 'update-blocklists' | 'render-whitelist',
+  description: string,
+  build: () => ReturnType<typeof buildJob.renderWhitelist>,
+): void {
+  program
+    .command(name)
+    .description(description)
+    .action(async () => {
+      const c = container();
+      const id = await c.queue.enqueue(build());
+      await done(c, `job ${String(id)} enqueued: ${name}`);
+    });
+}
+
+parameterlessTrackerCommand(
+  'import-blocklist-catalog',
+  'import/refresh the iblocklist catalog into the database',
+  () => buildJob.importBlocklistCatalog(),
+);
+parameterlessTrackerCommand(
+  'update-blocklists',
+  'download every enabled blocklist (verified) and refresh the merged cache',
+  () => buildJob.updateBlocklists(),
+);
+parameterlessTrackerCommand(
+  'render-whitelist',
+  're-render BIND zones, dnscrypt blocked-names and PGL allow.p2p',
+  () => buildJob.renderWhitelist(),
+);
+
+program
+  .command('render-blocklist-filters')
+  .argument('[username]')
+  .description('re-render per-user rtorrent ipv4 filter files from the merged cache')
+  .action(async (rawUser: string | undefined) => {
+    const c = container();
+    const username = rawUser === undefined ? undefined : Username.parse(rawUser).value;
+    const id = await c.queue.enqueue(
+      buildJob.renderBlocklistFilters(username === undefined ? {} : { username }),
+    );
+    await done(c, `job ${String(id)} enqueued: render-blocklist-filters ${username ?? '(all)'}`);
+  });
+
+function userAddressCommand(name: 'add-user-address' | 'remove-user-address'): void {
+  program
+    .command(name)
+    .argument('<username>')
+    .argument('<ipv4>')
+    .description(`${name === 'add-user-address' ? 'allow' : 'revoke'} a user IPv4 in the whitelist`)
+    .action(async (rawUser: string, ipv4: string) => {
+      const c = container();
+      const input = { username: Username.parse(rawUser).value, ipv4 };
+      const job =
+        name === 'add-user-address'
+          ? buildJob.addUserAddress(input)
+          : buildJob.removeUserAddress(input);
+      const id = await c.queue.enqueue(job);
+      await done(c, `job ${String(id)} enqueued: ${name} ${input.username} ${ipv4}`);
+    });
+}
+
+userAddressCommand('add-user-address');
+userAddressCommand('remove-user-address');
+
+program
+  .command('list-trackers')
+  .description('print the tracker whitelist as JSON (operator view)')
+  .action(async () => {
+    const c = container();
+    const rows = (await c.trackerRepo.listAll()).map((tracker) => ({
+      host: tracker.host.value,
+      proto: tracker.proto.value,
+      port: tracker.port.value,
+      privacy: tracker.privacy.value,
+      active: tracker.isActive,
+      dead: tracker.isDead,
+      ssl: tracker.isSsl,
+      checkState: tracker.checkState.value,
+      certExpiration: tracker.certExpiry?.value ?? null,
+      lastCheck: tracker.lastCheck ?? null,
+      ipv4: tracker.ipv4.map((ip) => ip.value),
+    }));
+    process.stdout.write(`${JSON.stringify(rows, null, 2)}\n`);
+    c.db.close();
+  });
+
 program
   .command('change-password')
   .argument('<username>')

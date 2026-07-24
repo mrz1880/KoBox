@@ -1,5 +1,7 @@
 import { parseJob, type Job } from '../../application/jobs/contract.js';
 import type { JobQueuePort } from '../../application/jobs/JobQueuePort.js';
+import { IpAddress } from '../../domain/shared/IpAddress.js';
+import { TrackerHost } from '../../domain/tracker/TrackerHost.js';
 import { EventHook } from '../../domain/torrent/EventHook.js';
 import { InfoHash } from '../../domain/torrent/InfoHash.js';
 import { Label } from '../../domain/torrent/Label.js';
@@ -9,7 +11,19 @@ import { HashedPassword } from '../../domain/user/HashedPassword.js';
 import { ProxyPort } from '../../domain/user/Port.js';
 import { Quota } from '../../domain/user/Quota.js';
 import { Username } from '../../domain/user/Username.js';
-import type { TorrentUseCases, UseCases } from '../useCases.js';
+import type { TorrentUseCases, TrackerUseCases, UseCases } from '../useCases.js';
+
+// What a completed job asks the worker to enqueue next. Use cases stay
+// queue-agnostic: they return reports, the worker turns them into jobs.
+interface ChainHints {
+  readonly fetchCertHost?: string;
+  readonly whitelistDirty?: boolean;
+  readonly blocklistsUpdated?: boolean;
+}
+
+function nowStamp(): string {
+  return new Date().toISOString().slice(0, 19).replace('T', ' ');
+}
 
 // The only privileged consumer. Payloads were schema-checked at enqueue and at
 // claim; reconstructing Value Objects here is the final, authoritative gate.
@@ -18,6 +32,7 @@ export class JobWorker {
     private readonly queue: JobQueuePort,
     private readonly useCases: UseCases,
     private readonly torrents: TorrentUseCases,
+    private readonly trackers: TrackerUseCases,
   ) {}
 
   async processNext(): Promise<boolean> {
@@ -25,8 +40,9 @@ export class JobWorker {
     if (!claimed) {
       return false;
     }
+    let hints: ChainHints | undefined;
     try {
-      await this.execute(claimed.job);
+      hints = await this.execute(claimed.job);
       await this.queue.markDone(claimed.id);
     } catch (error) {
       await this.queue.markFailed(
@@ -38,7 +54,7 @@ export class JobWorker {
     // Chaining runs only after the job is durably marked done, and outside the
     // try above: a failure to enqueue the follow-up must not re-fail a job
     // whose real work already succeeded.
-    await this.chainAfter(claimed.job);
+    await this.chainAfter(claimed.job, hints);
     return true;
   }
 
@@ -50,9 +66,9 @@ export class JobWorker {
     return count;
   }
 
-  // User Management -> Torrent Lifecycle stays decoupled: the worker reacts
-  // to a completed user job by enqueueing the torrent-side follow-up.
-  private async chainAfter(job: Job): Promise<void> {
+  // Cross-context coupling lives HERE, as chained jobs: User Management ->
+  // Torrent Lifecycle, and Torrent/Tracker reports -> cert/whitelist/filters.
+  private async chainAfter(job: Job, hints: ChainHints | undefined): Promise<void> {
     if (job.type === 'create-user') {
       await this.queue.enqueue(parseJob('provision-rtorrent', { username: job.payload.username }));
     }
@@ -61,9 +77,18 @@ export class JobWorker {
         parseJob('deprovision-rtorrent', { username: job.payload.username }),
       );
     }
+    if (hints?.fetchCertHost !== undefined) {
+      await this.queue.enqueue(parseJob('fetch-tracker-cert', { host: hints.fetchCertHost }));
+    }
+    if (hints?.whitelistDirty === true) {
+      await this.queue.enqueue(parseJob('render-whitelist', {}));
+    }
+    if (hints?.blocklistsUpdated === true) {
+      await this.queue.enqueue(parseJob('render-blocklist-filters', {}));
+    }
   }
 
-  private async execute(job: Job): Promise<void> {
+  private async execute(job: Job): Promise<ChainHints | undefined> {
     switch (job.type) {
       case 'create-user':
         await this.useCases.createUser.execute({
@@ -137,6 +162,64 @@ export class JobWorker {
           ...(job.payload.label !== undefined && { label: Label.parse(job.payload.label) }),
         });
         return;
+      case 'discover-tracker': {
+        const report = await this.trackers.discover.execute({
+          url: job.payload.url,
+          privacy: job.payload.privacy,
+          today: nowStamp().slice(0, 10),
+        });
+        return {
+          ...(report.certCheckWanted &&
+            report.host !== undefined && { fetchCertHost: report.host }),
+          whitelistDirty: report.whitelistDirty,
+        };
+      }
+      case 'fetch-tracker-cert': {
+        const report = await this.trackers.fetchCert.execute({
+          host: TrackerHost.parse(job.payload.host),
+          now: nowStamp(),
+        });
+        return { whitelistDirty: report.whitelistDirty };
+      }
+      case 'renew-tracker-certs': {
+        const report = await this.trackers.renewCerts.execute({
+          today: job.payload.today,
+          now: nowStamp(),
+        });
+        return { whitelistDirty: report.promoted > 0 };
+      }
+      case 'mark-tracker-dead': {
+        const report = await this.trackers.markDead.execute({
+          host: TrackerHost.parse(job.payload.host),
+        });
+        return { whitelistDirty: report.whitelistDirty };
+      }
+      case 'import-blocklist-catalog':
+        await this.trackers.importCatalog.execute();
+        return;
+      case 'update-blocklists': {
+        const report = await this.trackers.updateBlocklists.execute({ now: nowStamp() });
+        return { blocklistsUpdated: report.ranges !== undefined };
+      }
+      case 'render-whitelist':
+        await this.trackers.renderWhitelist.execute();
+        return;
+      case 'render-blocklist-filters':
+        await this.trackers.renderBlocklistFilters.execute({
+          ...(job.payload.username !== undefined && {
+            username: Username.parse(job.payload.username),
+          }),
+        });
+        return;
+      case 'add-user-address':
+      case 'remove-user-address': {
+        const report = await this.trackers.manageUserAddress.execute({
+          action: job.type === 'add-user-address' ? 'add' : 'remove',
+          username: Username.parse(job.payload.username),
+          ip: IpAddress.parse(job.payload.ipv4),
+        });
+        return { whitelistDirty: report.whitelistDirty };
+      }
     }
   }
 }
