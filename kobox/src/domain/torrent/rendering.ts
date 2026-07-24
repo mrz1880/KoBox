@@ -49,16 +49,21 @@ function homeOf(instance: TorrentInstance): string {
 }
 
 // Maps each hook's rtorrent argv (EventHook.rtorrentArgs order) onto the
-// `kobox torrent-event` CLI flags, positionally: "$1", "$2", ...
+// `kobox torrent-event` CLI flags, positionally: "$1", "$2", ... An empty
+// entry keeps positional alignment while forwarding nothing (rtorrent's
+// custom2 has no CLI counterpart — the worker does not use it).
 const CLI_FLAGS: Record<string, readonly string[]> = {
-  inserted_new: ['--hash', '--name', '--directory', '--torrent-file', '--torrent-dir', '--label'],
+  inserted_new: ['--hash', '--name', '--directory', '--torrent-file', '', '--label'],
   finished: ['--hash', '--base-path', '--directory', '--name', '--torrent-file', '--label'],
   erased: ['--hash', '--name', '--directory'],
 };
 
 function shimCliArgs(hook: EventHook): string {
   const flags = CLI_FLAGS[hook.type] ?? [];
-  return flags.map((flag, index) => `${flag} "$${String(index + 1)}"`).join(' ');
+  return flags
+    .map((flag, index) => (flag === '' ? '' : `${flag} "$${String(index + 1)}"`))
+    .filter((part) => part !== '')
+    .join(' ');
 }
 
 function renderRtorrentRc(instance: TorrentInstance, templates: RtorrentTemplates): string {

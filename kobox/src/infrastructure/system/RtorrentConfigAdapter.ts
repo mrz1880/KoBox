@@ -6,6 +6,11 @@ import { runOrThrow, type CommandRunner } from './CommandRunner.js';
 // Applies rendered files idempotently: a file is rewritten only when its
 // content differs, and nothing outside the given list is ever touched —
 // user drop-ins survive every render (the anti-§5.2 guarantee).
+//
+// The reconciled state is CONTENT. Ownership/mode are (re)set only when a file
+// is written: these files are root-owned and 0640, which the seedbox user
+// cannot alter, so metadata drift would require manual root action. If that
+// ever becomes a real concern, reconcile mode/owner here against a stat.
 export class RtorrentConfigAdapter implements RtorrentConfigPort {
   constructor(private readonly runner: CommandRunner) {}
 

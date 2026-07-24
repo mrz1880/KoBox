@@ -208,6 +208,35 @@ describe('HandleTorrentEvent', () => {
     expect(c.control.stopped).toHaveLength(0);
   });
 
+  it('should_ignore_an_event_whose_torrent_file_is_outside_the_user_home', async () => {
+    // A shell user could point the shim at any absolute path; the root worker
+    // must never read outside /home/<user>/ (defense of the privilege seam).
+    const outside = '/root/secret.torrent';
+    c.meta.preload(outside, metainfo(true));
+
+    await c.handleEvent.execute({
+      username: alice,
+      event: 'inserted_new',
+      infoHash: HASH,
+      torrentFile: outside,
+    });
+
+    expect(await c.torrents.findByInfoHash(alice, HASH)).toBeUndefined();
+  });
+
+  it('should_ignore_a_finished_event_whose_paths_escape_the_user_home', async () => {
+    await c.handleEvent.execute({
+      username: alice,
+      event: 'finished',
+      infoHash: HASH,
+      name: 'x',
+      basePath: '/home/bob/rtorrent/complete/x',
+    });
+
+    expect(await c.torrents.findByInfoHash(alice, HASH)).toBeUndefined();
+    expect(c.scripts.runs).toHaveLength(0);
+  });
+
   it('should_accept_a_private_torrent_and_record_it_loaded', async () => {
     c.meta.preload(TORRENT_FILE, metainfo(true));
 

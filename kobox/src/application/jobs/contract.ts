@@ -35,8 +35,9 @@ const passwordHashField = z.string().min(16).regex(CRYPT_HASH_PATTERN);
 const usernameOnly = z.strictObject({ username: usernameField });
 const labelField = z.string().regex(LABEL_PATTERN);
 const infoHashField = z.string().regex(INFO_HASH_PATTERN);
-// Paths from rtorrent hooks: absolute, no traversal — the worker additionally
-// re-checks them against the owning user's home before touching anything.
+// Paths from rtorrent hooks: absolute, no traversal. The worker enforces the
+// stronger invariant (must live under the owning user's home) in
+// HandleTorrentEvent before any path is read or stored.
 const absolutePathField = z
   .string()
   .min(1)
@@ -75,7 +76,6 @@ export const jobPayloadSchemas = {
     directory: absolutePathField.optional(),
     basePath: absolutePathField.optional(),
     torrentFile: absolutePathField.optional(),
-    torrentDir: absolutePathField.optional(),
     label: labelField.optional(),
   }),
 } satisfies Record<JobType, z.ZodType>;

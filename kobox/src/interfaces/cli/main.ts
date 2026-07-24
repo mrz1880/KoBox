@@ -214,7 +214,6 @@ program
   .option('--directory <path>')
   .option('--base-path <path>')
   .option('--torrent-file <path>')
-  .option('--torrent-dir <path>')
   .option('--label <label>')
   .description('report an rtorrent event (called by the KoBox shims)')
   .action((rawType: string, options: Record<string, string | undefined>) => {
@@ -228,7 +227,6 @@ program
       directory: options.directory,
       basePath: options.basePath,
       torrentFile: options.torrentFile,
-      torrentDir: options.torrentDir,
     };
     for (const [key, value] of Object.entries(optional)) {
       if (value !== undefined && value !== '') {

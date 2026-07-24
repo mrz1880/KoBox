@@ -2,6 +2,7 @@ import type { EventHookType } from '../../domain/torrent/EventHook.js';
 import type { InfoHash } from '../../domain/torrent/InfoHash.js';
 import type { Label } from '../../domain/torrent/Label.js';
 import { Torrent } from '../../domain/torrent/Torrent.js';
+import { TorrentState } from '../../domain/torrent/TorrentState.js';
 import type { TorrentInstance } from '../../domain/torrent/TorrentInstance.js';
 import type {
   RtorrentControlPort,
@@ -42,6 +43,14 @@ export class HandleTorrentEvent {
     const instance = await this.deps.instances.findByUsername(command.username);
     if (!instance) {
       throw new TorrentInstanceNotFoundError(command.username.value);
+    }
+    // Privilege-seam guard: a shell user could point the shim at any absolute
+    // path. The root worker must only ever touch paths under the user's own
+    // home — anything else is ignored (never read, never stored).
+    const home = `/home/${command.username.value}/`;
+    const provided = [command.torrentFile, command.directory, command.basePath];
+    if (provided.some((path) => path !== undefined && !path.startsWith(home))) {
+      return;
     }
     switch (command.event) {
       case 'inserted_new':
@@ -85,6 +94,9 @@ export class HandleTorrentEvent {
 
   private async onFinished(instance: TorrentInstance, command: TorrentEventCommand): Promise<void> {
     const existing = await this.deps.torrents.findByInfoHash(command.username, command.infoHash);
+    if (existing?.state === TorrentState.rejected) {
+      return; // a rejected torrent was stopped+closed: ignore a stray finish
+    }
     const name = command.name ?? existing?.name ?? command.infoHash.value;
     const base =
       existing ??
