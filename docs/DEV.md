@@ -60,6 +60,24 @@ Notes :
   **asynchrone** (`execFile` promisifié) : un `execFileSync` bloque la boucle
   d'événements et gèle les handshakes TLS des fixtures.
 
+- **Security & Network (Phase 3)** : les suites qui mutent le pare-feu/tc sont
+  **double-gardées** (root + `/.dockerenv`) — elles ne s'exécutent jamais sur un hôte
+  Linux nu. L'apply passe par le garde anti-verrouillage (`iptables-restore` +
+  sonde SSH + rollback) ; la sonde vise `KOBOX_SSH_PORT` (défaut 22 — `ssh` doit
+  tourner dans le conteneur, `docker/e2e-setup.sh` s'en charge côté E2E).
+  Env utiles : `KOBOX_SSH_PORT`, `KOBOX_PORTAL_PORT`, `KOBOX_VPN_{TUN_GW,TUN,TAP}_PORT`,
+  `KOBOX_VPN_*_SUBNET`, `KOBOX_VPN_REMOTE` (nom public des profils client),
+  `KOBOX_VPN_PKI` (arbre easy-rsa, défaut `/etc/openvpn/kobox-pki`),
+  `KOBOX_WAN_IF` (interface tc/HTB, défaut `eth0`),
+  `KOBOX_FAIRUSE_{EGRESS_MBIT,AUTH_PER_HOUR,THROTTLE_MBIT}` (défauts 50/30/5),
+  et les canaux d'alerte `KOBOX_NTFY_URL`, `KOBOX_DISCORD_WEBHOOK`,
+  `KOBOX_ALERT_EMAIL` (aucun configuré = stub console).
+  L'E2E security héberge sa fixture ntfy **en local** (`ntfy.example.net` →
+  127.0.0.2 via `/etc/hosts`) et flood le journal via `systemd-cat -t sshd`
+  (l'adapter journald matche l'identifier, pas l'unité, exactement pour ça).
+  fail2ban n'est validé que par `fail2ban-client -t` — le service reste coupé
+  dans le conteneur pour qu'aucun ban ne perturbe les tests.
+
 ## VM Multipass (validation full-stack, quotas ext4 réels)
 
 ```bash
