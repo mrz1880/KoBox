@@ -1,4 +1,6 @@
 import { z } from 'zod';
+import { INFO_HASH_PATTERN } from '../../domain/torrent/InfoHash.js';
+import { LABEL_PATTERN } from '../../domain/torrent/Label.js';
 import { EMAIL_PATTERN } from '../../domain/user/EmailAddress.js';
 import { CRYPT_HASH_PATTERN } from '../../domain/user/HashedPassword.js';
 import { USERNAME_PATTERN, Username } from '../../domain/user/Username.js';
@@ -13,6 +15,13 @@ export const JOB_TYPES = [
   'change-password',
   'suspend-user',
   'resume-user',
+  'provision-rtorrent',
+  'deprovision-rtorrent',
+  'render-rtorrent-config',
+  'add-watch-dir',
+  'set-sync-disabled',
+  'set-allow-public-tracker',
+  'torrent-event',
 ] as const;
 
 export type JobType = (typeof JOB_TYPES)[number];
@@ -24,6 +33,16 @@ const usernameField = z
 const passwordHashField = z.string().min(16).regex(CRYPT_HASH_PATTERN);
 
 const usernameOnly = z.strictObject({ username: usernameField });
+const labelField = z.string().regex(LABEL_PATTERN);
+const infoHashField = z.string().regex(INFO_HASH_PATTERN);
+// Paths from rtorrent hooks: absolute, no traversal — the worker additionally
+// re-checks them against the owning user's home before touching anything.
+const absolutePathField = z
+  .string()
+  .min(1)
+  .refine((raw) => raw.startsWith('/') && !raw.split('/').includes('..'), {
+    message: 'path must be absolute without ..',
+  });
 
 export const jobPayloadSchemas = {
   'create-user': z.strictObject({
@@ -42,6 +61,23 @@ export const jobPayloadSchemas = {
   }),
   'suspend-user': usernameOnly,
   'resume-user': usernameOnly,
+  'provision-rtorrent': usernameOnly,
+  'deprovision-rtorrent': usernameOnly,
+  'render-rtorrent-config': usernameOnly,
+  'add-watch-dir': z.strictObject({ username: usernameField, label: labelField }),
+  'set-sync-disabled': z.strictObject({ username: usernameField, disabled: z.boolean() }),
+  'set-allow-public-tracker': z.strictObject({ username: usernameField, allowed: z.boolean() }),
+  'torrent-event': z.strictObject({
+    username: usernameField,
+    event: z.enum(['inserted_new', 'finished', 'erased']),
+    infoHash: infoHashField,
+    name: z.string().min(1).optional(),
+    directory: absolutePathField.optional(),
+    basePath: absolutePathField.optional(),
+    torrentFile: absolutePathField.optional(),
+    torrentDir: absolutePathField.optional(),
+    label: labelField.optional(),
+  }),
 } satisfies Record<JobType, z.ZodType>;
 
 export type JobPayload<T extends JobType> = z.infer<(typeof jobPayloadSchemas)[T]>;
