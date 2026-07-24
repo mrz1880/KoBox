@@ -2,7 +2,7 @@
 
 > Prompt de reprise pour une **session Claude Code fraîche** dédiée à la **Phase 1** du rewrite
 > KoBox (bounded context **Torrent Lifecycle**), en autonomie, en TDD, dans la continuité de la
-> Phase 0 déjà mergée sur `v7.3`.
+> Phase 0 déjà mergée sur `main`.
 
 ---
 
@@ -10,7 +10,7 @@
 
 Mission : implémente la **Phase 1 de KoBox — Torrent Lifecycle** telle que cadrée dans
 `docs/AUDIT.md §6` (phase 1) et en réutilisant les fondations posées en Phase 0 (mergée sur
-`v7.3`). **Autonomie totale, TDD strict, un commit par unité de travail, une PR draft pour la
+`main`). **Autonomie totale, TDD strict, un commit par unité de travail, une PR draft pour la
 phase.** Ne re-débats aucune décision d'archi figée dans `docs/AUDIT.md`.
 
 ### 1. Lis d'abord, dans l'ordre (obligatoire avant toute action)
@@ -73,12 +73,12 @@ implémenter non.
 
 ### 4. Méthode (identique Phase 0)
 
-- Branche `feature/phase1-torrent-lifecycle` depuis `v7.3`. **Un commit par unité**, messages
+- Branche `feature/phase1-torrent-lifecycle` depuis `main`. **Un commit par unité**, messages
   conventional-commits (en anglais) + `Co-Authored-By`.
 - Pour chaque unité : `test-driven-development` (red→green→refactor), puis
   `verification-before-completion` (preuve d'exécution) avant de déclarer « fait ».
 - Sur tout bug : `systematic-debugging`.
-- Fin de phase : `requesting-code-review`, corriger, **PR draft** → `v7.3` (<200 mots), ne pas
+- Fin de phase : `requesting-code-review`, corriger, **PR draft** → `main` (<200 mots), ne pas
   merger sans validation.
 
 ### 5. Garde-fous (STOP si franchi)
@@ -98,7 +98,7 @@ implémenter non.
 
 ### 6. État au démarrage (mémo)
 
-- **Phase 0 (User Management) est mergée sur `v7.3`** : VOs, `SeedboxUser`, use cases
+- **Phase 0 (User Management) est mergée sur `main`** : VOs, `SeedboxUser`, use cases
   create/delete/change-password/suspend/resume, worker root + jobs typés, SQLite/Drizzle,
   adapters système + fakes, CLI `kobox`, E2E Debian 12 vert, CI, Dependabot, hooks.
 - **Scope v1** : figé dans `docs/AUDIT.md §7`, mais **le propriétaire peut retirer d'autres

@@ -10,19 +10,17 @@
 
 Mission : implémente la **Phase 2 de KoBox — Tracker & Blocklist** telle que cadrée dans
 `docs/AUDIT.md §1.4 + §6 (phase 2)` et en réutilisant les fondations des Phases 0 (User
-Management, mergée sur `v7.3`) et 1 (Torrent Lifecycle, **draft PR #5**, branche
-`feature/phase1-torrent-lifecycle`). **Autonomie totale, TDD strict, un commit par unité de
-travail, une PR draft pour la phase.** Ne re-débats aucune décision d'archi figée dans
-`docs/AUDIT.md`.
+Management) et 1 (Torrent Lifecycle), **toutes deux mergées sur `main`**. **Autonomie totale,
+TDD strict, un commit par unité de travail, une PR draft pour la phase.** Ne re-débats aucune
+décision d'archi figée dans `docs/AUDIT.md`.
 
 ### 0. État au démarrage (mémo — lis d'abord la mémoire projet)
 
-- **Phase 0** (User Management) est **mergée sur `v7.3`**.
-- **Phase 1** (Torrent Lifecycle) est **livrée en draft PR #5** vers `v7.3`, PAS ENCORE MERGÉE.
-  → **Vérifie l'état de la PR #5 avant de partir.** Si elle est mergée, branche Phase 2 depuis
-  `v7.3`. Si elle ne l'est **pas**, branche Phase 2 depuis `feature/phase1-torrent-lifecycle`
-  (Phase 2 dépend de l'agrégat `TorrentInstance`, du parsing metainfo/`Announcer` et de la
-  découverte des annonceurs posés en Phase 1) — et signale-le dans la description de PR.
+- **La branche principale est `main`** (l'ancienne `v7.3`, héritée du fork MySB, a été renommée
+  le 2026-07-24 ; les anciennes branches de version MySB sont archivées en tags `archive/*`).
+- **Phase 0** (User Management) et **Phase 1** (Torrent Lifecycle) sont **mergées sur `main`**
+  (Phase 1 via PR #5, rebase). Phase 2 dépend de l'agrégat `TorrentInstance`, du parsing
+  metainfo/`Announcer` et de la découverte des annonceurs posés en Phase 1 — tout est sur `main`.
 - Détails Phase 1 dans la mémoire `[[phase1-torrent-lifecycle-done]]` (pièges rtorrent inclus).
 
 ### 1. Lis d'abord, dans l'ordre (obligatoire avant toute action)
@@ -95,7 +93,7 @@ AUDIT §2) est OK ; implémenter Security non.
   `verification-before-completion` (preuve d'exécution : lint + typecheck + coverage + build +
   E2E conteneur) avant de déclarer « fait ».
 - Fin de phase : `requesting-code-review`, corriger (`receiving-code-review`), **PR draft** →
-  `v7.3` (<200 mots), ne pas merger sans validation.
+  `main` (<200 mots), ne pas merger sans validation.
 
 ### 5. Garde-fous (STOP si franchi)
 

@@ -29,7 +29,7 @@ public repo → neutral fixtures only, quality gates local (pre-commit/pre-push 
 `Announcer` VO + metainfo parsing land now), fair-use/metering (Phase 3), portal (Phase 6),
 warm-daemon socket for events (spool + CLI spawn is fine at ~100 ev/min; escape hatch documented).
 
-**Branch:** `feature/phase1-torrent-lifecycle` from `v7.3`.
+**Branch:** `feature/phase1-torrent-lifecycle` from `main`.
 
 ---
 
@@ -306,7 +306,7 @@ new schedule line + dirs exist; **event path as the user**: `runuser -u <user> ~
 - `pnpm lint && pnpm typecheck && pnpm coverage && pnpm build` green locally (pre-push enforces).
 - `make up && make test-int && make e2e` green in the Debian 12 container.
 - superpowers:requesting-code-review on the diff; fix findings.
-- Push branch; **draft PR** → `v7.3`, <200 words, conventional title
+- Push branch; **draft PR** → `main`, <200 words, conventional title
   `feat: Phase 1 — Torrent Lifecycle`.
 
 ---
