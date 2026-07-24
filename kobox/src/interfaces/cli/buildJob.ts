@@ -71,4 +71,44 @@ export const buildJob = {
   setAllowPublicTracker(input: { username: string; allowed: boolean }): Job {
     return parseJob('set-allow-public-tracker', input);
   },
+
+  discoverTracker(input: { url: string; privacy: string }): Job {
+    return parseJob('discover-tracker', input);
+  },
+
+  fetchTrackerCert(input: { host: string }): Job {
+    return parseJob('fetch-tracker-cert', input);
+  },
+
+  renewTrackerCerts(input: { today: string }): Job {
+    return parseJob('renew-tracker-certs', input);
+  },
+
+  markTrackerDead(input: { host: string }): Job {
+    return parseJob('mark-tracker-dead', input);
+  },
+
+  importBlocklistCatalog(): Job {
+    return parseJob('import-blocklist-catalog', {});
+  },
+
+  updateBlocklists(): Job {
+    return parseJob('update-blocklists', {});
+  },
+
+  renderWhitelist(): Job {
+    return parseJob('render-whitelist', {});
+  },
+
+  renderBlocklistFilters(input: { username?: string }): Job {
+    return parseJob('render-blocklist-filters', input);
+  },
+
+  addUserAddress(input: { username: string; ipv4: string }): Job {
+    return parseJob('add-user-address', input);
+  },
+
+  removeUserAddress(input: { username: string; ipv4: string }): Job {
+    return parseJob('remove-user-address', input);
+  },
 };
