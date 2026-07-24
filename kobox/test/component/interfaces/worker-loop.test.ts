@@ -1,19 +1,28 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import type { Job } from '../../../src/application/jobs/contract.js';
+import { parseJob, type Job } from '../../../src/application/jobs/contract.js';
 import type { ClaimedJob, JobQueuePort } from '../../../src/application/jobs/JobQueuePort.js';
+import { InfoHash } from '../../../src/domain/torrent/InfoHash.js';
 import { HashedPassword } from '../../../src/domain/user/HashedPassword.js';
 import { Password } from '../../../src/domain/user/Password.js';
 import type { PasswordHasherPort } from '../../../src/domain/user/ports.js';
 import { Username } from '../../../src/domain/user/Username.js';
+import { InMemoryTorrentInstanceRepository } from '../../../src/infrastructure/persistence/InMemoryTorrentInstanceRepository.js';
+import { InMemoryTorrentRepository } from '../../../src/infrastructure/persistence/InMemoryTorrentRepository.js';
 import { InMemoryUserRepository } from '../../../src/infrastructure/persistence/InMemoryUserRepository.js';
 import { FakeNotifications } from '../../../src/infrastructure/system/fakes/FakeNotifications.js';
 import { FakeQuota } from '../../../src/infrastructure/system/fakes/FakeQuota.js';
+import { FakeRtorrentConfig } from '../../../src/infrastructure/system/fakes/FakeRtorrentConfig.js';
+import { FakeRtorrentControl } from '../../../src/infrastructure/system/fakes/FakeRtorrentControl.js';
 import { FakeServiceControl } from '../../../src/infrastructure/system/fakes/FakeServiceControl.js';
 import { FakeSftp } from '../../../src/infrastructure/system/fakes/FakeSftp.js';
 import { FakeSystemAccounts } from '../../../src/infrastructure/system/fakes/FakeSystemAccounts.js';
+import { FakeTorrentMetainfo } from '../../../src/infrastructure/system/fakes/FakeTorrentMetainfo.js';
+import { FakeUserScriptRunner } from '../../../src/infrastructure/system/fakes/FakeUserScriptRunner.js';
+import { FakeWatchDirs } from '../../../src/infrastructure/system/fakes/FakeWatchDirs.js';
+import { loadRtorrentTemplates } from '../../../src/infrastructure/templates/TemplateProvider.js';
 import { buildJob } from '../../../src/interfaces/cli/buildJob.js';
 import { JobWorker } from '../../../src/interfaces/worker/JobWorker.js';
-import { buildUseCases } from '../../../src/interfaces/useCases.js';
+import { buildTorrentUseCases, buildUseCases } from '../../../src/interfaces/useCases.js';
 
 class InMemoryJobQueue implements JobQueuePort {
   private readonly rows: { id: number; job: Job; status: string; error?: string }[] = [];
@@ -79,6 +88,9 @@ interface World {
   queue: InMemoryJobQueue;
   accounts: FakeSystemAccounts;
   services: FakeServiceControl;
+  instances: InMemoryTorrentInstanceRepository;
+  torrents: InMemoryTorrentRepository;
+  scripts: FakeUserScriptRunner;
   worker: JobWorker;
   hasher: FakePasswordHasher;
 }
@@ -110,53 +122,123 @@ beforeEach(() => {
       releaseRtorrentPort: () => Promise.resolve(),
     },
   });
+  const instances = new InMemoryTorrentInstanceRepository();
+  const torrents = new InMemoryTorrentRepository();
+  const scripts = new FakeUserScriptRunner();
+  const torrentUseCases = buildTorrentUseCases({
+    users: repo,
+    instances,
+    torrents,
+    config: new FakeRtorrentConfig(),
+    watchDirs: new FakeWatchDirs(),
+    services,
+    metainfo: new FakeTorrentMetainfo(),
+    control: new FakeRtorrentControl(),
+    scripts,
+    templates: loadRtorrentTemplates(),
+    settings: { koboxBin: '/usr/local/bin/kobox' },
+  });
   const queue = new InMemoryJobQueue();
   world = {
     queue,
     accounts,
     services,
+    instances,
+    torrents,
+    scripts,
     hasher: new FakePasswordHasher(),
-    worker: new JobWorker(queue, useCases),
+    worker: new JobWorker(queue, useCases, torrentUseCases),
   };
 });
 
+async function enqueueCreateAlice(): Promise<number> {
+  const job = await buildJob.createUser(
+    {
+      username: 'alice',
+      email: 'alice@example.org',
+      accountType: 'normal',
+      quotaGib: 412,
+      proxyPort: 8080,
+    },
+    Password.parse('s3cretpw'),
+    world.hasher,
+  );
+  return world.queue.enqueue(job);
+}
+
 describe('CLI enqueue -> root worker loop (the privilege seam)', () => {
   it('should_create_a_user_end_to_end_through_a_typed_job', async () => {
-    const job = await buildJob.createUser(
-      {
-        username: 'alice',
-        email: 'alice@example.org',
-        accountType: 'normal',
-        quotaGib: 412,
-        proxyPort: 8080,
-      },
-      Password.parse('s3cretpw'),
-      world.hasher,
-    );
-    const id = await world.queue.enqueue(job);
+    const id = await enqueueCreateAlice();
 
     const processed = await world.worker.processNext();
 
     expect(processed).toBe(true);
     expect(world.queue.statusOf(id)).toBe('done');
     expect(await world.accounts.accountExists(alice)).toBe(true);
-    // rtorrent provisioning is Phase 1: create does not start a unit
+    // provisioning is a separate chained job: not yet executed after one step
     expect(await world.services.isUserServiceRunning(alice)).toBe(false);
   });
 
-  it('should_suspend_then_resume_via_jobs', async () => {
-    const createJob = await buildJob.createUser(
-      {
+  it('should_chain_rtorrent_provisioning_after_create_user', async () => {
+    await enqueueCreateAlice();
+
+    await world.worker.drain();
+
+    expect(await world.instances.findByUsername(alice)).toBeDefined();
+    expect(world.services.unitContentFor(alice)).toContain('User=alice');
+    expect(await world.services.isUserServiceRunning(alice)).toBe(true);
+  });
+
+  it('should_chain_deprovisioning_after_delete_user', async () => {
+    await enqueueCreateAlice();
+    await world.worker.drain();
+    await world.queue.enqueue(buildJob.deleteUser({ username: 'alice' }));
+
+    await world.worker.drain();
+
+    expect(await world.instances.findByUsername(alice)).toBeUndefined();
+    expect(world.services.unitContentFor(alice)).toBeUndefined();
+  });
+
+  it('should_execute_a_torrent_event_job_end_to_end', async () => {
+    await enqueueCreateAlice();
+    await world.worker.drain();
+    await world.queue.enqueue(
+      parseJob('torrent-event', {
         username: 'alice',
-        email: 'alice@example.org',
-        accountType: 'normal',
-        quotaGib: 412,
-        proxyPort: 8080,
-      },
-      Password.parse('s3cretpw'),
-      world.hasher,
+        event: 'finished',
+        infoHash: 'a1b2c3d4e5f6a7b8c9d0a1b2c3d4e5f6a7b8c9d0',
+        name: 'x',
+        basePath: '/home/alice/rtorrent/complete/x',
+        directory: '/home/alice/rtorrent/complete',
+      }),
     );
-    await world.queue.enqueue(createJob);
+
+    await world.worker.drain();
+
+    const torrent = await world.torrents.findByInfoHash(
+      alice,
+      InfoHash.parse('a1b2c3d4e5f6a7b8c9d0a1b2c3d4e5f6a7b8c9d0'),
+    );
+    expect(torrent?.state.value).toBe('completed');
+    expect(world.scripts.runs).toHaveLength(1);
+  });
+
+  it('should_execute_flag_and_watch_dir_jobs', async () => {
+    await enqueueCreateAlice();
+    await world.worker.drain();
+    await world.queue.enqueue(parseJob('set-sync-disabled', { username: 'alice', disabled: true }));
+    await world.queue.enqueue(parseJob('add-watch-dir', { username: 'alice', label: 'films' }));
+
+    await world.worker.drain();
+
+    const instance = await world.instances.findByUsername(alice);
+    expect(instance?.syncDisabled).toBe(true);
+    expect(instance?.watchDirs.map((dir) => dir.label?.value)).toEqual([undefined, 'films']);
+  });
+
+  it('should_suspend_then_resume_via_jobs', async () => {
+    await enqueueCreateAlice();
     await world.queue.enqueue(buildJob.suspendUser({ username: 'alice' }));
     await world.queue.enqueue(buildJob.resumeUser({ username: 'alice' }));
 

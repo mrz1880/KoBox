@@ -51,4 +51,24 @@ export const buildJob = {
   resumeUser(input: { username: string }): Job {
     return parseJob('resume-user', { username: input.username });
   },
+
+  provisionRtorrent(input: { username: string }): Job {
+    return parseJob('provision-rtorrent', { username: input.username });
+  },
+
+  renderRtorrentConfig(input: { username: string }): Job {
+    return parseJob('render-rtorrent-config', { username: input.username });
+  },
+
+  addWatchDir(input: { username: string; label: string }): Job {
+    return parseJob('add-watch-dir', input);
+  },
+
+  setSyncDisabled(input: { username: string; disabled: boolean }): Job {
+    return parseJob('set-sync-disabled', input);
+  },
+
+  setAllowPublicTracker(input: { username: string; allowed: boolean }): Job {
+    return parseJob('set-allow-public-tracker', input);
+  },
 };
