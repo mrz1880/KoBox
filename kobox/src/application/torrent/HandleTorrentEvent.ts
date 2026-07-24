@@ -5,6 +5,7 @@ import { Torrent } from '../../domain/torrent/Torrent.js';
 import { TorrentState } from '../../domain/torrent/TorrentState.js';
 import type { TorrentInstance } from '../../domain/torrent/TorrentInstance.js';
 import type {
+  AnnouncerSink,
   RtorrentControlPort,
   TorrentInstanceRepository,
   TorrentMetainfoPort,
@@ -31,6 +32,7 @@ interface Deps {
   readonly metainfo: TorrentMetainfoPort;
   readonly control: RtorrentControlPort;
   readonly scripts: UserScriptRunnerPort;
+  readonly announcers: AnnouncerSink;
 }
 
 // The typed replacement for the legacy 400-line bash hooks. Behavior flags
@@ -74,6 +76,14 @@ export class HandleTorrentEvent {
     const metainfo = await this.deps.metainfo.read(command.torrentFile);
     if (!metainfo) {
       return;
+    }
+    // Tracker discovery happens on every readable insert, accepted or not:
+    // rejection is the user's policy, tracker knowledge is global. Best-effort
+    // — a sink failure must never fail the event.
+    if (metainfo.announcers.length > 0) {
+      await this.deps.announcers
+        .publish(metainfo.announcers, metainfo.isPrivate ? 'private' : 'public')
+        .catch(() => undefined);
     }
     const torrent = Torrent.load({
       infoHash: command.infoHash,

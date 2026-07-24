@@ -11,6 +11,7 @@ import {
   GetentUsernameResolver,
   TorrentEventSpoolSweeper,
 } from '../infrastructure/spool/TorrentEventSpool.js';
+import { EnqueueAnnouncerSink } from '../infrastructure/jobs/EnqueueAnnouncerSink.js';
 import { BencodeMetainfoAdapter } from '../infrastructure/system/BencodeMetainfoAdapter.js';
 import { ExecFileRunner } from '../infrastructure/system/CommandRunner.js';
 import { OpensslPasswordHasher } from '../infrastructure/system/OpensslPasswordHasher.js';
@@ -74,6 +75,7 @@ export function buildContainer(name: string): Container {
     notifications: new ConsoleNotificationAdapter(logger),
     allocator: new SqlitePortAllocator(db),
   });
+  const queue = new SqliteJobQueue(db);
   const torrentUseCases = buildTorrentUseCases({
     users: repo,
     instances: new SqliteTorrentInstanceRepository(db),
@@ -84,10 +86,10 @@ export function buildContainer(name: string): Container {
     metainfo: new BencodeMetainfoAdapter(),
     control: new ScgiRtorrentControlAdapter(),
     scripts: new UserScriptRunnerAdapter(runner),
+    announcers: new EnqueueAnnouncerSink(queue),
     templates: loadRtorrentTemplates(),
     settings: { koboxBin: process.env.KOBOX_BIN ?? DEFAULT_KOBOX_BIN },
   });
-  const queue = new SqliteJobQueue(db);
   return {
     db,
     logger,

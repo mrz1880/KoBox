@@ -20,6 +20,7 @@ import { DeleteUser } from '../application/user/DeleteUser.js';
 import { ResumeUser } from '../application/user/ResumeUser.js';
 import { SuspendUser } from '../application/user/SuspendUser.js';
 import type {
+  AnnouncerSink,
   RtorrentConfigPort,
   RtorrentControlPort,
   TorrentInstanceRepository,
@@ -91,6 +92,7 @@ export interface TorrentUseCaseDeps {
   readonly metainfo: TorrentMetainfoPort;
   readonly control: RtorrentControlPort;
   readonly scripts: UserScriptRunnerPort;
+  readonly announcers: AnnouncerSink;
   readonly templates: RtorrentTemplates;
   readonly settings: RenderSettings;
 }
