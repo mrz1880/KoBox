@@ -288,6 +288,12 @@ exports[`job contract > should_keep_the_wire_contract_stable 1`] = `
     "properties": {},
     "type": "object",
   },
+  "render-openvpn": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {},
+    "type": "object",
+  },
   "render-rtorrent-config": {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "additionalProperties": false,

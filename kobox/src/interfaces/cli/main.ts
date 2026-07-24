@@ -410,6 +410,17 @@ program
   });
 
 program
+  .command('render-openvpn')
+  .description(
+    're-render OpenVPN server configs and client profiles (no restart: tunnels stay up)',
+  )
+  .action(async () => {
+    const c = container();
+    const id = await c.queue.enqueue(buildJob.renderOpenVpn());
+    await done(c, `job ${String(id)} enqueued: render-openvpn`);
+  });
+
+program
   .command('list-trackers')
   .description('print the tracker whitelist as JSON (operator view)')
   .action(async () => {

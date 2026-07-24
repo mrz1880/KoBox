@@ -34,6 +34,7 @@ describe('job contract', () => {
       'add-user-hostname',
       'remove-user-hostname',
       'resolve-dyndns',
+      'render-openvpn',
     ]);
   });
 

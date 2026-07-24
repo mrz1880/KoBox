@@ -38,6 +38,7 @@ export const JOB_TYPES = [
   'add-user-hostname',
   'remove-user-hostname',
   'resolve-dyndns',
+  'render-openvpn',
 ] as const;
 
 export type JobType = (typeof JOB_TYPES)[number];
@@ -138,6 +139,7 @@ export const jobPayloadSchemas = {
   'add-user-hostname': userHostnamePayload,
   'remove-user-hostname': userHostnamePayload,
   'resolve-dyndns': z.strictObject({}),
+  'render-openvpn': z.strictObject({}),
 } satisfies Record<JobType, z.ZodType>;
 
 export type JobPayload<T extends JobType> = z.infer<(typeof jobPayloadSchemas)[T]>;

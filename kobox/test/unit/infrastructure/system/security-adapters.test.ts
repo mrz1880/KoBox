@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -14,6 +14,7 @@ import type {
 } from '../../../../src/infrastructure/system/CommandRunner.js';
 import { DynDnsHost } from '../../../../src/domain/security/DynDnsHost.js';
 import { DynDnsLookupAdapter } from '../../../../src/infrastructure/system/DynDnsLookupAdapter.js';
+import { FsVpnPkiAdapter } from '../../../../src/infrastructure/system/FsVpnPkiAdapter.js';
 import { GetentUserIdentityAdapter } from '../../../../src/infrastructure/system/GetentUserIdentityAdapter.js';
 import { IptablesRestoreAdapter } from '../../../../src/infrastructure/system/IptablesRestoreAdapter.js';
 import { NetworkServiceAdapter } from '../../../../src/infrastructure/system/NetworkServiceAdapter.js';
@@ -208,6 +209,25 @@ describe('NetworkServiceAdapter', () => {
     await adapter.reloadPeerGuardian();
 
     expect(runner.commandLines()).toContain('pglcmd reload');
+  });
+});
+
+describe('FsVpnPkiAdapter', () => {
+  it('should_read_client_material_from_an_easyrsa_tree', async () => {
+    const pkiDir = mkdtempSync(join(tmpdir(), 'kobox-pki-'));
+    mkdirSync(join(pkiDir, 'issued'), { recursive: true });
+    mkdirSync(join(pkiDir, 'private'), { recursive: true });
+    writeFileSync(join(pkiDir, 'ca.crt'), 'CA-PEM\n');
+    writeFileSync(join(pkiDir, 'issued/alice.crt'), 'ALICE-PEM\n');
+    writeFileSync(join(pkiDir, 'private/alice.key'), 'ALICE-KEY\n');
+    const adapter = new FsVpnPkiAdapter(pkiDir);
+
+    const material = await adapter.clientMaterial(Username.parse('alice'));
+    expect(material).toEqual({ caCrt: 'CA-PEM', userCrt: 'ALICE-PEM', userKey: 'ALICE-KEY' });
+
+    expect(await adapter.clientMaterial(Username.parse('bob'))).toBeUndefined();
+    expect(adapter.serverPaths().serverKey).toBe(join(pkiDir, 'private/server.key'));
+    rmSync(pkiDir, { recursive: true, force: true });
   });
 });
 

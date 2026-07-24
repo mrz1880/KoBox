@@ -23,7 +23,9 @@ import { FsBlocklistCacheAdapter } from '../infrastructure/system/FsBlocklistCac
 import { HttpsBlocklistDownloadAdapter } from '../infrastructure/system/HttpsBlocklistDownloadAdapter.js';
 import { IblocklistCatalogAdapter } from '../infrastructure/system/IblocklistCatalogAdapter.js';
 import { Cidr } from '../domain/security/Cidr.js';
+import { DynDnsHost } from '../domain/security/DynDnsHost.js';
 import { DynDnsLookupAdapter } from '../infrastructure/system/DynDnsLookupAdapter.js';
+import { FsVpnPkiAdapter, DEFAULT_PKI_DIR } from '../infrastructure/system/FsVpnPkiAdapter.js';
 import { GetentUserIdentityAdapter } from '../infrastructure/system/GetentUserIdentityAdapter.js';
 import { IptablesRestoreAdapter } from '../infrastructure/system/IptablesRestoreAdapter.js';
 import { NetworkServiceAdapter } from '../infrastructure/system/NetworkServiceAdapter.js';
@@ -58,9 +60,11 @@ function envPort(name: string, fallback: number): number {
 }
 
 export function securitySettings(): SecuritySettings {
+  const vpnRemote = process.env.KOBOX_VPN_REMOTE;
   return {
     sshPort: envPort('KOBOX_SSH_PORT', 22),
     portalPort: envPort('KOBOX_PORTAL_PORT', 8189),
+    ...(vpnRemote !== undefined && { vpnRemote: DynDnsHost.parse(vpnRemote) }),
     vpn: {
       tunGwPort: envPort('KOBOX_VPN_TUN_GW_PORT', 8193),
       tunPort: envPort('KOBOX_VPN_TUN_PORT', 8194),
@@ -170,6 +174,7 @@ export function buildContainer(name: string): Container {
     files: networkFiles,
     reload: networkServices,
     resolver: new DynDnsLookupAdapter(),
+    pki: new FsVpnPkiAdapter(process.env.KOBOX_VPN_PKI ?? DEFAULT_PKI_DIR),
     notifications,
     settings,
   });

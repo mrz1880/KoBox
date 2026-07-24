@@ -131,4 +131,8 @@ export const buildJob = {
   resolveDynDns(): Job {
     return parseJob('resolve-dyndns', {});
   },
+
+  renderOpenVpn(): Job {
+    return parseJob('render-openvpn', {});
+  },
 };

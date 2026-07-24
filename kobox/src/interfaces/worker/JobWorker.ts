@@ -247,6 +247,9 @@ export class JobWorker {
           fail2banDirty: report.fail2banDirty,
         };
       }
+      case 'render-openvpn':
+        await this.security.renderOpenVpn.execute();
+        return;
       case 'add-user-address':
       case 'remove-user-address': {
         const report = await this.trackers.manageUserAddress.execute({

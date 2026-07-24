@@ -17,6 +17,7 @@ import { SetSyncDisabled } from '../application/torrent/SetSyncDisabled.js';
 import { ApplyFirewall } from '../application/security/ApplyFirewall.js';
 import { ManageUserHostname } from '../application/security/ManageUserHostname.js';
 import { RenderFail2ban } from '../application/security/RenderFail2ban.js';
+import { RenderOpenVpn } from '../application/security/RenderOpenVpn.js';
 import { ResolveDynDns } from '../application/security/ResolveDynDns.js';
 import type { SecuritySettings } from '../application/security/settings.js';
 import { ChangePassword } from '../application/user/ChangePassword.js';
@@ -55,6 +56,7 @@ import type {
   NetworkServicePort,
   SecurityNotificationPort,
   UserIdentityPort,
+  VpnPkiPort,
 } from '../domain/security/ports.js';
 import type { RenderSettings, RtorrentTemplates } from '../domain/torrent/rendering.js';
 import type { PortAllocatorPort } from '../domain/user/PortAllocatorPort.js';
@@ -174,6 +176,7 @@ export interface SecurityUseCaseDeps {
   readonly files: ManagedFilesPort;
   readonly reload: NetworkServicePort;
   readonly resolver: DynDnsResolverPort;
+  readonly pki: VpnPkiPort;
   readonly notifications: SecurityNotificationPort;
   readonly settings: SecuritySettings;
 }
@@ -183,6 +186,7 @@ export interface SecurityUseCases {
   readonly renderFail2ban: RenderFail2ban;
   readonly manageUserHostname: ManageUserHostname;
   readonly resolveDynDns: ResolveDynDns;
+  readonly renderOpenVpn: RenderOpenVpn;
 }
 
 export function buildSecurityUseCases(deps: SecurityUseCaseDeps): SecurityUseCases {
@@ -191,6 +195,7 @@ export function buildSecurityUseCases(deps: SecurityUseCaseDeps): SecurityUseCas
     renderFail2ban: new RenderFail2ban(deps),
     manageUserHostname: new ManageUserHostname(deps),
     resolveDynDns: new ResolveDynDns(deps),
+    renderOpenVpn: new RenderOpenVpn(deps),
   };
 }
 

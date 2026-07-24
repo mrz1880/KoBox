@@ -41,6 +41,7 @@ import { FakeDynDnsResolver } from '../../../src/infrastructure/system/fakes/Fak
 import { FakeFirewallApply } from '../../../src/infrastructure/system/fakes/FakeFirewallApply.js';
 import { FakeNetworkServices } from '../../../src/infrastructure/system/fakes/FakeNetworkServices.js';
 import { FakeUserIdentity } from '../../../src/infrastructure/system/fakes/FakeUserIdentity.js';
+import { FakeVpnPki } from '../../../src/infrastructure/system/fakes/FakeVpnPki.js';
 import { buildJob } from '../../../src/interfaces/cli/buildJob.js';
 import { JobWorker } from '../../../src/interfaces/worker/JobWorker.js';
 import {
@@ -211,6 +212,7 @@ beforeEach(() => {
     files: networkFiles,
     reload: new FakeNetworkServices(),
     resolver: dyndns,
+    pki: new FakeVpnPki(),
     notifications,
     settings: {
       sshPort: 22,
