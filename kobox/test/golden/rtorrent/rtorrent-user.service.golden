@@ -1,0 +1,19 @@
+# KoBox-managed unit — DO NOT EDIT: rendered declaratively, re-applied idempotently.
+[Unit]
+Description=KoBox rTorrent instance for alice
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=alice
+Group=kobox-users
+WorkingDirectory=/home/alice
+Environment=HOME=/home/alice
+ExecStart=/usr/bin/rtorrent -n -o import=/home/alice/.rtorrent.rc
+Restart=on-failure
+RestartSec=5
+UMask=0027
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,4 @@
+#!/bin/sh
+# KoBox-managed shim — DO NOT EDIT. Zero logic here by design: behavior
+# flags live in the KoBox database, handling happens in the root worker.
+exec /usr/local/bin/kobox torrent-event finished --hash "$1" --base-path "$2" --directory "$3" --name "$4" --torrent-file "$5" --label "$6"

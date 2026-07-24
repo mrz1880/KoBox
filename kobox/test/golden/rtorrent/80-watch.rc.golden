@@ -1,0 +1,8 @@
+# KoBox-managed file for alice — DO NOT EDIT (see .rtorrent.rc header).
+# One schedule per watch directory; labels land in d.custom1.
+# Watching watch/
+schedule2 = watch_directory_0,5,5,"load.normal=/home/alice/rtorrent/watch/*.torrent,d.directory.set=/home/alice/rtorrent/complete/,d.custom1.set=,d.custom2.set=/home/alice/rtorrent/torrents/"
+# Watching watch/films/
+schedule2 = watch_directory_1,5,5,"load.normal=/home/alice/rtorrent/watch/films/*.torrent,d.directory.set=/home/alice/rtorrent/complete/films/,d.custom1.set=films,d.custom2.set=/home/alice/rtorrent/torrents/films/"
+# Watching watch/series/
+schedule2 = watch_directory_2,5,5,"load.normal=/home/alice/rtorrent/watch/series/*.torrent,d.directory.set=/home/alice/rtorrent/complete/series/,d.custom1.set=series,d.custom2.set=/home/alice/rtorrent/torrents/series/"
