@@ -131,6 +131,7 @@ interface World {
   certStore: FakeCertStore;
   download: FakeBlocklistDownload;
   networkFiles: FakeRtorrentConfig;
+  blocklistCache: FakeBlocklistCache;
   firewall: FakeFirewallApply;
   identity: FakeUserIdentity;
   dyndns: FakeDynDnsResolver;
@@ -190,6 +191,7 @@ beforeEach(() => {
   const download = new FakeBlocklistDownload();
   const networkFiles = new FakeRtorrentConfig();
   const addresses = new InMemoryUserAddressRepository();
+  const blocklistCache = new FakeBlocklistCache();
   const trackerUseCases = buildTrackerUseCases({
     trackers,
     blocklists,
@@ -201,7 +203,7 @@ beforeEach(() => {
     certStore,
     download,
     catalog: new FakeIblocklistCatalog([]),
-    cache: new FakeBlocklistCache(),
+    cache: blocklistCache,
     files: networkFiles,
     reload: new FakeNetworkServiceReload(),
     notifications,
@@ -262,6 +264,7 @@ beforeEach(() => {
     certStore,
     download,
     networkFiles,
+    blocklistCache,
     firewall,
     identity,
     dyndns,
@@ -296,6 +299,22 @@ describe('CLI enqueue -> root worker loop (the privilege seam)', () => {
     expect(await world.accounts.accountExists(alice)).toBe(true);
     // provisioning is a separate chained job: not yet executed after one step
     expect(await world.services.isUserServiceRunning(alice)).toBe(false);
+  });
+
+  it('should_chain_the_user_blocklist_filter_render_after_provisioning', async () => {
+    // Phase 2 debt: a new user gets their filter immediately, without
+    // waiting for the next update-blocklists run (legacy parity).
+    await world.blocklistCache.write(['10.0.0.0/8']);
+    await enqueueCreateAlice();
+
+    await world.worker.drain();
+
+    expect(world.networkFiles.contentAt('/home/alice/blocklist/blocklist_rtorrent.txt')).toBe(
+      '10.0.0.0/8\n',
+    );
+    expect(
+      world.networkFiles.contentAt('/home/alice/rtorrent/config.d/80-blocklist.rc'),
+    ).toContain('ipv4_filter.load');
   });
 
   it('should_chain_rtorrent_provisioning_after_create_user', async () => {

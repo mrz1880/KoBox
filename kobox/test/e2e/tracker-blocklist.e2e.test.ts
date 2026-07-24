@@ -289,10 +289,13 @@ describe.skipIf(!onDebianAsRoot)('E2E: tracker discovery, certs, whitelist and b
       'ipv4_filter.load',
     );
 
-    // a real rtorrent must accept the drop-in + filter file
+    // a real rtorrent must accept the drop-in + filter file — and PROVE the
+    // parse through its own log, not just by staying alive
     sh('systemctl', ['restart', `rtorrent-${USER}`]);
     await waitForScgi(20_000);
     expect(unitProperty('ActiveState')).toBe('active');
+    const rtorrentLog = readFileSync(join(HOME, 'logs/rtorrent.log'), 'utf8');
+    expect(rtorrentLog).toContain('IPv4 filter list size');
   }, 60_000);
 
   it('should_keep_the_last_good_blocklist_when_the_source_dies', async () => {

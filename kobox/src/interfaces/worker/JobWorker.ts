@@ -81,6 +81,13 @@ export class JobWorker {
         parseJob('deprovision-rtorrent', { username: job.payload.username }),
       );
     }
+    // legacy parity: a fresh instance gets its blocklist filter immediately,
+    // not at the next update-blocklists run
+    if (job.type === 'provision-rtorrent') {
+      await this.queue.enqueue(
+        parseJob('render-blocklist-filters', { username: job.payload.username }),
+      );
+    }
     // the firewall names uids and rtorrent ports: reconcile it whenever the
     // provisioned population changes
     if (job.type === 'provision-rtorrent' || job.type === 'deprovision-rtorrent') {
