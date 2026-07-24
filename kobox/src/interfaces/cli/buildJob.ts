@@ -135,4 +135,8 @@ export const buildJob = {
   renderOpenVpn(): Job {
     return parseJob('render-openvpn', {});
   },
+
+  evaluateFairUse(): Job {
+    return parseJob('evaluate-fair-use', {});
+  },
 };

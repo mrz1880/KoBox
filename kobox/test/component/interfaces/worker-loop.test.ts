@@ -36,8 +36,14 @@ import { FakeTorrentMetainfo } from '../../../src/infrastructure/system/fakes/Fa
 import { FakeUserScriptRunner } from '../../../src/infrastructure/system/fakes/FakeUserScriptRunner.js';
 import { FakeWatchDirs } from '../../../src/infrastructure/system/fakes/FakeWatchDirs.js';
 import { loadRtorrentTemplates } from '../../../src/infrastructure/templates/TemplateProvider.js';
+import { Bandwidth } from '../../../src/domain/security/Bandwidth.js';
 import { Cidr } from '../../../src/domain/security/Cidr.js';
+import { FairUsePolicy } from '../../../src/domain/security/FairUsePolicy.js';
+import { InMemoryFairUseRepository } from '../../../src/infrastructure/persistence/InMemoryFairUseRepository.js';
 import { FakeDynDnsResolver } from '../../../src/infrastructure/system/fakes/FakeDynDnsResolver.js';
+import { FakeShaping } from '../../../src/infrastructure/system/fakes/FakeShaping.js';
+import { FakeSshAuthLog } from '../../../src/infrastructure/system/fakes/FakeSshAuthLog.js';
+import { FakeUsageMeter } from '../../../src/infrastructure/system/fakes/FakeUsageMeter.js';
 import { FakeFirewallApply } from '../../../src/infrastructure/system/fakes/FakeFirewallApply.js';
 import { FakeNetworkServices } from '../../../src/infrastructure/system/fakes/FakeNetworkServices.js';
 import { FakeUserIdentity } from '../../../src/infrastructure/system/fakes/FakeUserIdentity.js';
@@ -213,6 +219,20 @@ beforeEach(() => {
     reload: new FakeNetworkServices(),
     resolver: dyndns,
     pki: new FakeVpnPki(),
+    fairUse: new InMemoryFairUseRepository(),
+    meter: new FakeUsageMeter(),
+    authLog: new FakeSshAuthLog(),
+    shaping: new FakeShaping(),
+    health: {
+      checkProcess: (name) => Promise.resolve({ name, state: 'healthy' as const }),
+      checkSocket: (host, port) =>
+        Promise.resolve({ name: `${host}:${String(port)}`, state: 'healthy' as const }),
+    },
+    policy: FairUsePolicy.of({
+      sustainedEgress: Bandwidth.mbit(50),
+      maxAuthPerHour: 30,
+      throttleTo: Bandwidth.mbit(5),
+    }),
     notifications,
     settings: {
       sshPort: 22,

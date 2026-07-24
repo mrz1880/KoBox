@@ -410,6 +410,41 @@ program
   });
 
 program
+  .command('evaluate-fair-use')
+  .description('meter usage per user and run the graduated response (cron entry point)')
+  .action(async () => {
+    const c = container();
+    const id = await c.queue.enqueue(buildJob.evaluateFairUse());
+    await done(c, `job ${String(id)} enqueued: evaluate-fair-use`);
+  });
+
+program
+  .command('show-usage')
+  .description('print per-user usage, fair-use state and recent audit events as JSON')
+  .action(async () => {
+    const c = container();
+    const counters = new Map(
+      (await c.usageMeter.readCounters()).map((counter) => [counter.username, counter]),
+    );
+    const rows = [];
+    for (const user of await c.repo.listAll()) {
+      const state = await c.fairUseRepo.getState(user.username);
+      const events = await c.fairUseRepo.listEvents(user.username);
+      rows.push({
+        username: user.username.value,
+        status: user.status.value,
+        level: state.level,
+        health: state.healthState,
+        egressBytes: counters.get(user.username.value)?.egressBytes ?? 0,
+        ingressBytes: counters.get(user.username.value)?.ingressBytes ?? 0,
+        recentEvents: events.slice(-5),
+      });
+    }
+    process.stdout.write(`${JSON.stringify(rows, null, 2)}\n`);
+    c.db.close();
+  });
+
+program
   .command('render-openvpn')
   .description(
     're-render OpenVPN server configs and client profiles (no restart: tunnels stay up)',

@@ -23,9 +23,15 @@ import { FsBlocklistCacheAdapter } from '../infrastructure/system/FsBlocklistCac
 import { HttpsBlocklistDownloadAdapter } from '../infrastructure/system/HttpsBlocklistDownloadAdapter.js';
 import { IblocklistCatalogAdapter } from '../infrastructure/system/IblocklistCatalogAdapter.js';
 import { Cidr } from '../domain/security/Cidr.js';
+import { Bandwidth } from '../domain/security/Bandwidth.js';
 import { DynDnsHost } from '../domain/security/DynDnsHost.js';
+import { FairUsePolicy } from '../domain/security/FairUsePolicy.js';
+import { SqliteFairUseRepository } from '../infrastructure/persistence/SqliteFairUseRepository.js';
 import { DynDnsLookupAdapter } from '../infrastructure/system/DynDnsLookupAdapter.js';
 import { FsVpnPkiAdapter, DEFAULT_PKI_DIR } from '../infrastructure/system/FsVpnPkiAdapter.js';
+import { IptablesUsageMeterAdapter } from '../infrastructure/system/IptablesUsageMeterAdapter.js';
+import { JournaldSshAuthAdapter } from '../infrastructure/system/JournaldSshAuthAdapter.js';
+import { TcShapingAdapter } from '../infrastructure/system/TcShapingAdapter.js';
 import { GetentUserIdentityAdapter } from '../infrastructure/system/GetentUserIdentityAdapter.js';
 import { IptablesRestoreAdapter } from '../infrastructure/system/IptablesRestoreAdapter.js';
 import { NetworkServiceAdapter } from '../infrastructure/system/NetworkServiceAdapter.js';
@@ -57,6 +63,14 @@ import type { SecuritySettings } from '../application/security/settings.js';
 function envPort(name: string, fallback: number): number {
   const raw = process.env[name];
   return raw === undefined ? fallback : Number(raw);
+}
+
+export function fairUsePolicy(): FairUsePolicy {
+  return FairUsePolicy.of({
+    sustainedEgress: Bandwidth.mbit(envPort('KOBOX_FAIRUSE_EGRESS_MBIT', 50)),
+    maxAuthPerHour: envPort('KOBOX_FAIRUSE_AUTH_PER_HOUR', 30),
+    throttleTo: Bandwidth.mbit(envPort('KOBOX_FAIRUSE_THROTTLE_MBIT', 5)),
+  });
 }
 
 export function securitySettings(): SecuritySettings {
@@ -97,6 +111,8 @@ export interface Container {
   readonly trackerRepo: SqliteTrackerRepository;
   readonly healthProbe: ProcessSocketHealthProbe;
   readonly spoolSweeper: TorrentEventSpoolSweeper;
+  readonly fairUseRepo: SqliteFairUseRepository;
+  readonly usageMeter: IptablesUsageMeterAdapter;
 }
 
 export function buildContainer(name: string): Container {
@@ -145,6 +161,7 @@ export function buildContainer(name: string): Container {
   const notifications = new ConsoleNotificationAdapter(logger);
   const healthProbe = new ProcessSocketHealthProbe(runner);
   const settings = securitySettings();
+  const fairUseRepo = new SqliteFairUseRepository(db);
   const trackerUseCases = buildTrackerUseCases({
     trackers: trackerRepo,
     blocklists: new SqliteBlocklistRepository(db),
@@ -175,6 +192,12 @@ export function buildContainer(name: string): Container {
     reload: networkServices,
     resolver: new DynDnsLookupAdapter(),
     pki: new FsVpnPkiAdapter(process.env.KOBOX_VPN_PKI ?? DEFAULT_PKI_DIR),
+    fairUse: fairUseRepo,
+    meter: new IptablesUsageMeterAdapter(runner),
+    authLog: new JournaldSshAuthAdapter(runner),
+    shaping: new TcShapingAdapter(runner, process.env.KOBOX_WAN_IF ?? 'eth0'),
+    health: healthProbe,
+    policy: fairUsePolicy(),
     notifications,
     settings,
   });
@@ -195,5 +218,7 @@ export function buildContainer(name: string): Container {
       spoolDir(),
       new GetentUsernameResolver(runner).resolve,
     ),
+    fairUseRepo,
+    usageMeter: new IptablesUsageMeterAdapter(runner),
   };
 }

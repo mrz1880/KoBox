@@ -15,6 +15,7 @@ import { RenderRtorrentConfig } from '../application/torrent/RenderRtorrentConfi
 import { SetAllowPublicTracker } from '../application/torrent/SetAllowPublicTracker.js';
 import { SetSyncDisabled } from '../application/torrent/SetSyncDisabled.js';
 import { ApplyFirewall } from '../application/security/ApplyFirewall.js';
+import { EvaluateFairUse } from '../application/security/EvaluateFairUse.js';
 import { ManageUserHostname } from '../application/security/ManageUserHostname.js';
 import { RenderFail2ban } from '../application/security/RenderFail2ban.js';
 import { RenderOpenVpn } from '../application/security/RenderOpenVpn.js';
@@ -49,18 +50,24 @@ import type {
   TrackerRepository,
   UserAddressRepository,
 } from '../domain/tracker/ports.js';
+import type { FairUsePolicy } from '../domain/security/FairUsePolicy.js';
 import type {
   DynDnsBindingRepository,
   DynDnsResolverPort,
+  FairUseRepository,
   FirewallApplyPort,
   NetworkServicePort,
   SecurityNotificationPort,
+  ShapingPort,
+  SshAuthLogPort,
+  UsageMeterPort,
   UserIdentityPort,
   VpnPkiPort,
 } from '../domain/security/ports.js';
 import type { RenderSettings, RtorrentTemplates } from '../domain/torrent/rendering.js';
 import type { PortAllocatorPort } from '../domain/user/PortAllocatorPort.js';
 import type {
+  HealthProbePort,
   NotificationPort,
   QuotaPort,
   ServiceControlPort,
@@ -177,6 +184,12 @@ export interface SecurityUseCaseDeps {
   readonly reload: NetworkServicePort;
   readonly resolver: DynDnsResolverPort;
   readonly pki: VpnPkiPort;
+  readonly fairUse: FairUseRepository;
+  readonly meter: UsageMeterPort;
+  readonly authLog: SshAuthLogPort;
+  readonly shaping: ShapingPort;
+  readonly health: HealthProbePort;
+  readonly policy: FairUsePolicy;
   readonly notifications: SecurityNotificationPort;
   readonly settings: SecuritySettings;
 }
@@ -187,6 +200,7 @@ export interface SecurityUseCases {
   readonly manageUserHostname: ManageUserHostname;
   readonly resolveDynDns: ResolveDynDns;
   readonly renderOpenVpn: RenderOpenVpn;
+  readonly evaluateFairUse: EvaluateFairUse;
 }
 
 export function buildSecurityUseCases(deps: SecurityUseCaseDeps): SecurityUseCases {
@@ -196,6 +210,7 @@ export function buildSecurityUseCases(deps: SecurityUseCaseDeps): SecurityUseCas
     manageUserHostname: new ManageUserHostname(deps),
     resolveDynDns: new ResolveDynDns(deps),
     renderOpenVpn: new RenderOpenVpn(deps),
+    evaluateFairUse: new EvaluateFairUse(deps),
   };
 }
 

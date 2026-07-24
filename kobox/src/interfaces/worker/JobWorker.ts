@@ -250,6 +250,9 @@ export class JobWorker {
       case 'render-openvpn':
         await this.security.renderOpenVpn.execute();
         return;
+      case 'evaluate-fair-use':
+        await this.security.evaluateFairUse.execute({ now: nowStamp() });
+        return;
       case 'add-user-address':
       case 'remove-user-address': {
         const report = await this.trackers.manageUserAddress.execute({
