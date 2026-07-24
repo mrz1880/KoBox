@@ -3,6 +3,9 @@ services:
     build: .
     container_name: kobox-dev
     privileged: true
+    # systemd needs the host cgroup namespace to boot as PID 1 on cgroup-v2
+    # hosts (GitHub Actions runners); Docker Desktop tolerated its absence.
+    cgroup: host
     volumes:
       - ../..:/opt/KoBox
       # mask the host's node_modules: native modules differ between macOS and linux

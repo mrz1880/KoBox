@@ -45,8 +45,17 @@ jobs:
       - name: Boot container
         run: |
           docker compose -f docker/docker-compose.yml up -d
-          sleep 5
-          docker exec kobox-dev systemctl is-system-running --wait || true
+          for i in $(seq 1 30); do
+            state=$(docker inspect -f '{{.State.Running}}' kobox-dev 2>/dev/null || echo false)
+            if [ "$state" != "true" ]; then
+              echo "::error::kobox-dev exited during boot"; docker compose -f docker/docker-compose.yml logs; exit 1
+            fi
+            if docker exec kobox-dev systemctl is-system-running 2>/dev/null | grep -qE 'running|degraded'; then
+              echo "systemd is up"; exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::systemd did not come up"; docker compose -f docker/docker-compose.yml logs; exit 1
       - name: Install dependencies in container
         run: docker exec kobox-dev bash -lc 'cd /opt/KoBox/kobox && corepack enable pnpm && pnpm install --frozen-lockfile'
       - name: Integration tests (real system adapters)
