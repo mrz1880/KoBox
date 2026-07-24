@@ -13,6 +13,7 @@ export interface UpdateBlocklistsCommand {
 export interface BlocklistUpdateReport {
   readonly updated: number;
   readonly failed: number;
+  readonly skipped: number; // subscription lists left alone for lack of credentials
   // undefined = every download failed: the previous cache stays authoritative
   readonly ranges?: readonly string[];
 }
@@ -43,8 +44,15 @@ export class UpdateBlocklists {
     const downloaded: (readonly string[])[] = [];
     let updated = 0;
     let failed = 0;
+    let skipped = 0;
 
     for (const list of enabled) {
+      if (list.subscription && !credentials) {
+        // guaranteed 4xx without credentials: skip quietly instead of a
+        // failure notification on every run
+        skipped += 1;
+        continue;
+      }
       const url =
         list.subscription && credentials
           ? list.url.withCredentials(credentials.username, credentials.pin)
@@ -52,9 +60,16 @@ export class UpdateBlocklists {
       const fetched = await download.fetch(url);
       if (fetched) {
         downloaded.push(fetched.ranges);
+        await cache.writeList(list.fileStem, fetched.ranges);
         await blocklists.save(list.recordSuccess(command.now, fetched.sha256));
         updated += 1;
       } else {
+        // issue #117, both halves: the other lists keep updating AND this
+        // list's last good ranges stay in the merge
+        const lastGood = await cache.readList(list.fileStem);
+        if (lastGood !== undefined) {
+          downloaded.push(lastGood);
+        }
         await blocklists.save(list.recordFailure());
         await notifications.notify({
           type: 'BlocklistUpdateFailed',
@@ -66,10 +81,10 @@ export class UpdateBlocklists {
     }
 
     if (updated === 0) {
-      return { updated, failed };
+      return { updated, failed, skipped };
     }
     const ranges = mergeBlocklistRanges(downloaded);
     await cache.write(ranges);
-    return { updated, failed, ranges };
+    return { updated, failed, skipped, ranges };
   }
 }

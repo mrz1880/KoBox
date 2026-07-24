@@ -83,9 +83,13 @@ export interface IblocklistCatalogPort {
 
 // Durable merged-ranges cache: update-blocklists writes it, the per-user
 // filter render reads it — the two jobs stay decoupled through disk state.
+// Per-list entries keep each list's LAST GOOD ranges so a failing list
+// (expired subscription) still contributes yesterday's data (issue #117).
 export interface BlocklistCachePort {
   write(ranges: readonly string[]): Promise<void>;
   read(): Promise<readonly string[]>;
+  writeList(stem: string, ranges: readonly string[]): Promise<void>;
+  readList(stem: string): Promise<readonly string[] | undefined>;
 }
 
 export interface TrackerNotificationPort {

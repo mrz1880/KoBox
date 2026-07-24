@@ -15,7 +15,10 @@ import type {
 import { CertStoreAdapter } from '../../../../src/infrastructure/system/CertStoreAdapter.js';
 import { DnsLookupResolverAdapter } from '../../../../src/infrastructure/system/DnsLookupResolverAdapter.js';
 import { decodeP2pDownload } from '../../../../src/infrastructure/system/HttpsBlocklistDownloadAdapter.js';
-import { parseIblocklistCatalog } from '../../../../src/infrastructure/system/IblocklistCatalogAdapter.js';
+import {
+  IblocklistCatalogAdapter,
+  parseIblocklistCatalog,
+} from '../../../../src/infrastructure/system/IblocklistCatalogAdapter.js';
 import { NetworkServiceReloadAdapter } from '../../../../src/infrastructure/system/NetworkServiceReloadAdapter.js';
 import { OpensslTrackerCertAdapter } from '../../../../src/infrastructure/system/OpensslTrackerCertAdapter.js';
 import { RtorrentConfigAdapter } from '../../../../src/infrastructure/system/RtorrentConfigAdapter.js';
@@ -66,6 +69,7 @@ describe('OpensslTrackerCertAdapter', () => {
       'tracker.example.org',
     ]);
     expect(runner.calls[0]?.stdin).toBe('');
+    expect(runner.calls[0]?.timeoutMs).toBe(10_000); // the legacy `timeout 10`
     expect(runner.calls[1]?.args).toEqual(['x509', '-enddate', '-noout']);
     expect(runner.calls[1]?.stdin).toBe(`${PEM}\n`);
   });
@@ -257,5 +261,14 @@ describe('NetworkServiceReloadAdapter', () => {
     const adapter = new NetworkServiceReloadAdapter(failing, logger);
     await expect(adapter.reloadDns()).resolves.toBeUndefined();
     await expect(adapter.reloadPeerGuardian()).resolves.toBeUndefined();
+  });
+});
+
+describe('IblocklistCatalogAdapter transport failures', () => {
+  it('should_throw_when_the_catalog_cannot_be_fetched', async () => {
+    // a network failure must fail the import job — an empty catalog and a
+    // dead feed are not the same thing for the operator
+    const adapter = new IblocklistCatalogAdapter(logger, 'https://127.0.0.1:9/lists.xml');
+    await expect(adapter.fetchCatalog()).rejects.toThrow(/catalog/);
   });
 });

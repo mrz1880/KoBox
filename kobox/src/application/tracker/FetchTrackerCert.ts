@@ -44,34 +44,39 @@ export class FetchTrackerCert {
     const locked = tracker.beginCheck();
     await trackers.save(locked);
 
-    let fetched;
     try {
-      fetched = await certPort.fetch(tracker.host, tracker.port);
+      const fetched = await certPort.fetch(tracker.host, tracker.port);
+
+      if (!fetched) {
+        // Promoted tracker: transient failure — defer, keep the cert state.
+        // Never-promoted tracker: a plain-http endpoint, settle as such.
+        const next = tracker.isSsl
+          ? locked.deferCheck(command.now)
+          : locked.completeCheck({ promoted: false, at: command.now });
+        await trackers.save(next);
+        return { promoted: false, whitelistDirty: false };
+      }
+
+      await certStore.install(tracker.host, fetched.pem);
+      await certStore.rehash();
+      const expiry = CertExpiry.on(fetched.expiresOn);
+      await trackers.save(locked.completeCheck({ promoted: true, expiry, at: command.now }));
+
+      const previous = tracker.certExpiry;
+      if (previous !== undefined && !previous.equals(expiry)) {
+        await notifications.notify({
+          type: 'TrackerCertRenewed',
+          host: tracker.host.value,
+          expiresOn: expiry.value,
+        });
+      }
+      return { promoted: true, whitelistDirty: true };
     } catch (error) {
-      // release the lock: a tracker must never stay stuck in 'checking'
-      await trackers.save(tracker);
+      // Release the lock whatever failed (fetch, store, save): a tracker must
+      // never stay stuck in 'checking'. Best-effort — if even this save
+      // fails, needsCertCheck still reselects 'checking' rows (self-heal).
+      await trackers.save(tracker).catch(() => undefined);
       throw error instanceof Error ? error : new Error(String(error));
     }
-
-    if (!fetched) {
-      await trackers.save(locked.completeCheck({ promoted: false, at: command.now }));
-      return { promoted: false, whitelistDirty: false };
-    }
-
-    await certStore.install(tracker.host, fetched.pem);
-    await certStore.rehash();
-    const expiry = CertExpiry.on(fetched.expiresOn);
-    const promoted = locked.completeCheck({ promoted: true, expiry, at: command.now });
-    await trackers.save(promoted);
-
-    const previous = tracker.certExpiry;
-    if (previous !== undefined && !previous.equals(expiry)) {
-      await notifications.notify({
-        type: 'TrackerCertRenewed',
-        host: tracker.host.value,
-        expiresOn: expiry.value,
-      });
-    }
-    return { promoted: true, whitelistDirty: true };
   }
 }

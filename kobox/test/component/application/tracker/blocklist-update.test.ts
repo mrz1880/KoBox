@@ -155,6 +155,28 @@ describe('UpdateBlocklists', () => {
     expect(failed?.lastUpdate).toEqual({ status: 'failed' });
   });
 
+  it('should_merge_the_last_good_ranges_of_a_list_that_fails_this_run', async () => {
+    // issue #117, second half: the expired list's LAST GOOD data must survive
+    // in the merged filter, not just "the other lists still update"
+    await blocklists.save(personalList('good', 'https://lists.example.net/good.gz'));
+    await blocklists.save(personalList('expired', 'https://lists.example.net/expired.gz'));
+    download.givenList('https://lists.example.net/good.gz', {
+      ranges: ['10.0.0.0/8'],
+      sha256: 'gg',
+    });
+    await cache.writeList('me#expired', ['203.0.113.0/24']); // yesterday's good data
+
+    const report = await new UpdateBlocklists({
+      blocklists,
+      download,
+      notifications,
+      cache,
+    }).execute({ now: NOW });
+
+    expect(report.ranges).toEqual(['10.0.0.0/8', '203.0.113.0/24']);
+    expect(cache.stored).toEqual(['10.0.0.0/8', '203.0.113.0/24']);
+  });
+
   it('should_keep_the_previous_cache_when_every_download_fails', async () => {
     await cache.write(['203.0.113.0/24']);
     await blocklists.save(personalList('a', 'https://lists.example.net/a.gz'));
@@ -168,6 +190,33 @@ describe('UpdateBlocklists', () => {
 
     expect(report.ranges).toBeUndefined();
     expect(cache.stored).toEqual(['203.0.113.0/24']); // untouched
+  });
+
+  it('should_skip_subscription_lists_when_no_credentials_are_configured', async () => {
+    await blocklists.save(
+      Blocklist.create({
+        source: BlocklistSource.parse('iblocklist'),
+        author: 'Example Org',
+        name: 'paid',
+        url: BlocklistUrl.parse('https://lists.example.net/paid'),
+        subscription: true,
+        enabled: true,
+      }),
+    );
+
+    const report = await new UpdateBlocklists({
+      blocklists,
+      download,
+      notifications,
+      cache,
+    }).execute({ now: NOW });
+
+    // not an error: without credentials the fetch is guaranteed to fail —
+    // skip quietly instead of a failure notification on every run
+    expect(report.skipped).toBe(1);
+    expect(report.failed).toBe(0);
+    expect(download.requestedUrls).toEqual([]);
+    expect(notifications.published).toEqual([]);
   });
 
   it('should_append_subscription_credentials_only_at_fetch_time', async () => {

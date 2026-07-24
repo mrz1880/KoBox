@@ -204,6 +204,27 @@ describe.skipIf(!onDebianAsRoot)('HttpsBlocklistDownloadAdapter against a local 
     expect(await adapter.fetch(url)).toBeUndefined();
   });
 
+  it('should_cut_off_a_server_that_accepts_and_stalls', async () => {
+    const { keyPath, certPath } = generateSelfSigned(
+      dir,
+      'localhost',
+      'DNS:localhost,IP:127.0.0.1',
+    );
+    const ca = readFileSync(certPath, 'utf8');
+    server = createHttpsServer(
+      { key: readFileSync(keyPath), cert: readFileSync(certPath) },
+      () => {
+        // accept the request and never answer: the dying-mirror failure mode
+      },
+    );
+    const port = await listen(server);
+    const adapter = new HttpsBlocklistDownloadAdapter(logger, { ca, timeoutMs: 300 });
+
+    const startedAt = Date.now();
+    expect(await adapter.fetch(`https://localhost:${String(port)}/stall.gz`)).toBeUndefined();
+    expect(Date.now() - startedAt).toBeLessThan(5_000); // no worker stall
+  });
+
   it('should_reject_an_untrusted_server_without_the_ca', async () => {
     const body = gzipSync(Buffer.from('Some org:192.0.2.0-192.0.2.255\n'));
     const { url } = await serveBody(body);
