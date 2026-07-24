@@ -1,5 +1,13 @@
 import { createLogger, type Logger } from '../infrastructure/logging/logger.js';
 import { ConsoleNotificationAdapter } from '../infrastructure/notifications/ConsoleNotificationAdapter.js';
+import { DiscordChannel } from '../infrastructure/notifications/DiscordChannel.js';
+import { EmailChannel } from '../infrastructure/notifications/EmailChannel.js';
+import { MultiChannelNotifier } from '../infrastructure/notifications/MultiChannelNotifier.js';
+import { NtfyChannel } from '../infrastructure/notifications/NtfyChannel.js';
+import type { NotificationChannel } from '../infrastructure/notifications/formatEvent.js';
+import type { SecurityNotificationPort } from '../domain/security/ports.js';
+import type { TrackerNotificationPort } from '../domain/tracker/ports.js';
+import type { NotificationPort } from '../domain/user/ports.js';
 import { KoboxDatabase } from '../infrastructure/persistence/db.js';
 import { SqliteBlocklistRepository } from '../infrastructure/persistence/SqliteBlocklistRepository.js';
 import { SqliteJobQueue } from '../infrastructure/persistence/SqliteJobQueue.js';
@@ -65,6 +73,30 @@ function envPort(name: string, fallback: number): number {
   return raw === undefined ? fallback : Number(raw);
 }
 
+// The frozen alert channels (ntfy + email via Postfix + Discord), each armed
+// by its env var; with none configured the Phase 0 console stub remains.
+function buildNotifier(
+  logger: Logger,
+  runner: ExecFileRunner,
+): NotificationPort & TrackerNotificationPort & SecurityNotificationPort {
+  const channels: NotificationChannel[] = [];
+  const ntfyUrl = process.env.KOBOX_NTFY_URL;
+  if (ntfyUrl !== undefined && ntfyUrl !== '') {
+    channels.push(new NtfyChannel(fetch, ntfyUrl));
+  }
+  const webhook = process.env.KOBOX_DISCORD_WEBHOOK;
+  if (webhook !== undefined && webhook !== '') {
+    channels.push(new DiscordChannel(fetch, webhook));
+  }
+  const email = process.env.KOBOX_ALERT_EMAIL;
+  if (email !== undefined && email !== '') {
+    channels.push(new EmailChannel(runner, email));
+  }
+  return channels.length > 0
+    ? new MultiChannelNotifier(channels, logger)
+    : new ConsoleNotificationAdapter(logger);
+}
+
 export function fairUsePolicy(): FairUsePolicy {
   return FairUsePolicy.of({
     sustainedEgress: Bandwidth.mbit(envPort('KOBOX_FAIRUSE_EGRESS_MBIT', 50)),
@@ -128,13 +160,14 @@ export function buildContainer(name: string): Container {
         logger.warn({ username }, 'quota enforcement skipped: KOBOX_QUOTA_FS not set');
       });
   const services = new SystemdServiceControlAdapter(runner);
+  const notifications = buildNotifier(logger, runner);
   const useCases = buildUseCases({
     repo,
     accounts: new SystemAccountAdapter(runner),
     quota,
     sftp: new SftpAdapter(runner),
     services,
-    notifications: new ConsoleNotificationAdapter(logger),
+    notifications,
     allocator: new SqlitePortAllocator(db),
   });
   const queue = new SqliteJobQueue(db);
@@ -158,7 +191,6 @@ export function buildContainer(name: string): Container {
   const networkServices = new NetworkServiceAdapter(runner, logger);
   const trackerRepo = new SqliteTrackerRepository(db);
   const addressRepo = new SqliteUserAddressRepository(db);
-  const notifications = new ConsoleNotificationAdapter(logger);
   const healthProbe = new ProcessSocketHealthProbe(runner);
   const settings = securitySettings();
   const fairUseRepo = new SqliteFairUseRepository(db);
