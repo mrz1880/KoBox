@@ -4,6 +4,7 @@ export interface CommandRequest {
   readonly command: string;
   readonly args: readonly string[];
   readonly stdin?: string;
+  readonly timeoutMs?: number; // default 60 s; network probes want much less
 }
 
 export interface CommandResult {
@@ -46,7 +47,7 @@ export class ExecFileRunner implements CommandRunner {
       const child = execFile(
         request.command,
         [...request.args],
-        { encoding: 'utf8', timeout: 60_000 },
+        { encoding: 'utf8', timeout: request.timeoutMs ?? 60_000 },
         (error, stdout, stderr) => {
           if (error && typeof error.code !== 'number') {
             // spawn failure (ENOENT, timeout kill) — not a command exit code

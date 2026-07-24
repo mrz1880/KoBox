@@ -218,6 +218,56 @@ describe('FetchTrackerCert', () => {
     expect((await trackers.findByHost(HOST))?.checkState.value).toBe('pending');
   });
 
+  it('should_keep_the_promotion_and_retry_later_when_a_renewal_probe_gets_nothing', async () => {
+    // a transient timeout on renewal day must NOT demote the tracker and
+    // silently end its cert monitoring — keep state, retry on the next sweep
+    await trackers.save(aTracker().promotedUntil('2026-07-25').build());
+    await certStore.install(HOST, 'PEM');
+
+    const report = await fetchUseCase().execute({ host: HOST, now: NOW });
+
+    const saved = await trackers.findByHost(HOST);
+    expect(saved?.isSsl).toBe(true);
+    expect(saved?.certExpiry?.value).toBe('2026-07-25');
+    expect(saved?.checkState.value).toBe('pending');
+    expect(saved?.lastCheck).toBe(NOW);
+    expect(certStore.installed.has('tracker.example.org')).toBe(true);
+    expect(report.promoted).toBe(false);
+    expect((await trackers.listNeedingCertCheck('2026-07-24')).map((t) => t.host.value)).toEqual([
+      'tracker.example.org',
+    ]);
+  });
+
+  it('should_release_the_lock_when_the_store_or_save_fails_after_fetch', async () => {
+    await trackers.save(aTracker().build());
+    certPort.givenCert('tracker.example.org', { pem: 'PEM', expiresOn: '2026-09-15' });
+    const failingStore = {
+      install: () => Promise.reject(new Error('disk full')),
+      remove: () => Promise.resolve(),
+      rehash: () => Promise.resolve(),
+    };
+    const failing = new FetchTrackerCert({
+      trackers,
+      certPort,
+      certStore: failingStore,
+      notifications,
+    });
+
+    await expect(failing.execute({ host: HOST, now: NOW })).rejects.toThrow(/disk full/);
+
+    expect((await trackers.findByHost(HOST))?.checkState.value).toBe('pending');
+  });
+
+  it('should_reselect_a_tracker_stuck_in_checking_after_a_worker_crash', async () => {
+    // a crash between beginCheck and completeCheck must self-heal on the
+    // next renewal sweep
+    await trackers.save(aTracker().build().beginCheck());
+
+    const due = await trackers.listNeedingCertCheck('2026-07-24');
+
+    expect(due.map((t) => t.host.value)).toEqual(['tracker.example.org']);
+  });
+
   it('should_skip_a_dead_tracker', async () => {
     await trackers.save(aTracker().deadTracker().build());
 

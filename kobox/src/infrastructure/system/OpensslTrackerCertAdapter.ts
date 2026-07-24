@@ -30,6 +30,7 @@ export class OpensslTrackerCertAdapter implements TrackerCertPort {
           host.value,
         ],
         stdin: '', // close stdin so s_client exits after the handshake
+        timeoutMs: 10_000, // the legacy `timeout 10` — a dead tracker must not stall the sweep
       });
     } catch (error) {
       if (isEnoent(error)) {

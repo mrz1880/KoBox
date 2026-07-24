@@ -131,6 +131,17 @@ export class Tracker {
     });
   }
 
+  // A probe that got no answer on an ALREADY promoted tracker: keep the
+  // certificate state (transient network failures must not end monitoring),
+  // stamp the attempt, and stay pending so the next sweep retries.
+  deferCheck(at: string): Tracker {
+    return new Tracker({
+      ...this.props(),
+      checkState: CheckState.parse('pending'),
+      lastCheck: at,
+    });
+  }
+
   markDead(): { tracker: Tracker; event?: TrackerDied } {
     if (this.isDead) {
       return { tracker: this };
@@ -142,7 +153,10 @@ export class Tracker {
   }
 
   needsCertCheck(today: string): boolean {
-    if (this.checkState.value === 'pending') {
+    // 'checking' is included on purpose: a worker crash mid-check must
+    // self-heal on the next sweep instead of leaking the lock forever
+    // (jobs are serialized by the single root worker, so re-selection is safe).
+    if (this.checkState.value !== 'none') {
       return true;
     }
     return this.isSsl && (this.certExpiry?.isDueOn(today) ?? false);

@@ -99,8 +99,10 @@ export class IblocklistCatalogAdapter implements IblocklistCatalogPort {
   async fetchCatalog(): Promise<readonly CatalogEntry[]> {
     const xml = await httpsGetText(this.catalogUrl, this.options);
     if (xml === undefined) {
+      // a dead feed and an empty catalog are different things: fail the
+      // import job so the operator's cron surfaces the outage
       this.logger.warn({ url: this.catalogUrl }, 'iblocklist catalog fetch failed');
-      return [];
+      throw new Error(`iblocklist catalog fetch failed: ${this.catalogUrl}`);
     }
     return parseIblocklistCatalog(xml);
   }

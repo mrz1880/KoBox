@@ -45,21 +45,26 @@ export function decodeP2pDownload(body: Buffer): DownloadedList | undefined {
 
 export interface HttpsDownloadOptions {
   readonly ca?: string; // test seam: fixture CA for the in-test https server
+  readonly timeoutMs?: number; // default 30 s — a wedged mirror must not stall the worker
 }
 
-function httpsGet(url: string, options: HttpsDownloadOptions): Promise<Buffer | undefined> {
+interface HttpsResponse {
+  readonly status: number;
+  readonly location?: string;
+  readonly body?: Buffer;
+}
+
+// Every request path shares the same timeout: a server that accepts the
+// connection and stalls (the classic dying-mirror failure) is cut off.
+function httpsGet(url: string, options: HttpsDownloadOptions): Promise<HttpsResponse | undefined> {
   return new Promise((resolve) => {
     const requestOptions: RequestOptions = options.ca === undefined ? {} : { ca: options.ca };
     const request = get(url, requestOptions, (response) => {
       const status = response.statusCode ?? 0;
-      if (status >= 300 && status < 400 && response.headers.location !== undefined) {
-        response.resume();
-        resolve(undefined); // redirects handled by the caller (single hop)
-        return;
-      }
+      const location = response.headers.location;
       if (status !== 200) {
         response.resume();
-        resolve(undefined);
+        resolve({ status, ...(location !== undefined && { location }) });
         return;
       }
       const chunks: Buffer[] = [];
@@ -74,7 +79,7 @@ function httpsGet(url: string, options: HttpsDownloadOptions): Promise<Buffer | 
         chunks.push(chunk);
       });
       response.on('end', () => {
-        resolve(Buffer.concat(chunks));
+        resolve({ status, body: Buffer.concat(chunks) });
       });
       response.on('error', () => {
         resolve(undefined);
@@ -83,26 +88,8 @@ function httpsGet(url: string, options: HttpsDownloadOptions): Promise<Buffer | 
     request.on('error', () => {
       resolve(undefined);
     });
-    request.setTimeout(30_000, () => {
+    request.setTimeout(options.timeoutMs ?? 30_000, () => {
       request.destroy();
-      resolve(undefined);
-    });
-  });
-}
-
-function redirectTarget(url: string, options: HttpsDownloadOptions): Promise<string | undefined> {
-  return new Promise((resolve) => {
-    const requestOptions: RequestOptions = {
-      method: 'HEAD',
-      ...(options.ca === undefined ? {} : { ca: options.ca }),
-    };
-    const request = get(url, requestOptions, (response) => {
-      response.resume();
-      const status = response.statusCode ?? 0;
-      const location = response.headers.location;
-      resolve(status >= 300 && status < 400 && location !== undefined ? location : undefined);
-    });
-    request.on('error', () => {
       resolve(undefined);
     });
   });
@@ -117,19 +104,16 @@ export class HttpsBlocklistDownloadAdapter implements BlocklistDownloadPort {
   // The url arrives from BlocklistUrl (+optional credentials): https by
   // construction. Any failure returns undefined — callers isolate per list.
   async fetch(url: string): Promise<DownloadedList | undefined> {
-    let body = await httpsGet(url, this.options);
-    if (body === undefined) {
-      // one https-only redirect hop (iblocklist mirrors do this)
-      const target = await redirectTarget(url, this.options);
-      if (target?.startsWith('https://')) {
-        body = await httpsGet(target, this.options);
-      }
+    let response = await httpsGet(url, this.options);
+    // one https-only redirect hop (iblocklist mirrors do this)
+    if (response?.location?.startsWith('https://')) {
+      response = await httpsGet(response.location, this.options);
     }
-    if (body === undefined) {
+    if (response?.body === undefined) {
       this.logger.warn('blocklist download failed');
       return undefined;
     }
-    const decoded = decodeP2pDownload(body);
+    const decoded = decodeP2pDownload(response.body);
     if (!decoded) {
       this.logger.warn('blocklist body failed integrity checks');
     }
