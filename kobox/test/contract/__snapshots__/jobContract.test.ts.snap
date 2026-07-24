@@ -2,6 +2,25 @@
 
 exports[`job contract > should_keep_the_wire_contract_stable 1`] = `
 {
+  "add-user-address": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "ipv4": {
+        "pattern": "^(0|[1-9][0-9]?|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\\.(0|[1-9][0-9]?|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\\.(0|[1-9][0-9]?|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\\.(0|[1-9][0-9]?|1[0-9][0-9]|2[0-4][0-9]|25[0-5])$",
+        "type": "string",
+      },
+      "username": {
+        "pattern": "^[a-z][a-z0-9]{0,31}$",
+        "type": "string",
+      },
+    },
+    "required": [
+      "username",
+      "ipv4",
+    ],
+    "type": "object",
+  },
   "add-watch-dir": {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "additionalProperties": false,
@@ -114,6 +133,65 @@ exports[`job contract > should_keep_the_wire_contract_stable 1`] = `
     ],
     "type": "object",
   },
+  "discover-tracker": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "privacy": {
+        "enum": [
+          "public",
+          "private",
+        ],
+        "type": "string",
+      },
+      "url": {
+        "maxLength": 2048,
+        "pattern": "^(https?|udp):\\/\\/\\S+$",
+        "type": "string",
+      },
+    },
+    "required": [
+      "url",
+      "privacy",
+    ],
+    "type": "object",
+  },
+  "fetch-tracker-cert": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "host": {
+        "maxLength": 253,
+        "pattern": "^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$",
+        "type": "string",
+      },
+    },
+    "required": [
+      "host",
+    ],
+    "type": "object",
+  },
+  "import-blocklist-catalog": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {},
+    "type": "object",
+  },
+  "mark-tracker-dead": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "host": {
+        "maxLength": 253,
+        "pattern": "^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$",
+        "type": "string",
+      },
+    },
+    "required": [
+      "host",
+    ],
+    "type": "object",
+  },
   "provision-rtorrent": {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "additionalProperties": false,
@@ -128,6 +206,36 @@ exports[`job contract > should_keep_the_wire_contract_stable 1`] = `
     ],
     "type": "object",
   },
+  "remove-user-address": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "ipv4": {
+        "pattern": "^(0|[1-9][0-9]?|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\\.(0|[1-9][0-9]?|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\\.(0|[1-9][0-9]?|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\\.(0|[1-9][0-9]?|1[0-9][0-9]|2[0-4][0-9]|25[0-5])$",
+        "type": "string",
+      },
+      "username": {
+        "pattern": "^[a-z][a-z0-9]{0,31}$",
+        "type": "string",
+      },
+    },
+    "required": [
+      "username",
+      "ipv4",
+    ],
+    "type": "object",
+  },
+  "render-blocklist-filters": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "username": {
+        "pattern": "^[a-z][a-z0-9]{0,31}$",
+        "type": "string",
+      },
+    },
+    "type": "object",
+  },
   "render-rtorrent-config": {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "additionalProperties": false,
@@ -139,6 +247,26 @@ exports[`job contract > should_keep_the_wire_contract_stable 1`] = `
     },
     "required": [
       "username",
+    ],
+    "type": "object",
+  },
+  "render-whitelist": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {},
+    "type": "object",
+  },
+  "renew-tracker-certs": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "today": {
+        "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+        "type": "string",
+      },
+    },
+    "required": [
+      "today",
     ],
     "type": "object",
   },
@@ -252,6 +380,12 @@ exports[`job contract > should_keep_the_wire_contract_stable 1`] = `
       "event",
       "infoHash",
     ],
+    "type": "object",
+  },
+  "update-blocklists": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {},
     "type": "object",
   },
 }
