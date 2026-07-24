@@ -8,6 +8,13 @@
       "when": 1784843467996,
       "tag": "0000_phase0-user-management",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1784873213393,
+      "tag": "0001_phase1-torrent-lifecycle",
+      "breakpoints": true
     }
   ]
 }

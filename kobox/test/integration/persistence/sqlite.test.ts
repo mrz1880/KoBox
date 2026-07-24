@@ -3,11 +3,18 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { parseJob } from '../../../src/application/jobs/contract.js';
+import { InfoHash } from '../../../src/domain/torrent/InfoHash.js';
+import { Label } from '../../../src/domain/torrent/Label.js';
+import { Torrent } from '../../../src/domain/torrent/Torrent.js';
+import { TorrentInstance } from '../../../src/domain/torrent/TorrentInstance.js';
+import { RtorrentPort, ScgiPort } from '../../../src/domain/user/Port.js';
 import { Quota } from '../../../src/domain/user/Quota.js';
 import { Username } from '../../../src/domain/user/Username.js';
 import { KoboxDatabase } from '../../../src/infrastructure/persistence/db.js';
 import { SqliteJobQueue } from '../../../src/infrastructure/persistence/SqliteJobQueue.js';
 import { SqlitePortAllocator } from '../../../src/infrastructure/persistence/SqlitePortAllocator.js';
+import { SqliteTorrentInstanceRepository } from '../../../src/infrastructure/persistence/SqliteTorrentInstanceRepository.js';
+import { SqliteTorrentRepository } from '../../../src/infrastructure/persistence/SqliteTorrentRepository.js';
 import { SqliteUserRepository } from '../../../src/infrastructure/persistence/SqliteUserRepository.js';
 import { aUser } from '../../builders/UserBuilder.js';
 
@@ -170,5 +177,113 @@ describe('SqliteJobQueue', () => {
     };
     expect(row.error).toMatch(/interrupted/);
     expect(await queue.claimNextPending()).toBeUndefined();
+  });
+});
+
+describe('SqliteTorrentInstanceRepository', () => {
+  it('should_roundtrip_an_instance_with_watch_dirs_and_flags', async () => {
+    const repo = new SqliteTorrentInstanceRepository(db);
+    const { instance } = TorrentInstance.provision({
+      username: Username.parse('alice'),
+      scgiPort: ScgiPort.parse(51101),
+      rtorrentPort: RtorrentPort.parse(45001),
+    });
+    const withDirs = instance
+      .addWatchDir(Label.parse('films'))
+      .instance.addWatchDir(Label.parse('series')).instance;
+
+    await repo.save(withDirs.setAllowPublicTracker(true));
+    const found = await repo.findByUsername(Username.parse('alice'));
+
+    expect(found?.scgiPort.value).toBe(51101);
+    expect(found?.rtorrentPort.value).toBe(45001);
+    expect(found?.allowPublicTracker).toBe(true);
+    expect(found?.syncDisabled).toBe(false);
+    expect(found?.watchDirs.map((dir) => dir.label?.value)).toEqual([
+      undefined,
+      'films',
+      'series',
+    ]);
+  });
+
+  it('should_update_in_place_on_resave_without_duplicating_watch_dirs', async () => {
+    const repo = new SqliteTorrentInstanceRepository(db);
+    const { instance } = TorrentInstance.provision({
+      username: Username.parse('alice'),
+      scgiPort: ScgiPort.parse(51101),
+      rtorrentPort: RtorrentPort.parse(45001),
+    });
+    await repo.save(instance);
+    await repo.save(instance.addWatchDir(Label.parse('films')).instance.setSyncDisabled(true));
+    await repo.save(instance.addWatchDir(Label.parse('films')).instance.setSyncDisabled(true));
+
+    const found = await repo.findByUsername(Username.parse('alice'));
+    expect(found?.syncDisabled).toBe(true);
+    expect(found?.watchDirs).toHaveLength(2);
+  });
+
+  it('should_delete_the_instance_and_its_watch_dirs', async () => {
+    const repo = new SqliteTorrentInstanceRepository(db);
+    const { instance } = TorrentInstance.provision({
+      username: Username.parse('alice'),
+      scgiPort: ScgiPort.parse(51101),
+      rtorrentPort: RtorrentPort.parse(45001),
+    });
+    await repo.save(instance.addWatchDir(Label.parse('films')).instance);
+
+    await repo.delete(Username.parse('alice'));
+    await repo.delete(Username.parse('alice')); // idempotent
+
+    expect(await repo.findByUsername(Username.parse('alice'))).toBeUndefined();
+    const orphans = db.raw.prepare('SELECT COUNT(*) AS n FROM watch_dirs').get() as { n: number };
+    expect(orphans.n).toBe(0);
+  });
+});
+
+describe('SqliteTorrentRepository', () => {
+  const alice = Username.parse('alice');
+  const hash = InfoHash.parse('a1b2c3d4e5f6a7b8c9d0a1b2c3d4e5f6a7b8c9d0');
+
+  it('should_upsert_by_username_and_info_hash_through_state_transitions', async () => {
+    const repo = new SqliteTorrentRepository(db);
+    const loaded = Torrent.load({ infoHash: hash, name: 'x', label: Label.parse('films') });
+
+    await repo.upsert(alice, loaded);
+    await repo.upsert(alice, loaded.complete('/home/alice/rtorrent/complete/films/x'));
+
+    const found = await repo.findByInfoHash(alice, hash);
+    expect(found?.state.value).toBe('completed');
+    expect(found?.tree).toBe('/home/alice/rtorrent/complete/films/x');
+    expect(found?.label?.value).toBe('films');
+    expect(await repo.listFor(alice)).toHaveLength(1);
+  });
+
+  it('should_scope_torrents_by_user', async () => {
+    const repo = new SqliteTorrentRepository(db);
+    await repo.upsert(alice, Torrent.load({ infoHash: hash, name: 'x' }));
+    await repo.upsert(Username.parse('bob'), Torrent.load({ infoHash: hash, name: 'x' }));
+
+    expect(await repo.listFor(alice)).toHaveLength(1);
+    expect(await repo.findByInfoHash(Username.parse('bob'), hash)).toBeDefined();
+
+    await repo.delete(alice, hash);
+    expect(await repo.findByInfoHash(alice, hash)).toBeUndefined();
+    expect(await repo.findByInfoHash(Username.parse('bob'), hash)).toBeDefined();
+  });
+
+  it('should_delete_all_torrents_for_a_user', async () => {
+    const repo = new SqliteTorrentRepository(db);
+    await repo.upsert(alice, Torrent.load({ infoHash: hash, name: 'x' }));
+    await repo.upsert(
+      alice,
+      Torrent.load({
+        infoHash: InfoHash.parse('b1b2c3d4e5f6a7b8c9d0a1b2c3d4e5f6a7b8c9d0'),
+        name: 'y',
+      }),
+    );
+
+    await repo.deleteAllFor(alice);
+
+    expect(await repo.listFor(alice)).toHaveLength(0);
   });
 });
