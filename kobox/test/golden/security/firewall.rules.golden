@@ -1,0 +1,54 @@
+# KoBox-managed firewall — DO NOT EDIT (rendered declaratively).
+# Applied atomically via iptables-restore; pgl chains reload after apply.
+*filter
+:INPUT DROP [0:0]
+:FORWARD DROP [0:0]
+:OUTPUT ACCEPT [0:0]
+:pgl_in - [0:0]
+:kobox-meter-in - [0:0]
+:kobox-meter-out - [0:0]
+:kobox-u-alice - [0:0]
+:kobox-u-bob - [0:0]
+-A INPUT -i lo -j ACCEPT
+-A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+-A INPUT -p icmp -j ACCEPT
+-A INPUT -s 192.0.2.42 -m comment --comment "kobox:trusted:alice" -j ACCEPT
+-A INPUT -s 198.51.100.7 -m comment --comment "kobox:trusted:alice" -j ACCEPT
+-A INPUT -s 198.51.100.9 -m comment --comment "kobox:trusted:bob" -j ACCEPT
+-A INPUT -j pgl_in
+-A INPUT -p tcp --dport 22 -j ACCEPT
+-A INPUT -p tcp --dport 8189 -j ACCEPT
+-A INPUT -p tcp --dport 80 -j ACCEPT
+-A INPUT -p tcp --dport 443 -j ACCEPT
+-A INPUT -p udp --dport 8193 -j ACCEPT
+-A INPUT -p udp --dport 8194 -j ACCEPT
+-A INPUT -p udp --dport 8195 -j ACCEPT
+-A INPUT -s 10.0.0.0/24 -p udp --dport 53 -j ACCEPT
+-A INPUT -s 10.0.0.0/24 -p tcp --dport 53 -j ACCEPT
+-A INPUT -s 10.0.1.0/24 -p udp --dport 53 -j ACCEPT
+-A INPUT -s 10.0.1.0/24 -p tcp --dport 53 -j ACCEPT
+-A INPUT -s 10.0.2.0/24 -p udp --dport 53 -j ACCEPT
+-A INPUT -s 10.0.2.0/24 -p tcp --dport 53 -j ACCEPT
+-A INPUT -p tcp --dport 45001 -j kobox-u-alice
+-A INPUT -p tcp --dport 45002 -j kobox-u-bob
+-A FORWARD -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+-A FORWARD -s 10.0.0.0/24 -j ACCEPT
+-A FORWARD -s 10.0.1.0/24 -j ACCEPT
+-A FORWARD -s 10.0.2.0/24 -j ACCEPT
+-A OUTPUT -j kobox-meter-out
+-A kobox-u-alice -j kobox-meter-in
+-A kobox-u-alice -j ACCEPT
+-A kobox-u-bob -j kobox-meter-in
+-A kobox-u-bob -j ACCEPT
+-A kobox-meter-in -p tcp --dport 45001 -m comment --comment "kobox:ingress:alice" -j RETURN
+-A kobox-meter-in -p tcp --dport 45002 -m comment --comment "kobox:ingress:bob" -j RETURN
+-A kobox-meter-out -m owner --uid-owner 1001 -m comment --comment "kobox:egress:alice" -j RETURN
+-A kobox-meter-out -m owner --uid-owner 1002 -m comment --comment "kobox:egress:bob" -j RETURN
+COMMIT
+*nat
+:PREROUTING ACCEPT [0:0]
+:INPUT ACCEPT [0:0]
+:OUTPUT ACCEPT [0:0]
+:POSTROUTING ACCEPT [0:0]
+-A POSTROUTING -s 10.0.0.0/24 ! -d 10.0.0.0/24 -j MASQUERADE
+COMMIT
