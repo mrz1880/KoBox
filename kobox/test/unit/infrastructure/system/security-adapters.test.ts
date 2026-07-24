@@ -17,6 +17,8 @@ import { DynDnsLookupAdapter } from '../../../../src/infrastructure/system/DynDn
 import { FsVpnPkiAdapter } from '../../../../src/infrastructure/system/FsVpnPkiAdapter.js';
 import { GetentUserIdentityAdapter } from '../../../../src/infrastructure/system/GetentUserIdentityAdapter.js';
 import { IptablesRestoreAdapter } from '../../../../src/infrastructure/system/IptablesRestoreAdapter.js';
+import { IptablesUsageMeterAdapter } from '../../../../src/infrastructure/system/IptablesUsageMeterAdapter.js';
+import { JournaldSshAuthAdapter } from '../../../../src/infrastructure/system/JournaldSshAuthAdapter.js';
 import { NetworkServiceAdapter } from '../../../../src/infrastructure/system/NetworkServiceAdapter.js';
 import { Username } from '../../../../src/domain/user/Username.js';
 import { createLogger } from '../../../../src/infrastructure/logging/logger.js';
@@ -209,6 +211,72 @@ describe('NetworkServiceAdapter', () => {
     await adapter.reloadPeerGuardian();
 
     expect(runner.commandLines()).toContain('pglcmd reload');
+  });
+});
+
+const METER_OUT_LISTING = `Chain kobox-meter-out (1 references)
+    pkts      bytes target     prot opt in     out     source               destination
+     120    654321 RETURN     all  --  *      *       0.0.0.0/0            0.0.0.0/0            owner UID match 1001 /* kobox:egress:alice */
+      10     11111 RETURN     all  --  *      *       0.0.0.0/0            0.0.0.0/0            owner UID match 1002 /* kobox:egress:bob */
+`;
+
+const METER_IN_LISTING = `Chain kobox-meter-in (2 references)
+    pkts      bytes target     prot opt in     out     source               destination
+      50     98765 RETURN     tcp  --  *      *       0.0.0.0/0            0.0.0.0/0            tcp dpt:45000 /* kobox:ingress:alice */
+`;
+
+describe('IptablesUsageMeterAdapter', () => {
+  it('should_parse_egress_and_ingress_counters_from_the_meter_chains', async () => {
+    const runner = new PrefixRunner();
+    runner.on('iptables -nvxL kobox-meter-out', { stdout: METER_OUT_LISTING });
+    runner.on('iptables -nvxL kobox-meter-in', { stdout: METER_IN_LISTING });
+    const meter = new IptablesUsageMeterAdapter(runner);
+
+    const counters = await meter.readCounters();
+
+    expect(counters).toEqual([
+      { username: 'alice', egressBytes: 654_321, ingressBytes: 98_765 },
+      { username: 'bob', egressBytes: 11_111, ingressBytes: 0 },
+    ]);
+  });
+
+  it('should_return_no_counters_on_a_fresh_box_without_the_chains', async () => {
+    const runner = new PrefixRunner();
+    runner.on('iptables', { exitCode: 1, stderr: 'iptables: No chain/target/match by that name.' });
+    const meter = new IptablesUsageMeterAdapter(runner);
+
+    expect(await meter.readCounters()).toEqual([]);
+  });
+});
+
+const JOURNAL_JSONL = [
+  JSON.stringify({ MESSAGE: 'Accepted publickey for alice from 203.0.113.55 port 51234 ssh2' }),
+  JSON.stringify({ MESSAGE: 'Accepted publickey for alice from 203.0.113.55 port 51235 ssh2' }),
+  JSON.stringify({ MESSAGE: 'Accepted publickey for bob from 198.51.100.9 port 4222 ssh2' }),
+  JSON.stringify({ MESSAGE: 'Accepted password for alice from 203.0.113.55 port 51236 ssh2' }),
+  JSON.stringify({ MESSAGE: 'Disconnected from user alice 203.0.113.55 port 51234' }),
+].join('\n');
+
+describe('JournaldSshAuthAdapter', () => {
+  it('should_count_accepted_publickey_lines_for_the_user_only', async () => {
+    const runner = new PrefixRunner();
+    runner.on('journalctl', { stdout: JOURNAL_JSONL });
+    const authLog = new JournaldSshAuthAdapter(runner);
+
+    expect(await authLog.countAcceptedPublickey(Username.parse('alice'), 60)).toBe(2);
+    const call = runner.calls[0];
+    expect(call?.command).toBe('journalctl');
+    expect(call?.args).toContain('--since');
+    expect(call?.args).toContain('-60min');
+  });
+
+  it('should_treat_the_no_entries_exit_code_as_zero', async () => {
+    // journalctl exits 1 with empty output when nothing matches the window
+    const runner = new PrefixRunner();
+    runner.on('journalctl', { exitCode: 1, stdout: '' });
+    const authLog = new JournaldSshAuthAdapter(runner);
+
+    expect(await authLog.countAcceptedPublickey(Username.parse('alice'), 60)).toBe(0);
   });
 });
 
