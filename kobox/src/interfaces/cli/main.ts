@@ -1,12 +1,16 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
+import { EventHook } from '../../domain/torrent/EventHook.js';
+import { InfoHash } from '../../domain/torrent/InfoHash.js';
+import { LABEL_PATTERN, Label } from '../../domain/torrent/Label.js';
 import { AccountType } from '../../domain/user/AccountType.js';
 import { EmailAddress } from '../../domain/user/EmailAddress.js';
 import { Password } from '../../domain/user/Password.js';
 import { ProxyPort } from '../../domain/user/Port.js';
 import { Quota } from '../../domain/user/Quota.js';
 import { Username } from '../../domain/user/Username.js';
-import { buildContainer, type Container } from '../composition.js';
+import { TorrentEventSpoolWriter } from '../../infrastructure/spool/TorrentEventSpool.js';
+import { buildContainer, spoolDir, type Container } from '../composition.js';
 import { buildJob } from './buildJob.js';
 
 async function readStdin(): Promise<string> {
@@ -79,8 +83,16 @@ program
     await done(c, `job ${String(id)} enqueued: create-user ${username}`);
   });
 
+const USERNAME_JOB_BUILDERS = {
+  'delete-user': (input: { username: string }) => buildJob.deleteUser(input),
+  'suspend-user': (input: { username: string }) => buildJob.suspendUser(input),
+  'resume-user': (input: { username: string }) => buildJob.resumeUser(input),
+  'provision-rtorrent': (input: { username: string }) => buildJob.provisionRtorrent(input),
+  'render-rtorrent-config': (input: { username: string }) => buildJob.renderRtorrentConfig(input),
+} as const;
+
 function usernameCommand(
-  name: string,
+  name: keyof typeof USERNAME_JOB_BUILDERS,
   description: string,
   run: (c: Container, username: Username) => Promise<void>,
 ): void {
@@ -97,13 +109,7 @@ function usernameCommand(
         await done(c, `${name} ${username.value}: done`);
         return;
       }
-      const job =
-        name === 'delete-user'
-          ? buildJob.deleteUser({ username: username.value })
-          : name === 'suspend-user'
-            ? buildJob.suspendUser({ username: username.value })
-            : buildJob.resumeUser({ username: username.value });
-      const id = await c.queue.enqueue(job);
+      const id = await c.queue.enqueue(USERNAME_JOB_BUILDERS[name]({ username: username.value }));
       await done(c, `job ${String(id)} enqueued: ${name} ${username.value}`);
     });
 }
@@ -117,6 +123,126 @@ usernameCommand('suspend-user', 'reversibly cut SSH/SFTP/rtorrent for a user', (
 usernameCommand('resume-user', 'restore a suspended user to full service', (c, username) =>
   c.useCases.resumeUser.execute({ username }),
 );
+usernameCommand(
+  'provision-rtorrent',
+  'provision the per-user rtorrent instance (config, dirs, systemd unit)',
+  async (c, username) => {
+    await c.torrentUseCases.provision.execute({ username });
+  },
+);
+usernameCommand(
+  'render-rtorrent-config',
+  're-render managed rtorrent files, restart only if changed and running',
+  async (c, username) => {
+    await c.torrentUseCases.render.execute({ username });
+  },
+);
+
+program
+  .command('add-watch-dir')
+  .argument('<username>')
+  .argument('<label>')
+  .description('add a labeled watch directory (custom1) to a user instance')
+  .action(async (rawUser: string, rawLabel: string) => {
+    const { direct } = program.opts<GlobalOptions>();
+    const username = Username.parse(rawUser);
+    const label = Label.parse(rawLabel);
+    const c = container();
+    if (direct) {
+      await c.torrentUseCases.addWatchDir.execute({ username, label });
+      await done(c, `watch dir ${label.value} added for ${username.value}`);
+      return;
+    }
+    const id = await c.queue.enqueue(
+      buildJob.addWatchDir({ username: username.value, label: label.value }),
+    );
+    await done(c, `job ${String(id)} enqueued: add-watch-dir ${username.value} ${label.value}`);
+  });
+
+function flagCommand(
+  name: 'set-sync-disabled' | 'set-allow-public-tracker',
+  description: string,
+): void {
+  program
+    .command(name)
+    .argument('<username>')
+    .argument('<state>', 'on|off')
+    .description(description)
+    .action(async (rawUser: string, rawState: string) => {
+      if (rawState !== 'on' && rawState !== 'off') {
+        throw new Error(`state must be "on" or "off", got ${JSON.stringify(rawState)}`);
+      }
+      const { direct } = program.opts<GlobalOptions>();
+      const username = Username.parse(rawUser);
+      const value = rawState === 'on';
+      const c = container();
+      if (direct) {
+        if (name === 'set-sync-disabled') {
+          await c.torrentUseCases.setSyncDisabled.execute({ username, disabled: value });
+        } else {
+          await c.torrentUseCases.setAllowPublicTracker.execute({ username, allowed: value });
+        }
+        await done(c, `${name} ${username.value}: ${rawState}`);
+        return;
+      }
+      const job =
+        name === 'set-sync-disabled'
+          ? buildJob.setSyncDisabled({ username: username.value, disabled: value })
+          : buildJob.setAllowPublicTracker({ username: username.value, allowed: value });
+      const id = await c.queue.enqueue(job);
+      await done(c, `job ${String(id)} enqueued: ${name} ${username.value} ${rawState}`);
+    });
+}
+
+flagCommand(
+  'set-sync-disabled',
+  'per-user DB flag: skip the post-download script fan-out (survives restarts)',
+);
+flagCommand(
+  'set-allow-public-tracker',
+  'per-user DB flag: accept torrents from public trackers (survives restarts)',
+);
+
+// The unprivileged event path: rtorrent shims call this AS the seedbox user.
+// It never opens the database — it drops an owner-authenticated file into the
+// spool; the root worker derives the username from the file owner.
+program
+  .command('torrent-event')
+  .argument('<type>', 'inserted_new|finished|erased')
+  .requiredOption('--hash <infoHash>')
+  .option('--name <name>')
+  .option('--directory <path>')
+  .option('--base-path <path>')
+  .option('--torrent-file <path>')
+  .option('--torrent-dir <path>')
+  .option('--label <label>')
+  .description('report an rtorrent event (called by the KoBox shims)')
+  .action((rawType: string, options: Record<string, string | undefined>) => {
+    const hook = EventHook.parse(rawType);
+    const submission: Record<string, string> = {
+      event: hook.type,
+      infoHash: InfoHash.parse(options.hash ?? '').value,
+    };
+    const optional: Record<string, string | undefined> = {
+      name: options.name,
+      directory: options.directory,
+      basePath: options.basePath,
+      torrentFile: options.torrentFile,
+      torrentDir: options.torrentDir,
+    };
+    for (const [key, value] of Object.entries(optional)) {
+      if (value !== undefined && value !== '') {
+        submission[key] = value;
+      }
+    }
+    // labels can come from ruTorrent free text: forward only what the
+    // contract will accept, dropping the field beats dropping the event
+    if (options.label !== undefined && LABEL_PATTERN.test(options.label)) {
+      submission.label = options.label;
+    }
+    const path = new TorrentEventSpoolWriter(spoolDir()).submit(submission);
+    process.stdout.write(`event spooled: ${path}\n`);
+  });
 
 program
   .command('change-password')
