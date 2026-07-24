@@ -1,0 +1,2 @@
+#### KoBox - Blacklisted domains (ex: inactive trackers)
+zone "dead.example.net" { type master; file "/etc/bind/db.empty"; };
