@@ -69,6 +69,68 @@ export const torrents = sqliteTable(
   (table) => [unique().on(table.username, table.infoHash)],
 );
 
+// The tracker whitelist (legacy trackers_list). check_state replaces the
+// magic to_check ∈ {0,1,3}; cert_expiration keeps the REAL notAfter date
+// (the legacy stored it skewed by -2 days; the margin now lives in CertExpiry).
+export const trackers = sqliteTable('trackers', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  host: text('host').notNull().unique(),
+  domain: text('domain').notNull(),
+  proto: text('proto', { enum: ['http', 'https', 'udp'] }).notNull(),
+  port: integer('port').notNull(),
+  privacy: text('privacy', { enum: ['public', 'private'] }).notNull(),
+  isActive: integer('is_active').notNull().default(1),
+  isDead: integer('is_dead').notNull().default(0),
+  isSsl: integer('is_ssl').notNull().default(0),
+  checkState: text('check_state', { enum: ['none', 'pending', 'checking'] }).notNull(),
+  certExpiration: text('cert_expiration'),
+  lastCheck: text('last_check'),
+  createdAt: text('created_at')
+    .notNull()
+    .default(sql`(datetime('now'))`),
+});
+
+export const trackerIpv4 = sqliteTable(
+  'tracker_ipv4',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    trackerId: integer('tracker_id')
+      .notNull()
+      .references(() => trackers.id, { onDelete: 'cascade' }),
+    ipv4: text('ipv4').notNull(),
+  },
+  (table) => [unique().on(table.trackerId, table.ipv4)],
+);
+
+export const blocklists = sqliteTable(
+  'blocklists',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    source: text('source', { enum: ['iblocklist', 'personal'] }).notNull(),
+    author: text('author').notNull(),
+    name: text('name').notNull(),
+    url: text('url').notNull(),
+    subscription: integer('subscription').notNull().default(0),
+    enabled: integer('enabled').notNull().default(0),
+    lastUpdateStatus: text('last_update_status', { enum: ['ok', 'failed'] }),
+    lastUpdateAt: text('last_update_at'),
+    sha256: text('sha256'),
+  },
+  (table) => [unique().on(table.source, table.author, table.name)],
+);
+
+// Static per-user IPv4 allow-list entries (legacy users_addresses; the DynDNS
+// hostname flavor arrives with the Security context in Phase 3).
+export const userAddresses = sqliteTable(
+  'user_addresses',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    username: text('username').notNull(),
+    ipv4: text('ipv4').notNull(),
+  },
+  (table) => [unique().on(table.username, table.ipv4)],
+);
+
 export const jobs = sqliteTable('jobs', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   type: text('type').notNull(),
