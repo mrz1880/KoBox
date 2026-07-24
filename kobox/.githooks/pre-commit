@@ -12,11 +12,15 @@ if git diff --cached --name-only | grep -q '^kobox/'; then
   pnpm lint
   pnpm typecheck
   echo "[pre-commit] guard: no production/personal identifiers"
-  # Block obvious leaks from re-entering a public repo.
+  # The detection list is base64-encoded so the very identifiers we forbid do
+  # not appear in cleartext in this public repo. Decode at runtime only.
+  forbidden="$(printf '%s' \
+    'a29mYW1pbHl8MTk1XC4xNTRcLjE3MXxtcnoxODgwfFxiYW50aG9ueVxifFxibHVkb1xifFxibHVkb2ZcYnxcYmxlb25ldWZcYnxcYmp1bGllblxifFxidGl0aVxifFxidG9ueXpcYnxcYmZyZWRcYnxcYnJvbWFpblxi' \
+    | base64 -d)"
   if git diff --cached -U0 --no-color -- 'src' 'test' \
       | grep -nE '^\+' \
       | grep -viE '^\+\+\+' \
-      | grep -inE 'kofamily|195\.154\.171|the-maintainer|\btonyz\b|\bleoneuf\b|\bludof?\b|\bromain\b'; then
+      | grep -inE "$forbidden"; then
     echo "[pre-commit] BLOCKED: staged lines contain a production/personal identifier." >&2
     exit 1
   fi

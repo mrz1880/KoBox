@@ -3,7 +3,7 @@ import { EmailAddress, InvalidEmailAddressError } from '../../../../src/domain/u
 
 describe('EmailAddress', () => {
   it('should_accept_common_addresses_and_normalize_to_lowercase', () => {
-    expect(EmailAddress.parse('MrZ1880@Gmail.com').value).toBe('the-maintainer@gmail.com');
+    expect(EmailAddress.parse('Alice.Doe@Example.COM').value).toBe('alice.doe@example.com');
     expect(EmailAddress.parse('a.b+tag@sub.domain.org').value).toBe('a.b+tag@sub.domain.org');
   });
 
