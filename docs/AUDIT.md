@@ -480,9 +480,9 @@ dashboard de plus que personne ne regarde.
 
 **Honnêteté (anti-overkill)** : un stack complet Prometheus + Grafana + Loki + Alertmanager +
 tracing OTel pour **8 users / 1 mainteneur** est disproportionné. Reco **légère** : logs
-structurés + `/metrics` optionnel + `FairUseEvaluator` + push. On **garde NetData** (déjà en
-place) pour l'œil host ; Grafana/scrape Prometheus restent branchables plus tard sans rien
-réécrire (l'endpoint est là).
+structurés + `/metrics` optionnel + `FairUseEvaluator` + push. **NetData est retiré du scope v1**
+(directive owner) ; l'observabilité KoBox se fait donc via les logs structurés + `/metrics`, et
+Grafana/scrape Prometheus restent branchables plus tard sans rien réécrire (l'endpoint est là).
 
 **Placement** : instrumentation + sondes de santé en **Phase 0** (fondation) ; métering par-user
 + `FairUseEvaluator` + throttle en **Phase 3 (Security & Network)**, quand le contexte réseau
@@ -728,7 +728,8 @@ Le owner peut compléter la liste des retraits ultérieurement.
 |---|---|
 | Billing / renting | `tracking_rent_*` = 0 ligne (jamais utilisé) |
 | port_forwarding | 0 ligne |
-| Plex / Tautulli | non installé sur la box |
+| Plex / Tautulli | non installé + directive owner (retrait explicite) |
+| **NetData** | directive owner (retrait explicite) — observabilité via logs/`metrics` |
 | **Wolf CMS** | remplacé par construction (le portail est réécrit) |
 
 **Portail — décision de forme** : conserver l'**URL/entrée** actuelle (`https://seedbox.example:8189`
