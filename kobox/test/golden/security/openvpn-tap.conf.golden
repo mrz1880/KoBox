@@ -1,0 +1,20 @@
+# KoBox-managed OpenVPN server (tap) — DO NOT EDIT (rendered declaratively).
+port 8195
+proto udp4
+dev tap
+topology subnet
+server 10.0.2.0 255.255.255.0
+ca /etc/openvpn/kobox-pki/ca.crt
+cert /etc/openvpn/kobox-pki/issued/server.crt
+key /etc/openvpn/kobox-pki/private/server.key
+dh /etc/openvpn/kobox-pki/dh.pem
+data-ciphers AES-256-GCM:AES-128-GCM
+auth SHA256
+keepalive 10 120
+persist-key
+persist-tun
+user nobody
+group nogroup
+status /var/log/openvpn/kobox-tap-status.log
+verb 3
+push "dhcp-option DNS 10.0.2.1"

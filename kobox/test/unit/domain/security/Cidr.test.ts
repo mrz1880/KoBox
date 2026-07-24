@@ -52,6 +52,15 @@ describe('Cidr', () => {
     expect(Cidr.parse('0.0.0.0/0').contains(IpAddress.parse('203.0.113.9'))).toBe(true);
   });
 
+  it('should_expose_network_netmask_and_gateway_for_config_rendering', () => {
+    const cidr = Cidr.parse('10.0.1.0/24');
+    expect(cidr.networkAddress).toBe('10.0.1.0');
+    expect(cidr.netmask).toBe('255.255.255.0');
+    expect(cidr.gatewayAddress).toBe('10.0.1.1');
+    expect(Cidr.parse('192.0.2.64/26').netmask).toBe('255.255.255.192');
+    expect(Cidr.parse('192.0.2.64/26').gatewayAddress).toBe('192.0.2.65');
+  });
+
   it('should_build_a_host_cidr_from_an_ip', () => {
     expect(Cidr.host(IpAddress.parse('203.0.113.9')).value).toBe('203.0.113.9/32');
   });

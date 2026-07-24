@@ -11,6 +11,10 @@ function ipToInt(ip: string): number {
   return ip.split('.').reduce((acc, octet) => acc * 256 + Number(octet), 0);
 }
 
+function intToIp(n: number): string {
+  return [(n >>> 24) & 255, (n >>> 16) & 255, (n >>> 8) & 255, n & 255].join('.');
+}
+
 function maskOf(prefix: number): number {
   return prefix === 0 ? 0 : (0xffffffff << (32 - prefix)) >>> 0;
 }
@@ -47,6 +51,19 @@ export class Cidr {
 
   static host(ip: IpAddress): Cidr {
     return new Cidr(`${ip.value}/32`, ipToInt(ip.value), maskOf(32));
+  }
+
+  get networkAddress(): string {
+    return intToIp(this.network);
+  }
+
+  get netmask(): string {
+    return intToIp(this.mask);
+  }
+
+  // Convention shared with the legacy layout: the box owns .1 of each tunnel.
+  get gatewayAddress(): string {
+    return intToIp((this.network + 1) >>> 0);
   }
 
   contains(ip: IpAddress): boolean {
