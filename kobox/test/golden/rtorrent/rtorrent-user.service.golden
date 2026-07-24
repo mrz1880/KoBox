@@ -6,8 +6,10 @@ Wants=network-online.target
 
 [Service]
 Type=simple
+# No Group= override: the user's own primary group must stay first so rtorrent
+# can read the root:<user> 0640 managed files; kobox-users comes in as a
+# supplementary group via the user database (initgroups).
 User=alice
-Group=kobox-users
 WorkingDirectory=/home/alice
 Environment=HOME=/home/alice
 ExecStart=/usr/bin/rtorrent -n -o import=/home/alice/.rtorrent.rc

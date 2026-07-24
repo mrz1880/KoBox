@@ -57,14 +57,19 @@ function userExists(): boolean {
 describe.skipIf(!onDebianAsRoot)('E2E: create -> suspend -> resume -> delete', () => {
   beforeAll(() => {
     const dir = mkdtempSync(join(tmpdir(), 'kobox-e2e-'));
-    env = { ...process.env, KOBOX_DB: join(dir, 'kobox.db') };
-    sh('bash', ['docker/e2e-setup.sh', E2E_USER]);
+    env = { ...process.env, KOBOX_DB: join(dir, 'kobox.db'), KOBOX_SPOOL: join(dir, 'events') };
+    sh('bash', ['docker/e2e-setup.sh']);
     if (userExists()) {
+      try {
+        execFileSync('systemctl', ['disable', '--now', `rtorrent-${E2E_USER}`], { stdio: 'ignore' });
+      } catch {
+        // unit may not exist
+      }
       execFileSync('userdel', ['-r', E2E_USER], { stdio: 'ignore' });
     }
   });
 
-  it('should_provision_a_real_user_from_an_enqueued_typed_job', () => {
+  it('should_provision_a_real_user_and_its_rtorrent_instance_from_typed_jobs', () => {
     const output = kobox(
       ['create-user', E2E_USER, '--email', 'e2euser@example.org', '--quota-gib', '10'],
       's3cretpw\n',
@@ -79,11 +84,8 @@ describe.skipIf(!onDebianAsRoot)('E2E: create -> suspend -> resume -> delete', (
     expect(groupsOf()).toEqual(expect.arrayContaining(['kobox-users', 'kobox-sftp']));
     expect(passwdStatus()).toBe('P');
     expect(sh('getent', ['shadow', E2E_USER])).toContain('$6$');
-    expect(unitState()).not.toBe('active'); // rtorrent provisioning is Phase 1
-
-    // simulate Phase 1 having provisioned and started the unit, so the
-    // suspend/resume steps below exercise the real service control path
-    sh('systemctl', ['start', `rtorrent-${E2E_USER}`]);
+    // Phase 1: create-user chains provision-rtorrent — a REAL rtorrent runs
+    expect(existsSync(`/home/${E2E_USER}/.rtorrent.rc`)).toBe(true);
     expect(unitState()).toBe('active');
   });
 
@@ -123,11 +125,13 @@ describe.skipIf(!onDebianAsRoot)('E2E: create -> suspend -> resume -> delete', (
     expect(report.checks.length).toBeGreaterThan(0);
   });
 
-  it('should_delete_the_user_and_release_everything', () => {
+  it('should_delete_the_user_and_release_everything_including_the_unit', () => {
     kobox(['delete-user', E2E_USER]);
     drainQueue();
 
     expect(userExists()).toBe(false);
     expect(unitState()).not.toBe('active');
+    // deprovision-rtorrent chained after delete-user: unit file removed
+    expect(existsSync(`/etc/systemd/system/rtorrent-${E2E_USER}.service`)).toBe(false);
   });
 });

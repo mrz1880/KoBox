@@ -19,6 +19,15 @@ method.insert = d.data_path, simple,\
         (cat, (d.directory), /),\
         (cat, (d.directory), /, (d.name))"
 
+## Bootstrap the layout FIRST: later sections (logs, session) expect the
+## directories to exist at parse time — rtorrent executes this file top-down.
+execute.throw = sh, -c, (cat, "mkdir -p ", (cfg.logdir))
+execute.throw = sh, -c, (cat, "mkdir -p ", (cfg.config))
+execute.throw = sh, -c, (cat, "mkdir -p ", (cfg.complete))
+execute.throw = sh, -c, (cat, "mkdir -p ", (cfg.session))
+execute.throw = sh, -c, (cat, "mkdir -p ", (cfg.watch))
+execute.throw = sh, -c, (cat, "mkdir -p ", (cfg.torrents))
+
 ## Event hooks -> KoBox shims (typed job pipeline; zero logic in the shims)
 {{event_hooks}}
 
@@ -85,13 +94,7 @@ log.execute = (cat, (cfg.logdir), "execute.log")
 log.open_file = "rtorrent", (cat, (cfg.logdir), "rtorrent.log")
 log.add_output = "notice", "rtorrent"
 
-## Bootstrap: create the layout, then load config.d drop-ins
-execute.throw = sh, -c, (cat, "mkdir -p ", (cfg.logdir))
-execute.throw = sh, -c, (cat, "mkdir -p ", (cfg.config))
-execute.throw = sh, -c, (cat, "mkdir -p ", (cfg.complete))
-execute.throw = sh, -c, (cat, "mkdir -p ", (cfg.session))
-execute.throw = sh, -c, (cat, "mkdir -p ", (cfg.watch))
-execute.throw = sh, -c, (cat, "mkdir -p ", (cfg.torrents))
+## PID file and config.d drop-ins
 execute.nothrow = sh, -c, (cat, "echo >", (session.path), "rtorrent.pid", " ", (system.pid))
 execute.nothrow = sh, -c, (cat,\
     "find ", (cfg.config), " -name '*.rc' ",\

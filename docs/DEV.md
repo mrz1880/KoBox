@@ -40,9 +40,14 @@ Notes :
 - **Quota** : les filesystems du conteneur (overlay/tmpfs) ne supportent pas les quotas
   ext4. Sans `KOBOX_QUOTA_FS`, l'adapter Noop trace un warning explicite et le quota
   reste enregistré en DB. La validation quota réelle se fait sur VM (voir plus bas).
-- `docker/e2e-setup.sh <user>` prépare le conteneur : conf sshd chroot (`Match Group
-  kobox-sftp`) + unité systemd factice `rtorrent-<user>` (Phase 0 ne provisionne pas
-  rtorrent — c'est la Phase 1).
+- `docker/e2e-setup.sh` prépare le conteneur : conf sshd chroot (`Match Group
+  kobox-sftp`). Depuis la Phase 1, l'unité `rtorrent-<user>` est provisionnée par KoBox
+  lui-même (image avec le paquet `rtorrent` — l'E2E fait tourner un vrai rtorrent sur la
+  config rendue).
+- **Événements rtorrent** : les shims écrivent dans le spool `KOBOX_SPOOL`
+  (défaut `/var/spool/kobox/events`, mode `1733`) ; le worker root en déduit l'identité
+  depuis le propriétaire du fichier. `KOBOX_BIN` fixe la commande `kobox` insérée dans
+  les shims rendus (défaut `/usr/local/bin/kobox`).
 
 ## VM Multipass (validation full-stack, quotas ext4 réels)
 

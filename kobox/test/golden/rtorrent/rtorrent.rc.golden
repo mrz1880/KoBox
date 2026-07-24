@@ -19,6 +19,15 @@ method.insert = d.data_path, simple,\
         (cat, (d.directory), /),\
         (cat, (d.directory), /, (d.name))"
 
+## Bootstrap the layout FIRST: later sections (logs, session) expect the
+## directories to exist at parse time — rtorrent executes this file top-down.
+execute.throw = sh, -c, (cat, "mkdir -p ", (cfg.logdir))
+execute.throw = sh, -c, (cat, "mkdir -p ", (cfg.config))
+execute.throw = sh, -c, (cat, "mkdir -p ", (cfg.complete))
+execute.throw = sh, -c, (cat, "mkdir -p ", (cfg.session))
+execute.throw = sh, -c, (cat, "mkdir -p ", (cfg.watch))
+execute.throw = sh, -c, (cat, "mkdir -p ", (cfg.torrents))
+
 ## Event hooks -> KoBox shims (typed job pipeline; zero logic in the shims)
 method.set_key = event.download.inserted_new, kobox_inserted_new, "execute2={sh,/home/alice/.rTorrent_inserted_new.sh,$d.hash=,$d.name=,$d.directory=,$d.loaded_file=,$d.custom2=,$d.custom1=}"
 method.set_key = event.download.finished, kobox_finished, "execute2={sh,/home/alice/.rTorrent_finished.sh,$d.hash=,$d.base_path=,$d.directory=,$d.name=,$d.loaded_file=,$d.custom1=}"
@@ -87,13 +96,7 @@ log.execute = (cat, (cfg.logdir), "execute.log")
 log.open_file = "rtorrent", (cat, (cfg.logdir), "rtorrent.log")
 log.add_output = "notice", "rtorrent"
 
-## Bootstrap: create the layout, then load config.d drop-ins
-execute.throw = sh, -c, (cat, "mkdir -p ", (cfg.logdir))
-execute.throw = sh, -c, (cat, "mkdir -p ", (cfg.config))
-execute.throw = sh, -c, (cat, "mkdir -p ", (cfg.complete))
-execute.throw = sh, -c, (cat, "mkdir -p ", (cfg.session))
-execute.throw = sh, -c, (cat, "mkdir -p ", (cfg.watch))
-execute.throw = sh, -c, (cat, "mkdir -p ", (cfg.torrents))
+## PID file and config.d drop-ins
 execute.nothrow = sh, -c, (cat, "echo >", (session.path), "rtorrent.pid", " ", (system.pid))
 execute.nothrow = sh, -c, (cat,\
     "find ", (cfg.config), " -name '*.rc' ",\
