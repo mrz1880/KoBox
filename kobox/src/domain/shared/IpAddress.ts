@@ -8,7 +8,7 @@ export class InvalidIpAddressError extends DomainError {
 
 // Strict dotted-quad: no leading zeros (octal ambiguity), no signs, no spaces.
 const OCTET = '(0|[1-9][0-9]?|1[0-9][0-9]|2[0-4][0-9]|25[0-5])';
-const IPV4_PATTERN = new RegExp(`^${OCTET}\\.${OCTET}\\.${OCTET}\\.${OCTET}$`);
+export const IPV4_PATTERN = new RegExp(`^${OCTET}\\.${OCTET}\\.${OCTET}\\.${OCTET}$`);
 
 export class IpAddress {
   private constructor(readonly value: string) {}

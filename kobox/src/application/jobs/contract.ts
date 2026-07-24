@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { IPV4_PATTERN } from '../../domain/shared/IpAddress.js';
 import { INFO_HASH_PATTERN } from '../../domain/torrent/InfoHash.js';
 import { LABEL_PATTERN } from '../../domain/torrent/Label.js';
 import { EMAIL_PATTERN } from '../../domain/user/EmailAddress.js';
@@ -22,6 +23,16 @@ export const JOB_TYPES = [
   'set-sync-disabled',
   'set-allow-public-tracker',
   'torrent-event',
+  'discover-tracker',
+  'fetch-tracker-cert',
+  'renew-tracker-certs',
+  'mark-tracker-dead',
+  'import-blocklist-catalog',
+  'update-blocklists',
+  'render-whitelist',
+  'render-blocklist-filters',
+  'add-user-address',
+  'remove-user-address',
 ] as const;
 
 export type JobType = (typeof JOB_TYPES)[number];
@@ -44,6 +55,22 @@ const absolutePathField = z
   .refine((raw) => raw.startsWith('/') && !raw.split('/').includes('..'), {
     message: 'path must be absolute without ..',
   });
+
+// Wire-level mirror of TrackerHost (the VO stays authoritative in the
+// worker): ≥2 labels, label charset, no leading dash — the §5.1 shape cannot
+// even be enqueued.
+const TRACKER_HOST_LABEL = '[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?';
+const trackerHostField = z
+  .string()
+  .max(253)
+  .regex(new RegExp(`^${TRACKER_HOST_LABEL}(\\.${TRACKER_HOST_LABEL})+$`, 'i'));
+const announceUrlField = z
+  .string()
+  .max(2048)
+  .regex(/^(https?|udp):\/\/\S+$/i);
+const isoDateField = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+const ipv4Field = z.string().regex(IPV4_PATTERN);
+const userAddressPayload = z.strictObject({ username: usernameField, ipv4: ipv4Field });
 
 export const jobPayloadSchemas = {
   'create-user': z.strictObject({
@@ -78,6 +105,19 @@ export const jobPayloadSchemas = {
     torrentFile: absolutePathField.optional(),
     label: labelField.optional(),
   }),
+  'discover-tracker': z.strictObject({
+    url: announceUrlField,
+    privacy: z.enum(['public', 'private']),
+  }),
+  'fetch-tracker-cert': z.strictObject({ host: trackerHostField }),
+  'renew-tracker-certs': z.strictObject({ today: isoDateField }),
+  'mark-tracker-dead': z.strictObject({ host: trackerHostField }),
+  'import-blocklist-catalog': z.strictObject({}),
+  'update-blocklists': z.strictObject({}),
+  'render-whitelist': z.strictObject({}),
+  'render-blocklist-filters': z.strictObject({ username: usernameField.optional() }),
+  'add-user-address': userAddressPayload,
+  'remove-user-address': userAddressPayload,
 } satisfies Record<JobType, z.ZodType>;
 
 export type JobPayload<T extends JobType> = z.infer<(typeof jobPayloadSchemas)[T]>;

@@ -19,6 +19,16 @@ describe('job contract', () => {
       'set-sync-disabled',
       'set-allow-public-tracker',
       'torrent-event',
+      'discover-tracker',
+      'fetch-tracker-cert',
+      'renew-tracker-certs',
+      'mark-tracker-dead',
+      'import-blocklist-catalog',
+      'update-blocklists',
+      'render-whitelist',
+      'render-blocklist-filters',
+      'add-user-address',
+      'remove-user-address',
     ]);
   });
 
@@ -113,6 +123,57 @@ describe('job contract', () => {
     ).toThrow();
     expect(() => parseJob('add-watch-dir', { username: 'alice', label: '../up' })).toThrow();
     expect(() => parseJob('add-watch-dir', { username: 'alice', label: 'Films Fr' })).toThrow();
+  });
+
+  it('should_parse_tracker_and_blocklist_jobs', () => {
+    expect(
+      parseJob('discover-tracker', {
+        url: 'https://tracker.example.org:2710/announce',
+        privacy: 'private',
+      }).type,
+    ).toBe('discover-tracker');
+    expect(parseJob('fetch-tracker-cert', { host: 'tracker.example.org' }).type).toBe(
+      'fetch-tracker-cert',
+    );
+    expect(parseJob('renew-tracker-certs', { today: '2026-07-24' }).type).toBe(
+      'renew-tracker-certs',
+    );
+    expect(parseJob('mark-tracker-dead', { host: 'tracker.example.org' }).type).toBe(
+      'mark-tracker-dead',
+    );
+    expect(parseJob('import-blocklist-catalog', {}).type).toBe('import-blocklist-catalog');
+    expect(parseJob('update-blocklists', {}).type).toBe('update-blocklists');
+    expect(parseJob('render-whitelist', {}).type).toBe('render-whitelist');
+    expect(parseJob('render-blocklist-filters', {}).type).toBe('render-blocklist-filters');
+    expect(parseJob('render-blocklist-filters', { username: 'alice' }).type).toBe(
+      'render-blocklist-filters',
+    );
+    expect(
+      parseJob('add-user-address', { username: 'alice', ipv4: '198.51.100.7' }).type,
+    ).toBe('add-user-address');
+    expect(
+      parseJob('remove-user-address', { username: 'alice', ipv4: '198.51.100.7' }).type,
+    ).toBe('remove-user-address');
+  });
+
+  it('should_reject_tracker_payloads_violating_invariants', () => {
+    // the §5.1 injection shape must die at the wire boundary too
+    expect(() =>
+      parseJob('fetch-tracker-cert', { host: 'tracker.example.org;id' }),
+    ).toThrow();
+    expect(() => parseJob('fetch-tracker-cert', { host: '-x.example.org' })).toThrow();
+    expect(() => parseJob('fetch-tracker-cert', { host: 'localhost' })).toThrow();
+    expect(() =>
+      parseJob('discover-tracker', { url: 'ftp://x.example.org/a', privacy: 'private' }),
+    ).toThrow();
+    expect(() =>
+      parseJob('discover-tracker', { url: 'https://x.example.org/a', privacy: 'open' }),
+    ).toThrow();
+    expect(() => parseJob('renew-tracker-certs', { today: 'yesterday' })).toThrow();
+    expect(() => parseJob('update-blocklists', { extra: true })).toThrow(); // strict object
+    expect(() =>
+      parseJob('add-user-address', { username: 'alice', ipv4: '256.1.1.1' }),
+    ).toThrow();
   });
 
   // Breaking-change detector: if a payload schema changes shape, this snapshot
