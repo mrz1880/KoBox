@@ -7,6 +7,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     systemd \
     systemd-sysv \
     dbus \
+    bind9utils \
     ca-certificates \
     curl \
     gnupg \
