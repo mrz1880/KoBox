@@ -33,6 +33,7 @@ export const JOB_TYPES = [
   'render-blocklist-filters',
   'add-user-address',
   'remove-user-address',
+  'apply-firewall',
 ] as const;
 
 export type JobType = (typeof JOB_TYPES)[number];
@@ -118,6 +119,7 @@ export const jobPayloadSchemas = {
   'render-blocklist-filters': z.strictObject({ username: usernameField.optional() }),
   'add-user-address': userAddressPayload,
   'remove-user-address': userAddressPayload,
+  'apply-firewall': z.strictObject({}),
 } satisfies Record<JobType, z.ZodType>;
 
 export type JobPayload<T extends JobType> = z.infer<(typeof jobPayloadSchemas)[T]>;

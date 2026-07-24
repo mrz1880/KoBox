@@ -1,0 +1,155 @@
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import type { RenderedFile } from '../../../../src/domain/shared/files.js';
+import type {
+  HealthCheckResult,
+  HealthProbePort,
+} from '../../../../src/domain/user/ports.js';
+import type {
+  CommandRequest,
+  CommandResult,
+  CommandRunner,
+} from '../../../../src/infrastructure/system/CommandRunner.js';
+import { GetentUserIdentityAdapter } from '../../../../src/infrastructure/system/GetentUserIdentityAdapter.js';
+import { IptablesRestoreAdapter } from '../../../../src/infrastructure/system/IptablesRestoreAdapter.js';
+import { Username } from '../../../../src/domain/user/Username.js';
+
+class RecordingRunner implements CommandRunner {
+  readonly calls: CommandRequest[] = [];
+  private readonly byCommand = new Map<string, CommandResult>();
+
+  on(command: string, result: Partial<CommandResult>): void {
+    this.byCommand.set(command, { stdout: '', stderr: '', exitCode: 0, ...result });
+  }
+
+  run(request: CommandRequest): Promise<CommandResult> {
+    this.calls.push(request);
+    return Promise.resolve(
+      this.byCommand.get(request.command) ?? { stdout: '', stderr: '', exitCode: 0 },
+    );
+  }
+}
+
+class StubProbe implements HealthProbePort {
+  state: 'healthy' | 'unhealthy' = 'healthy';
+
+  checkProcess(name: string): Promise<HealthCheckResult> {
+    return Promise.resolve({ name, state: this.state });
+  }
+
+  checkSocket(host: string, port: number): Promise<HealthCheckResult> {
+    return Promise.resolve({ name: `${host}:${String(port)}`, state: this.state });
+  }
+}
+
+class RecordingFiles {
+  readonly applied: RenderedFile[] = [];
+
+  apply(files: readonly RenderedFile[]): Promise<readonly string[]> {
+    this.applied.push(...files);
+    for (const file of files) {
+      writeFileSync(file.path, file.content);
+    }
+    return Promise.resolve(files.map((file) => file.path));
+  }
+}
+
+const SNAPSHOT = '*filter\n:INPUT ACCEPT [0:0]\nCOMMIT\n';
+
+let dir: string;
+let runner: RecordingRunner;
+let probe: StubProbe;
+let files: RecordingFiles;
+let adapter: IptablesRestoreAdapter;
+let rules: RenderedFile;
+
+beforeEach(() => {
+  dir = mkdtempSync(join(tmpdir(), 'kobox-fw-'));
+  runner = new RecordingRunner();
+  runner.on('iptables-save', { stdout: SNAPSHOT });
+  probe = new StubProbe();
+  files = new RecordingFiles();
+  adapter = new IptablesRestoreAdapter(runner, files, probe, 22);
+  rules = {
+    path: join(dir, 'firewall.rules'),
+    content: '*filter\n:INPUT DROP [0:0]\n-A INPUT -i lo -j ACCEPT\nCOMMIT\n',
+    mode: '0600',
+    owner: 'root',
+    group: 'root',
+  };
+});
+
+afterEach(() => {
+  rmSync(dir, { recursive: true, force: true });
+});
+
+describe('IptablesRestoreAdapter', () => {
+  it('should_snapshot_restore_probe_then_persist_the_file', async () => {
+    const outcome = await adapter.apply(rules);
+
+    expect(outcome).toBe('applied');
+    expect(runner.calls.map((call) => call.command)).toEqual([
+      'iptables-save',
+      'iptables-restore',
+    ]);
+    // the ruleset travels via stdin — argv never carries rule content
+    expect(runner.calls[1]?.stdin).toBe(rules.content);
+    expect(runner.calls[1]?.timeoutMs).toBe(10_000);
+    expect(files.applied).toHaveLength(1);
+    expect(readFileSync(rules.path, 'utf8')).toBe(rules.content);
+  });
+
+  it('should_be_idempotent_when_the_persisted_rules_already_match', async () => {
+    await adapter.apply(rules);
+    runner.calls.length = 0;
+
+    const outcome = await adapter.apply(rules);
+
+    expect(outcome).toBe('unchanged');
+    expect(runner.calls).toHaveLength(0); // no restore, no snapshot
+  });
+
+  it('should_restore_the_snapshot_and_keep_the_old_file_when_the_probe_fails', async () => {
+    probe.state = 'unhealthy';
+
+    const outcome = await adapter.apply(rules);
+
+    expect(outcome).toBe('rolled-back');
+    const restores = runner.calls.filter((call) => call.command === 'iptables-restore');
+    expect(restores).toHaveLength(2);
+    expect(restores[1]?.stdin).toBe(SNAPSHOT); // the pre-apply state came back
+    // the file was NOT persisted: it must keep describing the live ruleset
+    expect(files.applied).toHaveLength(0);
+  });
+
+  it('should_throw_and_leave_the_file_untouched_when_restore_itself_fails', async () => {
+    runner.on('iptables-restore', { exitCode: 2, stderr: 'iptables-restore: line 2 failed' });
+
+    await expect(adapter.apply(rules)).rejects.toThrow('line 2 failed');
+    expect(files.applied).toHaveLength(0);
+  });
+});
+
+describe('GetentUserIdentityAdapter', () => {
+  it('should_parse_the_uid_from_getent_passwd_via_argv_only', async () => {
+    const identityRunner = new RecordingRunner();
+    identityRunner.on('getent', {
+      stdout: 'alice:x:1001:1001::/home/alice:/bin/bash\n',
+    });
+    const identity = new GetentUserIdentityAdapter(identityRunner);
+
+    expect(await identity.uidOf(Username.parse('alice'))).toBe(1001);
+    expect(identityRunner.calls[0]?.command).toBe('getent');
+    expect(identityRunner.calls[0]?.args).toEqual(['passwd', 'alice']);
+  });
+
+  it('should_return_undefined_for_a_missing_account', async () => {
+    const identityRunner = new RecordingRunner();
+    identityRunner.on('getent', { exitCode: 2 });
+    const identity = new GetentUserIdentityAdapter(identityRunner);
+
+    expect(await identity.uidOf(Username.parse('ghost'))).toBeUndefined();
+  });
+});

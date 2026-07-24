@@ -14,6 +14,8 @@ import { ProvisionRtorrentInstance } from '../application/torrent/ProvisionRtorr
 import { RenderRtorrentConfig } from '../application/torrent/RenderRtorrentConfig.js';
 import { SetAllowPublicTracker } from '../application/torrent/SetAllowPublicTracker.js';
 import { SetSyncDisabled } from '../application/torrent/SetSyncDisabled.js';
+import { ApplyFirewall } from '../application/security/ApplyFirewall.js';
+import type { SecuritySettings } from '../application/security/settings.js';
 import { ChangePassword } from '../application/user/ChangePassword.js';
 import { CreateUser } from '../application/user/CreateUser.js';
 import { DeleteUser } from '../application/user/DeleteUser.js';
@@ -43,6 +45,12 @@ import type {
   TrackerRepository,
   UserAddressRepository,
 } from '../domain/tracker/ports.js';
+import type {
+  FirewallApplyPort,
+  NetworkServicePort,
+  SecurityNotificationPort,
+  UserIdentityPort,
+} from '../domain/security/ports.js';
 import type { RenderSettings, RtorrentTemplates } from '../domain/torrent/rendering.js';
 import type { PortAllocatorPort } from '../domain/user/PortAllocatorPort.js';
 import type {
@@ -149,6 +157,26 @@ export function buildTrackerUseCases(deps: TrackerUseCaseDeps): TrackerUseCases 
     renderWhitelist: new RenderWhitelist(deps),
     renderBlocklistFilters: new RenderBlocklistFilters(deps),
     manageUserAddress: new ManageUserAddress(deps),
+  };
+}
+
+export interface SecurityUseCaseDeps {
+  readonly users: UserRepository;
+  readonly addresses: UserAddressRepository;
+  readonly identity: UserIdentityPort;
+  readonly firewall: FirewallApplyPort;
+  readonly reload: NetworkServicePort;
+  readonly notifications: SecurityNotificationPort;
+  readonly settings: SecuritySettings;
+}
+
+export interface SecurityUseCases {
+  readonly applyFirewall: ApplyFirewall;
+}
+
+export function buildSecurityUseCases(deps: SecurityUseCaseDeps): SecurityUseCases {
+  return {
+    applyFirewall: new ApplyFirewall(deps),
   };
 }
 

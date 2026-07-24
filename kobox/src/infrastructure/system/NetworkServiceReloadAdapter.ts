@@ -1,11 +1,12 @@
+import type { NetworkServicePort } from '../../domain/security/ports.js';
 import type { NetworkServiceReloadPort } from '../../domain/tracker/ports.js';
 import type { Logger } from '../logging/logger.js';
 import type { CommandRequest, CommandRunner } from './CommandRunner.js';
 
-// Phase 3 (Security & Network) will own these services; until then the files
-// are the truth and reloads are best-effort — a missing binary or inactive
-// unit must never fail a render job.
-export class NetworkServiceReloadAdapter implements NetworkServiceReloadPort {
+// Best-effort stopgap satisfying both reload ports until the real
+// NetworkServiceAdapter (escalating errors, absent-unit detection) replaces
+// it wholesale — a missing binary or inactive unit must never fail a job.
+export class NetworkServiceReloadAdapter implements NetworkServiceReloadPort, NetworkServicePort {
   constructor(
     private readonly runner: CommandRunner,
     private readonly logger: Logger,
@@ -18,6 +19,10 @@ export class NetworkServiceReloadAdapter implements NetworkServiceReloadPort {
 
   async reloadPeerGuardian(): Promise<void> {
     await this.tryRun({ command: 'pglcmd', args: ['reload'] });
+  }
+
+  async reloadFail2ban(): Promise<void> {
+    await this.tryRun({ command: 'systemctl', args: ['reload-or-restart', 'fail2ban'] });
   }
 
   private async tryRun(request: CommandRequest): Promise<void> {

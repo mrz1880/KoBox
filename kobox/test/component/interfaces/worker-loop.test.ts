@@ -36,9 +36,14 @@ import { FakeTorrentMetainfo } from '../../../src/infrastructure/system/fakes/Fa
 import { FakeUserScriptRunner } from '../../../src/infrastructure/system/fakes/FakeUserScriptRunner.js';
 import { FakeWatchDirs } from '../../../src/infrastructure/system/fakes/FakeWatchDirs.js';
 import { loadRtorrentTemplates } from '../../../src/infrastructure/templates/TemplateProvider.js';
+import { Cidr } from '../../../src/domain/security/Cidr.js';
+import { FakeFirewallApply } from '../../../src/infrastructure/system/fakes/FakeFirewallApply.js';
+import { FakeNetworkServices } from '../../../src/infrastructure/system/fakes/FakeNetworkServices.js';
+import { FakeUserIdentity } from '../../../src/infrastructure/system/fakes/FakeUserIdentity.js';
 import { buildJob } from '../../../src/interfaces/cli/buildJob.js';
 import { JobWorker } from '../../../src/interfaces/worker/JobWorker.js';
 import {
+  buildSecurityUseCases,
   buildTorrentUseCases,
   buildTrackerUseCases,
   buildUseCases,
@@ -118,6 +123,8 @@ interface World {
   certStore: FakeCertStore;
   download: FakeBlocklistDownload;
   networkFiles: FakeRtorrentConfig;
+  firewall: FakeFirewallApply;
+  identity: FakeUserIdentity;
   worker: JobWorker;
   hasher: FakePasswordHasher;
 }
@@ -173,10 +180,11 @@ beforeEach(() => {
   const certStore = new FakeCertStore();
   const download = new FakeBlocklistDownload();
   const networkFiles = new FakeRtorrentConfig();
+  const addresses = new InMemoryUserAddressRepository();
   const trackerUseCases = buildTrackerUseCases({
     trackers,
     blocklists,
-    addresses: new InMemoryUserAddressRepository(),
+    addresses,
     users: repo,
     instances,
     dns,
@@ -188,6 +196,28 @@ beforeEach(() => {
     files: networkFiles,
     reload: new FakeNetworkServiceReload(),
     notifications,
+  });
+  const firewall = new FakeFirewallApply();
+  const identity = new FakeUserIdentity();
+  const securityUseCases = buildSecurityUseCases({
+    users: repo,
+    addresses,
+    identity,
+    firewall,
+    reload: new FakeNetworkServices(),
+    notifications,
+    settings: {
+      sshPort: 22,
+      portalPort: 8189,
+      vpn: {
+        tunGwPort: 8193,
+        tunPort: 8194,
+        tapPort: 8195,
+        tunGwSubnet: Cidr.parse('10.0.0.0/24'),
+        tunSubnet: Cidr.parse('10.0.1.0/24'),
+        tapSubnet: Cidr.parse('10.0.2.0/24'),
+      },
+    },
   });
   const queue = new InMemoryJobQueue();
   world = {
@@ -204,8 +234,10 @@ beforeEach(() => {
     certStore,
     download,
     networkFiles,
+    firewall,
+    identity,
     hasher: new FakePasswordHasher(),
-    worker: new JobWorker(queue, useCases, torrentUseCases, trackerUseCases),
+    worker: new JobWorker(queue, useCases, torrentUseCases, trackerUseCases, securityUseCases),
   };
 });
 
@@ -318,6 +350,41 @@ describe('CLI enqueue -> root worker loop (the privilege seam)', () => {
 
   it('should_report_nothing_to_do_on_an_empty_queue', async () => {
     expect(await world.worker.processNext()).toBe(false);
+  });
+});
+
+describe('security job chains (provision -> firewall)', () => {
+  it('should_apply_the_firewall_after_provisioning_a_user', async () => {
+    world.identity.setUid('alice', 1001);
+    await enqueueCreateAlice();
+
+    await world.worker.drain();
+
+    const content = world.firewall.applied.at(-1)?.content ?? '';
+    expect(content).toContain(':kobox-u-alice - [0:0]');
+    expect(content).toContain('-m owner --uid-owner 1001');
+  });
+
+  it('should_reapply_the_firewall_after_deprovisioning', async () => {
+    world.identity.setUid('alice', 1001);
+    await enqueueCreateAlice();
+    await world.worker.drain();
+    world.identity.clearUid('alice');
+    await world.queue.enqueue(buildJob.deleteUser({ username: 'alice' }));
+
+    await world.worker.drain();
+
+    const content = world.firewall.applied.at(-1)?.content ?? '';
+    expect(content).not.toContain('kobox-u-alice');
+  });
+
+  it('should_execute_a_standalone_apply_firewall_job', async () => {
+    const id = await world.queue.enqueue(parseJob('apply-firewall', {}));
+
+    await world.worker.drain();
+
+    expect(world.queue.statusOf(id)).toBe('done');
+    expect(world.firewall.applied).toHaveLength(1);
   });
 });
 

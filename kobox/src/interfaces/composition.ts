@@ -22,6 +22,9 @@ import { DnsLookupResolverAdapter } from '../infrastructure/system/DnsLookupReso
 import { FsBlocklistCacheAdapter } from '../infrastructure/system/FsBlocklistCacheAdapter.js';
 import { HttpsBlocklistDownloadAdapter } from '../infrastructure/system/HttpsBlocklistDownloadAdapter.js';
 import { IblocklistCatalogAdapter } from '../infrastructure/system/IblocklistCatalogAdapter.js';
+import { Cidr } from '../domain/security/Cidr.js';
+import { GetentUserIdentityAdapter } from '../infrastructure/system/GetentUserIdentityAdapter.js';
+import { IptablesRestoreAdapter } from '../infrastructure/system/IptablesRestoreAdapter.js';
 import { NetworkServiceReloadAdapter } from '../infrastructure/system/NetworkServiceReloadAdapter.js';
 import { OpensslTrackerCertAdapter } from '../infrastructure/system/OpensslTrackerCertAdapter.js';
 import { OpensslPasswordHasher } from '../infrastructure/system/OpensslPasswordHasher.js';
@@ -37,13 +40,36 @@ import { WatchDirAdapter } from '../infrastructure/system/WatchDirAdapter.js';
 import { loadRtorrentTemplates } from '../infrastructure/templates/TemplateProvider.js';
 import { JobWorker } from './worker/JobWorker.js';
 import {
+  buildSecurityUseCases,
   buildTorrentUseCases,
   buildTrackerUseCases,
   buildUseCases,
+  type SecurityUseCases,
   type TorrentUseCases,
   type TrackerUseCases,
   type UseCases,
 } from './useCases.js';
+import type { SecuritySettings } from '../application/security/settings.js';
+
+function envPort(name: string, fallback: number): number {
+  const raw = process.env[name];
+  return raw === undefined ? fallback : Number(raw);
+}
+
+export function securitySettings(): SecuritySettings {
+  return {
+    sshPort: envPort('KOBOX_SSH_PORT', 22),
+    portalPort: envPort('KOBOX_PORTAL_PORT', 8189),
+    vpn: {
+      tunGwPort: envPort('KOBOX_VPN_TUN_GW_PORT', 8193),
+      tunPort: envPort('KOBOX_VPN_TUN_PORT', 8194),
+      tapPort: envPort('KOBOX_VPN_TAP_PORT', 8195),
+      tunGwSubnet: Cidr.parse(process.env.KOBOX_VPN_TUN_GW_SUBNET ?? '10.0.0.0/24'),
+      tunSubnet: Cidr.parse(process.env.KOBOX_VPN_TUN_SUBNET ?? '10.0.1.0/24'),
+      tapSubnet: Cidr.parse(process.env.KOBOX_VPN_TAP_SUBNET ?? '10.0.2.0/24'),
+    },
+  };
+}
 
 export const DEFAULT_DB_PATH = '/var/lib/kobox/kobox.db';
 export const DEFAULT_KOBOX_BIN = '/usr/local/bin/kobox';
@@ -58,6 +84,7 @@ export interface Container {
   readonly useCases: UseCases;
   readonly torrentUseCases: TorrentUseCases;
   readonly trackerUseCases: TrackerUseCases;
+  readonly securityUseCases: SecurityUseCases;
   readonly queue: SqliteJobQueue;
   readonly worker: JobWorker;
   readonly hasher: OpensslPasswordHasher;
@@ -107,11 +134,16 @@ export function buildContainer(name: string): Container {
   const iblocklistUser = process.env.KOBOX_IBLOCKLIST_USER;
   const iblocklistPin = process.env.KOBOX_IBLOCKLIST_PIN;
   const networkFiles = new RtorrentConfigAdapter(runner);
+  const networkServices = new NetworkServiceReloadAdapter(runner, logger);
   const trackerRepo = new SqliteTrackerRepository(db);
+  const addressRepo = new SqliteUserAddressRepository(db);
+  const notifications = new ConsoleNotificationAdapter(logger);
+  const healthProbe = new ProcessSocketHealthProbe(runner);
+  const settings = securitySettings();
   const trackerUseCases = buildTrackerUseCases({
     trackers: trackerRepo,
     blocklists: new SqliteBlocklistRepository(db),
-    addresses: new SqliteUserAddressRepository(db),
+    addresses: addressRepo,
     users: repo,
     instances: new SqliteTorrentInstanceRepository(db),
     dns: new DnsLookupResolverAdapter(),
@@ -121,12 +153,21 @@ export function buildContainer(name: string): Container {
     catalog: new IblocklistCatalogAdapter(logger, process.env.KOBOX_IBLOCKLIST_CATALOG_URL),
     cache: new FsBlocklistCacheAdapter(process.env.KOBOX_BLOCKLIST_CACHE),
     files: networkFiles,
-    reload: new NetworkServiceReloadAdapter(runner, logger),
-    notifications: new ConsoleNotificationAdapter(logger),
+    reload: networkServices,
+    notifications,
     ...(iblocklistUser !== undefined &&
       iblocklistPin !== undefined && {
         credentials: { username: iblocklistUser, pin: iblocklistPin },
       }),
+  });
+  const securityUseCases = buildSecurityUseCases({
+    users: repo,
+    addresses: addressRepo,
+    identity: new GetentUserIdentityAdapter(runner),
+    firewall: new IptablesRestoreAdapter(runner, networkFiles, healthProbe, settings.sshPort),
+    reload: networkServices,
+    notifications,
+    settings,
   });
   return {
     db,
@@ -134,12 +175,13 @@ export function buildContainer(name: string): Container {
     useCases,
     torrentUseCases,
     trackerUseCases,
+    securityUseCases,
     queue,
-    worker: new JobWorker(queue, useCases, torrentUseCases, trackerUseCases),
+    worker: new JobWorker(queue, useCases, torrentUseCases, trackerUseCases, securityUseCases),
     hasher: new OpensslPasswordHasher(runner),
     repo,
     trackerRepo,
-    healthProbe: new ProcessSocketHealthProbe(runner),
+    healthProbe,
     spoolSweeper: new TorrentEventSpoolSweeper(
       spoolDir(),
       new GetentUsernameResolver(runner).resolve,

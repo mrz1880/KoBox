@@ -8,6 +8,10 @@ export class FakeUserIdentity implements UserIdentityPort {
     this.uids.set(username, uid);
   }
 
+  clearUid(username: string): void {
+    this.uids.delete(username);
+  }
+
   uidOf(username: Username): Promise<number | undefined> {
     return Promise.resolve(this.uids.get(username.value));
   }

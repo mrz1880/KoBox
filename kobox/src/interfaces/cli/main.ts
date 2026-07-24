@@ -357,6 +357,17 @@ function userAddressCommand(name: 'add-user-address' | 'remove-user-address'): v
 userAddressCommand('add-user-address');
 userAddressCommand('remove-user-address');
 
+// ---- Security & Network (Phase 3) ---------------------------------------
+
+program
+  .command('apply-firewall')
+  .description('reconcile the declarative default-deny firewall (guarded iptables-restore)')
+  .action(async () => {
+    const c = container();
+    const id = await c.queue.enqueue(buildJob.applyFirewall());
+    await done(c, `job ${String(id)} enqueued: apply-firewall`);
+  });
+
 program
   .command('list-trackers')
   .description('print the tracker whitelist as JSON (operator view)')

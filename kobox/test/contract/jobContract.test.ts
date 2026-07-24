@@ -29,7 +29,13 @@ describe('job contract', () => {
       'render-blocklist-filters',
       'add-user-address',
       'remove-user-address',
+      'apply-firewall',
     ]);
+  });
+
+  it('should_parse_security_jobs', () => {
+    expect(parseJob('apply-firewall', {}).type).toBe('apply-firewall');
+    expect(() => parseJob('apply-firewall', { extra: 1 })).toThrow(); // strict object
   });
 
   it('should_parse_a_valid_create_user_job', () => {

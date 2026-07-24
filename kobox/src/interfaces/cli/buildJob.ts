@@ -111,4 +111,8 @@ export const buildJob = {
   removeUserAddress(input: { username: string; ipv4: string }): Job {
     return parseJob('remove-user-address', input);
   },
+
+  applyFirewall(): Job {
+    return parseJob('apply-firewall', {});
+  },
 };

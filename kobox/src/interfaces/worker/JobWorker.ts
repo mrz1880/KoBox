@@ -11,7 +11,7 @@ import { HashedPassword } from '../../domain/user/HashedPassword.js';
 import { ProxyPort } from '../../domain/user/Port.js';
 import { Quota } from '../../domain/user/Quota.js';
 import { Username } from '../../domain/user/Username.js';
-import type { TorrentUseCases, TrackerUseCases, UseCases } from '../useCases.js';
+import type { SecurityUseCases, TorrentUseCases, TrackerUseCases, UseCases } from '../useCases.js';
 
 // What a completed job asks the worker to enqueue next. Use cases stay
 // queue-agnostic: they return reports, the worker turns them into jobs.
@@ -33,6 +33,7 @@ export class JobWorker {
     private readonly useCases: UseCases,
     private readonly torrents: TorrentUseCases,
     private readonly trackers: TrackerUseCases,
+    private readonly security: SecurityUseCases,
   ) {}
 
   async processNext(): Promise<boolean> {
@@ -76,6 +77,11 @@ export class JobWorker {
       await this.queue.enqueue(
         parseJob('deprovision-rtorrent', { username: job.payload.username }),
       );
+    }
+    // the firewall names uids and rtorrent ports: reconcile it whenever the
+    // provisioned population changes
+    if (job.type === 'provision-rtorrent' || job.type === 'deprovision-rtorrent') {
+      await this.queue.enqueue(parseJob('apply-firewall', {}));
     }
     if (hints?.fetchCertHost !== undefined) {
       await this.queue.enqueue(parseJob('fetch-tracker-cert', { host: hints.fetchCertHost }));
@@ -210,6 +216,9 @@ export class JobWorker {
             username: Username.parse(job.payload.username),
           }),
         });
+        return;
+      case 'apply-firewall':
+        await this.security.applyFirewall.execute();
         return;
       case 'add-user-address':
       case 'remove-user-address': {
