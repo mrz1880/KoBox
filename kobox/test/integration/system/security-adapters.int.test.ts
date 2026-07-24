@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { createServer, type Server } from 'node:net';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { Bandwidth } from '../../../src/domain/security/Bandwidth.js';
@@ -141,6 +141,11 @@ describe.skipIf(!inContainerAsRoot)('security adapters against the real containe
   }, 30_000);
 
   it('should_render_fail2ban_files_a_real_fail2ban_accepts', async () => {
+    // the stock nginx-http-auth jail wants its logfile to exist; nginx is not
+    // installed in the container (it is on the real box), so stub the path —
+    // the test owns its precondition rather than leaning on external setup
+    mkdirSync('/var/log/nginx', { recursive: true });
+    writeFileSync('/var/log/nginx/error.log', '');
     const files = new RtorrentConfigAdapter(runner);
     await files.apply([renderFail2banJails([], 22), renderPublickeyFloodFilter()]);
 
