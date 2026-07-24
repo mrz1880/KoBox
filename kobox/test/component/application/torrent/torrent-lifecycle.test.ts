@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
+import { Announcer } from '../../../../src/domain/torrent/Announcer.js';
 import { InfoHash } from '../../../../src/domain/torrent/InfoHash.js';
 import { Label } from '../../../../src/domain/torrent/Label.js';
 import type { TorrentMetainfo } from '../../../../src/domain/torrent/ports.js';
@@ -15,6 +16,7 @@ import { UserNotFoundError } from '../../../../src/application/user/errors.js';
 import { InMemoryTorrentInstanceRepository } from '../../../../src/infrastructure/persistence/InMemoryTorrentInstanceRepository.js';
 import { InMemoryTorrentRepository } from '../../../../src/infrastructure/persistence/InMemoryTorrentRepository.js';
 import { InMemoryUserRepository } from '../../../../src/infrastructure/persistence/InMemoryUserRepository.js';
+import { FakeAnnouncerSink } from '../../../../src/infrastructure/system/fakes/FakeAnnouncerSink.js';
 import { FakeRtorrentConfig } from '../../../../src/infrastructure/system/fakes/FakeRtorrentConfig.js';
 import { FakeRtorrentControl } from '../../../../src/infrastructure/system/fakes/FakeRtorrentControl.js';
 import { FakeServiceControl } from '../../../../src/infrastructure/system/fakes/FakeServiceControl.js';
@@ -29,7 +31,12 @@ const HASH = InfoHash.parse('a1b2c3d4e5f6a7b8c9d0a1b2c3d4e5f6a7b8c9d0');
 const TORRENT_FILE = '/home/alice/rtorrent/torrents/x.torrent';
 
 function metainfo(isPrivate: boolean): TorrentMetainfo {
-  return { infoHash: HASH, name: 'x', isPrivate, announcers: [] };
+  return {
+    infoHash: HASH,
+    name: 'x',
+    isPrivate,
+    announcers: [Announcer.parse('https://tracker.example.org:2710/announce')],
+  };
 }
 
 interface Context {
@@ -42,6 +49,7 @@ interface Context {
   readonly meta: FakeTorrentMetainfo;
   readonly control: FakeRtorrentControl;
   readonly scripts: FakeUserScriptRunner;
+  readonly announcers: FakeAnnouncerSink;
   readonly provision: ProvisionRtorrentInstance;
   readonly deprovision: DeprovisionRtorrentInstance;
   readonly render: RenderRtorrentConfig;
@@ -61,6 +69,7 @@ function makeContext(): Context {
   const meta = new FakeTorrentMetainfo();
   const control = new FakeRtorrentControl();
   const scripts = new FakeUserScriptRunner();
+  const announcers = new FakeAnnouncerSink();
   const templates = loadRtorrentTemplates();
   const settings = { koboxBin: '/usr/local/bin/kobox' };
   const render = new RenderRtorrentConfig({ instances, config, watchDirs, services, templates, settings });
@@ -74,6 +83,7 @@ function makeContext(): Context {
     meta,
     control,
     scripts,
+    announcers,
     provision: new ProvisionRtorrentInstance({
       users,
       instances,
@@ -88,7 +98,14 @@ function makeContext(): Context {
     addWatchDir: new AddWatchDir({ instances, render }),
     setSyncDisabled: new SetSyncDisabled({ instances }),
     setAllowPublicTracker: new SetAllowPublicTracker({ instances }),
-    handleEvent: new HandleTorrentEvent({ instances, torrents, metainfo: meta, control, scripts }),
+    handleEvent: new HandleTorrentEvent({
+      instances,
+      torrents,
+      metainfo: meta,
+      control,
+      scripts,
+      announcers,
+    }),
   };
 }
 
@@ -370,5 +387,66 @@ describe('DeprovisionRtorrentInstance', () => {
     expect(c.services.unitContentFor(alice)).toBeUndefined();
     expect(await c.instances.findByUsername(alice)).toBeUndefined();
     expect(await c.torrents.listFor(alice)).toHaveLength(0);
+  });
+});
+
+describe('HandleTorrentEvent announcer publication (Torrent -> Tracker seam)', () => {
+  const insertedNew = {
+    username: alice,
+    event: 'inserted_new' as const,
+    infoHash: HASH,
+    torrentFile: TORRENT_FILE,
+  };
+
+  it('should_publish_announcers_once_for_an_accepted_torrent', async () => {
+    await c.provision.execute({ username: alice });
+    c.meta.preload(TORRENT_FILE, metainfo(true));
+
+    await c.handleEvent.execute(insertedNew);
+
+    expect(c.announcers.publications).toEqual([
+      {
+        urls: ['https://tracker.example.org:2710/announce'],
+        privacy: 'private',
+      },
+    ]);
+  });
+
+  it('should_publish_announcers_even_when_the_torrent_is_rejected', async () => {
+    // the legacy discovered trackers on every insert — rejection is about the
+    // user's policy, not about tracker knowledge
+    await c.provision.execute({ username: alice });
+    c.meta.preload(TORRENT_FILE, metainfo(false)); // public, not allowed
+
+    await c.handleEvent.execute(insertedNew);
+
+    expect(c.announcers.publications).toHaveLength(1);
+    expect(c.announcers.publications[0]?.privacy).toBe('public');
+  });
+
+  it('should_not_publish_on_the_xmlrpc_early_exit', async () => {
+    await c.provision.execute({ username: alice });
+
+    await c.handleEvent.execute({ username: alice, event: 'inserted_new', infoHash: HASH });
+
+    expect(c.announcers.publications).toHaveLength(0);
+  });
+
+  it('should_not_fail_the_event_when_the_sink_throws', async () => {
+    await c.provision.execute({ username: alice });
+    c.meta.preload(TORRENT_FILE, metainfo(true));
+    const failing = new HandleTorrentEvent({
+      instances: c.instances,
+      torrents: c.torrents,
+      metainfo: c.meta,
+      control: c.control,
+      scripts: c.scripts,
+      announcers: {
+        publish: () => Promise.reject(new Error('queue down')),
+      },
+    });
+
+    await expect(failing.execute(insertedNew)).resolves.toBeUndefined();
+    expect(await c.torrents.findByInfoHash(alice, HASH)).toBeDefined();
   });
 });

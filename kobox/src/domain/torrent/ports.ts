@@ -58,3 +58,10 @@ export interface FinishedScriptArgs {
 export interface UserScriptRunnerPort {
   runFinishedScripts(username: Username, args: FinishedScriptArgs): Promise<void>;
 }
+
+// Torrent -> Tracker context seam (AUDIT §2): announcers seen at insert time
+// are published outward; the Tracker context consumes them as discovery jobs.
+// The Torrent context knows nothing about trackers beyond this port.
+export interface AnnouncerSink {
+  publish(announcers: readonly Announcer[], privacy: 'public' | 'private'): Promise<void>;
+}

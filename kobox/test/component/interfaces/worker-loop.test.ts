@@ -9,6 +9,7 @@ import { Username } from '../../../src/domain/user/Username.js';
 import { InMemoryTorrentInstanceRepository } from '../../../src/infrastructure/persistence/InMemoryTorrentInstanceRepository.js';
 import { InMemoryTorrentRepository } from '../../../src/infrastructure/persistence/InMemoryTorrentRepository.js';
 import { InMemoryUserRepository } from '../../../src/infrastructure/persistence/InMemoryUserRepository.js';
+import { FakeAnnouncerSink } from '../../../src/infrastructure/system/fakes/FakeAnnouncerSink.js';
 import { FakeNotifications } from '../../../src/infrastructure/system/fakes/FakeNotifications.js';
 import { FakeQuota } from '../../../src/infrastructure/system/fakes/FakeQuota.js';
 import { FakeRtorrentConfig } from '../../../src/infrastructure/system/fakes/FakeRtorrentConfig.js';
@@ -135,6 +136,7 @@ beforeEach(() => {
     metainfo: new FakeTorrentMetainfo(),
     control: new FakeRtorrentControl(),
     scripts,
+    announcers: new FakeAnnouncerSink(),
     templates: loadRtorrentTemplates(),
     settings: { koboxBin: '/usr/local/bin/kobox' },
   });
