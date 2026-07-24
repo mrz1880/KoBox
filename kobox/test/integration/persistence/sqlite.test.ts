@@ -10,7 +10,20 @@ import { TorrentInstance } from '../../../src/domain/torrent/TorrentInstance.js'
 import { RtorrentPort, ScgiPort } from '../../../src/domain/user/Port.js';
 import { Quota } from '../../../src/domain/user/Quota.js';
 import { Username } from '../../../src/domain/user/Username.js';
+import { IpAddress } from '../../../src/domain/shared/IpAddress.js';
+import { Blocklist } from '../../../src/domain/tracker/Blocklist.js';
+import { BlocklistSource } from '../../../src/domain/tracker/BlocklistSource.js';
+import { BlocklistUrl } from '../../../src/domain/tracker/BlocklistUrl.js';
+import { CertExpiry } from '../../../src/domain/tracker/CertExpiry.js';
+import { Tracker } from '../../../src/domain/tracker/Tracker.js';
+import { TrackerHost } from '../../../src/domain/tracker/TrackerHost.js';
+import { TrackerPort } from '../../../src/domain/tracker/TrackerPort.js';
+import { TrackerPrivacy } from '../../../src/domain/tracker/TrackerPrivacy.js';
+import { TrackerProto } from '../../../src/domain/tracker/TrackerProto.js';
 import { KoboxDatabase } from '../../../src/infrastructure/persistence/db.js';
+import { SqliteBlocklistRepository } from '../../../src/infrastructure/persistence/SqliteBlocklistRepository.js';
+import { SqliteTrackerRepository } from '../../../src/infrastructure/persistence/SqliteTrackerRepository.js';
+import { SqliteUserAddressRepository } from '../../../src/infrastructure/persistence/SqliteUserAddressRepository.js';
 import { SqliteJobQueue } from '../../../src/infrastructure/persistence/SqliteJobQueue.js';
 import { SqlitePortAllocator } from '../../../src/infrastructure/persistence/SqlitePortAllocator.js';
 import { SqliteTorrentInstanceRepository } from '../../../src/infrastructure/persistence/SqliteTorrentInstanceRepository.js';
@@ -285,5 +298,166 @@ describe('SqliteTorrentRepository', () => {
     await repo.deleteAllFor(alice);
 
     expect(await repo.listFor(alice)).toHaveLength(0);
+  });
+});
+
+function discoveredTracker(host = 'tracker.example.org'): Tracker {
+  return Tracker.discover({
+    host: TrackerHost.parse(host),
+    proto: TrackerProto.parse('https'),
+    port: TrackerPort.parse(443),
+    privacy: TrackerPrivacy.parse('private'),
+  }).tracker;
+}
+
+describe('SqliteTrackerRepository', () => {
+  it('should_roundtrip_a_tracker_with_its_addresses', async () => {
+    const repo = new SqliteTrackerRepository(db);
+    const tracker = discoveredTracker().updateAddresses([
+      IpAddress.parse('192.0.2.11'),
+      IpAddress.parse('192.0.2.10'),
+    ]);
+
+    await repo.save(tracker);
+    const found = await repo.findByHost(TrackerHost.parse('tracker.example.org'));
+
+    expect(found?.proto.value).toBe('https');
+    expect(found?.port.value).toBe(443);
+    expect(found?.privacy.value).toBe('private');
+    expect(found?.isActive).toBe(true);
+    expect(found?.checkState.value).toBe('pending');
+    expect(found?.ipv4.map((ip) => ip.value).sort()).toEqual(['192.0.2.10', '192.0.2.11']);
+  });
+
+  it('should_persist_check_transitions_and_promotion', async () => {
+    const repo = new SqliteTrackerRepository(db);
+    await repo.save(discoveredTracker());
+
+    const pending = await repo.findByHost(TrackerHost.parse('tracker.example.org'));
+    if (!pending) throw new Error('expected tracker');
+    await repo.save(
+      pending.beginCheck().completeCheck({
+        promoted: true,
+        expiry: CertExpiry.on('2026-09-15'),
+        at: '2026-07-24 10:00:00',
+      }),
+    );
+
+    const found = await repo.findByHost(TrackerHost.parse('tracker.example.org'));
+    expect(found?.isSsl).toBe(true);
+    expect(found?.certExpiry?.value).toBe('2026-09-15');
+    expect(found?.lastCheck).toBe('2026-07-24 10:00:00');
+    expect(found?.checkState.value).toBe('none');
+  });
+
+  it('should_upsert_by_host_and_replace_addresses_wholesale', async () => {
+    const repo = new SqliteTrackerRepository(db);
+    await repo.save(discoveredTracker().updateAddresses([IpAddress.parse('192.0.2.10')]));
+    await repo.save(discoveredTracker().updateAddresses([IpAddress.parse('192.0.2.12')]));
+
+    const all = await repo.listAll();
+    expect(all).toHaveLength(1);
+    expect(all[0]?.ipv4.map((ip) => ip.value)).toEqual(['192.0.2.12']);
+  });
+
+  it('should_list_only_trackers_needing_a_cert_check', async () => {
+    const repo = new SqliteTrackerRepository(db);
+    await repo.save(discoveredTracker('pending.example.org'));
+    const promoted = discoveredTracker('due.example.org').beginCheck().completeCheck({
+      promoted: true,
+      expiry: CertExpiry.on('2026-07-25'),
+      at: '2026-07-01 10:00:00',
+    });
+    await repo.save(promoted);
+    const notDue = discoveredTracker('fresh.example.org').beginCheck().completeCheck({
+      promoted: true,
+      expiry: CertExpiry.on('2026-12-31'),
+      at: '2026-07-01 10:00:00',
+    });
+    await repo.save(notDue);
+
+    const hosts = (await repo.listNeedingCertCheck('2026-07-24')).map((t) => t.host.value).sort();
+    expect(hosts).toEqual(['due.example.org', 'pending.example.org']);
+  });
+
+  it('should_mark_dead_persistently', async () => {
+    const repo = new SqliteTrackerRepository(db);
+    await repo.save(discoveredTracker().markDead().tracker);
+
+    const found = await repo.findByHost(TrackerHost.parse('tracker.example.org'));
+    expect(found?.isDead).toBe(true);
+    expect(found?.isActive).toBe(false);
+  });
+});
+
+describe('SqliteBlocklistRepository', () => {
+  const level1 = () =>
+    Blocklist.create({
+      source: BlocklistSource.parse('iblocklist'),
+      author: 'Example Org',
+      name: 'level1',
+      url: BlocklistUrl.parse('https://list.example.org/?list=abc'),
+      subscription: false,
+      enabled: true,
+    });
+
+  it('should_roundtrip_a_blocklist_with_tagged_update_state', async () => {
+    const repo = new SqliteBlocklistRepository(db);
+    await repo.save(level1().recordSuccess('2026-07-24 10:00:00', 'deadbeef'));
+
+    const found = await repo.findBySourceAuthorName(
+      BlocklistSource.parse('iblocklist'),
+      'Example Org',
+      'level1',
+    );
+    expect(found?.lastUpdate).toEqual({ status: 'ok', at: '2026-07-24 10:00:00' });
+    expect(found?.sha256).toBe('deadbeef');
+
+    await repo.save(found?.recordFailure() ?? level1());
+    const failed = await repo.findBySourceAuthorName(
+      BlocklistSource.parse('iblocklist'),
+      'Example Org',
+      'level1',
+    );
+    expect(failed?.lastUpdate).toEqual({ status: 'failed' });
+    expect(failed?.sha256).toBe('deadbeef');
+  });
+
+  it('should_upsert_by_source_author_name_and_list_enabled_only', async () => {
+    const repo = new SqliteBlocklistRepository(db);
+    await repo.save(level1());
+    await repo.save(level1().disable());
+    await repo.save(
+      Blocklist.create({
+        source: BlocklistSource.parse('personal'),
+        author: 'me',
+        name: 'mine',
+        url: BlocklistUrl.parse('https://lists.example.net/mine.gz'),
+        subscription: false,
+        enabled: true,
+      }),
+    );
+
+    expect(await repo.listAll()).toHaveLength(2);
+    const enabled = await repo.listEnabled();
+    expect(enabled).toHaveLength(1);
+    expect(enabled[0]?.name).toBe('mine');
+  });
+});
+
+describe('SqliteUserAddressRepository', () => {
+  it('should_add_list_and_remove_addresses_idempotently', async () => {
+    const repo = new SqliteUserAddressRepository(db);
+    const alice = Username.parse('alice');
+    await repo.add(alice, IpAddress.parse('198.51.100.7'));
+    await repo.add(alice, IpAddress.parse('198.51.100.7')); // duplicate: no-op
+    await repo.add(Username.parse('bob'), IpAddress.parse('198.51.100.8'));
+
+    const all = await repo.listAll();
+    expect(all).toHaveLength(2);
+
+    await repo.remove(alice, IpAddress.parse('198.51.100.7'));
+    await repo.remove(alice, IpAddress.parse('198.51.100.7')); // idempotent
+    expect((await repo.listAll()).map((a) => a.username.value)).toEqual(['bob']);
   });
 });
