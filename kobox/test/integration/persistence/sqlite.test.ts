@@ -20,7 +20,10 @@ import { TrackerHost } from '../../../src/domain/tracker/TrackerHost.js';
 import { TrackerPort } from '../../../src/domain/tracker/TrackerPort.js';
 import { TrackerPrivacy } from '../../../src/domain/tracker/TrackerPrivacy.js';
 import { TrackerProto } from '../../../src/domain/tracker/TrackerProto.js';
+import { Bandwidth } from '../../../src/domain/security/Bandwidth.js';
+import { DynDnsHost } from '../../../src/domain/security/DynDnsHost.js';
 import { KoboxDatabase } from '../../../src/infrastructure/persistence/db.js';
+import { SqliteFairUseRepository } from '../../../src/infrastructure/persistence/SqliteFairUseRepository.js';
 import { SqliteBlocklistRepository } from '../../../src/infrastructure/persistence/SqliteBlocklistRepository.js';
 import { SqliteTrackerRepository } from '../../../src/infrastructure/persistence/SqliteTrackerRepository.js';
 import { SqliteUserAddressRepository } from '../../../src/infrastructure/persistence/SqliteUserAddressRepository.js';
@@ -459,5 +462,95 @@ describe('SqliteUserAddressRepository', () => {
     await repo.remove(alice, IpAddress.parse('198.51.100.7'));
     await repo.remove(alice, IpAddress.parse('198.51.100.7')); // idempotent
     expect((await repo.listAll()).map((a) => a.username.value)).toEqual(['bob']);
+  });
+
+  it('should_expose_hostname_rows_to_the_whitelist_only_once_resolved', async () => {
+    const repo = new SqliteUserAddressRepository(db);
+    const alice = Username.parse('alice');
+    const host = DynDnsHost.parse('dyn.example.org');
+
+    await repo.addHostname(alice, host);
+    await repo.addHostname(alice, host); // duplicate: no-op
+    expect(await repo.listAll()).toHaveLength(0); // unresolved yet
+
+    const bindings = await repo.listHostnames();
+    expect(bindings).toHaveLength(1);
+    expect(bindings[0]?.host.value).toBe('dyn.example.org');
+    expect(bindings[0]?.resolvedIp).toBeUndefined();
+
+    await repo.updateResolvedIp(alice, host, IpAddress.parse('203.0.113.9'));
+    const all = await repo.listAll();
+    expect(all).toHaveLength(1);
+    expect(all[0]?.ip.value).toBe('203.0.113.9');
+    expect((await repo.listHostnames())[0]?.resolvedIp?.value).toBe('203.0.113.9');
+  });
+
+  it('should_remove_hostname_bindings_idempotently', async () => {
+    const repo = new SqliteUserAddressRepository(db);
+    const alice = Username.parse('alice');
+    const host = DynDnsHost.parse('dyn.example.org');
+    await repo.addHostname(alice, host);
+    await repo.updateResolvedIp(alice, host, IpAddress.parse('203.0.113.9'));
+
+    await repo.removeHostname(alice, host);
+    await repo.removeHostname(alice, host); // idempotent
+    expect(await repo.listHostnames()).toHaveLength(0);
+    expect(await repo.listAll()).toHaveLength(0);
+  });
+});
+
+describe('SqliteFairUseRepository', () => {
+  it('should_default_to_a_clean_state_and_roundtrip_transitions', async () => {
+    const repo = new SqliteFairUseRepository(db);
+    const alice = Username.parse('alice');
+
+    expect(await repo.getState(alice)).toEqual({ level: 'none', healthState: 'healthy' });
+
+    await repo.saveState(alice, { level: 'alerted', healthState: 'healthy' }, '2026-07-24 10:00:00');
+    await repo.saveState(alice, { level: 'throttled', healthState: 'unhealthy' }, '2026-07-24 10:05:00');
+    expect(await repo.getState(alice)).toEqual({ level: 'throttled', healthState: 'unhealthy' });
+  });
+
+  it('should_append_an_immutable_audit_trail', async () => {
+    const repo = new SqliteFairUseRepository(db);
+    const alice = Username.parse('alice');
+
+    await repo.appendEvent(alice, 'FairUseBreached', '{"observedBps":80000000}', '2026-07-24 10:00:00');
+    await repo.appendEvent(alice, 'UserThrottled', '{"rateBps":5000000}', '2026-07-24 10:05:00');
+    await repo.appendEvent(Username.parse('bob'), 'FairUseRecovered', '{}', '2026-07-24 11:00:00');
+
+    const events = await repo.listEvents(alice);
+    expect(events.map((e) => e.eventType)).toEqual(['FairUseBreached', 'UserThrottled']);
+    expect(events[0]?.detailJson).toContain('80000000');
+  });
+
+  it('should_return_per_user_policy_overrides_only_when_set', async () => {
+    const repo = new SqliteFairUseRepository(db);
+    const alice = Username.parse('alice');
+
+    expect(await repo.overridesFor(alice)).toBeUndefined();
+
+    await repo.saveOverrides(alice, { maxAuthPerHour: 120 });
+    const overrides = await repo.overridesFor(alice);
+    expect(overrides?.maxAuthPerHour).toBe(120);
+    expect(overrides?.sustainedEgress).toBeUndefined();
+
+    await repo.saveOverrides(alice, { sustainedEgress: Bandwidth.mbit(100) });
+    expect((await repo.overridesFor(alice))?.sustainedEgress?.bps).toBe(100_000_000);
+  });
+
+  it('should_roundtrip_usage_samples_per_user', async () => {
+    const repo = new SqliteFairUseRepository(db);
+    const alice = Username.parse('alice');
+
+    expect(await repo.lastSample(alice)).toBeUndefined();
+
+    await repo.putSample(alice, { egressBytes: 1000, ingressBytes: 200, sampledAt: '2026-07-24 10:00:00' });
+    await repo.putSample(alice, { egressBytes: 5000, ingressBytes: 900, sampledAt: '2026-07-24 10:05:00' });
+    expect(await repo.lastSample(alice)).toEqual({
+      egressBytes: 5000,
+      ingressBytes: 900,
+      sampledAt: '2026-07-24 10:05:00',
+    });
   });
 });

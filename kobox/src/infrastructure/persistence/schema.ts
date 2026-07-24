@@ -119,17 +119,62 @@ export const blocklists = sqliteTable(
   (table) => [unique().on(table.source, table.author, table.name)],
 );
 
-// Static per-user IPv4 allow-list entries (legacy users_addresses; the DynDNS
-// hostname flavor arrives with the Security context in Phase 3).
+// Per-user allow-list entries (legacy users_addresses). Two flavors: static
+// IPv4 rows, and DynDNS hostname rows whose ipv4 holds the LAST RESOLVED
+// address (null until the first successful resolution).
 export const userAddresses = sqliteTable(
   'user_addresses',
   {
     id: integer('id').primaryKey({ autoIncrement: true }),
     username: text('username').notNull(),
-    ipv4: text('ipv4').notNull(),
+    ipv4: text('ipv4'),
+    checkBy: text('check_by', { enum: ['ipv4', 'hostname'] })
+      .notNull()
+      .default('ipv4'),
+    hostname: text('hostname'),
   },
-  (table) => [unique().on(table.username, table.ipv4)],
+  (table) => [unique().on(table.username, table.ipv4), unique().on(table.username, table.hostname)],
 );
+
+// Graduated-response state machine per user (none -> alerted -> throttled);
+// health transition tracking rides along to dedupe ServiceUnhealthy alerts.
+export const fairUseState = sqliteTable('fair_use_state', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  username: text('username').notNull().unique(),
+  level: text('level', { enum: ['none', 'alerted', 'throttled'] }).notNull(),
+  healthState: text('health_state', { enum: ['healthy', 'unhealthy'] })
+    .notNull()
+    .default('healthy'),
+  updatedAt: text('updated_at').notNull(),
+});
+
+// Append-only audit trail: every fair-use decision is traceable (locked
+// decision 2026-07-23 — reversible AND audited).
+export const fairUseEvents = sqliteTable('fair_use_events', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  username: text('username').notNull(),
+  eventType: text('event_type').notNull(),
+  detailJson: text('detail_json').notNull(),
+  createdAt: text('created_at').notNull(),
+});
+
+// Per-user overrides only; installation defaults live in composition.
+export const fairUsePolicies = sqliteTable('fair_use_policies', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  username: text('username').notNull().unique(),
+  egressLimitBps: integer('egress_limit_bps'),
+  authRatePerHour: integer('auth_rate_per_hour'),
+  throttleToBps: integer('throttle_to_bps'),
+});
+
+// Last cumulative meter reading per user — the delta basis for rates.
+export const usageSamples = sqliteTable('usage_samples', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  username: text('username').notNull().unique(),
+  egressBytes: integer('egress_bytes').notNull(),
+  ingressBytes: integer('ingress_bytes').notNull(),
+  sampledAt: text('sampled_at').notNull(),
+});
 
 export const jobs = sqliteTable('jobs', {
   id: integer('id').primaryKey({ autoIncrement: true }),
