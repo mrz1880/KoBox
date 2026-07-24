@@ -27,7 +27,7 @@
     "test:component": "vitest run test/component",
     "test:contract": "vitest run test/contract",
     "test:int": "vitest run test/integration",
-    "test:e2e": "vitest run test/e2e",
+    "test:e2e": "vitest run --no-file-parallelism test/e2e",
     "coverage": "vitest run test/unit test/component test/contract --coverage",
     "build": "tsc -p tsconfig.build.json"
   },
