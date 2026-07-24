@@ -1,0 +1,138 @@
+import { createHash } from 'node:crypto';
+import { get, type RequestOptions } from 'node:https';
+import { gunzipSync } from 'node:zlib';
+import type { BlocklistDownloadPort, DownloadedList } from '../../domain/tracker/ports.js';
+import type { Logger } from '../logging/logger.js';
+
+const MAX_BODY_BYTES = 32 * 1024 * 1024;
+const GZIP_MAGIC = Buffer.from([0x1f, 0x8b]);
+
+// P2P format: "description:start-end"; bare "start-end" and CIDR lines are
+// accepted too (personal lists). Comments and garbage are dropped here; the
+// domain merge applies the numeric filters again (defense in depth).
+function parseRanges(text: string): readonly string[] {
+  return text
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line !== '' && !line.startsWith('#'))
+    .map((line) => {
+      const colon = line.lastIndexOf(':');
+      return colon === -1 ? line : line.slice(colon + 1);
+    })
+    .filter((line) => /^[0-9][0-9./-]*$/.test(line));
+}
+
+// §5.6 closure, integrity half: the body must gunzip cleanly (when gzipped)
+// and yield at least one range; the sha256 of the raw body is recorded so an
+// operator can audit exactly what was applied.
+export function decodeP2pDownload(body: Buffer): DownloadedList | undefined {
+  let text: string;
+  if (body.subarray(0, 2).equals(GZIP_MAGIC)) {
+    try {
+      text = gunzipSync(body).toString('utf8');
+    } catch {
+      return undefined; // truncated or corrupted archive
+    }
+  } else {
+    text = body.toString('utf8');
+  }
+  const ranges = parseRanges(text);
+  if (ranges.length === 0) {
+    return undefined;
+  }
+  return { ranges, sha256: createHash('sha256').update(body).digest('hex') };
+}
+
+export interface HttpsDownloadOptions {
+  readonly ca?: string; // test seam: fixture CA for the in-test https server
+}
+
+function httpsGet(url: string, options: HttpsDownloadOptions): Promise<Buffer | undefined> {
+  return new Promise((resolve) => {
+    const requestOptions: RequestOptions = options.ca === undefined ? {} : { ca: options.ca };
+    const request = get(url, requestOptions, (response) => {
+      const status = response.statusCode ?? 0;
+      if (status >= 300 && status < 400 && response.headers.location !== undefined) {
+        response.resume();
+        resolve(undefined); // redirects handled by the caller (single hop)
+        return;
+      }
+      if (status !== 200) {
+        response.resume();
+        resolve(undefined);
+        return;
+      }
+      const chunks: Buffer[] = [];
+      let size = 0;
+      response.on('data', (chunk: Buffer) => {
+        size += chunk.length;
+        if (size > MAX_BODY_BYTES) {
+          request.destroy();
+          resolve(undefined);
+          return;
+        }
+        chunks.push(chunk);
+      });
+      response.on('end', () => {
+        resolve(Buffer.concat(chunks));
+      });
+      response.on('error', () => {
+        resolve(undefined);
+      });
+    });
+    request.on('error', () => {
+      resolve(undefined);
+    });
+    request.setTimeout(30_000, () => {
+      request.destroy();
+      resolve(undefined);
+    });
+  });
+}
+
+function redirectTarget(url: string, options: HttpsDownloadOptions): Promise<string | undefined> {
+  return new Promise((resolve) => {
+    const requestOptions: RequestOptions = {
+      method: 'HEAD',
+      ...(options.ca === undefined ? {} : { ca: options.ca }),
+    };
+    const request = get(url, requestOptions, (response) => {
+      response.resume();
+      const status = response.statusCode ?? 0;
+      const location = response.headers.location;
+      resolve(status >= 300 && status < 400 && location !== undefined ? location : undefined);
+    });
+    request.on('error', () => {
+      resolve(undefined);
+    });
+  });
+}
+
+export class HttpsBlocklistDownloadAdapter implements BlocklistDownloadPort {
+  constructor(
+    private readonly logger: Logger,
+    private readonly options: HttpsDownloadOptions = {},
+  ) {}
+
+  // The url arrives from BlocklistUrl (+optional credentials): https by
+  // construction. Any failure returns undefined — callers isolate per list.
+  async fetch(url: string): Promise<DownloadedList | undefined> {
+    let body = await httpsGet(url, this.options);
+    if (body === undefined) {
+      // one https-only redirect hop (iblocklist mirrors do this)
+      const target = await redirectTarget(url, this.options);
+      if (target?.startsWith('https://')) {
+        body = await httpsGet(target, this.options);
+      }
+    }
+    if (body === undefined) {
+      this.logger.warn('blocklist download failed');
+      return undefined;
+    }
+    const decoded = decodeP2pDownload(body);
+    if (!decoded) {
+      this.logger.warn('blocklist body failed integrity checks');
+    }
+    return decoded;
+  }
+}
