@@ -111,4 +111,32 @@ export const buildJob = {
   removeUserAddress(input: { username: string; ipv4: string }): Job {
     return parseJob('remove-user-address', input);
   },
+
+  applyFirewall(): Job {
+    return parseJob('apply-firewall', {});
+  },
+
+  renderFail2ban(): Job {
+    return parseJob('render-fail2ban', {});
+  },
+
+  addUserHostname(input: { username: string; hostname: string }): Job {
+    return parseJob('add-user-hostname', input);
+  },
+
+  removeUserHostname(input: { username: string; hostname: string }): Job {
+    return parseJob('remove-user-hostname', input);
+  },
+
+  resolveDynDns(): Job {
+    return parseJob('resolve-dyndns', {});
+  },
+
+  renderOpenVpn(): Job {
+    return parseJob('render-openvpn', {});
+  },
+
+  evaluateFairUse(): Job {
+    return parseJob('evaluate-fair-use', {});
+  },
 };

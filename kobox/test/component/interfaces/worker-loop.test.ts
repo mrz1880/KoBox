@@ -36,9 +36,22 @@ import { FakeTorrentMetainfo } from '../../../src/infrastructure/system/fakes/Fa
 import { FakeUserScriptRunner } from '../../../src/infrastructure/system/fakes/FakeUserScriptRunner.js';
 import { FakeWatchDirs } from '../../../src/infrastructure/system/fakes/FakeWatchDirs.js';
 import { loadRtorrentTemplates } from '../../../src/infrastructure/templates/TemplateProvider.js';
+import { Bandwidth } from '../../../src/domain/security/Bandwidth.js';
+import { Cidr } from '../../../src/domain/security/Cidr.js';
+import { FairUsePolicy } from '../../../src/domain/security/FairUsePolicy.js';
+import { InMemoryFairUseRepository } from '../../../src/infrastructure/persistence/InMemoryFairUseRepository.js';
+import { FakeDynDnsResolver } from '../../../src/infrastructure/system/fakes/FakeDynDnsResolver.js';
+import { FakeShaping } from '../../../src/infrastructure/system/fakes/FakeShaping.js';
+import { FakeSshAuthLog } from '../../../src/infrastructure/system/fakes/FakeSshAuthLog.js';
+import { FakeUsageMeter } from '../../../src/infrastructure/system/fakes/FakeUsageMeter.js';
+import { FakeFirewallApply } from '../../../src/infrastructure/system/fakes/FakeFirewallApply.js';
+import { FakeNetworkServices } from '../../../src/infrastructure/system/fakes/FakeNetworkServices.js';
+import { FakeUserIdentity } from '../../../src/infrastructure/system/fakes/FakeUserIdentity.js';
+import { FakeVpnPki } from '../../../src/infrastructure/system/fakes/FakeVpnPki.js';
 import { buildJob } from '../../../src/interfaces/cli/buildJob.js';
 import { JobWorker } from '../../../src/interfaces/worker/JobWorker.js';
 import {
+  buildSecurityUseCases,
   buildTorrentUseCases,
   buildTrackerUseCases,
   buildUseCases,
@@ -118,6 +131,10 @@ interface World {
   certStore: FakeCertStore;
   download: FakeBlocklistDownload;
   networkFiles: FakeRtorrentConfig;
+  blocklistCache: FakeBlocklistCache;
+  firewall: FakeFirewallApply;
+  identity: FakeUserIdentity;
+  dyndns: FakeDynDnsResolver;
   worker: JobWorker;
   hasher: FakePasswordHasher;
 }
@@ -173,10 +190,12 @@ beforeEach(() => {
   const certStore = new FakeCertStore();
   const download = new FakeBlocklistDownload();
   const networkFiles = new FakeRtorrentConfig();
+  const addresses = new InMemoryUserAddressRepository();
+  const blocklistCache = new FakeBlocklistCache();
   const trackerUseCases = buildTrackerUseCases({
     trackers,
     blocklists,
-    addresses: new InMemoryUserAddressRepository(),
+    addresses,
     users: repo,
     instances,
     dns,
@@ -184,10 +203,51 @@ beforeEach(() => {
     certStore,
     download,
     catalog: new FakeIblocklistCatalog([]),
-    cache: new FakeBlocklistCache(),
+    cache: blocklistCache,
     files: networkFiles,
     reload: new FakeNetworkServiceReload(),
     notifications,
+  });
+  const firewall = new FakeFirewallApply();
+  const identity = new FakeUserIdentity();
+  const dyndns = new FakeDynDnsResolver();
+  const securityUseCases = buildSecurityUseCases({
+    users: repo,
+    addresses,
+    bindings: addresses,
+    identity,
+    firewall,
+    files: networkFiles,
+    reload: new FakeNetworkServices(),
+    resolver: dyndns,
+    pki: new FakeVpnPki(),
+    fairUse: new InMemoryFairUseRepository(),
+    meter: new FakeUsageMeter(),
+    authLog: new FakeSshAuthLog(),
+    shaping: new FakeShaping(),
+    health: {
+      checkProcess: (name) => Promise.resolve({ name, state: 'healthy' as const }),
+      checkSocket: (host, port) =>
+        Promise.resolve({ name: `${host}:${String(port)}`, state: 'healthy' as const }),
+    },
+    policy: FairUsePolicy.of({
+      sustainedEgress: Bandwidth.mbit(50),
+      maxAuthPerHour: 30,
+      throttleTo: Bandwidth.mbit(5),
+    }),
+    notifications,
+    settings: {
+      sshPort: 22,
+      portalPort: 8189,
+      vpn: {
+        tunGwPort: 8193,
+        tunPort: 8194,
+        tapPort: 8195,
+        tunGwSubnet: Cidr.parse('10.0.0.0/24'),
+        tunSubnet: Cidr.parse('10.0.1.0/24'),
+        tapSubnet: Cidr.parse('10.0.2.0/24'),
+      },
+    },
   });
   const queue = new InMemoryJobQueue();
   world = {
@@ -204,8 +264,12 @@ beforeEach(() => {
     certStore,
     download,
     networkFiles,
+    blocklistCache,
+    firewall,
+    identity,
+    dyndns,
     hasher: new FakePasswordHasher(),
-    worker: new JobWorker(queue, useCases, torrentUseCases, trackerUseCases),
+    worker: new JobWorker(queue, useCases, torrentUseCases, trackerUseCases, securityUseCases),
   };
 });
 
@@ -235,6 +299,22 @@ describe('CLI enqueue -> root worker loop (the privilege seam)', () => {
     expect(await world.accounts.accountExists(alice)).toBe(true);
     // provisioning is a separate chained job: not yet executed after one step
     expect(await world.services.isUserServiceRunning(alice)).toBe(false);
+  });
+
+  it('should_chain_the_user_blocklist_filter_render_after_provisioning', async () => {
+    // Phase 2 debt: a new user gets their filter immediately, without
+    // waiting for the next update-blocklists run (legacy parity).
+    await world.blocklistCache.write(['10.0.0.0/8']);
+    await enqueueCreateAlice();
+
+    await world.worker.drain();
+
+    expect(world.networkFiles.contentAt('/home/alice/blocklist/blocklist_rtorrent.txt')).toBe(
+      '10.0.0.0/8\n',
+    );
+    expect(
+      world.networkFiles.contentAt('/home/alice/rtorrent/config.d/80-blocklist.rc'),
+    ).toContain('ipv4_filter.load');
   });
 
   it('should_chain_rtorrent_provisioning_after_create_user', async () => {
@@ -318,6 +398,105 @@ describe('CLI enqueue -> root worker loop (the privilege seam)', () => {
 
   it('should_report_nothing_to_do_on_an_empty_queue', async () => {
     expect(await world.worker.processNext()).toBe(false);
+  });
+});
+
+describe('security job chains (provision -> firewall)', () => {
+  it('should_apply_the_firewall_after_provisioning_a_user', async () => {
+    world.identity.setUid('alice', 1001);
+    await enqueueCreateAlice();
+
+    await world.worker.drain();
+
+    const content = world.firewall.applied.at(-1)?.content ?? '';
+    expect(content).toContain(':kobox-u-alice - [0:0]');
+    expect(content).toContain('-m owner --uid-owner 1001');
+  });
+
+  it('should_reapply_the_firewall_after_deprovisioning', async () => {
+    world.identity.setUid('alice', 1001);
+    await enqueueCreateAlice();
+    await world.worker.drain();
+    world.identity.clearUid('alice');
+    await world.queue.enqueue(buildJob.deleteUser({ username: 'alice' }));
+
+    await world.worker.drain();
+
+    const content = world.firewall.applied.at(-1)?.content ?? '';
+    expect(content).not.toContain('kobox-u-alice');
+  });
+
+  it('should_execute_a_standalone_apply_firewall_job', async () => {
+    const id = await world.queue.enqueue(parseJob('apply-firewall', {}));
+
+    await world.worker.drain();
+
+    expect(world.queue.statusOf(id)).toBe('done');
+    expect(world.firewall.applied).toHaveLength(1);
+  });
+
+  it('should_refresh_whitelist_firewall_and_fail2ban_when_a_dyndns_address_changes', async () => {
+    world.identity.setUid('alice', 1001);
+    await enqueueCreateAlice();
+    await world.worker.drain();
+    world.dyndns.setAnswer('dyn.example.org', IpAddress.parse('203.0.113.9'));
+    await world.queue.enqueue(
+      parseJob('add-user-hostname', { username: 'alice', hostname: 'dyn.example.org' }),
+    );
+    await world.queue.enqueue(parseJob('resolve-dyndns', {}));
+
+    await world.worker.drain();
+
+    expect(world.networkFiles.contentAt('/etc/pgl/allow.p2p')).toContain(
+      'alice:203.0.113.9-255.255.255.255',
+    );
+    expect(world.networkFiles.contentAt('/etc/fail2ban/jail.d/kobox.local')).toContain(
+      '203.0.113.9',
+    );
+    expect(world.firewall.applied.at(-1)?.content).toContain(
+      '-A INPUT -s 203.0.113.9 -m comment --comment "kobox:trusted:alice" -j ACCEPT',
+    );
+  });
+
+  it('should_refresh_firewall_and_fail2ban_on_static_address_changes_too', async () => {
+    // removing a compromised member IP must leave the LIVE firewall too,
+    // not only allow.p2p (review I2)
+    world.identity.setUid('alice', 1001);
+    await enqueueCreateAlice();
+    await world.worker.drain();
+    await world.queue.enqueue(
+      parseJob('add-user-address', { username: 'alice', ipv4: '198.51.100.7' }),
+    );
+    await world.worker.drain();
+
+    expect(world.firewall.applied.at(-1)?.content).toContain(
+      '-A INPUT -s 198.51.100.7 -m comment --comment "kobox:trusted:alice" -j ACCEPT',
+    );
+    expect(world.networkFiles.contentAt('/etc/fail2ban/jail.d/kobox.local')).toContain(
+      '198.51.100.7',
+    );
+
+    await world.queue.enqueue(
+      parseJob('remove-user-address', { username: 'alice', ipv4: '198.51.100.7' }),
+    );
+    await world.worker.drain();
+
+    expect(world.firewall.applied.at(-1)?.content).not.toContain('198.51.100.7');
+    expect(world.networkFiles.contentAt('/etc/fail2ban/jail.d/kobox.local')).not.toContain(
+      '198.51.100.7',
+    );
+  });
+
+  it('should_not_chain_refreshes_while_the_hostname_stays_unresolved', async () => {
+    await world.queue.enqueue(
+      parseJob('add-user-hostname', { username: 'alice', hostname: 'dyn.example.org' }),
+    );
+    await world.queue.enqueue(parseJob('resolve-dyndns', {}));
+
+    await world.worker.drain();
+
+    expect(world.firewall.applied).toHaveLength(0);
+    expect(world.networkFiles.contentAt('/etc/pgl/allow.p2p')).toBeUndefined();
   });
 });
 

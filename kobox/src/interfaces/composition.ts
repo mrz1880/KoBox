@@ -1,5 +1,13 @@
 import { createLogger, type Logger } from '../infrastructure/logging/logger.js';
 import { ConsoleNotificationAdapter } from '../infrastructure/notifications/ConsoleNotificationAdapter.js';
+import { DiscordChannel } from '../infrastructure/notifications/DiscordChannel.js';
+import { EmailChannel } from '../infrastructure/notifications/EmailChannel.js';
+import { MultiChannelNotifier } from '../infrastructure/notifications/MultiChannelNotifier.js';
+import { NtfyChannel } from '../infrastructure/notifications/NtfyChannel.js';
+import type { NotificationChannel } from '../infrastructure/notifications/formatEvent.js';
+import type { SecurityNotificationPort } from '../domain/security/ports.js';
+import type { TrackerNotificationPort } from '../domain/tracker/ports.js';
+import type { NotificationPort } from '../domain/user/ports.js';
 import { KoboxDatabase } from '../infrastructure/persistence/db.js';
 import { SqliteBlocklistRepository } from '../infrastructure/persistence/SqliteBlocklistRepository.js';
 import { SqliteJobQueue } from '../infrastructure/persistence/SqliteJobQueue.js';
@@ -22,7 +30,19 @@ import { DnsLookupResolverAdapter } from '../infrastructure/system/DnsLookupReso
 import { FsBlocklistCacheAdapter } from '../infrastructure/system/FsBlocklistCacheAdapter.js';
 import { HttpsBlocklistDownloadAdapter } from '../infrastructure/system/HttpsBlocklistDownloadAdapter.js';
 import { IblocklistCatalogAdapter } from '../infrastructure/system/IblocklistCatalogAdapter.js';
-import { NetworkServiceReloadAdapter } from '../infrastructure/system/NetworkServiceReloadAdapter.js';
+import { Cidr } from '../domain/security/Cidr.js';
+import { Bandwidth } from '../domain/security/Bandwidth.js';
+import { DynDnsHost } from '../domain/security/DynDnsHost.js';
+import { FairUsePolicy } from '../domain/security/FairUsePolicy.js';
+import { SqliteFairUseRepository } from '../infrastructure/persistence/SqliteFairUseRepository.js';
+import { DynDnsLookupAdapter } from '../infrastructure/system/DynDnsLookupAdapter.js';
+import { FsVpnPkiAdapter, DEFAULT_PKI_DIR } from '../infrastructure/system/FsVpnPkiAdapter.js';
+import { IptablesUsageMeterAdapter } from '../infrastructure/system/IptablesUsageMeterAdapter.js';
+import { JournaldSshAuthAdapter } from '../infrastructure/system/JournaldSshAuthAdapter.js';
+import { TcShapingAdapter } from '../infrastructure/system/TcShapingAdapter.js';
+import { GetentUserIdentityAdapter } from '../infrastructure/system/GetentUserIdentityAdapter.js';
+import { IptablesRestoreAdapter } from '../infrastructure/system/IptablesRestoreAdapter.js';
+import { NetworkServiceAdapter } from '../infrastructure/system/NetworkServiceAdapter.js';
 import { OpensslTrackerCertAdapter } from '../infrastructure/system/OpensslTrackerCertAdapter.js';
 import { OpensslPasswordHasher } from '../infrastructure/system/OpensslPasswordHasher.js';
 import { ProcessSocketHealthProbe } from '../infrastructure/system/ProcessSocketHealthProbe.js';
@@ -37,13 +57,77 @@ import { WatchDirAdapter } from '../infrastructure/system/WatchDirAdapter.js';
 import { loadRtorrentTemplates } from '../infrastructure/templates/TemplateProvider.js';
 import { JobWorker } from './worker/JobWorker.js';
 import {
+  buildSecurityUseCases,
   buildTorrentUseCases,
   buildTrackerUseCases,
   buildUseCases,
+  type SecurityUseCases,
   type TorrentUseCases,
   type TrackerUseCases,
   type UseCases,
 } from './useCases.js';
+import type { SecuritySettings } from '../application/security/settings.js';
+
+function envInt(name: string, fallback: number): number {
+  const raw = process.env[name];
+  if (raw === undefined) {
+    return fallback;
+  }
+  const value = Number(raw);
+  if (!Number.isInteger(value) || value <= 0) {
+    throw new Error(`${name} must be a positive integer, got ${JSON.stringify(raw)}`);
+  }
+  return value;
+}
+
+// The frozen alert channels (ntfy + email via Postfix + Discord), each armed
+// by its env var; with none configured the Phase 0 console stub remains.
+function buildNotifier(
+  logger: Logger,
+  runner: ExecFileRunner,
+): NotificationPort & TrackerNotificationPort & SecurityNotificationPort {
+  const channels: NotificationChannel[] = [];
+  const ntfyUrl = process.env.KOBOX_NTFY_URL;
+  if (ntfyUrl !== undefined && ntfyUrl !== '') {
+    channels.push(new NtfyChannel(fetch, ntfyUrl));
+  }
+  const webhook = process.env.KOBOX_DISCORD_WEBHOOK;
+  if (webhook !== undefined && webhook !== '') {
+    channels.push(new DiscordChannel(fetch, webhook));
+  }
+  const email = process.env.KOBOX_ALERT_EMAIL;
+  if (email !== undefined && email !== '') {
+    channels.push(new EmailChannel(runner, email));
+  }
+  return channels.length > 0
+    ? new MultiChannelNotifier(channels, logger)
+    : new ConsoleNotificationAdapter(logger);
+}
+
+export function fairUsePolicy(): FairUsePolicy {
+  return FairUsePolicy.of({
+    sustainedEgress: Bandwidth.mbit(envInt('KOBOX_FAIRUSE_EGRESS_MBIT', 50)),
+    maxAuthPerHour: envInt('KOBOX_FAIRUSE_AUTH_PER_HOUR', 30),
+    throttleTo: Bandwidth.mbit(envInt('KOBOX_FAIRUSE_THROTTLE_MBIT', 5)),
+  });
+}
+
+export function securitySettings(): SecuritySettings {
+  const vpnRemote = process.env.KOBOX_VPN_REMOTE;
+  return {
+    sshPort: envInt('KOBOX_SSH_PORT', 22),
+    portalPort: envInt('KOBOX_PORTAL_PORT', 8189),
+    ...(vpnRemote !== undefined && { vpnRemote: DynDnsHost.parse(vpnRemote) }),
+    vpn: {
+      tunGwPort: envInt('KOBOX_VPN_TUN_GW_PORT', 8193),
+      tunPort: envInt('KOBOX_VPN_TUN_PORT', 8194),
+      tapPort: envInt('KOBOX_VPN_TAP_PORT', 8195),
+      tunGwSubnet: Cidr.parse(process.env.KOBOX_VPN_TUN_GW_SUBNET ?? '10.0.0.0/24'),
+      tunSubnet: Cidr.parse(process.env.KOBOX_VPN_TUN_SUBNET ?? '10.0.1.0/24'),
+      tapSubnet: Cidr.parse(process.env.KOBOX_VPN_TAP_SUBNET ?? '10.0.2.0/24'),
+    },
+  };
+}
 
 export const DEFAULT_DB_PATH = '/var/lib/kobox/kobox.db';
 export const DEFAULT_KOBOX_BIN = '/usr/local/bin/kobox';
@@ -58,6 +142,7 @@ export interface Container {
   readonly useCases: UseCases;
   readonly torrentUseCases: TorrentUseCases;
   readonly trackerUseCases: TrackerUseCases;
+  readonly securityUseCases: SecurityUseCases;
   readonly queue: SqliteJobQueue;
   readonly worker: JobWorker;
   readonly hasher: OpensslPasswordHasher;
@@ -65,6 +150,8 @@ export interface Container {
   readonly trackerRepo: SqliteTrackerRepository;
   readonly healthProbe: ProcessSocketHealthProbe;
   readonly spoolSweeper: TorrentEventSpoolSweeper;
+  readonly fairUseRepo: SqliteFairUseRepository;
+  readonly usageMeter: IptablesUsageMeterAdapter;
 }
 
 export function buildContainer(name: string): Container {
@@ -80,13 +167,14 @@ export function buildContainer(name: string): Container {
         logger.warn({ username }, 'quota enforcement skipped: KOBOX_QUOTA_FS not set');
       });
   const services = new SystemdServiceControlAdapter(runner);
+  const notifications = buildNotifier(logger, runner);
   const useCases = buildUseCases({
     repo,
     accounts: new SystemAccountAdapter(runner),
     quota,
     sftp: new SftpAdapter(runner),
     services,
-    notifications: new ConsoleNotificationAdapter(logger),
+    notifications,
     allocator: new SqlitePortAllocator(db),
   });
   const queue = new SqliteJobQueue(db);
@@ -107,11 +195,16 @@ export function buildContainer(name: string): Container {
   const iblocklistUser = process.env.KOBOX_IBLOCKLIST_USER;
   const iblocklistPin = process.env.KOBOX_IBLOCKLIST_PIN;
   const networkFiles = new RtorrentConfigAdapter(runner);
+  const networkServices = new NetworkServiceAdapter(runner, logger);
   const trackerRepo = new SqliteTrackerRepository(db);
+  const addressRepo = new SqliteUserAddressRepository(db);
+  const healthProbe = new ProcessSocketHealthProbe(runner);
+  const settings = securitySettings();
+  const fairUseRepo = new SqliteFairUseRepository(db);
   const trackerUseCases = buildTrackerUseCases({
     trackers: trackerRepo,
     blocklists: new SqliteBlocklistRepository(db),
-    addresses: new SqliteUserAddressRepository(db),
+    addresses: addressRepo,
     users: repo,
     instances: new SqliteTorrentInstanceRepository(db),
     dns: new DnsLookupResolverAdapter(),
@@ -121,12 +214,31 @@ export function buildContainer(name: string): Container {
     catalog: new IblocklistCatalogAdapter(logger, process.env.KOBOX_IBLOCKLIST_CATALOG_URL),
     cache: new FsBlocklistCacheAdapter(process.env.KOBOX_BLOCKLIST_CACHE),
     files: networkFiles,
-    reload: new NetworkServiceReloadAdapter(runner, logger),
-    notifications: new ConsoleNotificationAdapter(logger),
+    reload: networkServices,
+    notifications,
     ...(iblocklistUser !== undefined &&
       iblocklistPin !== undefined && {
         credentials: { username: iblocklistUser, pin: iblocklistPin },
       }),
+  });
+  const securityUseCases = buildSecurityUseCases({
+    users: repo,
+    addresses: addressRepo,
+    bindings: addressRepo,
+    identity: new GetentUserIdentityAdapter(runner),
+    firewall: new IptablesRestoreAdapter(runner, networkFiles, healthProbe, settings.sshPort),
+    files: networkFiles,
+    reload: networkServices,
+    resolver: new DynDnsLookupAdapter(),
+    pki: new FsVpnPkiAdapter(process.env.KOBOX_VPN_PKI ?? DEFAULT_PKI_DIR),
+    fairUse: fairUseRepo,
+    meter: new IptablesUsageMeterAdapter(runner),
+    authLog: new JournaldSshAuthAdapter(runner),
+    shaping: new TcShapingAdapter(runner, process.env.KOBOX_WAN_IF ?? 'eth0'),
+    health: healthProbe,
+    policy: fairUsePolicy(),
+    notifications,
+    settings,
   });
   return {
     db,
@@ -134,15 +246,18 @@ export function buildContainer(name: string): Container {
     useCases,
     torrentUseCases,
     trackerUseCases,
+    securityUseCases,
     queue,
-    worker: new JobWorker(queue, useCases, torrentUseCases, trackerUseCases),
+    worker: new JobWorker(queue, useCases, torrentUseCases, trackerUseCases, securityUseCases),
     hasher: new OpensslPasswordHasher(runner),
     repo,
     trackerRepo,
-    healthProbe: new ProcessSocketHealthProbe(runner),
+    healthProbe,
     spoolSweeper: new TorrentEventSpoolSweeper(
       spoolDir(),
       new GetentUsernameResolver(runner).resolve,
     ),
+    fairUseRepo,
+    usageMeter: new IptablesUsageMeterAdapter(runner),
   };
 }

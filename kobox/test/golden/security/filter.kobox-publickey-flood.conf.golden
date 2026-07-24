@@ -1,0 +1,6 @@
+# KoBox — bans a flood of *successful* publickey logins (abnormal auth
+# frequency with a valid key, invisible to failure-based jails).
+[Definition]
+journalmatch = _SYSTEMD_UNIT=ssh.service + _COMM=sshd
+failregex = ^.*Accepted publickey for \S+ from <HOST> port \d+.*$
+ignoreregex =

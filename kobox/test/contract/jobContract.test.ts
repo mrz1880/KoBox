@@ -29,7 +29,39 @@ describe('job contract', () => {
       'render-blocklist-filters',
       'add-user-address',
       'remove-user-address',
+      'apply-firewall',
+      'render-fail2ban',
+      'add-user-hostname',
+      'remove-user-hostname',
+      'resolve-dyndns',
+      'render-openvpn',
+      'evaluate-fair-use',
     ]);
+  });
+
+  it('should_parse_security_jobs', () => {
+    expect(parseJob('apply-firewall', {}).type).toBe('apply-firewall');
+    expect(() => parseJob('apply-firewall', { extra: 1 })).toThrow(); // strict object
+    expect(parseJob('render-fail2ban', {}).type).toBe('render-fail2ban');
+    expect(parseJob('resolve-dyndns', {}).type).toBe('resolve-dyndns');
+    expect(
+      parseJob('add-user-hostname', { username: 'alice', hostname: 'dyn.example.org' }).type,
+    ).toBe('add-user-hostname');
+    expect(
+      parseJob('remove-user-hostname', { username: 'alice', hostname: 'dyn.example.org' }).type,
+    ).toBe('remove-user-hostname');
+  });
+
+  it('should_reject_hostnames_that_are_ip_literals_or_unsafe', () => {
+    expect(() =>
+      parseJob('add-user-hostname', { username: 'alice', hostname: '203.0.113.9' }),
+    ).toThrow();
+    expect(() =>
+      parseJob('add-user-hostname', { username: 'alice', hostname: 'dyn.example.org;id' }),
+    ).toThrow();
+    expect(() =>
+      parseJob('add-user-hostname', { username: 'alice', hostname: 'localhost' }),
+    ).toThrow();
   });
 
   it('should_parse_a_valid_create_user_job', () => {

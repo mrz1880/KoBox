@@ -357,6 +357,104 @@ function userAddressCommand(name: 'add-user-address' | 'remove-user-address'): v
 userAddressCommand('add-user-address');
 userAddressCommand('remove-user-address');
 
+// ---- Security & Network (Phase 3) ---------------------------------------
+
+program
+  .command('apply-firewall')
+  .description('reconcile the declarative default-deny firewall (guarded iptables-restore)')
+  .action(async () => {
+    const c = container();
+    const id = await c.queue.enqueue(buildJob.applyFirewall());
+    await done(c, `job ${String(id)} enqueued: apply-firewall`);
+  });
+
+program
+  .command('render-fail2ban')
+  .description('re-render fail2ban jails (incl. publickey-flood) and reload when changed')
+  .action(async () => {
+    const c = container();
+    const id = await c.queue.enqueue(buildJob.renderFail2ban());
+    await done(c, `job ${String(id)} enqueued: render-fail2ban`);
+  });
+
+function userHostnameCommand(name: 'add-user-hostname' | 'remove-user-hostname'): void {
+  program
+    .command(name)
+    .argument('<username>')
+    .argument('<hostname>')
+    .description(
+      `${name === 'add-user-hostname' ? 'track' : 'stop tracking'} a DynDNS hostname for a user (restrict IP)`,
+    )
+    .action(async (rawUser: string, hostname: string) => {
+      const c = container();
+      const input = { username: Username.parse(rawUser).value, hostname };
+      const job =
+        name === 'add-user-hostname'
+          ? buildJob.addUserHostname(input)
+          : buildJob.removeUserHostname(input);
+      const id = await c.queue.enqueue(job);
+      await done(c, `job ${String(id)} enqueued: ${name} ${input.username} ${hostname}`);
+    });
+}
+
+userHostnameCommand('add-user-hostname');
+userHostnameCommand('remove-user-hostname');
+
+program
+  .command('resolve-dyndns')
+  .description('re-resolve DynDNS hostnames; refreshes whitelist/firewall/fail2ban on change')
+  .action(async () => {
+    const c = container();
+    const id = await c.queue.enqueue(buildJob.resolveDynDns());
+    await done(c, `job ${String(id)} enqueued: resolve-dyndns`);
+  });
+
+program
+  .command('evaluate-fair-use')
+  .description('meter usage per user and run the graduated response (cron entry point)')
+  .action(async () => {
+    const c = container();
+    const id = await c.queue.enqueue(buildJob.evaluateFairUse());
+    await done(c, `job ${String(id)} enqueued: evaluate-fair-use`);
+  });
+
+program
+  .command('show-usage')
+  .description('print per-user usage, fair-use state and recent audit events as JSON')
+  .action(async () => {
+    const c = container();
+    const counters = new Map(
+      (await c.usageMeter.readCounters()).map((counter) => [counter.username, counter]),
+    );
+    const rows = [];
+    for (const user of await c.repo.listAll()) {
+      const state = await c.fairUseRepo.getState(user.username);
+      const events = await c.fairUseRepo.listEvents(user.username);
+      rows.push({
+        username: user.username.value,
+        status: user.status.value,
+        level: state.level,
+        health: state.healthState,
+        egressBytes: counters.get(user.username.value)?.egressBytes ?? 0,
+        ingressBytes: counters.get(user.username.value)?.ingressBytes ?? 0,
+        recentEvents: events.slice(-5),
+      });
+    }
+    process.stdout.write(`${JSON.stringify(rows, null, 2)}\n`);
+    c.db.close();
+  });
+
+program
+  .command('render-openvpn')
+  .description(
+    're-render OpenVPN server configs and client profiles (no restart: tunnels stay up)',
+  )
+  .action(async () => {
+    const c = container();
+    const id = await c.queue.enqueue(buildJob.renderOpenVpn());
+    await done(c, `job ${String(id)} enqueued: render-openvpn`);
+  });
+
 program
   .command('list-trackers')
   .description('print the tracker whitelist as JSON (operator view)')

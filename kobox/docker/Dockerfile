@@ -10,7 +10,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     bind9utils \
     ca-certificates \
     curl \
+    fail2ban \
     gnupg \
+    iproute2 \
+    iptables \
     openssh-server \
     openssl \
     procps \

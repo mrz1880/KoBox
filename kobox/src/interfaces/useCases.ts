@@ -14,6 +14,13 @@ import { ProvisionRtorrentInstance } from '../application/torrent/ProvisionRtorr
 import { RenderRtorrentConfig } from '../application/torrent/RenderRtorrentConfig.js';
 import { SetAllowPublicTracker } from '../application/torrent/SetAllowPublicTracker.js';
 import { SetSyncDisabled } from '../application/torrent/SetSyncDisabled.js';
+import { ApplyFirewall } from '../application/security/ApplyFirewall.js';
+import { EvaluateFairUse } from '../application/security/EvaluateFairUse.js';
+import { ManageUserHostname } from '../application/security/ManageUserHostname.js';
+import { RenderFail2ban } from '../application/security/RenderFail2ban.js';
+import { RenderOpenVpn } from '../application/security/RenderOpenVpn.js';
+import { ResolveDynDns } from '../application/security/ResolveDynDns.js';
+import type { SecuritySettings } from '../application/security/settings.js';
 import { ChangePassword } from '../application/user/ChangePassword.js';
 import { CreateUser } from '../application/user/CreateUser.js';
 import { DeleteUser } from '../application/user/DeleteUser.js';
@@ -43,9 +50,24 @@ import type {
   TrackerRepository,
   UserAddressRepository,
 } from '../domain/tracker/ports.js';
+import type { FairUsePolicy } from '../domain/security/FairUsePolicy.js';
+import type {
+  DynDnsBindingRepository,
+  DynDnsResolverPort,
+  FairUseRepository,
+  FirewallApplyPort,
+  NetworkServicePort,
+  SecurityNotificationPort,
+  ShapingPort,
+  SshAuthLogPort,
+  UsageMeterPort,
+  UserIdentityPort,
+  VpnPkiPort,
+} from '../domain/security/ports.js';
 import type { RenderSettings, RtorrentTemplates } from '../domain/torrent/rendering.js';
 import type { PortAllocatorPort } from '../domain/user/PortAllocatorPort.js';
 import type {
+  HealthProbePort,
   NotificationPort,
   QuotaPort,
   ServiceControlPort,
@@ -149,6 +171,46 @@ export function buildTrackerUseCases(deps: TrackerUseCaseDeps): TrackerUseCases 
     renderWhitelist: new RenderWhitelist(deps),
     renderBlocklistFilters: new RenderBlocklistFilters(deps),
     manageUserAddress: new ManageUserAddress(deps),
+  };
+}
+
+export interface SecurityUseCaseDeps {
+  readonly users: UserRepository;
+  readonly addresses: UserAddressRepository;
+  readonly bindings: DynDnsBindingRepository;
+  readonly identity: UserIdentityPort;
+  readonly firewall: FirewallApplyPort;
+  readonly files: ManagedFilesPort;
+  readonly reload: NetworkServicePort;
+  readonly resolver: DynDnsResolverPort;
+  readonly pki: VpnPkiPort;
+  readonly fairUse: FairUseRepository;
+  readonly meter: UsageMeterPort;
+  readonly authLog: SshAuthLogPort;
+  readonly shaping: ShapingPort;
+  readonly health: HealthProbePort;
+  readonly policy: FairUsePolicy;
+  readonly notifications: SecurityNotificationPort;
+  readonly settings: SecuritySettings;
+}
+
+export interface SecurityUseCases {
+  readonly applyFirewall: ApplyFirewall;
+  readonly renderFail2ban: RenderFail2ban;
+  readonly manageUserHostname: ManageUserHostname;
+  readonly resolveDynDns: ResolveDynDns;
+  readonly renderOpenVpn: RenderOpenVpn;
+  readonly evaluateFairUse: EvaluateFairUse;
+}
+
+export function buildSecurityUseCases(deps: SecurityUseCaseDeps): SecurityUseCases {
+  return {
+    applyFirewall: new ApplyFirewall(deps),
+    renderFail2ban: new RenderFail2ban(deps),
+    manageUserHostname: new ManageUserHostname(deps),
+    resolveDynDns: new ResolveDynDns(deps),
+    renderOpenVpn: new RenderOpenVpn(deps),
+    evaluateFairUse: new EvaluateFairUse(deps),
   };
 }
 

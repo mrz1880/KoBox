@@ -1,0 +1,22 @@
+# KoBox-managed fail2ban jails — DO NOT EDIT (rendered declaratively).
+# backend is set per-jail (not in DEFAULT): the journald backend fits
+# the ssh jails only — nginx jails keep their file-based default.
+[DEFAULT]
+ignoreip = 127.0.0.1/8 ::1 192.0.2.42 198.51.100.9
+
+[sshd]
+enabled = true
+backend = systemd
+port = 22
+
+[nginx-http-auth]
+enabled = true
+
+[kobox-publickey-flood]
+enabled = true
+backend = systemd
+filter = kobox-publickey-flood
+port = 22
+maxretry = 30
+findtime = 3600
+bantime = 3600

@@ -1,5 +1,6 @@
 import { parseJob, type Job } from '../../application/jobs/contract.js';
 import type { JobQueuePort } from '../../application/jobs/JobQueuePort.js';
+import { DynDnsHost } from '../../domain/security/DynDnsHost.js';
 import { IpAddress } from '../../domain/shared/IpAddress.js';
 import { TrackerHost } from '../../domain/tracker/TrackerHost.js';
 import { EventHook } from '../../domain/torrent/EventHook.js';
@@ -11,7 +12,7 @@ import { HashedPassword } from '../../domain/user/HashedPassword.js';
 import { ProxyPort } from '../../domain/user/Port.js';
 import { Quota } from '../../domain/user/Quota.js';
 import { Username } from '../../domain/user/Username.js';
-import type { TorrentUseCases, TrackerUseCases, UseCases } from '../useCases.js';
+import type { SecurityUseCases, TorrentUseCases, TrackerUseCases, UseCases } from '../useCases.js';
 
 // What a completed job asks the worker to enqueue next. Use cases stay
 // queue-agnostic: they return reports, the worker turns them into jobs.
@@ -19,6 +20,8 @@ interface ChainHints {
   readonly fetchCertHost?: string;
   readonly whitelistDirty?: boolean;
   readonly blocklistsUpdated?: boolean;
+  readonly firewallDirty?: boolean;
+  readonly fail2banDirty?: boolean;
 }
 
 function nowStamp(): string {
@@ -33,6 +36,7 @@ export class JobWorker {
     private readonly useCases: UseCases,
     private readonly torrents: TorrentUseCases,
     private readonly trackers: TrackerUseCases,
+    private readonly security: SecurityUseCases,
   ) {}
 
   async processNext(): Promise<boolean> {
@@ -77,6 +81,18 @@ export class JobWorker {
         parseJob('deprovision-rtorrent', { username: job.payload.username }),
       );
     }
+    // legacy parity: a fresh instance gets its blocklist filter immediately,
+    // not at the next update-blocklists run
+    if (job.type === 'provision-rtorrent') {
+      await this.queue.enqueue(
+        parseJob('render-blocklist-filters', { username: job.payload.username }),
+      );
+    }
+    // the firewall names uids and rtorrent ports: reconcile it whenever the
+    // provisioned population changes
+    if (job.type === 'provision-rtorrent' || job.type === 'deprovision-rtorrent') {
+      await this.queue.enqueue(parseJob('apply-firewall', {}));
+    }
     if (hints?.fetchCertHost !== undefined) {
       await this.queue.enqueue(parseJob('fetch-tracker-cert', { host: hints.fetchCertHost }));
     }
@@ -85,6 +101,12 @@ export class JobWorker {
     }
     if (hints?.blocklistsUpdated === true) {
       await this.queue.enqueue(parseJob('render-blocklist-filters', {}));
+    }
+    if (hints?.firewallDirty === true) {
+      await this.queue.enqueue(parseJob('apply-firewall', {}));
+    }
+    if (hints?.fail2banDirty === true) {
+      await this.queue.enqueue(parseJob('render-fail2ban', {}));
     }
   }
 
@@ -211,6 +233,33 @@ export class JobWorker {
           }),
         });
         return;
+      case 'apply-firewall':
+        await this.security.applyFirewall.execute();
+        return;
+      case 'render-fail2ban':
+        await this.security.renderFail2ban.execute();
+        return;
+      case 'add-user-hostname':
+      case 'remove-user-hostname':
+        return await this.security.manageUserHostname.execute({
+          action: job.type === 'add-user-hostname' ? 'add' : 'remove',
+          username: Username.parse(job.payload.username),
+          host: DynDnsHost.parse(job.payload.hostname),
+        });
+      case 'resolve-dyndns': {
+        const report = await this.security.resolveDynDns.execute();
+        return {
+          whitelistDirty: report.whitelistDirty,
+          firewallDirty: report.firewallDirty,
+          fail2banDirty: report.fail2banDirty,
+        };
+      }
+      case 'render-openvpn':
+        await this.security.renderOpenVpn.execute();
+        return;
+      case 'evaluate-fair-use':
+        await this.security.evaluateFairUse.execute({ now: nowStamp() });
+        return;
       case 'add-user-address':
       case 'remove-user-address': {
         const report = await this.trackers.manageUserAddress.execute({
@@ -218,7 +267,13 @@ export class JobWorker {
           username: Username.parse(job.payload.username),
           ip: IpAddress.parse(job.payload.ipv4),
         });
-        return { whitelistDirty: report.whitelistDirty };
+        // a member address is rendered in three places: allow.p2p, the
+        // firewall trusted rules and fail2ban ignoreip — refresh all of them
+        return {
+          whitelistDirty: report.whitelistDirty,
+          firewallDirty: report.whitelistDirty,
+          fail2banDirty: report.whitelistDirty,
+        };
       }
     }
   }

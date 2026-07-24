@@ -1,0 +1,28 @@
+# KoBox-managed OpenVPN client profile for alice (tun-gw) — DO NOT EDIT.
+client
+remote seedbox.example.org 8193
+proto udp4
+dev tun
+resolv-retry infinite
+nobind
+persist-key
+persist-tun
+remote-cert-tls server
+data-ciphers AES-256-GCM:AES-128-GCM
+auth SHA256
+verb 3
+<ca>
+-----BEGIN CERTIFICATE-----
+CA-FIXTURE
+-----END CERTIFICATE-----
+</ca>
+<cert>
+-----BEGIN CERTIFICATE-----
+ALICE-FIXTURE
+-----END CERTIFICATE-----
+</cert>
+<key>
+-----BEGIN PRIVATE KEY-----
+ALICE-KEY-FIXTURE
+-----END PRIVATE KEY-----
+</key>

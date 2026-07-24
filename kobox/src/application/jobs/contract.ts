@@ -33,6 +33,13 @@ export const JOB_TYPES = [
   'render-blocklist-filters',
   'add-user-address',
   'remove-user-address',
+  'apply-firewall',
+  'render-fail2ban',
+  'add-user-hostname',
+  'remove-user-hostname',
+  'resolve-dyndns',
+  'render-openvpn',
+  'evaluate-fair-use',
 ] as const;
 
 export type JobType = (typeof JOB_TYPES)[number];
@@ -71,6 +78,16 @@ const announceUrlField = z
 const isoDateField = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 const ipv4Field = z.string().regex(IPV4_PATTERN);
 const userAddressPayload = z.strictObject({ username: usernameField, ipv4: ipv4Field });
+// Wire-level mirror of DynDnsHost (the VO stays authoritative in the worker):
+// same shell-safe FQDN shape as trackers, minus IPv4 literals.
+const dynDnsHostField = z
+  .string()
+  .max(253)
+  .regex(new RegExp(`^${TRACKER_HOST_LABEL}(\\.${TRACKER_HOST_LABEL})+$`, 'i'))
+  .refine((raw) => !/^\d+\.\d+\.\d+\.\d+$/.test(raw), {
+    message: 'IPv4 literal — use add-user-address instead',
+  });
+const userHostnamePayload = z.strictObject({ username: usernameField, hostname: dynDnsHostField });
 
 export const jobPayloadSchemas = {
   'create-user': z.strictObject({
@@ -118,6 +135,13 @@ export const jobPayloadSchemas = {
   'render-blocklist-filters': z.strictObject({ username: usernameField.optional() }),
   'add-user-address': userAddressPayload,
   'remove-user-address': userAddressPayload,
+  'apply-firewall': z.strictObject({}),
+  'render-fail2ban': z.strictObject({}),
+  'add-user-hostname': userHostnamePayload,
+  'remove-user-hostname': userHostnamePayload,
+  'resolve-dyndns': z.strictObject({}),
+  'render-openvpn': z.strictObject({}),
+  'evaluate-fair-use': z.strictObject({}),
 } satisfies Record<JobType, z.ZodType>;
 
 export type JobPayload<T extends JobType> = z.infer<(typeof jobPayloadSchemas)[T]>;
