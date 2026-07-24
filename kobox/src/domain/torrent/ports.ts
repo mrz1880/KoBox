@@ -1,3 +1,4 @@
+import type { ManagedFilesPort } from '../shared/files.js';
 import type { ScgiPort } from '../user/Port.js';
 import type { Username } from '../user/Username.js';
 import type { Announcer } from './Announcer.js';
@@ -5,6 +6,8 @@ import type { InfoHash } from './InfoHash.js';
 import type { Torrent } from './Torrent.js';
 import type { TorrentInstance } from './TorrentInstance.js';
 import type { WatchDir } from './WatchDir.js';
+
+export type { RenderedFile } from '../shared/files.js';
 
 export interface TorrentInstanceRepository {
   findByUsername(username: Username): Promise<TorrentInstance | undefined>;
@@ -20,21 +23,9 @@ export interface TorrentRepository {
   deleteAllFor(username: Username): Promise<void>;
 }
 
-// A fully rendered managed file: content is the whole desired state. Applying
-// it is idempotent — adapters write only when the on-disk content differs and
-// never touch paths outside this list (no more destructive regeneration).
-export interface RenderedFile {
-  readonly path: string;
-  readonly content: string;
-  readonly mode: string; // octal, e.g. '0640'
-  readonly owner: string;
-  readonly group: string;
-}
-
-export interface RtorrentConfigPort {
-  // Returns the paths whose content actually changed.
-  apply(files: readonly RenderedFile[]): Promise<readonly string[]>;
-}
+// RenderedFile moved to domain/shared/files.ts (re-exported above): the
+// write-if-changed apply pattern now serves every context that renders config.
+export type RtorrentConfigPort = ManagedFilesPort;
 
 export interface WatchDirPort {
   ensureLayout(username: Username, watchDirs: readonly WatchDir[]): Promise<void>;
