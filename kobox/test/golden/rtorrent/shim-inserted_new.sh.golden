@@ -1,0 +1,4 @@
+#!/bin/sh
+# KoBox-managed shim — DO NOT EDIT. Zero logic here by design: behavior
+# flags live in the KoBox database, handling happens in the root worker.
+exec /usr/local/bin/kobox torrent-event inserted_new --hash "$1" --name "$2" --directory "$3" --torrent-file "$4" --torrent-dir "$5" --label "$6"
