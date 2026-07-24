@@ -107,6 +107,20 @@ describe('BencodeMetainfoAdapter', () => {
     expect(await new BencodeMetainfoAdapter().read(join(dir, 'nope.torrent'))).toBeUndefined();
   });
 
+  it('should_refuse_to_read_a_file_larger_than_the_cap', async () => {
+    // A .torrent is a few KB; a user could plant a huge file to OOM the root
+    // worker. The adapter caps the read instead of loading it whole.
+    const bigButValid = torrentFixture(
+      { ...PRIVATE_INFO, pieces: Buffer.alloc(4096) },
+      { announce: 'https://tracker.example.org/announce' },
+    );
+    const path = write('big.torrent', bigButValid);
+    expect(bigButValid.length).toBeGreaterThan(1024);
+    // uncapped: parses fine; capped below its size: refused without reading whole
+    expect(await new BencodeMetainfoAdapter().read(path)).toBeDefined();
+    expect(await new BencodeMetainfoAdapter(1024).read(path)).toBeUndefined();
+  });
+
   it('should_return_undefined_for_garbage_never_throwing', async () => {
     const adapter = new BencodeMetainfoAdapter();
     await fc.assert(

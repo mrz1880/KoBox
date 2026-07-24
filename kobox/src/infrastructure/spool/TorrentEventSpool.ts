@@ -78,40 +78,51 @@ export class TorrentEventSpoolSweeper {
     return events;
   }
 
-  // Every visited file is removed: a bad event must not clog the spool.
+  // Malformed files are removed (they will never parse); an owner that cannot
+  // be resolved is left in place so a transient getent failure retries next
+  // sweep instead of silently dropping a legitimate event.
   private async consume(path: string): Promise<SpooledTorrentEvent | undefined> {
+    let uid: number;
+    let raw: unknown;
     try {
-      const uid = statSync(path).uid;
-      const raw: unknown = JSON.parse(readFileSync(path, 'utf8'));
-      const username = await this.resolveUsername(uid);
-      if (username === undefined || typeof raw !== 'object' || raw === null) {
-        return undefined;
+      uid = statSync(path).uid;
+      raw = JSON.parse(readFileSync(path, 'utf8'));
+      if (typeof raw !== 'object' || raw === null) {
+        throw new Error('event payload is not an object');
       }
-      // file owner is authoritative — any username in the payload is discarded
-      return { username, payload: { ...raw, username } };
     } catch {
+      rmSync(path, { force: true }); // unparseable: quarantine by removal
       return undefined;
-    } finally {
-      rmSync(path, { force: true });
     }
+    const username = await this.resolveUsername(uid);
+    if (username === undefined) {
+      return undefined; // keep the file for a later sweep
+    }
+    rmSync(path, { force: true });
+    // file owner is authoritative — any username in the payload is discarded
+    return { username, payload: { ...(raw as Record<string, unknown>), username } };
   }
 }
 
-// uid -> username through getent (argv only), cached: the worker resolves
-// each active seedbox user once per process lifetime.
+// uid -> username through getent (argv only). Positive results are cached for
+// the process lifetime; negatives are NOT cached, so a transient failure does
+// not poison the resolver for a real user.
 export class GetentUsernameResolver {
-  private readonly cache = new Map<number, string | undefined>();
+  private readonly cache = new Map<number, string>();
 
   constructor(private readonly runner: CommandRunner) {}
 
   resolve: UsernameResolver = async (uid) => {
-    if (this.cache.has(uid)) {
-      return this.cache.get(uid);
+    const cached = this.cache.get(uid);
+    if (cached !== undefined) {
+      return cached;
     }
     const result = await this.runner.run({ command: 'getent', args: ['passwd', String(uid)] });
     const username = result.exitCode === 0 ? result.stdout.split(':')[0]?.trim() : undefined;
-    const resolved = username === '' ? undefined : username;
-    this.cache.set(uid, resolved);
-    return resolved;
+    if (username === undefined || username === '') {
+      return undefined;
+    }
+    this.cache.set(uid, username);
+    return username;
   };
 }

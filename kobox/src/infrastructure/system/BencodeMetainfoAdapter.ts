@@ -1,8 +1,12 @@
 import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { readFileSync, statSync } from 'node:fs';
 import { Announcer } from '../../domain/torrent/Announcer.js';
 import { InfoHash } from '../../domain/torrent/InfoHash.js';
 import type { TorrentMetainfo, TorrentMetainfoPort } from '../../domain/torrent/ports.js';
+
+// A real .torrent metainfo is a few KB; cap the read so a user cannot OOM the
+// root worker by planting a huge file where the hook will point us.
+const DEFAULT_MAX_BYTES = 8 * 1024 * 1024;
 
 type BValue = number | Buffer | BValue[] | BDict;
 interface BDict {
@@ -143,8 +147,16 @@ function collectAnnouncers(top: BDict): readonly Announcer[] {
 }
 
 export class BencodeMetainfoAdapter implements TorrentMetainfoPort {
+  constructor(private readonly maxBytes: number = DEFAULT_MAX_BYTES) {}
+
   read(path: string): Promise<TorrentMetainfo | undefined> {
     try {
+      // Regular files only, capped: skips /dev/* (non-regular) and oversized
+      // planted files before any content is loaded into memory.
+      const stat = statSync(path);
+      if (!stat.isFile() || stat.size > this.maxBytes) {
+        return Promise.resolve(undefined);
+      }
       const buf = readFileSync(path);
       const decoder = new Decoder(buf);
       const top = decoder.decodeTopLevelDict();

@@ -53,13 +53,15 @@ describe('torrent event spool', () => {
     expect(events[0]?.payload.username).toBe('alice'); // identity = file ownership
   });
 
-  it('should_drop_events_whose_owner_cannot_be_resolved', async () => {
+  it('should_keep_events_whose_owner_cannot_be_resolved_for_a_later_retry', async () => {
+    // A transient getent failure must not silently drop a legitimate event;
+    // leave the file so the next sweep can resolve and process it.
     new TorrentEventSpoolWriter(dir).submit(submission);
 
     const events = await sweeperResolvingTo(undefined).sweep();
 
     expect(events).toHaveLength(0);
-    expect(readdirSync(dir)).toHaveLength(0); // still consumed, not stuck forever
+    expect(readdirSync(dir)).toHaveLength(1); // preserved, not consumed
   });
 
   it('should_quarantine_malformed_json_without_blocking_the_rest', async () => {

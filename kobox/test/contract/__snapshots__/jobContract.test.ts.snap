@@ -238,10 +238,6 @@ exports[`job contract > should_keep_the_wire_contract_stable 1`] = `
         "minLength": 1,
         "type": "string",
       },
-      "torrentDir": {
-        "minLength": 1,
-        "type": "string",
-      },
       "torrentFile": {
         "minLength": 1,
         "type": "string",

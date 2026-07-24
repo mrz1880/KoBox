@@ -28,13 +28,17 @@ export class JobWorker {
     try {
       await this.execute(claimed.job);
       await this.queue.markDone(claimed.id);
-      await this.chainAfter(claimed.job);
     } catch (error) {
       await this.queue.markFailed(
         claimed.id,
         error instanceof Error ? error.message : String(error),
       );
+      return true;
     }
+    // Chaining runs only after the job is durably marked done, and outside the
+    // try above: a failure to enqueue the follow-up must not re-fail a job
+    // whose real work already succeeded.
+    await this.chainAfter(claimed.job);
     return true;
   }
 
