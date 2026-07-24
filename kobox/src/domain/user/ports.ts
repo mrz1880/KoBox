@@ -37,12 +37,16 @@ export interface SftpPort {
   isChrootAccessEnabled(username: Username): Promise<boolean>;
 }
 
-// Seam toward the Torrent Lifecycle context (Phase 1): Phase 0 only needs to
-// stop/start the per-user rtorrent service on suspend/resume.
+// Owned jointly with the Torrent Lifecycle context: Phase 0 drives
+// stop/start on suspend/resume, Phase 1 provisions the unit itself
+// (install/remove/restart with declarative, write-if-changed content).
 export interface ServiceControlPort {
   stopUserService(username: Username): Promise<void>;
   startUserService(username: Username): Promise<void>;
   isUserServiceRunning(username: Username): Promise<boolean>;
+  installUserService(username: Username, unitContent: string): Promise<void>;
+  removeUserService(username: Username): Promise<void>;
+  restartUserService(username: Username): Promise<void>;
 }
 
 // Hashing happens at the unprivileged boundary (CLI/web) so plaintext dies there.
