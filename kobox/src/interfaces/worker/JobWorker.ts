@@ -220,6 +220,9 @@ export class JobWorker {
       case 'apply-firewall':
         await this.security.applyFirewall.execute();
         return;
+      case 'render-fail2ban':
+        await this.security.renderFail2ban.execute();
+        return;
       case 'add-user-address':
       case 'remove-user-address': {
         const report = await this.trackers.manageUserAddress.execute({

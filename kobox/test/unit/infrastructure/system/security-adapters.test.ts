@@ -14,7 +14,12 @@ import type {
 } from '../../../../src/infrastructure/system/CommandRunner.js';
 import { GetentUserIdentityAdapter } from '../../../../src/infrastructure/system/GetentUserIdentityAdapter.js';
 import { IptablesRestoreAdapter } from '../../../../src/infrastructure/system/IptablesRestoreAdapter.js';
+import { NetworkServiceAdapter } from '../../../../src/infrastructure/system/NetworkServiceAdapter.js';
 import { Username } from '../../../../src/domain/user/Username.js';
+import { createLogger } from '../../../../src/infrastructure/logging/logger.js';
+
+process.env.KOBOX_LOG_LEVEL = 'silent';
+const logger = createLogger('test');
 
 class RecordingRunner implements CommandRunner {
   readonly calls: CommandRequest[] = [];
@@ -129,6 +134,78 @@ describe('IptablesRestoreAdapter', () => {
 
     await expect(adapter.apply(rules)).rejects.toThrow('line 2 failed');
     expect(files.applied).toHaveLength(0);
+  });
+});
+
+class PrefixRunner implements CommandRunner {
+  readonly calls: CommandRequest[] = [];
+  private readonly rules: { prefix: string; result: CommandResult }[] = [];
+
+  on(prefix: string, result: Partial<CommandResult>): void {
+    this.rules.push({ prefix, result: { stdout: '', stderr: '', exitCode: 0, ...result } });
+  }
+
+  run(request: CommandRequest): Promise<CommandResult> {
+    this.calls.push(request);
+    const line = [request.command, ...request.args].join(' ');
+    const match = this.rules.find((rule) => line.startsWith(rule.prefix));
+    return Promise.resolve(match?.result ?? { stdout: '', stderr: '', exitCode: 0 });
+  }
+
+  commandLines(): readonly string[] {
+    return this.calls.map((call) => [call.command, ...call.args].join(' '));
+  }
+}
+
+describe('NetworkServiceAdapter', () => {
+  it('should_reload_units_that_exist_and_escalate_their_failures', async () => {
+    const runner = new PrefixRunner();
+    runner.on('systemctl list-unit-files fail2ban.service', { stdout: 'fail2ban.service enabled\n' });
+    const adapter = new NetworkServiceAdapter(runner, logger);
+
+    await adapter.reloadFail2ban();
+    expect(runner.commandLines()).toContain('systemctl reload-or-restart fail2ban');
+
+    runner.on('systemctl reload-or-restart fail2ban', { exitCode: 1, stderr: 'boom' });
+    await expect(adapter.reloadFail2ban()).rejects.toThrow('boom');
+  });
+
+  it('should_skip_absent_units_explicitly_instead_of_failing', async () => {
+    const runner = new PrefixRunner(); // no units listed at all
+    const adapter = new NetworkServiceAdapter(runner, logger);
+
+    await adapter.reloadFail2ban();
+    await adapter.reloadDns();
+    await adapter.reloadPeerGuardian();
+
+    const reloadCalls = runner
+      .commandLines()
+      .filter((line) => !line.startsWith('systemctl list-unit-files'));
+    expect(reloadCalls).toEqual([]);
+  });
+
+  it('should_reload_bind_via_rndc_and_dnscrypt_via_try_restart', async () => {
+    const runner = new PrefixRunner();
+    runner.on('systemctl list-unit-files named.service', { stdout: 'named.service enabled\n' });
+    runner.on('systemctl list-unit-files dnscrypt-proxy.service', {
+      stdout: 'dnscrypt-proxy.service enabled\n',
+    });
+    const adapter = new NetworkServiceAdapter(runner, logger);
+
+    await adapter.reloadDns();
+
+    expect(runner.commandLines()).toContain('rndc reload');
+    expect(runner.commandLines()).toContain('systemctl try-restart dnscrypt-proxy');
+  });
+
+  it('should_reload_peerguardian_through_pglcmd_when_the_unit_exists', async () => {
+    const runner = new PrefixRunner();
+    runner.on('systemctl list-unit-files pgl.service', { stdout: 'pgl.service enabled\n' });
+    const adapter = new NetworkServiceAdapter(runner, logger);
+
+    await adapter.reloadPeerGuardian();
+
+    expect(runner.commandLines()).toContain('pglcmd reload');
   });
 });
 

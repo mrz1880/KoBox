@@ -19,7 +19,6 @@ import {
   IblocklistCatalogAdapter,
   parseIblocklistCatalog,
 } from '../../../../src/infrastructure/system/IblocklistCatalogAdapter.js';
-import { NetworkServiceReloadAdapter } from '../../../../src/infrastructure/system/NetworkServiceReloadAdapter.js';
 import { OpensslTrackerCertAdapter } from '../../../../src/infrastructure/system/OpensslTrackerCertAdapter.js';
 import { RtorrentConfigAdapter } from '../../../../src/infrastructure/system/RtorrentConfigAdapter.js';
 import { createLogger } from '../../../../src/infrastructure/logging/logger.js';
@@ -239,28 +238,6 @@ describe('parseIblocklistCatalog', () => {
     expect(parseIblocklistCatalog('<lists>\n<list>\n <name>x</name>\n</list>\n</lists>')).toEqual(
       [],
     );
-  });
-});
-
-describe('NetworkServiceReloadAdapter', () => {
-  it('should_reload_dns_and_peerguardian_best_effort', async () => {
-    const runner = new RecordingRunner();
-    const adapter = new NetworkServiceReloadAdapter(runner, logger);
-
-    await adapter.reloadDns();
-    await adapter.reloadPeerGuardian();
-
-    const commands = runner.calls.map((call) => [call.command, ...call.args].join(' '));
-    expect(commands).toContain('rndc reload');
-    expect(commands).toContain('systemctl try-restart dnscrypt-proxy');
-    expect(commands).toContain('pglcmd reload');
-  });
-
-  it('should_swallow_failures_because_the_services_belong_to_phase_3', async () => {
-    const failing: CommandRunner = { run: () => Promise.reject(new Error('absent')) };
-    const adapter = new NetworkServiceReloadAdapter(failing, logger);
-    await expect(adapter.reloadDns()).resolves.toBeUndefined();
-    await expect(adapter.reloadPeerGuardian()).resolves.toBeUndefined();
   });
 });
 

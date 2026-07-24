@@ -204,6 +204,7 @@ beforeEach(() => {
     addresses,
     identity,
     firewall,
+    files: networkFiles,
     reload: new FakeNetworkServices(),
     notifications,
     settings: {

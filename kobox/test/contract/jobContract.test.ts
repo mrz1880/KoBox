@@ -30,12 +30,14 @@ describe('job contract', () => {
       'add-user-address',
       'remove-user-address',
       'apply-firewall',
+      'render-fail2ban',
     ]);
   });
 
   it('should_parse_security_jobs', () => {
     expect(parseJob('apply-firewall', {}).type).toBe('apply-firewall');
     expect(() => parseJob('apply-firewall', { extra: 1 })).toThrow(); // strict object
+    expect(parseJob('render-fail2ban', {}).type).toBe('render-fail2ban');
   });
 
   it('should_parse_a_valid_create_user_job', () => {

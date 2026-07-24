@@ -115,4 +115,8 @@ export const buildJob = {
   applyFirewall(): Job {
     return parseJob('apply-firewall', {});
   },
+
+  renderFail2ban(): Job {
+    return parseJob('render-fail2ban', {});
+  },
 };

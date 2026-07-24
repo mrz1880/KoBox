@@ -34,6 +34,7 @@ export const JOB_TYPES = [
   'add-user-address',
   'remove-user-address',
   'apply-firewall',
+  'render-fail2ban',
 ] as const;
 
 export type JobType = (typeof JOB_TYPES)[number];
@@ -120,6 +121,7 @@ export const jobPayloadSchemas = {
   'add-user-address': userAddressPayload,
   'remove-user-address': userAddressPayload,
   'apply-firewall': z.strictObject({}),
+  'render-fail2ban': z.strictObject({}),
 } satisfies Record<JobType, z.ZodType>;
 
 export type JobPayload<T extends JobType> = z.infer<(typeof jobPayloadSchemas)[T]>;

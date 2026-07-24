@@ -15,6 +15,7 @@ import { RenderRtorrentConfig } from '../application/torrent/RenderRtorrentConfi
 import { SetAllowPublicTracker } from '../application/torrent/SetAllowPublicTracker.js';
 import { SetSyncDisabled } from '../application/torrent/SetSyncDisabled.js';
 import { ApplyFirewall } from '../application/security/ApplyFirewall.js';
+import { RenderFail2ban } from '../application/security/RenderFail2ban.js';
 import type { SecuritySettings } from '../application/security/settings.js';
 import { ChangePassword } from '../application/user/ChangePassword.js';
 import { CreateUser } from '../application/user/CreateUser.js';
@@ -165,6 +166,7 @@ export interface SecurityUseCaseDeps {
   readonly addresses: UserAddressRepository;
   readonly identity: UserIdentityPort;
   readonly firewall: FirewallApplyPort;
+  readonly files: ManagedFilesPort;
   readonly reload: NetworkServicePort;
   readonly notifications: SecurityNotificationPort;
   readonly settings: SecuritySettings;
@@ -172,11 +174,13 @@ export interface SecurityUseCaseDeps {
 
 export interface SecurityUseCases {
   readonly applyFirewall: ApplyFirewall;
+  readonly renderFail2ban: RenderFail2ban;
 }
 
 export function buildSecurityUseCases(deps: SecurityUseCaseDeps): SecurityUseCases {
   return {
     applyFirewall: new ApplyFirewall(deps),
+    renderFail2ban: new RenderFail2ban(deps),
   };
 }
 

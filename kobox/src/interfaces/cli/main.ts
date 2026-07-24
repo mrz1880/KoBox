@@ -369,6 +369,15 @@ program
   });
 
 program
+  .command('render-fail2ban')
+  .description('re-render fail2ban jails (incl. publickey-flood) and reload when changed')
+  .action(async () => {
+    const c = container();
+    const id = await c.queue.enqueue(buildJob.renderFail2ban());
+    await done(c, `job ${String(id)} enqueued: render-fail2ban`);
+  });
+
+program
   .command('list-trackers')
   .description('print the tracker whitelist as JSON (operator view)')
   .action(async () => {

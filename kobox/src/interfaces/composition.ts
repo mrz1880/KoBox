@@ -25,7 +25,7 @@ import { IblocklistCatalogAdapter } from '../infrastructure/system/IblocklistCat
 import { Cidr } from '../domain/security/Cidr.js';
 import { GetentUserIdentityAdapter } from '../infrastructure/system/GetentUserIdentityAdapter.js';
 import { IptablesRestoreAdapter } from '../infrastructure/system/IptablesRestoreAdapter.js';
-import { NetworkServiceReloadAdapter } from '../infrastructure/system/NetworkServiceReloadAdapter.js';
+import { NetworkServiceAdapter } from '../infrastructure/system/NetworkServiceAdapter.js';
 import { OpensslTrackerCertAdapter } from '../infrastructure/system/OpensslTrackerCertAdapter.js';
 import { OpensslPasswordHasher } from '../infrastructure/system/OpensslPasswordHasher.js';
 import { ProcessSocketHealthProbe } from '../infrastructure/system/ProcessSocketHealthProbe.js';
@@ -134,7 +134,7 @@ export function buildContainer(name: string): Container {
   const iblocklistUser = process.env.KOBOX_IBLOCKLIST_USER;
   const iblocklistPin = process.env.KOBOX_IBLOCKLIST_PIN;
   const networkFiles = new RtorrentConfigAdapter(runner);
-  const networkServices = new NetworkServiceReloadAdapter(runner, logger);
+  const networkServices = new NetworkServiceAdapter(runner, logger);
   const trackerRepo = new SqliteTrackerRepository(db);
   const addressRepo = new SqliteUserAddressRepository(db);
   const notifications = new ConsoleNotificationAdapter(logger);
@@ -165,6 +165,7 @@ export function buildContainer(name: string): Container {
     addresses: addressRepo,
     identity: new GetentUserIdentityAdapter(runner),
     firewall: new IptablesRestoreAdapter(runner, networkFiles, healthProbe, settings.sshPort),
+    files: networkFiles,
     reload: networkServices,
     notifications,
     settings,
