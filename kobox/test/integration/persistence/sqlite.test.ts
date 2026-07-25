@@ -645,24 +645,24 @@ describe('SqliteComponentRegistry', () => {
   it('should_list_every_component_row_for_the_status_view', async () => {
     const registry = new SqliteComponentRegistry(db);
     await registry.markInstalled(ComponentName.parse('nginx'), Version.parse('1.22.1-9'), now);
-    await registry.markSkipped(ComponentName.parse('pgl'), 'not packaged', now);
+    await registry.markSkipped(ComponentName.parse('dnscrypt'), 'not packaged', now);
 
     const rows = await registry.list();
 
     expect(rows.map((row) => [row.name.value, row.state.value])).toEqual([
+      ['dnscrypt', 'skipped'],
       ['nginx', 'installed'],
-      ['pgl', 'skipped'],
     ]);
   });
 
   it('should_record_skips_with_reason_and_reset_back_to_to_install', async () => {
     const registry = new SqliteComponentRegistry(db);
-    const pgl = ComponentName.parse('pgl');
+    const dnscrypt = ComponentName.parse('dnscrypt');
 
-    await registry.markSkipped(pgl, 'pgl not packaged for Debian 12', now);
-    expect((await registry.get(pgl))?.state.value).toBe('skipped');
+    await registry.markSkipped(dnscrypt, 'dnscrypt-proxy not packaged for Debian 12', now);
+    expect((await registry.get(dnscrypt))?.state.value).toBe('skipped');
 
-    await registry.reset(pgl, '2026-07-24 13:00:00');
-    expect((await registry.get(pgl))?.state.value).toBe('to_install');
+    await registry.reset(dnscrypt, '2026-07-24 13:00:00');
+    expect((await registry.get(dnscrypt))?.state.value).toBe('to_install');
   });
 });

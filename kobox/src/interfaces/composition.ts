@@ -17,6 +17,8 @@ import { SystemFactsAdapter } from '../infrastructure/system/SystemFactsAdapter.
 import { createLogger, type Logger } from '../infrastructure/logging/logger.js';
 import { ConsoleNotificationAdapter } from '../infrastructure/notifications/ConsoleNotificationAdapter.js';
 import { DiscordChannel } from '../infrastructure/notifications/DiscordChannel.js';
+import type { BackupSettings } from '../application/maintenance/RunBackup.js';
+import { BackupHostAdapter } from '../infrastructure/system/BackupHostAdapter.js';
 import { MultiChannelNotifier } from '../infrastructure/notifications/MultiChannelNotifier.js';
 import { OutboxEmailChannel } from '../infrastructure/notifications/OutboxEmailChannel.js';
 import { SendmailTransport } from '../infrastructure/notifications/SendmailTransport.js';
@@ -158,6 +160,15 @@ export function securitySettings(): SecuritySettings {
 
 export const DEFAULT_DB_PATH = '/var/lib/kobox/kobox.db';
 export const DEFAULT_KOBOX_BIN = '/usr/local/bin/kobox';
+
+export function backupSettings(): BackupSettings {
+  return {
+    root: process.env.KOBOX_BACKUP_ROOT ?? '/var/backups/kobox',
+    ttlDays: envInt('KOBOX_BACKUP_TTL_DAYS', 7),
+    keepMin: envInt('KOBOX_BACKUP_KEEP_MIN', 3),
+    configDirs: ['/etc/kobox', '/etc/letsencrypt'],
+  };
+}
 
 // Snapshot of the KOBOX_* environment at install time: rendered into
 // /etc/kobox/worker.env (0600) so the systemd worker sees the same
@@ -374,6 +385,8 @@ export function buildContainer(name: string): Container {
   const maintenanceUseCases = buildMaintenanceUseCases({
     outbox,
     transport: new SendmailTransport(runner),
+    backupHost: new BackupHostAdapter(runner, db),
+    backupSettings: backupSettings(),
   });
   return {
     db,

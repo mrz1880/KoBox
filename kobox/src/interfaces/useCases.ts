@@ -14,8 +14,10 @@ import { ProvisionRtorrentInstance } from '../application/torrent/ProvisionRtorr
 import { RenderRtorrentConfig } from '../application/torrent/RenderRtorrentConfig.js';
 import { SetAllowPublicTracker } from '../application/torrent/SetAllowPublicTracker.js';
 import { SetSyncDisabled } from '../application/torrent/SetSyncDisabled.js';
+import type { BackupHostPort } from '../application/maintenance/BackupHostPort.js';
 import type { MailOutboxPort } from '../application/maintenance/MailOutboxPort.js';
 import type { MailTransportPort } from '../application/maintenance/MailTransportPort.js';
+import { RunBackup, type BackupSettings } from '../application/maintenance/RunBackup.js';
 import { SendMails } from '../application/maintenance/SendMails.js';
 import { ApplyFirewall } from '../application/security/ApplyFirewall.js';
 import { DeprovisionVpnUser } from '../application/security/DeprovisionVpnUser.js';
@@ -113,15 +115,19 @@ export function buildUseCases(deps: UseCaseDeps): UseCases {
 export interface MaintenanceUseCaseDeps {
   readonly outbox: MailOutboxPort;
   readonly transport: MailTransportPort;
+  readonly backupHost: BackupHostPort;
+  readonly backupSettings: BackupSettings;
 }
 
 export interface MaintenanceUseCases {
   readonly sendMails: SendMails;
+  readonly runBackup: RunBackup;
 }
 
 export function buildMaintenanceUseCases(deps: MaintenanceUseCaseDeps): MaintenanceUseCases {
   return {
     sendMails: new SendMails(deps),
+    runBackup: new RunBackup({ backupHost: deps.backupHost, settings: deps.backupSettings }),
   };
 }
 

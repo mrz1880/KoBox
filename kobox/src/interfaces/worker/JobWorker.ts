@@ -287,9 +287,11 @@ export class JobWorker {
       case 'send-mails':
         await this.maintenance.sendMails.execute({ now: nowStamp() });
         return;
-      // run-backup and apply-ipset land with their use cases later in this
-      // phase; an explicit error beats a silent no-op if enqueued early
       case 'run-backup':
+        await this.maintenance.runBackup.execute({ now: nowStamp() });
+        return;
+      // apply-ipset lands with its use case later in this phase; an explicit
+      // error beats a silent no-op if enqueued early
       case 'apply-ipset':
         throw new Error(`${job.type}: not implemented yet`);
       case 'add-user-address':

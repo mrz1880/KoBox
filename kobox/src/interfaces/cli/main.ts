@@ -10,12 +10,20 @@ import { ProxyPort } from '../../domain/user/Port.js';
 import { Quota } from '../../domain/user/Quota.js';
 import { Username } from '../../domain/user/Username.js';
 import { ConfigureMailRelay } from '../../application/maintenance/ConfigureMailRelay.js';
+import { RestoreBackup } from '../../application/maintenance/RestoreBackup.js';
+import { BackupHostAdapter } from '../../infrastructure/system/BackupHostAdapter.js';
 import { ExecFileRunner } from '../../infrastructure/system/CommandRunner.js';
 import { InstallHostAdapter } from '../../infrastructure/system/InstallHostAdapter.js';
 import { RtorrentConfigAdapter } from '../../infrastructure/system/RtorrentConfigAdapter.js';
 import { SystemdAdapter } from '../../infrastructure/system/SystemdAdapter.js';
 import { TorrentEventSpoolWriter } from '../../infrastructure/spool/TorrentEventSpool.js';
-import { buildContainer, buildInstallation, spoolDir, type Container } from '../composition.js';
+import {
+  buildContainer,
+  buildInstallation,
+  spoolDir,
+  DEFAULT_DB_PATH,
+  type Container,
+} from '../composition.js';
 import { buildJob } from './buildJob.js';
 
 async function readStdin(): Promise<string> {
@@ -633,6 +641,28 @@ program
       password,
     });
     process.stdout.write('postfix relay configured (sasl_passwd 0600, postmap, reload)\n');
+  });
+
+program
+  .command('restore-backup')
+  .argument('<backupDir>', 'backup directory (e.g. /var/backups/kobox/20260725T053000Z)')
+  .option('--yes', 'confirm the restore')
+  .description('restore the database from a backup (stops the worker; old DB kept aside)')
+  .action(async (backupDir: string, options: Record<string, boolean | undefined>) => {
+    if (options.yes !== true) {
+      throw new Error('refusing to restore without --yes');
+    }
+    // no container: opening the live DB here would hold the file we replace
+    const runner = new ExecFileRunner();
+    const restore = new RestoreBackup({
+      backupHost: new BackupHostAdapter(runner),
+      systemd: new SystemdAdapter(runner),
+      liveDbPath: process.env.KOBOX_DB ?? DEFAULT_DB_PATH,
+    });
+    const report = await restore.execute({ backupDir });
+    process.stdout.write(
+      `restored ${report.restoredFrom}\nprevious database kept at ${report.asidePath}\n`,
+    );
   });
 
 program

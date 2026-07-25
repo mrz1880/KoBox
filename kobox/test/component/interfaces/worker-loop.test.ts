@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { parseJob, type Job } from '../../../src/application/jobs/contract.js';
+import type { BackupHostPort } from '../../../src/application/maintenance/BackupHostPort.js';
 import type { MailDelivery } from '../../../src/application/maintenance/MailTransportPort.js';
 import { InMemoryMailOutbox } from '../../../src/infrastructure/persistence/InMemoryMailOutbox.js';
 import type { ClaimedJob, JobQueuePort } from '../../../src/application/jobs/JobQueuePort.js';
@@ -167,6 +168,27 @@ class RecordingMailTransport {
   }
 }
 
+class NoopBackupHost implements BackupHostPort {
+  ensureDir(): Promise<void> {
+    return Promise.resolve();
+  }
+  sqliteBackup(): Promise<void> {
+    return Promise.resolve();
+  }
+  archiveDir(): Promise<boolean> {
+    return Promise.resolve(true);
+  }
+  listBackups(): Promise<readonly string[]> {
+    return Promise.resolve([]);
+  }
+  removeBackup(): Promise<void> {
+    return Promise.resolve();
+  }
+  restoreDatabase(): Promise<string> {
+    return Promise.reject(new Error('not under test'));
+  }
+}
+
 let world: World;
 
 beforeEach(() => {
@@ -283,7 +305,12 @@ beforeEach(() => {
   const queue = new InMemoryJobQueue();
   const outbox = new InMemoryMailOutbox();
   const mailTransport = new RecordingMailTransport();
-  const maintenanceUseCases = buildMaintenanceUseCases({ outbox, transport: mailTransport });
+  const maintenanceUseCases = buildMaintenanceUseCases({
+    outbox,
+    transport: mailTransport,
+    backupHost: new NoopBackupHost(),
+    backupSettings: { root: '/var/backups/kobox', ttlDays: 7, keepMin: 3, configDirs: [] },
+  });
   world = {
     queue,
     accounts,
