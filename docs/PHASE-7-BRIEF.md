@@ -34,6 +34,14 @@ big-bang : coexistence, dry-run, rollback documenté.
   2. Webmin/Seedbox-Manager/Cakebox : liés/iframés mais pas encore composants d'install
      dédiés (si the owner les garde — cf. §7 AUDIT « scope v1 figé »).
   3. Pin ruTorrent officiel : process documenté (`docs/OPS.md`), pin à arrêter avec the owner.
+  4. **Durcissement portail (revue Phase 6, non bloquant)** : (a) composition dédiée au
+     portail qui n'instancie **pas** le `JobWorker` ni les adapters privilégiés — la
+     frontière §3.5 est aujourd'hui tenue par l'interface `PortalServerDeps` (sous-ensemble
+     non-privilégié) + le process non-root, pas par ce que le process construit ;
+     (b) `EnvironmentFile` propre au portail (aujourd'hui il partage `worker.env`, qui porte
+     `KOBOX_IBLOCKLIST_PIN`/`KOBOX_DISCORD_WEBHOOK`/`KOBOX_NTFY_URL` qu'il n'utilise pas) ;
+     (c) `ProtectSystem=strict` + `ReadWritePaths=/var/lib/kobox` sur l'unité (écarté en
+     Phase 6 car l'E2E d'install pose la DB sous `/tmp` — à régler avec une DB hors `/tmp`).
 
 ### 1. Lis d'abord (obligatoire)
 
