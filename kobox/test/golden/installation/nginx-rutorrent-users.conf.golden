@@ -1,0 +1,11 @@
+# KoBox-managed — DO NOT EDIT (rendered declaratively).
+location = /RPC-ALICE {
+    auth_request /internal/auth/rpc;
+    include scgi_params;
+    scgi_pass 127.0.0.1:51101;
+}
+location = /RPC-BOB {
+    auth_request /internal/auth/rpc;
+    include scgi_params;
+    scgi_pass 127.0.0.1:51102;
+}

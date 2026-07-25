@@ -123,6 +123,8 @@ export class JobWorker {
     // provisioned population changes
     if (job.type === 'provision-rtorrent' || job.type === 'deprovision-rtorrent') {
       await this.queue.enqueue(parseJob('apply-firewall', {}));
+      // and the per-user nginx /RPC-<USER> SCGI mounts (Phase 6)
+      await this.queue.enqueue(parseJob('render-rutorrent-users', {}));
     }
     if (hints?.fetchCertHost !== undefined) {
       await this.queue.enqueue(parseJob('fetch-tracker-cert', { host: hints.fetchCertHost }));
@@ -328,6 +330,9 @@ export class JobWorker {
         return;
       case 'apply-ipset':
         await this.trackers.applyIpset.execute();
+        return;
+      case 'render-rutorrent-users':
+        await this.torrents.renderRutorrentUsers.execute();
         return;
       case 'add-user-address':
       case 'remove-user-address': {

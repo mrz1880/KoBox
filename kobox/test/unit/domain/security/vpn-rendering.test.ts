@@ -109,7 +109,8 @@ describe('renderOpenVpnClientProfile', () => {
     const file = renderOpenVpnClientProfile(Username.parse('alice'), 'tun-gw', remote, vpn, material);
     expect(file.path).toBe('/etc/kobox/vpn-profiles/alice/kobox-tun-gw.ovpn');
     expect(file.mode).toBe('0640');
-    expect(file.group).toBe('alice');
+    // Phase 6: the portal group owns the profile so /access/ovpn can stream it
+    expect(file.group).toBe('kobox-portal');
     expect(file.content).toContain('remote seedbox.example.org 8193');
     expect(file.content).toContain('<ca>');
     expect(file.content).toContain('ALICE-FIXTURE');

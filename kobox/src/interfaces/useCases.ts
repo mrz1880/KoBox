@@ -13,6 +13,7 @@ import { DeprovisionRtorrentInstance } from '../application/torrent/DeprovisionR
 import { HandleTorrentEvent } from '../application/torrent/HandleTorrentEvent.js';
 import { ProvisionRtorrentInstance } from '../application/torrent/ProvisionRtorrentInstance.js';
 import { RenderRtorrentConfig } from '../application/torrent/RenderRtorrentConfig.js';
+import { RenderRutorrentUsers } from '../application/torrent/RenderRutorrentUsers.js';
 import { SetAllowPublicTracker } from '../application/torrent/SetAllowPublicTracker.js';
 import { SetSyncDisabled } from '../application/torrent/SetSyncDisabled.js';
 import type { BackupHostPort } from '../application/maintenance/BackupHostPort.js';
@@ -151,6 +152,8 @@ export interface TorrentUseCaseDeps {
   readonly announcers: AnnouncerSink;
   readonly templates: RtorrentTemplates;
   readonly settings: RenderSettings;
+  // nginx reload for the per-user /RPC-<USER> SCGI mounts (Phase 6)
+  readonly nginx: NetworkServicePort;
 }
 
 export interface TorrentUseCases {
@@ -161,6 +164,7 @@ export interface TorrentUseCases {
   readonly setSyncDisabled: SetSyncDisabled;
   readonly setAllowPublicTracker: SetAllowPublicTracker;
   readonly handleEvent: HandleTorrentEvent;
+  readonly renderRutorrentUsers: RenderRutorrentUsers;
 }
 
 export interface TrackerUseCaseDeps {
@@ -269,5 +273,10 @@ export function buildTorrentUseCases(deps: TorrentUseCaseDeps): TorrentUseCases 
     setSyncDisabled: new SetSyncDisabled(deps),
     setAllowPublicTracker: new SetAllowPublicTracker(deps),
     handleEvent: new HandleTorrentEvent(deps),
+    renderRutorrentUsers: new RenderRutorrentUsers({
+      users: deps.users,
+      files: deps.config,
+      reload: deps.nginx,
+    }),
   };
 }

@@ -155,6 +155,7 @@ interface World {
   certStore: FakeCertStore;
   download: FakeBlocklistDownload;
   networkFiles: FakeRtorrentConfig;
+  rutorrentFiles: FakeRtorrentConfig;
   blocklistCache: FakeBlocklistCache;
   firewall: FakeFirewallApply;
   identity: FakeUserIdentity;
@@ -232,11 +233,12 @@ beforeEach(() => {
   const instances = new InMemoryTorrentInstanceRepository();
   const torrents = new InMemoryTorrentRepository();
   const scripts = new FakeUserScriptRunner();
+  const rutorrentFiles = new FakeRtorrentConfig();
   const torrentUseCases = buildTorrentUseCases({
     users: repo,
     instances,
     torrents,
-    config: new FakeRtorrentConfig(),
+    config: rutorrentFiles,
     watchDirs: new FakeWatchDirs(),
     services,
     metainfo: new FakeTorrentMetainfo(),
@@ -245,6 +247,7 @@ beforeEach(() => {
     announcers: new FakeAnnouncerSink(),
     templates: loadRtorrentTemplates(),
     settings: { koboxBin: '/usr/local/bin/kobox' },
+    nginx: new FakeNetworkServices(),
   });
   const trackers = new InMemoryTrackerRepository();
   const blocklists = new InMemoryBlocklistRepository();
@@ -342,6 +345,7 @@ beforeEach(() => {
     certStore,
     download,
     networkFiles,
+    rutorrentFiles,
     blocklistCache,
     firewall,
     identity,
@@ -535,6 +539,16 @@ describe('security job chains (provision -> firewall)', () => {
     const content = world.firewall.applied.at(-1)?.content ?? '';
     expect(content).toContain(':kobox-u-alice - [0:0]');
     expect(content).toContain('-m owner --uid-owner 1001');
+  });
+
+  it('should_render_the_per_user_rpc_mounts_after_provisioning', async () => {
+    world.identity.setUid('alice', 1001);
+    await enqueueCreateAlice();
+
+    await world.worker.drain();
+
+    const include = world.rutorrentFiles.contentAt('/etc/nginx/kobox.d/rutorrent-users.conf');
+    expect(include).toContain('location = /RPC-ALICE');
   });
 
   it('should_reapply_the_firewall_after_deprovisioning', async () => {

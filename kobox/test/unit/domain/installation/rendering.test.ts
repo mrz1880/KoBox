@@ -12,6 +12,8 @@ import {
   renderFirewallBootUnit,
   renderNginxVhost,
   renderRutorrentConfig,
+  renderRutorrentUserConfig,
+  renderRutorrentUsersInclude,
   renderSshdDropin,
   renderSysctlTweaks,
   renderWorkerEnv,
@@ -93,11 +95,19 @@ describe('installation rendering', () => {
     expectGolden('sources.list.golden', file.content);
   });
 
-  it('should_render_a_deny_by_default_nginx_vhost_golden', () => {
+  it('should_render_a_session_authed_nginx_vhost_golden', () => {
     const file = renderNginxVhost({ portalPort: 8189 });
     expect(file.path).toBe('/etc/nginx/conf.d/kobox.conf');
     expect(file.content).toContain('listen 8189 ssl');
-    expect(file.content).toContain('auth_basic_user_file /etc/nginx/kobox.htpasswd');
+    // Phase 6: the shared Basic Auth is gone; the SSR portal owns auth
+    expect(file.content).not.toContain('auth_basic');
+    expect(file.content).not.toContain('kobox.htpasswd');
+    expect(file.content).toContain('proxy_pass http://127.0.0.1:8190');
+    expect(file.content).toContain('auth_request /internal/auth;');
+    // /ru is gated and forwards the authenticated user to php-fpm
+    expect(file.content).toContain('fastcgi_param REMOTE_USER $kobox_user;');
+    // per-user SCGI mounts are pulled from the rendered include dir
+    expect(file.content).toContain('include /etc/nginx/kobox.d/*.conf;');
     // the ACME webroot is always served on :80 so certbot can validate
     // before any certificate exists
     expect(file.content).toContain('listen 80;');
@@ -105,6 +115,36 @@ describe('installation rendering', () => {
     expect(file.content).toContain('root /var/www/acme;');
     expect(file.content).toContain('ssl-cert-snakeoil');
     expectGolden('nginx-kobox.conf.golden', file.content);
+  });
+
+  it('should_render_per_user_rpc_scgi_mounts_golden', () => {
+    const file = renderRutorrentUsersInclude([
+      { username: 'alice', scgiPort: 51101 },
+      { username: 'bob', scgiPort: 51102 },
+    ]);
+    expect(file.path).toBe('/etc/nginx/kobox.d/rutorrent-users.conf');
+    // legacy parity: uppercase /RPC-<USER> mount per user
+    expect(file.content).toContain('location = /RPC-ALICE');
+    expect(file.content).toContain('scgi_pass 127.0.0.1:51101;');
+    expect(file.content).toContain('location = /RPC-BOB');
+    expect(file.content).toContain('scgi_pass 127.0.0.1:51102;');
+    // each mount is gated to its owner (or an admin) by the portal
+    expect(file.content).toContain('auth_request /internal/auth/rpc;');
+    expectGolden('nginx-rutorrent-users.conf.golden', file.content);
+  });
+
+  it('should_render_an_empty_rpc_include_when_no_users_exist', () => {
+    const file = renderRutorrentUsersInclude([]);
+    expect(file.content).not.toContain('location = /RPC-');
+    expect(file.content).toContain('KoBox-managed');
+  });
+
+  it('should_render_a_per_user_rutorrent_config_golden', () => {
+    const file = renderRutorrentUserConfig({ username: 'alice', scgiPort: 51101 });
+    expect(file.path).toBe('/var/www/rutorrent/conf/users/alice/config.php');
+    expect(file.content).toContain('$scgi_port = 51101;');
+    expect(file.content).toContain("$XMLRPCMountPoint = '/RPC-ALICE';");
+    expectGolden('nginx-rutorrent-user-alice.php.golden', file.content);
   });
 
   it('should_switch_to_the_lets_encrypt_paths_once_a_cert_was_issued', () => {

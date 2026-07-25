@@ -371,6 +371,13 @@ export function buildContainer(name: string): Container {
     clock: nowStamp,
   });
   const queue = new SqliteJobQueue(db);
+  const networkServices = new NetworkServiceAdapter(runner, logger, {
+    // post-install contract: absent units are breakage, except components
+    // kobox install honestly skips (dnscrypt-proxy is not packaged for
+    // Debian 12)
+    strict: process.env.KOBOX_STRICT_SERVICES === '1',
+    tolerateAbsent: ['dnscrypt-proxy'],
+  });
   const torrentUseCases = buildTorrentUseCases({
     users: repo,
     instances: new SqliteTorrentInstanceRepository(db),
@@ -384,17 +391,11 @@ export function buildContainer(name: string): Container {
     announcers: new EnqueueAnnouncerSink(queue),
     templates: loadRtorrentTemplates(),
     settings: { koboxBin: process.env.KOBOX_BIN ?? DEFAULT_KOBOX_BIN },
+    nginx: networkServices,
   });
   const iblocklistUser = process.env.KOBOX_IBLOCKLIST_USER;
   const iblocklistPin = process.env.KOBOX_IBLOCKLIST_PIN;
   const networkFiles = new RtorrentConfigAdapter(runner);
-  const networkServices = new NetworkServiceAdapter(runner, logger, {
-    // post-install contract: absent units are breakage, except components
-    // kobox install honestly skips (dnscrypt-proxy is not packaged for
-    // Debian 12)
-    strict: process.env.KOBOX_STRICT_SERVICES === '1',
-    tolerateAbsent: ['dnscrypt-proxy'],
-  });
   const trackerRepo = new SqliteTrackerRepository(db);
   const blocklistRepo = new SqliteBlocklistRepository(db);
   const addressRepo = new SqliteUserAddressRepository(db);

@@ -178,13 +178,19 @@ export interface NginxVhostSettings {
 
 export const ACME_WEBROOT = '/var/www/acme';
 
-// Secure by default: auth_basic against an initially EMPTY htpasswd denies
-// everyone until the portal phase wires real accounts. Snakeoil TLS until
-// the letsencrypt component confirms an issued certificate. The :80 block
-// only serves ACME challenges (webroot) and shoves everything else to the
-// TLS portal.
+// The KoBox portal HTTP port (Phase 6): nginx reverse-proxies the SSR portal
+// and delegates /ru + /RPC-* protection to it via auth_request.
+export const PORTAL_HTTP_PORT = 8190;
+
+// Phase 6: the shared Basic Auth is retired. The SSR portal owns auth; nginx
+// proxies it on / and gates ruTorrent (/ru) and the per-user SCGI mounts
+// (/RPC-<USER>, pulled from the rendered include dir) with auth_request
+// subrequests to the portal. Snakeoil TLS until the letsencrypt component
+// confirms an issued certificate. The :80 block only serves ACME challenges
+// (webroot) and shoves everything else to the TLS portal.
 export function renderNginxVhost(settings: NginxVhostSettings): RenderedFile {
   const le = settings.letsencrypt;
+  const portal = `http://127.0.0.1:${String(PORTAL_HTTP_PORT)}`;
   const certLines = le
     ? [
         `    ssl_certificate /etc/letsencrypt/live/${le.domain}/fullchain.pem;`,
@@ -217,27 +223,103 @@ export function renderNginxVhost(settings: NginxVhostSettings): RenderedFile {
       `    server_name ${le ? le.domain : '_'};`,
       ...certLines,
       '',
-      '    auth_basic "KoBox";',
-      '    auth_basic_user_file /etc/nginx/kobox.htpasswd;',
+      '    # auth_request targets: the portal answers 204 (allow) or 401/403',
+      '    location = /internal/auth {',
+      '        internal;',
+      `        proxy_pass ${portal}/internal/auth;`,
+      '        proxy_pass_request_body off;',
+      '        proxy_set_header Content-Length "";',
+      '        proxy_set_header X-Original-URI $request_uri;',
+      '    }',
+      '    location = /internal/auth/rpc {',
+      '        internal;',
+      `        proxy_pass ${portal}/internal/auth/rpc;`,
+      '        proxy_pass_request_body off;',
+      '        proxy_set_header Content-Length "";',
+      '        proxy_set_header X-Original-URI $request_uri;',
+      '    }',
       '',
-      '    root /var/www/kobox;',
+      '    # the SSR portal (application auth, sessions, CSRF)',
+      '    location / {',
+      `        proxy_pass ${portal};`,
+      '        proxy_set_header Host $host;',
+      '        proxy_set_header X-Forwarded-For $remote_addr;',
+      '        proxy_set_header X-Forwarded-Proto https;',
+      '    }',
       '',
+      '    # ruTorrent, gated by the portal session; the authenticated user is',
+      '    # forwarded to php-fpm as REMOTE_USER for the per-user profile',
       '    location /ru/ {',
+      '        auth_request /internal/auth;',
+      '        auth_request_set $kobox_user $upstream_http_x_kobox_user;',
       '        alias /var/www/rutorrent/;',
-      '        index index.html index.php;',
+      '        index index.php;',
       '    }',
       '',
       '    location ~ ^/ru/(.+\\.php)$ {',
+      '        auth_request /internal/auth;',
+      '        auth_request_set $kobox_user $upstream_http_x_kobox_user;',
       '        include fastcgi_params;',
       '        fastcgi_param SCRIPT_FILENAME /var/www/rutorrent/$1;',
+      '        fastcgi_param REMOTE_USER $kobox_user;',
       '        fastcgi_pass unix:/run/php/php8.2-fpm.sock;',
       '    }',
+      '',
+      '    # per-user SCGI mounts (/RPC-<USER>), each gated to its owner or an admin',
+      '    include /etc/nginx/kobox.d/*.conf;',
       '}',
       '',
     ].join('\n'),
     mode: '0644',
     owner: 'root',
     group: 'root',
+  };
+}
+
+export interface RutorrentUserWiring {
+  readonly username: string;
+  readonly scgiPort: number;
+}
+
+// The per-user SCGI mounts: one `/RPC-<UPPERCASE>` location per active user
+// (legacy /RPC-<USER> parity), each gated by the portal to its owner (or an
+// admin). Rendered as a single include so nginx reloads see the whole set
+// atomically.
+export function renderRutorrentUsersInclude(users: readonly RutorrentUserWiring[]): RenderedFile {
+  const blocks = users.map((user) =>
+    [
+      `location = /RPC-${user.username.toUpperCase()} {`,
+      '    auth_request /internal/auth/rpc;',
+      '    include scgi_params;',
+      `    scgi_pass 127.0.0.1:${String(user.scgiPort)};`,
+      '}',
+    ].join('\n'),
+  );
+  return {
+    path: '/etc/nginx/kobox.d/rutorrent-users.conf',
+    content: [MANAGED_HEADER, ...blocks, ''].join('\n'),
+    mode: '0644',
+    owner: 'root',
+    group: 'root',
+  };
+}
+
+// The per-user ruTorrent config the multiuser layout reads for REMOTE_USER:
+// binds that user's SCGI mount so ruTorrent talks to their own rtorrent.
+export function renderRutorrentUserConfig(user: RutorrentUserWiring): RenderedFile {
+  return {
+    path: `/var/www/rutorrent/conf/users/${user.username}/config.php`,
+    content: [
+      '<?php',
+      '// KoBox-managed — DO NOT EDIT (rendered declaratively).',
+      `$scgi_port = ${String(user.scgiPort)};`,
+      "$scgi_host = '127.0.0.1';",
+      `$XMLRPCMountPoint = '/RPC-${user.username.toUpperCase()}';`,
+      '',
+    ].join('\n'),
+    mode: '0640',
+    owner: 'root',
+    group: 'www-data',
   };
 }
 

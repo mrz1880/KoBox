@@ -41,6 +41,12 @@ export class NetworkServiceAdapter implements NetworkServicePort, NetworkService
     }
   }
 
+  async reloadNginx(): Promise<void> {
+    if (await this.unitExists('nginx')) {
+      await this.run('systemctl', ['reload', 'nginx']);
+    }
+  }
+
   private async run(command: string, args: readonly string[]): Promise<void> {
     await runOrThrow(this.runner, { command, args: [...args], timeoutMs: RELOAD_TIMEOUT_MS });
   }

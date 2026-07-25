@@ -59,6 +59,7 @@ export interface DynDnsResolverPort {
 export interface NetworkServicePort {
   reloadFail2ban(): Promise<void>;
   reloadDns(): Promise<void>;
+  reloadNginx(): Promise<void>;
 }
 
 export interface DynDnsBinding {
