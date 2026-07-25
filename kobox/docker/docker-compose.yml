@@ -11,6 +11,8 @@ services:
       # mask the host's node_modules: native modules differ between macOS and linux
       - kobox_node_modules:/opt/KoBox/kobox/node_modules
       - /sys/fs/cgroup:/sys/fs/cgroup:rw
+      # pebble's test CA (read-only) for KOBOX_ACME_CA_BUNDLE
+      - pebble_test:/opt/pebble-test:ro
     tmpfs:
       - /tmp
       - /run
@@ -19,5 +21,19 @@ services:
       - KOBOX_DB=/var/lib/kobox/kobox.db
     stop_signal: SIGRTMIN+3
 
+  # Local ACME fixture for the letsencrypt E2E — certbot NEVER talks to the
+  # real Let's Encrypt from the tests. PEBBLE_VA_ALWAYS_VALID skips challenge
+  # validation (we test the certbot->nginx wiring, not pebble's VA). The
+  # pebble_test volume exposes pebble's minica CA to the kobox container
+  # (docker populates a fresh named volume from the image content).
+  pebble:
+    image: ghcr.io/letsencrypt/pebble:2.7.0
+    container_name: kobox-pebble
+    environment:
+      - PEBBLE_VA_ALWAYS_VALID=1
+    volumes:
+      - pebble_test:/test
+
 volumes:
   kobox_node_modules:
+  pebble_test:
