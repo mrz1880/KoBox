@@ -36,6 +36,9 @@ import type { NotificationPort } from '../domain/user/ports.js';
 import { KoboxDatabase } from '../infrastructure/persistence/db.js';
 import { SqliteBlocklistRepository } from '../infrastructure/persistence/SqliteBlocklistRepository.js';
 import { SqliteJobQueue } from '../infrastructure/persistence/SqliteJobQueue.js';
+import { SqliteLoginAttemptsRepository } from '../infrastructure/persistence/SqliteLoginAttemptsRepository.js';
+import { SqlitePortalCredentialsRepository } from '../infrastructure/persistence/SqlitePortalCredentialsRepository.js';
+import { SqlitePortalSessionRepository } from '../infrastructure/persistence/SqlitePortalSessionRepository.js';
 import { SqlitePortAllocator } from '../infrastructure/persistence/SqlitePortAllocator.js';
 import { SqliteTorrentInstanceRepository } from '../infrastructure/persistence/SqliteTorrentInstanceRepository.js';
 import { SqliteTorrentRepository } from '../infrastructure/persistence/SqliteTorrentRepository.js';
@@ -328,6 +331,9 @@ export interface Container {
   readonly spoolSweeper: TorrentEventSpoolSweeper;
   readonly fairUseRepo: SqliteFairUseRepository;
   readonly usageMeter: IptablesUsageMeterAdapter;
+  readonly credentials: SqlitePortalCredentialsRepository;
+  readonly sessions: SqlitePortalSessionRepository;
+  readonly loginAttempts: SqliteLoginAttemptsRepository;
 }
 
 export function buildContainer(name: string): Container {
@@ -345,6 +351,9 @@ export function buildContainer(name: string): Container {
   const services = new SystemdServiceControlAdapter(runner);
   const outbox = new SqliteMailOutbox(db);
   const notifications = buildNotifier(logger, outbox);
+  const credentials = new SqlitePortalCredentialsRepository(db);
+  const sessions = new SqlitePortalSessionRepository(db);
+  const loginAttempts = new SqliteLoginAttemptsRepository(db);
   const useCases = buildUseCases({
     repo,
     accounts: new SystemAccountAdapter(runner),
@@ -353,6 +362,9 @@ export function buildContainer(name: string): Container {
     services,
     notifications,
     allocator: new SqlitePortAllocator(db),
+    credentials,
+    sessions,
+    clock: nowStamp,
   });
   const queue = new SqliteJobQueue(db);
   const torrentUseCases = buildTorrentUseCases({
@@ -453,6 +465,7 @@ export function buildContainer(name: string): Container {
       trackerUseCases,
       securityUseCases,
       maintenanceUseCases,
+      outbox,
     ),
     hasher: new OpensslPasswordHasher(runner),
     repo,
@@ -464,5 +477,8 @@ export function buildContainer(name: string): Container {
     ),
     fairUseRepo,
     usageMeter: new IptablesUsageMeterAdapter(runner),
+    credentials,
+    sessions,
+    loginAttempts,
   };
 }

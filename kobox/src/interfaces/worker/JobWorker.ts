@@ -1,5 +1,7 @@
 import { parseJob, type Job } from '../../application/jobs/contract.js';
 import type { JobQueuePort } from '../../application/jobs/JobQueuePort.js';
+import type { MailOutboxPort } from '../../application/maintenance/MailOutboxPort.js';
+import { parseRole } from '../../domain/portal/Role.js';
 import { DynDnsHost } from '../../domain/security/DynDnsHost.js';
 import { IpAddress } from '../../domain/shared/IpAddress.js';
 import { TrackerHost } from '../../domain/tracker/TrackerHost.js';
@@ -45,6 +47,7 @@ export class JobWorker {
     private readonly trackers: TrackerUseCases,
     private readonly security: SecurityUseCases,
     private readonly maintenance: MaintenanceUseCases,
+    private readonly outbox: MailOutboxPort,
   ) {}
 
   async processNext(): Promise<boolean> {
@@ -85,6 +88,21 @@ export class JobWorker {
       await this.queue.enqueue(parseJob('provision-rtorrent', { username: job.payload.username }));
       // Phase 3 debt #2: client cert issuance rides the same seam
       await this.queue.enqueue(parseJob('provision-vpn-user', { username: job.payload.username }));
+      // welcome mail through the durable outbox — never a password in it
+      await this.outbox.enqueue(
+        {
+          recipient: job.payload.email,
+          subject: 'Your KoBox account is ready',
+          body: [
+            `Hello ${job.payload.username},`,
+            '',
+            'Your seedbox account has been created. Sign in to the portal with',
+            'your username and the password you were given, then change it from',
+            'the "Password" page.',
+          ].join('\n'),
+        },
+        nowStamp(),
+      );
     }
     if (job.type === 'delete-user') {
       await this.queue.enqueue(
@@ -138,6 +156,7 @@ export class JobWorker {
           quota: Quota.bytes(job.payload.quotaBytes),
           proxyPort: ProxyPort.parse(job.payload.proxyPort),
           passwordHash: HashedPassword.parse(job.payload.passwordHash),
+          role: parseRole(job.payload.role),
         });
         return;
       case 'delete-user':
@@ -285,6 +304,21 @@ export class JobWorker {
         });
       case 'evaluate-fair-use':
         await this.security.evaluateFairUse.execute({ now: nowStamp() });
+        return;
+      case 'set-fair-use-override':
+        await this.security.setFairUseOverride.execute({
+          username: Username.parse(job.payload.username),
+          ...(job.payload.egressLimitBps !== undefined && {
+            egressLimitBps: job.payload.egressLimitBps,
+          }),
+          ...(job.payload.authRatePerHour !== undefined && {
+            authRatePerHour: job.payload.authRatePerHour,
+          }),
+          ...(job.payload.throttleToBps !== undefined && {
+            throttleToBps: job.payload.throttleToBps,
+          }),
+          now: nowStamp(),
+        });
         return;
       case 'send-mails':
         await this.maintenance.sendMails.execute({ now: nowStamp() });

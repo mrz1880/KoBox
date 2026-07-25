@@ -19,6 +19,8 @@ import { InMemoryTorrentInstanceRepository } from '../../../src/infrastructure/p
 import { InMemoryTorrentRepository } from '../../../src/infrastructure/persistence/InMemoryTorrentRepository.js';
 import { InMemoryTrackerRepository } from '../../../src/infrastructure/persistence/InMemoryTrackerRepository.js';
 import { InMemoryUserAddressRepository } from '../../../src/infrastructure/persistence/InMemoryUserAddressRepository.js';
+import { InMemoryPortalCredentialsRepository } from '../../../src/infrastructure/persistence/InMemoryPortalCredentialsRepository.js';
+import { InMemoryPortalSessionRepository } from '../../../src/infrastructure/persistence/InMemoryPortalSessionRepository.js';
 import { InMemoryUserRepository } from '../../../src/infrastructure/persistence/InMemoryUserRepository.js';
 import { FakeBlocklistCache } from '../../../src/infrastructure/system/fakes/FakeBlocklistCache.js';
 import { FakeBlocklistDownload } from '../../../src/infrastructure/system/fakes/FakeBlocklistDownload.js';
@@ -206,6 +208,8 @@ beforeEach(() => {
   const notifications = new FakeNotifications();
   let nextScgi = 51101;
   let nextRtorrent = 45000;
+  const credentials = new InMemoryPortalCredentialsRepository();
+  const sessions = new InMemoryPortalSessionRepository();
   const useCases = buildUseCases({
     repo,
     accounts,
@@ -213,6 +217,9 @@ beforeEach(() => {
     sftp,
     services,
     notifications,
+    credentials,
+    sessions,
+    clock: () => '2026-07-25 10:00:00',
     allocator: {
       allocateScgiPort: () =>
         import('../../../src/domain/user/Port.js').then((m) => m.ScgiPort.parse(nextScgi++)),
@@ -351,6 +358,7 @@ beforeEach(() => {
       trackerUseCases,
       securityUseCases,
       maintenanceUseCases,
+      outbox,
     ),
   };
 });
@@ -381,6 +389,18 @@ describe('CLI enqueue -> root worker loop (the privilege seam)', () => {
     expect(await world.accounts.accountExists(alice)).toBe(true);
     // provisioning is a separate chained job: not yet executed after one step
     expect(await world.services.isUserServiceRunning(alice)).toBe(false);
+  });
+
+  it('should_enqueue_a_welcome_mail_without_any_password_in_it', async () => {
+    await enqueueCreateAlice();
+
+    await world.worker.drain();
+
+    const recent = await world.outbox.listRecent(10);
+    const welcome = recent.find((mail) => mail.subject.includes('ready'));
+    expect(welcome?.recipient).toBe('alice@example.org');
+    expect(welcome?.body).toContain('alice');
+    expect(welcome?.body).not.toContain('s3cretpw');
   });
 
   it('should_chain_the_user_blocklist_filter_render_after_provisioning', async () => {

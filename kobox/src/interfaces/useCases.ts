@@ -23,6 +23,7 @@ import { SendMails } from '../application/maintenance/SendMails.js';
 import { ApplyFirewall } from '../application/security/ApplyFirewall.js';
 import { DeprovisionVpnUser } from '../application/security/DeprovisionVpnUser.js';
 import { EvaluateFairUse } from '../application/security/EvaluateFairUse.js';
+import { SetFairUseOverride } from '../application/security/SetFairUseOverride.js';
 import { ProvisionVpnUser } from '../application/security/ProvisionVpnUser.js';
 import { ManageUserHostname } from '../application/security/ManageUserHostname.js';
 import { RenderFail2ban } from '../application/security/RenderFail2ban.js';
@@ -75,6 +76,7 @@ import type {
   VpnPkiProvisionPort,
 } from '../domain/security/ports.js';
 import type { RenderSettings, RtorrentTemplates } from '../domain/torrent/rendering.js';
+import type { PortalCredentialsPort, SessionStorePort } from '../domain/portal/ports.js';
 import type { PortAllocatorPort } from '../domain/user/PortAllocatorPort.js';
 import type {
   HealthProbePort,
@@ -94,6 +96,9 @@ export interface UseCaseDeps {
   readonly services: ServiceControlPort;
   readonly notifications: NotificationPort;
   readonly allocator: PortAllocatorPort;
+  readonly credentials: PortalCredentialsPort;
+  readonly sessions: SessionStorePort;
+  readonly clock: () => string;
 }
 
 export interface UseCases {
@@ -230,6 +235,7 @@ export interface SecurityUseCaseDeps {
 
 export interface SecurityUseCases {
   readonly applyFirewall: ApplyFirewall;
+  readonly setFairUseOverride: SetFairUseOverride;
   readonly renderFail2ban: RenderFail2ban;
   readonly manageUserHostname: ManageUserHostname;
   readonly resolveDynDns: ResolveDynDns;
@@ -249,6 +255,7 @@ export function buildSecurityUseCases(deps: SecurityUseCaseDeps): SecurityUseCas
     provisionVpnUser: new ProvisionVpnUser(deps),
     deprovisionVpnUser: new DeprovisionVpnUser(deps),
     evaluateFairUse: new EvaluateFairUse(deps),
+    setFairUseOverride: new SetFairUseOverride(deps),
   };
 }
 

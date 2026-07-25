@@ -79,6 +79,7 @@ program
         quota: Quota.gib(Number(options.quotaGib ?? '500')),
         proxyPort: ProxyPort.parse(Number(options.proxyPort ?? '8080')),
         passwordHash: hash,
+        role: options.admin === undefined ? 'user' : 'admin',
       });
       await done(c, `user ${username} created`);
       return;
