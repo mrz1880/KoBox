@@ -193,6 +193,39 @@ export const usageSamples = sqliteTable('usage_samples', {
   sampledAt: text('sampled_at').notNull(),
 });
 
+// Durable mail outbox (legacy `mails` queue, AUDIT §1.7): notifications land
+// here and the scheduled send-mails job flushes them with typed backoff —
+// a relay outage delays mail instead of losing it.
+export const mails = sqliteTable(
+  'mails',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    recipient: text('recipient').notNull(),
+    subject: text('subject').notNull(),
+    body: text('body').notNull(),
+    status: text('status', { enum: ['pending', 'sent', 'failed'] })
+      .notNull()
+      .default('pending'),
+    attempts: integer('attempts').notNull().default(0),
+    nextAttemptAt: text('next_attempt_at').notNull(),
+    lastError: text('last_error'),
+    createdAt: text('created_at').notNull(),
+    sentAt: text('sent_at'),
+  },
+  (table) => [index('mails_status_next_attempt_idx').on(table.status, table.nextAttemptAt)],
+);
+
+// Upgrade ledger (§5.6 anti-GitHubRepoUpdate): every staged release leaves a
+// truthful row; `current`/`previous` drive the rollback path.
+export const releases = sqliteTable('releases', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  ref: text('ref').notNull(),
+  path: text('path').notNull().unique(),
+  state: text('state', { enum: ['staged', 'current', 'previous', 'failed'] }).notNull(),
+  createdAt: text('created_at').notNull(),
+  switchedAt: text('switched_at'),
+});
+
 export const jobs = sqliteTable('jobs', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   type: text('type').notNull(),
