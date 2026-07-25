@@ -12,7 +12,13 @@ import { HashedPassword } from '../../domain/user/HashedPassword.js';
 import { ProxyPort } from '../../domain/user/Port.js';
 import { Quota } from '../../domain/user/Quota.js';
 import { Username } from '../../domain/user/Username.js';
-import type { SecurityUseCases, TorrentUseCases, TrackerUseCases, UseCases } from '../useCases.js';
+import type {
+  MaintenanceUseCases,
+  SecurityUseCases,
+  TorrentUseCases,
+  TrackerUseCases,
+  UseCases,
+} from '../useCases.js';
 
 // What a completed job asks the worker to enqueue next. Use cases stay
 // queue-agnostic: they return reports, the worker turns them into jobs.
@@ -38,6 +44,7 @@ export class JobWorker {
     private readonly torrents: TorrentUseCases,
     private readonly trackers: TrackerUseCases,
     private readonly security: SecurityUseCases,
+    private readonly maintenance: MaintenanceUseCases,
   ) {}
 
   async processNext(): Promise<boolean> {
@@ -107,6 +114,8 @@ export class JobWorker {
     }
     if (hints?.blocklistsUpdated === true) {
       await this.queue.enqueue(parseJob('render-blocklist-filters', {}));
+      // fresh merged ranges reach the kernel set too (pgl successor)
+      await this.queue.enqueue(parseJob('apply-ipset', {}));
     }
     if (hints?.firewallDirty === true) {
       await this.queue.enqueue(parseJob('apply-firewall', {}));
@@ -276,6 +285,15 @@ export class JobWorker {
         });
       case 'evaluate-fair-use':
         await this.security.evaluateFairUse.execute({ now: nowStamp() });
+        return;
+      case 'send-mails':
+        await this.maintenance.sendMails.execute({ now: nowStamp() });
+        return;
+      case 'run-backup':
+        await this.maintenance.runBackup.execute({ now: nowStamp() });
+        return;
+      case 'apply-ipset':
+        await this.trackers.applyIpset.execute();
         return;
       case 'add-user-address':
       case 'remove-user-address': {

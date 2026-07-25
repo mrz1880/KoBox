@@ -9,8 +9,22 @@ import { Password } from '../../domain/user/Password.js';
 import { ProxyPort } from '../../domain/user/Port.js';
 import { Quota } from '../../domain/user/Quota.js';
 import { Username } from '../../domain/user/Username.js';
+import { ConfigureMailRelay } from '../../application/maintenance/ConfigureMailRelay.js';
+import { RestoreBackup } from '../../application/maintenance/RestoreBackup.js';
+import { BackupHostAdapter } from '../../infrastructure/system/BackupHostAdapter.js';
+import { ExecFileRunner } from '../../infrastructure/system/CommandRunner.js';
+import { InstallHostAdapter } from '../../infrastructure/system/InstallHostAdapter.js';
+import { RtorrentConfigAdapter } from '../../infrastructure/system/RtorrentConfigAdapter.js';
+import { SystemdAdapter } from '../../infrastructure/system/SystemdAdapter.js';
 import { TorrentEventSpoolWriter } from '../../infrastructure/spool/TorrentEventSpool.js';
-import { buildContainer, buildInstallation, spoolDir, type Container } from '../composition.js';
+import {
+  buildContainer,
+  buildInstallation,
+  buildUpgrade,
+  spoolDir,
+  DEFAULT_DB_PATH,
+  type Container,
+} from '../composition.js';
 import { buildJob } from './buildJob.js';
 
 async function readStdin(): Promise<string> {
@@ -288,10 +302,17 @@ program
   .action(async () => {
     const c = container();
     const today = new Date().toISOString().slice(0, 10);
-    const id = await c.queue.enqueue(buildJob.renewTrackerCerts({ today }));
-    await done(c, `job ${String(id)} enqueued: renew-tracker-certs ${today}`);
+    const id = await c.queue.enqueueUnique(buildJob.renewTrackerCerts({ today }));
+    await done(
+      c,
+      id === undefined
+        ? `renew-tracker-certs ${today} already pending`
+        : `job ${String(id)} enqueued: renew-tracker-certs ${today}`,
+    );
   });
 
+// cron re-runs these blindly every tick: enqueueUnique keeps a stopped
+// worker from accumulating a duplicate backlog (they are all idempotent)
 function parameterlessTrackerCommand(
   name: 'import-blocklist-catalog' | 'update-blocklists' | 'render-whitelist',
   description: string,
@@ -302,8 +323,11 @@ function parameterlessTrackerCommand(
     .description(description)
     .action(async () => {
       const c = container();
-      const id = await c.queue.enqueue(build());
-      await done(c, `job ${String(id)} enqueued: ${name}`);
+      const id = await c.queue.enqueueUnique(build());
+      await done(
+        c,
+        id === undefined ? `${name} already pending` : `job ${String(id)} enqueued: ${name}`,
+      );
     });
 }
 
@@ -319,9 +343,21 @@ parameterlessTrackerCommand(
 );
 parameterlessTrackerCommand(
   'render-whitelist',
-  're-render BIND zones, dnscrypt blocked-names and PGL allow.p2p',
+  're-render the BIND blacklist zones and dnscrypt blocked-names',
   () => buildJob.renderWhitelist(),
 );
+
+program
+  .command('apply-ipset')
+  .description('load the merged blocklist into the kernel kobox-bl ipset (atomic swap)')
+  .action(async () => {
+    const c = container();
+    const id = await c.queue.enqueueUnique(buildJob.applyIpset());
+    await done(
+      c,
+      id === undefined ? 'apply-ipset already pending' : `job ${String(id)} enqueued: apply-ipset`,
+    );
+  });
 
 program
   .command('render-blocklist-filters')
@@ -405,8 +441,13 @@ program
   .description('re-resolve DynDNS hostnames; refreshes whitelist/firewall/fail2ban on change')
   .action(async () => {
     const c = container();
-    const id = await c.queue.enqueue(buildJob.resolveDynDns());
-    await done(c, `job ${String(id)} enqueued: resolve-dyndns`);
+    const id = await c.queue.enqueueUnique(buildJob.resolveDynDns());
+    await done(
+      c,
+      id === undefined
+        ? 'resolve-dyndns already pending'
+        : `job ${String(id)} enqueued: resolve-dyndns`,
+    );
   });
 
 program
@@ -414,8 +455,37 @@ program
   .description('meter usage per user and run the graduated response (cron entry point)')
   .action(async () => {
     const c = container();
-    const id = await c.queue.enqueue(buildJob.evaluateFairUse());
-    await done(c, `job ${String(id)} enqueued: evaluate-fair-use`);
+    const id = await c.queue.enqueueUnique(buildJob.evaluateFairUse());
+    await done(
+      c,
+      id === undefined
+        ? 'evaluate-fair-use already pending'
+        : `job ${String(id)} enqueued: evaluate-fair-use`,
+    );
+  });
+
+program
+  .command('send-mails')
+  .description('flush the pending mail outbox through the Postfix relay (cron entry point)')
+  .action(async () => {
+    const c = container();
+    const id = await c.queue.enqueueUnique(buildJob.sendMails());
+    await done(
+      c,
+      id === undefined ? 'send-mails already pending' : `job ${String(id)} enqueued: send-mails`,
+    );
+  });
+
+program
+  .command('run-backup')
+  .description('dump the database and KoBox configs into a TTL-rotated backup (cron entry point)')
+  .action(async () => {
+    const c = container();
+    const id = await c.queue.enqueueUnique(buildJob.runBackup());
+    await done(
+      c,
+      id === undefined ? 'run-backup already pending' : `job ${String(id)} enqueued: run-backup`,
+    );
   });
 
 program
@@ -560,6 +630,95 @@ program
     } finally {
       c.db.close();
     }
+  });
+
+program
+  .command('configure-mail-relay')
+  .requiredOption('--host <fqdn>', 'SMTP relay hostname')
+  .requiredOption('--port <port>', 'SMTP relay port (e.g. 587)')
+  .requiredOption('--user <login>', 'SASL login (password read from stdin)')
+  .description('wire Postfix to an authenticated SMTP relay (direct root, secret stays on disk 0600)')
+  .action(async (options: Record<string, string>) => {
+    // no container: this command touches Postfix only, never the database
+    const password = await readStdin();
+    const runner = new ExecFileRunner();
+    const configure = new ConfigureMailRelay({
+      files: new RtorrentConfigAdapter(runner),
+      host: new InstallHostAdapter(runner),
+      systemd: new SystemdAdapter(runner),
+    });
+    await configure.execute({
+      host: options.host ?? '',
+      port: Number(options.port ?? '0'),
+      user: options.user ?? '',
+      password,
+    });
+    process.stdout.write('postfix relay configured (sasl_passwd 0600, postmap, reload)\n');
+  });
+
+program
+  .command('migrate')
+  .description('apply pending database migrations and exit (used by kobox upgrade)')
+  .action(async () => {
+    // migrations run inside KoboxDatabase.open — reaching this line means
+    // the schema is current
+    const c = container();
+    await done(c, 'database schema is up to date');
+  });
+
+program
+  .command('upgrade')
+  .option('--to <ref>', 'git tag or commit to upgrade to (pinned, verified to exist)')
+  .option('--rollback', 'switch back to the previous release')
+  .option('--offline', 'skip git fetch (air-gapped or already-fetched repos)')
+  .description('transactional upgrade: staged worktree, build, backup, migrate, atomic switch')
+  .action(async (options: Record<string, string | boolean | undefined>) => {
+    const c = container();
+    try {
+      const upgrade = buildUpgrade(c);
+      const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
+      if (options.rollback === true) {
+        const report = await upgrade.rollback({ now });
+        process.stdout.write(`rolled back to ${report.to} (${report.path})\n`);
+        return;
+      }
+      const to = typeof options.to === 'string' ? options.to : '';
+      if (to === '') {
+        throw new Error('kobox upgrade requires --to <ref> (or --rollback)');
+      }
+      const report = await upgrade.execute({
+        to,
+        now,
+        ...(options.offline === true && { offline: true }),
+      });
+      process.stdout.write(
+        `upgraded ${report.from ?? '(unrecorded)'} -> ${report.to} (${report.sha})\nDB backup: ${report.backupDir}\n`,
+      );
+    } finally {
+      c.db.close();
+    }
+  });
+
+program
+  .command('restore-backup')
+  .argument('<backupDir>', 'backup directory (e.g. /var/backups/kobox/20260725T053000Z)')
+  .option('--yes', 'confirm the restore')
+  .description('restore the database from a backup (stops the worker; old DB kept aside)')
+  .action(async (backupDir: string, options: Record<string, boolean | undefined>) => {
+    if (options.yes !== true) {
+      throw new Error('refusing to restore without --yes');
+    }
+    // no container: opening the live DB here would hold the file we replace
+    const runner = new ExecFileRunner();
+    const restore = new RestoreBackup({
+      backupHost: new BackupHostAdapter(runner),
+      systemd: new SystemdAdapter(runner),
+      liveDbPath: process.env.KOBOX_DB ?? DEFAULT_DB_PATH,
+    });
+    const report = await restore.execute({ backupDir });
+    process.stdout.write(
+      `restored ${report.restoredFrom}\nprevious database kept at ${report.asidePath}\n`,
+    );
   });
 
 program

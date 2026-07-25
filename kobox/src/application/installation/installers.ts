@@ -8,9 +8,12 @@ import type {
   SystemFacts,
   SystemdPort,
 } from '../../domain/installation/ports.js';
+import type { CertbotPort } from '../maintenance/CertbotPort.js';
 import {
+  ACME_WEBROOT,
   renderAptSources,
   renderBindLocal,
+  renderCertbotDeployHook,
   renderBindOptions,
   renderDnscryptConfig,
   renderFirewallBootUnit,
@@ -20,7 +23,10 @@ import {
   renderSysctlTweaks,
   renderWorkerEnv,
   renderWorkerUnit,
+  type NginxVhostSettings,
 } from '../../domain/installation/rendering.js';
+import { renderCronFile } from '../../domain/maintenance/rendering.js';
+import type { IpsetPort } from '../../domain/tracker/ports.js';
 import type { VpnPkiPort, VpnPkiProvisionPort } from '../../domain/security/ports.js';
 import { VPN_VARIANTS, renderOpenVpnServer } from '../../domain/security/vpn.js';
 import type { ManagedFilesPort, RenderedFile } from '../../domain/shared/files.js';
@@ -28,13 +34,24 @@ import type { SecuritySettings } from '../security/settings.js';
 
 export interface InstallSettings {
   readonly nodeBin: string;
-  readonly workerMain: string;
+  // the running source tree (linked as `current` on first install) and the
+  // symlink the worker unit executes through — upgrades flip the link only
+  readonly sourceDir: string;
+  readonly currentLink: string;
+  readonly koboxBin: string;
   readonly manageAptSources: boolean;
   // release pin for the vendored ruTorrent archive (env-driven: shipping a
   // baked sha for a moving upstream would be a lie) — unset = honest skip
   readonly rutorrentUrl?: string;
   readonly rutorrentSha256?: string;
   readonly quotaFs?: string;
+  // env-driven: KOBOX_LE_DOMAIN/KOBOX_LE_EMAIL (+ KOBOX_ACME_URL for the
+  // pebble fixture); unset = honest skip, snakeoil stays
+  readonly letsencrypt?: {
+    readonly domain: string;
+    readonly email: string;
+    readonly acmeUrl?: string;
+  };
   readonly workerEnv: ReadonlyMap<string, string>;
 }
 
@@ -44,6 +61,8 @@ export interface InstallerContext {
   readonly systemd: SystemdPort;
   readonly checks: ConfigCheckPort;
   readonly host: InstallHostPort;
+  readonly ipset: IpsetPort;
+  readonly certbot: CertbotPort;
   readonly pki: VpnPkiPort;
   readonly pkiProvision: VpnPkiProvisionPort;
   readonly artifacts: ArtifactFetchPort;
@@ -125,6 +144,7 @@ const RUTORRENT_DIR = '/var/www/rutorrent';
 const RUTORRENT_MARKER = `${RUTORRENT_DIR}/.kobox-artifact-sha256`;
 const RUTORRENT_ARCHIVE = '/var/tmp/kobox/rutorrent.tar.gz';
 const ZONES_SEED = '/etc/bind/kobox.zones.blacklists';
+const CRON_FILE = '/etc/cron.d/kobox';
 const BLOCKED_NAMES_SEED = '/etc/dnscrypt-proxy/blocked-names.txt';
 
 function installed(version?: string, detail?: string): InstallOutcome {
@@ -145,9 +165,15 @@ class KoboxCoreInstaller implements ComponentInstaller {
     await host.ensureDir('/etc/kobox', '0755');
     await host.ensureDir('/var/lib/kobox', '0700');
     await host.ensureDir('/var/spool/kobox/events', '1733');
+    // first install: current -> the tree the installer runs from; upgrades
+    // own the link afterwards (ensureSymlink never overwrites an existing one)
+    await host.ensureSymlink(install.currentLink, install.sourceDir);
     await files.apply([
       renderWorkerEnv(install.workerEnv),
-      renderWorkerUnit({ nodeBin: install.nodeBin, workerMain: install.workerMain }),
+      renderWorkerUnit({
+        nodeBin: install.nodeBin,
+        workerMain: `${install.currentLink}/dist/interfaces/worker/main.js`,
+      }),
       renderFirewallBootUnit(),
     ]);
     await systemd.daemonReload();
@@ -267,8 +293,13 @@ class NginxInstaller implements ComponentInstaller {
   constructor(private readonly ctx: InstallerContext) {}
 
   async install(): Promise<InstallOutcome> {
-    const { packages, host, systemd, checks, security } = this.ctx;
+    const { packages, host, systemd, checks } = this.ctx;
     await packages.ensureInstalled(['nginx', 'php-fpm', 'ssl-cert']);
+    // stock Debian ships sites-enabled/default with `listen 80
+    // default_server`: while that symlink exists it swallows every HTTP-01
+    // challenge (server_name _ never matches a Host) and Let's Encrypt can
+    // never validate — remove it; sites-available/default stays untouched
+    await host.removeFile('/etc/nginx/sites-enabled/default');
     // deny-by-default: an EMPTY htpasswd rejects everyone until the portal
     // phase wires real accounts; an existing file is never overwritten
     await host.ensureFile({
@@ -281,7 +312,7 @@ class NginxInstaller implements ComponentInstaller {
     const changed = await guardedApply(
       this.ctx,
       this.name,
-      [renderNginxVhost({ portalPort: security.portalPort })],
+      [renderNginxVhost(await nginxVhostSettings(this.ctx))],
       () => checks.nginx(),
     );
     await systemd.enable('nginx', { now: true });
@@ -434,30 +465,116 @@ class DnscryptInstaller implements ComponentInstaller {
   }
 }
 
-class PglInstaller implements ComponentInstaller {
-  readonly name = 'pgl';
+// Shared with NginxInstaller: once a live chain exists for the configured
+// domain, EVERY vhost render uses it — a full re-install must never flap the
+// portal back to snakeoil.
+async function nginxVhostSettings(ctx: InstallerContext): Promise<NginxVhostSettings> {
+  const le = ctx.install.letsencrypt;
+  if (le && (await ctx.host.pathExists(`/etc/letsencrypt/live/${le.domain}/fullchain.pem`))) {
+    return { portalPort: ctx.security.portalPort, letsencrypt: { domain: le.domain } };
+  }
+  return { portalPort: ctx.security.portalPort };
+}
+
+class LetsencryptInstaller implements ComponentInstaller {
+  readonly name = 'letsencrypt';
 
   constructor(private readonly ctx: InstallerContext) {}
 
   async install(): Promise<InstallOutcome> {
-    if (!(await this.ctx.packages.isAvailable('pgld'))) {
-      // the legacy shipped vendored Qt4-era debs; Debian 12 has neither —
-      // rtorrent-side enforcement (per-user ipv4_filter) keeps working
+    const { packages, host, files, systemd, checks, certbot, install } = this.ctx;
+    const le = install.letsencrypt;
+    if (!le) {
       return {
         state: 'skipped',
         reason:
-          'pgl is not packaged for Debian 12 (legacy used vendored Qt4 debs); ipset-based replacement deferred to Phase 5',
+          'no public FQDN configured — set KOBOX_LE_DOMAIN and KOBOX_LE_EMAIL, then re-run kobox install (snakeoil certificate stays)',
       };
     }
-    await this.ctx.packages.ensureInstalled(['pgld', 'pglcmd']);
-    await this.ctx.systemd.enable('pgl', { now: true });
-    return installed(await this.ctx.packages.installedVersion('pgld'));
+    await packages.ensureInstalled(['certbot']);
+    await host.ensureDir(ACME_WEBROOT, '0755');
+    // the :80 ACME block is already part of the nginx vhost — certbot can
+    // validate through the running server (webroot, no downtime)
+    await certbot.obtain({
+      domain: le.domain,
+      email: le.email,
+      webroot: ACME_WEBROOT,
+      ...(le.acmeUrl !== undefined && { acmeUrl: le.acmeUrl }),
+    });
+    const changed = await guardedApply(
+      this.ctx,
+      this.name,
+      [renderNginxVhost(await nginxVhostSettings(this.ctx))],
+      () => checks.nginx(),
+    );
+    if (changed.length > 0) {
+      await systemd.reloadOrRestart('nginx');
+    }
+    await files.apply([renderCertbotDeployHook()]);
+    await systemd.enable('certbot.timer', { now: true });
+    return installed(await packages.installedVersion('certbot'));
   }
 
   async uninstall(): Promise<void> {
-    if (await this.ctx.systemd.isActive('pgl')) {
-      await this.ctx.systemd.disable('pgl', { now: true });
+    const { host, systemd, checks } = this.ctx;
+    await host.removeFile('/etc/letsencrypt/renewal-hooks/deploy/kobox-nginx');
+    await systemd.disable('certbot.timer', { now: true });
+    // certificates are operator data and stay; the vhost falls back to
+    // snakeoil only when nginx re-installs
+    if (await this.ctx.systemd.isActive('nginx')) {
+      await guardedApply(
+        this.ctx,
+        this.name,
+        [renderNginxVhost({ portalPort: this.ctx.security.portalPort })],
+        () => checks.nginx(),
+      );
+      await systemd.reloadOrRestart('nginx');
     }
+  }
+}
+
+class IpsetInstaller implements ComponentInstaller {
+  readonly name = 'ipset';
+
+  constructor(private readonly ctx: InstallerContext) {}
+
+  async install(): Promise<InstallOutcome> {
+    const { packages, ipset } = this.ctx;
+    await packages.ensureInstalled(['ipset']);
+    // the tool can be present while the kernel lacks ip_set (containers):
+    // probe by actually creating the live set
+    if (!(await ipset.ensureBlocklistSet())) {
+      return {
+        state: 'skipped',
+        reason:
+          'kernel lacks ip_set support (container?) — rtorrent ipv4_filter enforcement continues; re-run kobox install on a host with the module',
+      };
+    }
+    return installed(await packages.installedVersion('ipset'));
+  }
+
+  async uninstall(): Promise<void> {
+    // the in-kernel set evaporates at reboot; the package stays (harmless)
+  }
+}
+
+class SchedulerInstaller implements ComponentInstaller {
+  readonly name = 'scheduler';
+
+  constructor(private readonly ctx: InstallerContext) {}
+
+  async install(): Promise<InstallOutcome> {
+    const { packages, files, systemd, install } = this.ctx;
+    // cron ships active on Debian 12; ensureInstalled is a fast no-op then
+    await packages.ensureInstalled(['cron']);
+    await files.apply([renderCronFile({ koboxBin: install.koboxBin })]);
+    await systemd.enable('cron', { now: true });
+    return installed(await packages.installedVersion('cron'));
+  }
+
+  async uninstall(): Promise<void> {
+    // cron itself is a stock Debian service, not ours — only the file goes
+    await this.ctx.host.removeFile(CRON_FILE);
   }
 }
 
@@ -561,7 +678,9 @@ export function buildInstallers(ctx: InstallerContext): ReadonlyMap<string, Comp
     new RutorrentInstaller(ctx),
     new BindInstaller(ctx),
     new DnscryptInstaller(ctx),
-    new PglInstaller(ctx),
+    new IpsetInstaller(ctx),
+    new LetsencryptInstaller(ctx),
+    new SchedulerInstaller(ctx),
     new Fail2banInstaller(ctx),
     new OpenVpnInstaller(ctx),
     new PostfixInstaller(ctx),

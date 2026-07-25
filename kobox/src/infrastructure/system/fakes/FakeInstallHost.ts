@@ -12,6 +12,8 @@ export class FakeInstallHost implements ManagedFilesPort, InstallHostPort, Artif
   readonly dirs = new Map<string, string>();
   readonly preseeded: string[] = [];
   readonly postconfSettings: Record<string, string> = {};
+  readonly postmapped: string[] = [];
+  readonly symlinks = new Map<string, string>();
   readonly quotaActivated: string[] = [];
   readonly fetched: [string, string][] = [];
   readonly extracted: [string, string][] = [];
@@ -31,6 +33,10 @@ export class FakeInstallHost implements ManagedFilesPort, InstallHostPort, Artif
 
   contentAt(path: string): string | undefined {
     return this.files.get(path)?.content;
+  }
+
+  fileAt(path: string): RenderedFile | undefined {
+    return this.files.get(path);
   }
 
   hostname(): Promise<string> {
@@ -63,6 +69,14 @@ export class FakeInstallHost implements ManagedFilesPort, InstallHostPort, Artif
     return Promise.resolve(true);
   }
 
+  ensureSymlink(linkPath: string, target: string): Promise<boolean> {
+    if (this.symlinks.has(linkPath)) {
+      return Promise.resolve(false);
+    }
+    this.symlinks.set(linkPath, target);
+    return Promise.resolve(true);
+  }
+
   extractTarGz(archive: string, destDir: string): Promise<void> {
     this.extracted.push([archive, destDir]);
     return Promise.resolve();
@@ -75,6 +89,11 @@ export class FakeInstallHost implements ManagedFilesPort, InstallHostPort, Artif
 
   postconf(settings: Readonly<Record<string, string>>): Promise<void> {
     Object.assign(this.postconfSettings, settings);
+    return Promise.resolve();
+  }
+
+  postmap(path: string): Promise<void> {
+    this.postmapped.push(path);
     return Promise.resolve();
   }
 

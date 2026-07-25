@@ -5,10 +5,12 @@ import {
   type ComponentInstaller,
   type InstallerContext,
 } from '../../../../src/application/installation/installers.js';
+import type { CertbotRequest } from '../../../../src/application/maintenance/CertbotPort.js';
 import type { SystemFacts } from '../../../../src/domain/installation/ports.js';
 import { Cidr } from '../../../../src/domain/security/Cidr.js';
 import { FakeConfigChecks } from '../../../../src/infrastructure/system/fakes/FakeConfigChecks.js';
 import { FakeInstallHost } from '../../../../src/infrastructure/system/fakes/FakeInstallHost.js';
+import { FakeIpset } from '../../../../src/infrastructure/system/fakes/FakeIpset.js';
 import { FakePackages } from '../../../../src/infrastructure/system/fakes/FakePackages.js';
 import { FakeSystemd } from '../../../../src/infrastructure/system/fakes/FakeSystemd.js';
 import { FakeVpnPki } from '../../../../src/infrastructure/system/fakes/FakeVpnPki.js';
@@ -29,7 +31,31 @@ interface World {
   readonly systemd: FakeSystemd;
   readonly checks: FakeConfigChecks;
   readonly pki: FakeVpnPki;
+  readonly ipset: FakeIpset;
+  readonly certbot: FakeCertbot;
   readonly installers: ReadonlyMap<string, ComponentInstaller>;
+}
+
+// records requests and materializes the live chain like real certbot would
+class FakeCertbot {
+  readonly requests: CertbotRequest[] = [];
+  failWith: string | undefined = undefined;
+
+  constructor(private readonly host: FakeInstallHost) {}
+
+  async obtain(request: CertbotRequest): Promise<void> {
+    if (this.failWith !== undefined) {
+      throw new Error(this.failWith);
+    }
+    this.requests.push(request);
+    await this.host.ensureFile({
+      path: `/etc/letsencrypt/live/${request.domain}/fullchain.pem`,
+      content: 'CHAIN',
+      mode: '0644',
+      owner: 'root',
+      group: 'root',
+    });
+  }
 }
 
 function buildWorld(overrides?: {
@@ -37,18 +63,23 @@ function buildWorld(overrides?: {
   manageAptSources?: boolean;
   quotaFs?: string;
   rutorrentPin?: 'none';
+  letsencrypt?: { domain: string; email: string; acmeUrl?: string };
 }): World {
   const packages = new FakePackages();
   const host = new FakeInstallHost();
   const systemd = new FakeSystemd();
   const checks = new FakeConfigChecks();
   const pki = new FakeVpnPki();
+  const ipset = new FakeIpset();
+  const certbot = new FakeCertbot(host);
   const ctx: InstallerContext = {
     packages,
     files: host,
     systemd,
     checks,
     host,
+    ipset,
+    certbot,
     pki,
     pkiProvision: pki,
     artifacts: host,
@@ -67,17 +98,20 @@ function buildWorld(overrides?: {
     },
     install: {
       nodeBin: '/usr/bin/node',
-      workerMain: '/opt/kobox/dist/interfaces/worker/main.js',
+      sourceDir: '/opt/kobox-src',
+      currentLink: '/opt/kobox/current',
+      koboxBin: '/usr/local/bin/kobox',
       manageAptSources: overrides?.manageAptSources ?? false,
       ...(overrides?.rutorrentPin !== 'none' && {
         rutorrentUrl: 'https://releases.example.net/rutorrent-4.3.9.tar.gz',
         rutorrentSha256: 'a'.repeat(64),
       }),
       ...(overrides?.quotaFs !== undefined && { quotaFs: overrides.quotaFs }),
+      ...(overrides?.letsencrypt !== undefined && { letsencrypt: overrides.letsencrypt }),
       workerEnv: new Map([['KOBOX_DB', '/var/lib/kobox/kobox.db']]),
     },
   };
-  return { packages, host, systemd, checks, pki, installers: buildInstallers(ctx) };
+  return { packages, host, systemd, checks, pki, ipset, certbot, installers: buildInstallers(ctx) };
 }
 
 function installer(world: World, name: string): ComponentInstaller {
@@ -102,9 +136,12 @@ describe('kobox-core installer', () => {
     expect(world.host.dirs.get('/etc/kobox')).toBe('0755');
     expect(world.host.dirs.get('/var/lib/kobox')).toBe('0700');
     expect(world.host.dirs.get('/var/spool/kobox/events')).toBe('1733');
+    // the unit executes THROUGH the current symlink: upgrades flip the link,
+    // never the unit (§5.6 versioned releases)
     expect(world.host.contentAt('/etc/systemd/system/kobox-worker.service')).toContain(
-      'ExecStart=/usr/bin/node /opt/kobox/dist/interfaces/worker/main.js',
+      'ExecStart=/usr/bin/node /opt/kobox/current/dist/interfaces/worker/main.js',
     );
+    expect(world.host.symlinks.get('/opt/kobox/current')).toBe('/opt/kobox-src');
     expect(world.host.contentAt('/etc/kobox/worker.env')).toContain(
       'KOBOX_DB=/var/lib/kobox/kobox.db',
     );
@@ -167,6 +204,25 @@ describe('sshd installer (the never-break-SSH guard)', () => {
 });
 
 describe('nginx installer', () => {
+  it('should_remove_the_debian_default_site_that_would_swallow_the_acme_port', async () => {
+    // stock Debian nginx ships sites-enabled/default with `listen 80
+    // default_server`: while it exists, every HTTP-01 challenge lands on the
+    // wrong vhost and Let's Encrypt issuance can never validate
+    await world.host.apply([
+      {
+        path: '/etc/nginx/sites-enabled/default',
+        content: 'server { listen 80 default_server; }',
+        mode: '0644',
+        owner: 'root',
+        group: 'root',
+      },
+    ]);
+
+    await installer(world, 'nginx').install();
+
+    expect(world.host.contentAt('/etc/nginx/sites-enabled/default')).toBeUndefined();
+  });
+
   it('should_install_render_the_vhost_and_seed_an_empty_htpasswd_once', async () => {
     await installer(world, 'nginx').install();
 
@@ -279,14 +335,113 @@ describe('dnscrypt installer', () => {
   });
 });
 
-describe('pgl installer', () => {
-  it('should_skip_honestly_on_debian_12_where_pgl_is_not_packaged', async () => {
-    world.packages.markUnavailable('pgld');
-
-    const outcome = await installer(world, 'pgl').install();
+describe('letsencrypt installer', () => {
+  it('should_skip_with_guidance_when_no_public_fqdn_is_configured', async () => {
+    const outcome = await installer(world, 'letsencrypt').install();
 
     expect(outcome).toMatchObject({ state: 'skipped' });
-    expect(outcome.state === 'skipped' && outcome.reason).toContain('not packaged');
+    expect(outcome.state === 'skipped' && outcome.reason).toContain('KOBOX_LE_DOMAIN');
+    // snakeoil stays: no vhost rewrite happened
+    expect(world.certbot.requests).toEqual([]);
+  });
+
+  it('should_obtain_the_cert_via_webroot_and_flip_the_vhost_to_the_live_chain', async () => {
+    const w = buildWorld({ letsencrypt: { domain: 'box.example.org', email: 'ops@example.org' } });
+    await installer(w, 'nginx').install(); // snakeoil first
+
+    const outcome = await installer(w, 'letsencrypt').install();
+
+    expect(outcome.state).toBe('installed');
+    expect(w.packages.installed).toContain('certbot');
+    expect(w.host.dirs.get('/var/www/acme')).toBe('0755');
+    expect(w.certbot.requests).toEqual([
+      { domain: 'box.example.org', email: 'ops@example.org', webroot: '/var/www/acme' },
+    ]);
+    const vhost = w.host.contentAt('/etc/nginx/conf.d/kobox.conf') ?? '';
+    expect(vhost).toContain('ssl_certificate /etc/letsencrypt/live/box.example.org/fullchain.pem;');
+    expect(vhost).not.toContain('snakeoil');
+    expect(w.host.contentAt('/etc/letsencrypt/renewal-hooks/deploy/kobox-nginx')).toContain(
+      'systemctl reload nginx',
+    );
+    expect(w.systemd.log).toContain('enable-now certbot.timer');
+  });
+
+  it('should_fail_the_component_and_keep_snakeoil_when_issuance_fails', async () => {
+    const w = buildWorld({ letsencrypt: { domain: 'box.example.org', email: 'ops@example.org' } });
+    await installer(w, 'nginx').install();
+    w.certbot.failWith = 'challenge failed';
+
+    await expect(installer(w, 'letsencrypt').install()).rejects.toThrow('challenge failed');
+
+    expect(w.host.contentAt('/etc/nginx/conf.d/kobox.conf')).toContain('snakeoil');
+  });
+
+  it('should_pass_a_custom_acme_directory_through_to_certbot', async () => {
+    const w = buildWorld({
+      letsencrypt: {
+        domain: 'box.example.org',
+        email: 'ops@example.org',
+        acmeUrl: 'https://acme.example.net:14000/dir',
+      },
+    });
+    await installer(w, 'nginx').install();
+
+    await installer(w, 'letsencrypt').install();
+
+    expect(w.certbot.requests[0]?.acmeUrl).toBe('https://acme.example.net:14000/dir');
+  });
+
+  it('should_render_the_live_chain_directly_on_nginx_re_runs_once_issued', async () => {
+    // anti-drift: a full re-install must not flap the vhost back to snakeoil
+    const w = buildWorld({ letsencrypt: { domain: 'box.example.org', email: 'ops@example.org' } });
+    await installer(w, 'nginx').install();
+    await installer(w, 'letsencrypt').install();
+
+    await installer(w, 'nginx').install();
+
+    expect(w.host.contentAt('/etc/nginx/conf.d/kobox.conf')).not.toContain('snakeoil');
+  });
+});
+
+describe('ipset installer', () => {
+  it('should_install_the_tool_and_create_the_live_set', async () => {
+    const outcome = await installer(world, 'ipset').install();
+
+    expect(outcome.state).toBe('installed');
+    expect(world.packages.installed).toContain('ipset');
+    expect(world.ipset.ensured).toBe(1);
+  });
+
+  it('should_skip_honestly_when_the_kernel_lacks_ip_set', async () => {
+    world.ipset.supported = false;
+
+    const outcome = await installer(world, 'ipset').install();
+
+    expect(outcome).toMatchObject({ state: 'skipped' });
+    expect(outcome.state === 'skipped' && outcome.reason).toContain('kernel');
+  });
+});
+
+describe('scheduler installer', () => {
+  it('should_render_the_declarative_cron_file_and_activate_cron', async () => {
+    const outcome = await installer(world, 'scheduler').install();
+
+    expect(outcome.state).toBe('installed');
+    expect(world.packages.installed).toContain('cron');
+    const content = world.host.contentAt('/etc/cron.d/kobox');
+    expect(content).toContain('*/5 * * * * root /usr/local/bin/kobox send-mails');
+    expect(content).toContain('30 5 * * * root /usr/local/bin/kobox run-backup');
+    expect(world.systemd.log).toContain('enable-now cron');
+  });
+
+  it('should_uninstall_by_removing_the_cron_file_only', async () => {
+    await installer(world, 'scheduler').install();
+
+    await installer(world, 'scheduler').uninstall();
+
+    expect(world.host.contentAt('/etc/cron.d/kobox')).toBeUndefined();
+    // cron itself stays: it is a stock Debian service, not ours
+    expect(world.systemd.log).not.toContain('disable-now cron');
   });
 });
 

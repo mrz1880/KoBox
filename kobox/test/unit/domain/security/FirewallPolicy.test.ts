@@ -41,6 +41,7 @@ const users: readonly FirewallUser[] = [
 const settings = {
   sshPort: 22,
   portalPort: 8189,
+  blocklistSet: false,
   vpn: {
     tunGwPort: 8193,
     tunPort: 8194,
@@ -51,8 +52,15 @@ const settings = {
   },
 } as const;
 
-function policyWith(policyUsers: readonly FirewallUser[]): FirewallPolicy {
-  return FirewallPolicy.create({ ...settings, users: policyUsers });
+function policyWith(
+  policyUsers: readonly FirewallUser[],
+  opts?: { blocklistSet?: boolean },
+): FirewallPolicy {
+  return FirewallPolicy.create({
+    ...settings,
+    users: policyUsers,
+    blocklistSet: opts?.blocklistSet ?? false,
+  });
 }
 
 describe('FirewallPolicy', () => {
@@ -87,7 +95,8 @@ describe('FirewallPolicy', () => {
 
 describe('renderFirewallRules', () => {
   it('should_render_the_complete_ruleset_deterministically', () => {
-    const file = renderFirewallRules(policyWith(users));
+    // golden documents the full variant (ipset available)
+    const file = renderFirewallRules(policyWith(users, { blocklistSet: true }));
     expect(file.path).toBe('/etc/kobox/firewall.rules');
     expect(file.mode).toBe('0600');
     expect(file.owner).toBe('root');
@@ -117,24 +126,34 @@ describe('renderFirewallRules', () => {
     expect(content).not.toMatch(/-A OUTPUT .*-j (DROP|REJECT)/);
   });
 
-  it('should_declare_the_pgl_seam_chain_and_jump_to_it_after_the_lifelines', () => {
-    const lines = renderFirewallRules(policyWith(users)).content.split('\n');
-    expect(lines).toContain(':pgl_in - [0:0]');
-    const pglIndex = lines.indexOf('-A INPUT -j pgl_in');
+  it('should_drop_blocklisted_sources_after_the_lifelines_when_the_ipset_is_available', () => {
+    // pgl retired (Phase 5): the kernel enforcement is one match-set rule
+    const lines = renderFirewallRules(policyWith(users, { blocklistSet: true })).content.split('\n');
+    expect(lines).not.toContain(':pgl_in - [0:0]');
+    const dropIndex = lines.indexOf('-A INPUT -m set --match-set kobox-bl src -j DROP');
     const establishedIndex = lines.indexOf(
       '-A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT',
     );
-    expect(pglIndex).toBeGreaterThan(establishedIndex);
+    const sshIndex = lines.indexOf('-A INPUT -p tcp --dport 22 -j ACCEPT');
+    expect(dropIndex).toBeGreaterThan(establishedIndex);
+    expect(dropIndex).toBeLessThan(sshIndex); // blocklisted IPs never reach services
   });
 
-  it('should_trust_declared_user_addresses_before_the_pgl_filter', () => {
-    const lines = renderFirewallRules(policyWith(users)).content.split('\n');
+  it('should_omit_the_match_set_rule_when_the_kernel_lacks_ipset', () => {
+    // containers without the ip_set module still get a loadable ruleset
+    const content = renderFirewallRules(policyWith(users, { blocklistSet: false })).content;
+    expect(content).not.toContain('--match-set');
+    expect(content).not.toContain('pgl_in');
+  });
+
+  it('should_trust_declared_user_addresses_before_the_blocklist_drop', () => {
+    const lines = renderFirewallRules(policyWith(users, { blocklistSet: true })).content.split('\n');
     const trusted = lines.indexOf(
       '-A INPUT -s 192.0.2.42 -m comment --comment "kobox:trusted:alice" -j ACCEPT',
     );
-    const pglIndex = lines.indexOf('-A INPUT -j pgl_in');
+    const dropIndex = lines.indexOf('-A INPUT -m set --match-set kobox-bl src -j DROP');
     expect(trusted).toBeGreaterThan(-1);
-    expect(trusted).toBeLessThan(pglIndex);
+    expect(trusted).toBeLessThan(dropIndex);
   });
 
   it('should_route_each_user_rtorrent_port_through_its_chain_with_metering', () => {

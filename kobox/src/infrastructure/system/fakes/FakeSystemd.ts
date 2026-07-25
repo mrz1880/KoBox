@@ -25,6 +25,12 @@ export class FakeSystemd implements SystemdPort {
     return Promise.resolve();
   }
 
+  stop(unit: string): Promise<void> {
+    this.log.push(`stop ${unit}`);
+    this.active.delete(unit);
+    return Promise.resolve();
+  }
+
   start(unit: string): Promise<void> {
     this.log.push(`start ${unit}`);
     this.active.add(unit);

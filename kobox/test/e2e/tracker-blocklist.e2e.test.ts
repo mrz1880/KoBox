@@ -36,7 +36,6 @@ const LISTS_HOST = 'lists.example.net';
 const LISTS_PORT = 8444;
 const FIXTURE_IP = '127.0.0.2';
 const PEM_PATH = `/etc/ssl/certs/${TRACKER_HOST}.pem`;
-const ALLOW_P2P = '/etc/pgl/allow.p2p';
 const ZONES = '/etc/bind/kobox.zones.blacklists';
 const BLOCKED_NAMES = '/etc/dnscrypt-proxy/blocked-names.txt';
 
@@ -216,7 +215,7 @@ describe.skipIf(!onDebianAsRoot)('E2E: tracker discovery, certs, whitelist and b
     };
 
     rmSync(PEM_PATH, { force: true });
-    for (const path of [ALLOW_P2P, ZONES, BLOCKED_NAMES]) {
+    for (const path of [ZONES, BLOCKED_NAMES, '/etc/kobox/blocklist.ipset']) {
       rmSync(path, { force: true });
     }
     try {
@@ -267,23 +266,21 @@ describe.skipIf(!onDebianAsRoot)('E2E: tracker discovery, certs, whitelist and b
 
   it('should_render_the_whitelist_files_with_users_and_trackers', async () => {
     kobox(['add-user-address', USER, '198.51.100.7']);
-    await drainQueue(); // address job + chained render-whitelist
+    await drainQueue(); // address job + chained renders
 
-    const allow = readFileSync(ALLOW_P2P, 'utf8');
-    expect(allow).toContain(`${USER}:198.51.100.7-255.255.255.255`);
-    expect(allow).toContain(`${TRACKER_HOST}:${FIXTURE_IP}-255.255.255.255`);
+    // allow.p2p died with pgl: the DNS files are the whitelist surface now
     expect(readFileSync(ZONES, 'utf8')).not.toContain(TRACKER_HOST); // active tracker
     expect(readFileSync(BLOCKED_NAMES, 'utf8')).not.toContain(TRACKER_HOST);
   });
 
   it('should_be_idempotent_on_a_forced_whitelist_render', async () => {
-    const before = statSync(ALLOW_P2P).mtimeMs;
+    const before = statSync(ZONES).mtimeMs;
 
     kobox(['render-whitelist']);
     await drainQueue();
 
     // unchanged content -> write-if-changed left the file untouched
-    expect(statSync(ALLOW_P2P).mtimeMs).toBe(before);
+    expect(statSync(ZONES).mtimeMs).toBe(before);
   });
 
   it('should_renew_a_due_certificate_via_the_cron_entry_point', async () => {
@@ -363,7 +360,6 @@ describe.skipIf(!onDebianAsRoot)('E2E: tracker discovery, certs, whitelist and b
       `zone "${TRACKER_HOST}" { type master; file "/etc/bind/db.empty"; };`,
     );
     expect(readFileSync(BLOCKED_NAMES, 'utf8')).toContain(TRACKER_HOST);
-    expect(readFileSync(ALLOW_P2P, 'utf8')).not.toContain(TRACKER_HOST);
     expect(existsSync(PEM_PATH)).toBe(false);
   });
 

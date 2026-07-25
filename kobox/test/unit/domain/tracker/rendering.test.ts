@@ -8,12 +8,11 @@ import { TrackerHost } from '../../../../src/domain/tracker/TrackerHost.js';
 import { TrackerPort } from '../../../../src/domain/tracker/TrackerPort.js';
 import { TrackerPrivacy } from '../../../../src/domain/tracker/TrackerPrivacy.js';
 import { TrackerProto } from '../../../../src/domain/tracker/TrackerProto.js';
-import type { UserAddress } from '../../../../src/domain/tracker/ports.js';
 import {
   mergeBlocklistRanges,
-  renderAllowP2p,
   renderBlacklistZones,
   renderBlockedNames,
+  renderIpsetRestore,
   renderUserBlocklistDropin,
   renderUserBlocklistFile,
 } from '../../../../src/domain/tracker/rendering.js';
@@ -52,12 +51,6 @@ const activeUdp = tracker('udp.example.io', 'udp', 6969, ['192.0.2.20']);
 const dead = tracker('dead.example.net', 'http', 80, []).markDead().tracker;
 const fixtures = [activeUdp, dead, activeHttps];
 
-const users: readonly UserAddress[] = [
-  { username: Username.parse('bob'), ip: IpAddress.parse('198.51.100.9') },
-  { username: Username.parse('alice'), ip: IpAddress.parse('198.51.100.7') },
-  { username: Username.parse('bob'), ip: IpAddress.parse('198.51.100.8') },
-];
-
 describe('renderBlacklistZones', () => {
   it('should_list_only_inactive_trackers_as_bind_zones', () => {
     const file = renderBlacklistZones(fixtures);
@@ -82,26 +75,44 @@ describe('renderBlockedNames', () => {
   });
 });
 
-describe('renderAllowP2p', () => {
-  it('should_allow_user_addresses_and_active_tracker_ips', () => {
-    const file = renderAllowP2p(users, fixtures);
-    expect(file.path).toBe('/etc/pgl/allow.p2p');
-    expect(file.content).toContain('alice:198.51.100.7-255.255.255.255');
-    expect(file.content).toContain('tracker.example.org:192.0.2.10-255.255.255.255');
-    expect(file.content).toContain('udp.example.io:192.0.2.20-255.255.255.255');
-    expect(file.content).not.toContain('dead.example.net');
-    expectGolden('allow.p2p.golden', file.content);
+describe('renderIpsetRestore', () => {
+  // pgl is retired (Phase 5): the merged ranges land in a kernel ipset via
+  // the atomic staging-set + swap pattern.
+  it('should_render_the_staging_swap_pattern_over_the_merged_ranges', () => {
+    const file = renderIpsetRestore(['9.9.9.9-9.9.9.9', '10.0.0.0/8', '192.0.2.0-192.0.2.255']);
+    expect(file.path).toBe('/etc/kobox/blocklist.ipset');
+    const lines = file.content.trimEnd().split('\n');
+    expect(lines[0]).toBe('create kobox-bl hash:net family inet maxelem 1048576 -exist');
+    expect(lines[1]).toBe('create kobox-bl-next hash:net family inet maxelem 1048576 -exist');
+    expect(lines[2]).toBe('flush kobox-bl-next');
+    expect(lines).toContain('add kobox-bl-next 10.0.0.0/8');
+    expect(lines).toContain('add kobox-bl-next 9.9.9.9-9.9.9.9');
+    expect(lines.at(-2)).toBe('swap kobox-bl kobox-bl-next');
+    expect(lines.at(-1)).toBe('destroy kobox-bl-next');
+    expectGolden('blocklist.ipset.golden', file.content);
   });
 
-  it('should_render_deterministically_regardless_of_input_order', () => {
-    const shuffled = renderAllowP2p([...users].reverse(), [...fixtures].reverse());
-    expect(shuffled.content).toBe(renderAllowP2p(users, fixtures).content);
+  it('should_drop_lines_that_are_not_plain_ranges_or_cidrs', () => {
+    const file = renderIpsetRestore([
+      '192.0.2.0/24',
+      '198.51.100.1-198.51.100.9',
+      '203.0.113.7',
+      '10.0.0.0/8 extra',
+      'add evil-set 1.2.3.4',
+      '1.2.3.4-',
+    ]);
+    const adds = file.content.split('\n').filter((line) => line.startsWith('add '));
+    expect(adds).toEqual([
+      'add kobox-bl-next 192.0.2.0/24',
+      'add kobox-bl-next 198.51.100.1-198.51.100.9',
+      'add kobox-bl-next 203.0.113.7',
+    ]);
   });
 
-  it('should_omit_empty_sections', () => {
-    const file = renderAllowP2p([], []);
-    expect(file.content).not.toContain('## Allow all KoBox users');
-    expect(file.content).not.toContain('## Trackers enabled');
+  it('should_render_an_empty_swap_when_there_are_no_ranges', () => {
+    const file = renderIpsetRestore([]);
+    expect(file.content).toContain('flush kobox-bl-next');
+    expect(file.content).not.toContain('add ');
   });
 });
 

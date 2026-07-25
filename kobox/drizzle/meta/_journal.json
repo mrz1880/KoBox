@@ -36,6 +36,13 @@
       "when": 1784957305851,
       "tag": "0004_phase4-installation",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1784990979333,
+      "tag": "0005_phase5-maintenance-ops",
+      "breakpoints": true
     }
   ]
 }

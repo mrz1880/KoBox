@@ -1,0 +1,3 @@
+#!/bin/sh
+# KoBox-managed — DO NOT EDIT (rendered declaratively).
+systemctl reload nginx

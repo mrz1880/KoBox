@@ -8,6 +8,8 @@ Wants=network-pre.target
 
 [Service]
 Type=oneshot
+ExecStartPre=-/usr/sbin/ipset create kobox-bl hash:net family inet maxelem 1048576 -exist
+ExecStartPre=-/usr/sbin/ipset restore -exist -file /etc/kobox/blocklist.ipset
 ExecStart=/usr/sbin/iptables-restore /etc/kobox/firewall.rules
 RemainAfterExit=yes
 

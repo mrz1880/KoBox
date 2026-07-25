@@ -2,10 +2,11 @@
 [Unit]
 Description=KoBox root worker (typed job queue consumer)
 After=network.target
+StartLimitIntervalSec=0
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/node /opt/kobox/dist/interfaces/worker/main.js
+ExecStart=/usr/bin/node /opt/kobox/current/dist/interfaces/worker/main.js
 EnvironmentFile=-/etc/kobox/worker.env
 Restart=on-failure
 RestartSec=2

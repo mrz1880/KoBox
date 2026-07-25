@@ -27,6 +27,7 @@ export interface SystemdPort {
   enable(unit: string, opts?: { readonly now?: boolean }): Promise<void>;
   disable(unit: string, opts?: { readonly now?: boolean }): Promise<void>;
   start(unit: string): Promise<void>;
+  stop(unit: string): Promise<void>;
   reloadOrRestart(unit: string): Promise<void>;
   isActive(unit: string): Promise<boolean>;
 }
@@ -52,9 +53,12 @@ export interface InstallHostPort {
   ensureDir(path: string, mode: string): Promise<void>;
   // creates the file only when absent; returns true when it was created
   ensureFile(file: RenderedFile): Promise<boolean>;
+  // creates the symlink only when absent; returns true when it was created
+  ensureSymlink(linkPath: string, target: string): Promise<boolean>;
   extractTarGz(archive: string, destDir: string): Promise<void>;
   applySysctl(): Promise<void>;
   postconf(settings: Readonly<Record<string, string>>): Promise<void>;
+  postmap(path: string): Promise<void>;
   preseedDebconf(selections: readonly string[]): Promise<void>;
   mountOptions(mountPoint: string): Promise<readonly string[]>;
   activateQuota(mountPoint: string): Promise<void>;

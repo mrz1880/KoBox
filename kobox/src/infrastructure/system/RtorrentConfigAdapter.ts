@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import type { RenderedFile, RtorrentConfigPort } from '../../domain/torrent/ports.js';
 import { runOrThrow, type CommandRunner } from './CommandRunner.js';
@@ -23,7 +23,10 @@ export class RtorrentConfigAdapter implements RtorrentConfigPort {
       }
       mkdirSync(dirname(file.path), { recursive: true });
       const temp = `${file.path}.kobox-tmp`;
-      writeFileSync(temp, file.content);
+      // born with the final mode: secrets (sasl_passwd) must never sit
+      // world-readable between write and the chmod below
+      writeFileSync(temp, file.content, { mode: parseInt(file.mode, 8) });
+      chmodSync(temp, parseInt(file.mode, 8)); // umask-proof
       renameSync(temp, file.path);
       await runOrThrow(this.runner, {
         command: 'chown',

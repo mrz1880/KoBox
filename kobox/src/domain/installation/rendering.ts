@@ -16,6 +16,10 @@ export function renderWorkerUnit(settings: WorkerUnitSettings): RenderedFile {
       '[Unit]',
       'Description=KoBox root worker (typed job queue consumer)',
       'After=network.target',
+      // the watchdog replacement promise: the worker never gives up — the
+      // default start-rate limit would leave the box jobless after a burst
+      // of restarts (upgrade + rollback) until a manual reset-failed
+      'StartLimitIntervalSec=0',
       '',
       '[Service]',
       'Type=simple',
@@ -51,6 +55,12 @@ export function renderFirewallBootUnit(): RenderedFile {
       '',
       '[Service]',
       'Type=oneshot',
+      // the ruleset may reference the kobox-bl ipset: the set must exist
+      // before the restore, and the rendered entries reload best-effort
+      // (`-` prefix: a kernel without ip_set must not fail the boot restore
+      // — the rules file on such a host carries no match-set rule anyway)
+      'ExecStartPre=-/usr/sbin/ipset create kobox-bl hash:net family inet maxelem 1048576 -exist',
+      'ExecStartPre=-/usr/sbin/ipset restore -exist -file /etc/kobox/blocklist.ipset',
       'ExecStart=/usr/sbin/iptables-restore /etc/kobox/firewall.rules',
       'RemainAfterExit=yes',
       '',
@@ -161,22 +171,51 @@ export function renderAptSources(): RenderedFile {
 
 export interface NginxVhostSettings {
   readonly portalPort: number;
+  // present once certbot issued a certificate: the vhost then serves the
+  // real chain instead of the snakeoil placeholder
+  readonly letsencrypt?: { readonly domain: string };
 }
+
+export const ACME_WEBROOT = '/var/www/acme';
 
 // Secure by default: auth_basic against an initially EMPTY htpasswd denies
 // everyone until the portal phase wires real accounts. Snakeoil TLS until
-// Let's Encrypt lands (Phase 5).
+// the letsencrypt component confirms an issued certificate. The :80 block
+// only serves ACME challenges (webroot) and shoves everything else to the
+// TLS portal.
 export function renderNginxVhost(settings: NginxVhostSettings): RenderedFile {
+  const le = settings.letsencrypt;
+  const certLines = le
+    ? [
+        `    ssl_certificate /etc/letsencrypt/live/${le.domain}/fullchain.pem;`,
+        `    ssl_certificate_key /etc/letsencrypt/live/${le.domain}/privkey.pem;`,
+      ]
+    : [
+        '    ssl_certificate /etc/ssl/certs/ssl-cert-snakeoil.pem;',
+        '    ssl_certificate_key /etc/ssl/private/ssl-cert-snakeoil.key;',
+      ];
   return {
     path: '/etc/nginx/conf.d/kobox.conf',
     content: [
       MANAGED_HEADER,
       'server {',
+      '    listen 80;',
+      '    server_name _;',
+      '',
+      '    location /.well-known/acme-challenge/ {',
+      `        root ${ACME_WEBROOT};`,
+      '    }',
+      '',
+      '    location / {',
+      `        return 301 https://$host:${String(settings.portalPort)}$request_uri;`,
+      '    }',
+      '}',
+      '',
+      'server {',
       // nginx 1.22 (Debian 12) syntax — `http2 on;` only exists from 1.25
       `    listen ${String(settings.portalPort)} ssl http2;`,
-      '    server_name _;',
-      '    ssl_certificate /etc/ssl/certs/ssl-cert-snakeoil.pem;',
-      '    ssl_certificate_key /etc/ssl/private/ssl-cert-snakeoil.key;',
+      `    server_name ${le ? le.domain : '_'};`,
+      ...certLines,
       '',
       '    auth_basic "KoBox";',
       '    auth_basic_user_file /etc/nginx/kobox.htpasswd;',
@@ -197,6 +236,19 @@ export function renderNginxVhost(settings: NginxVhostSettings): RenderedFile {
       '',
     ].join('\n'),
     mode: '0644',
+    owner: 'root',
+    group: 'root',
+  };
+}
+
+// Renewals ride the packaged certbot.timer; this hook makes nginx pick the
+// fresh chain up. deploy/ = runs only after an actual renewal, never on dry
+// runs or no-ops.
+export function renderCertbotDeployHook(): RenderedFile {
+  return {
+    path: '/etc/letsencrypt/renewal-hooks/deploy/kobox-nginx',
+    content: ['#!/bin/sh', '# KoBox-managed — DO NOT EDIT (rendered declaratively).', 'systemctl reload nginx', ''].join('\n'),
+    mode: '0755',
     owner: 'root',
     group: 'root',
   };

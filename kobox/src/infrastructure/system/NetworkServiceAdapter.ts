@@ -8,7 +8,7 @@ const RELOAD_TIMEOUT_MS = 15_000;
 export interface NetworkServiceOptions {
   // strict = post-install contract (KOBOX_STRICT_SERVICES=1): an absent unit
   // is breakage, not tolerance. tolerateAbsent lists the components honestly
-  // skipped by kobox install (pgl on Debian 12).
+  // skipped by kobox install (dnscrypt-proxy on Debian 12).
   readonly strict: boolean;
   readonly tolerateAbsent: readonly string[];
 }
@@ -17,7 +17,7 @@ const DEFAULT_OPTIONS: NetworkServiceOptions = { strict: false, tolerateAbsent: 
 
 // Real service management (replaces the Phase 2 best-effort adapter): a
 // failed reload now FAILS the calling job. The single tolerated case is an
-// absent unit (dev containers without bind9/pgl), detected explicitly via
+// absent unit (dev containers without bind9), detected explicitly via
 // systemctl list-unit-files and logged — never a blanket catch.
 export class NetworkServiceAdapter implements NetworkServicePort, NetworkServiceReloadPort {
   constructor(
@@ -38,12 +38,6 @@ export class NetworkServiceAdapter implements NetworkServicePort, NetworkService
     }
     if (await this.unitExists('dnscrypt-proxy')) {
       await this.run('systemctl', ['try-restart', 'dnscrypt-proxy']);
-    }
-  }
-
-  async reloadPeerGuardian(): Promise<void> {
-    if (await this.unitExists('pgl')) {
-      await this.run('pglcmd', ['reload']);
     }
   }
 

@@ -31,17 +31,22 @@ describe('ComponentName', () => {
       'rutorrent',
       'bind',
       'dnscrypt',
-      'pgl',
       'fail2ban',
       'openvpn',
       'postfix',
+      // Phase 5 additions (pgl is retired — ipset replaces it)
+      'scheduler',
+      'letsencrypt',
+      'ipset',
     ]) {
       expect(COMPONENT_NAMES).toContain(expected);
     }
+    expect(COMPONENT_NAMES).not.toContain('pgl');
   });
 
   it('should_reject_a_name_outside_the_closed_catalog', () => {
     expect(() => ComponentName.parse('netdata')).toThrow(InvalidComponentNameError);
+    expect(() => ComponentName.parse('pgl')).toThrow(InvalidComponentNameError);
     expect(() => ComponentName.parse('')).toThrow(InvalidComponentNameError);
     expect(() => ComponentName.parse('nginx; rm -rf /')).toThrow(InvalidComponentNameError);
   });

@@ -12,6 +12,10 @@ function queueRecorder() {
         jobs.push(job);
         return Promise.resolve(jobs.length);
       },
+      enqueueUnique: (job: Job) => {
+        jobs.push(job);
+        return Promise.resolve<number | undefined>(jobs.length);
+      },
       claimNextPending: () => Promise.resolve(undefined),
       markDone: () => Promise.resolve(),
       markFailed: () => Promise.resolve(),

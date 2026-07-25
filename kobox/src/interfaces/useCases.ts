@@ -1,6 +1,7 @@
 import { DiscoverTrackerFromTorrent } from '../application/tracker/DiscoverTrackerFromTorrent.js';
 import { FetchTrackerCert } from '../application/tracker/FetchTrackerCert.js';
 import { ImportBlocklistCatalog } from '../application/tracker/ImportBlocklistCatalog.js';
+import { ApplyIpset } from '../application/tracker/ApplyIpset.js';
 import { ManageUserAddress } from '../application/tracker/ManageUserAddress.js';
 import { MarkTrackerDead } from '../application/tracker/MarkTrackerDead.js';
 import { RenderBlocklistFilters } from '../application/tracker/RenderBlocklistFilters.js';
@@ -14,6 +15,11 @@ import { ProvisionRtorrentInstance } from '../application/torrent/ProvisionRtorr
 import { RenderRtorrentConfig } from '../application/torrent/RenderRtorrentConfig.js';
 import { SetAllowPublicTracker } from '../application/torrent/SetAllowPublicTracker.js';
 import { SetSyncDisabled } from '../application/torrent/SetSyncDisabled.js';
+import type { BackupHostPort } from '../application/maintenance/BackupHostPort.js';
+import type { MailOutboxPort } from '../application/maintenance/MailOutboxPort.js';
+import type { MailTransportPort } from '../application/maintenance/MailTransportPort.js';
+import { RunBackup, type BackupSettings } from '../application/maintenance/RunBackup.js';
+import { SendMails } from '../application/maintenance/SendMails.js';
 import { ApplyFirewall } from '../application/security/ApplyFirewall.js';
 import { DeprovisionVpnUser } from '../application/security/DeprovisionVpnUser.js';
 import { EvaluateFairUse } from '../application/security/EvaluateFairUse.js';
@@ -46,6 +52,7 @@ import type {
   CertStorePort,
   DnsResolverPort,
   IblocklistCatalogPort,
+  IpsetPort,
   NetworkServiceReloadPort,
   TrackerCertPort,
   TrackerNotificationPort,
@@ -107,6 +114,25 @@ export function buildUseCases(deps: UseCaseDeps): UseCases {
   };
 }
 
+export interface MaintenanceUseCaseDeps {
+  readonly outbox: MailOutboxPort;
+  readonly transport: MailTransportPort;
+  readonly backupHost: BackupHostPort;
+  readonly backupSettings: BackupSettings;
+}
+
+export interface MaintenanceUseCases {
+  readonly sendMails: SendMails;
+  readonly runBackup: RunBackup;
+}
+
+export function buildMaintenanceUseCases(deps: MaintenanceUseCaseDeps): MaintenanceUseCases {
+  return {
+    sendMails: new SendMails(deps),
+    runBackup: new RunBackup({ backupHost: deps.backupHost, settings: deps.backupSettings }),
+  };
+}
+
 export interface TorrentUseCaseDeps {
   readonly users: UserRepository;
   readonly instances: TorrentInstanceRepository;
@@ -146,6 +172,7 @@ export interface TrackerUseCaseDeps {
   readonly cache: BlocklistCachePort;
   readonly files: ManagedFilesPort;
   readonly reload: NetworkServiceReloadPort;
+  readonly ipset: IpsetPort;
   readonly notifications: TrackerNotificationPort;
   readonly credentials?: IblocklistCredentials;
 }
@@ -159,6 +186,7 @@ export interface TrackerUseCases {
   readonly updateBlocklists: UpdateBlocklists;
   readonly renderWhitelist: RenderWhitelist;
   readonly renderBlocklistFilters: RenderBlocklistFilters;
+  readonly applyIpset: ApplyIpset;
   readonly manageUserAddress: ManageUserAddress;
 }
 
@@ -173,6 +201,7 @@ export function buildTrackerUseCases(deps: TrackerUseCaseDeps): TrackerUseCases 
     updateBlocklists: new UpdateBlocklists(deps),
     renderWhitelist: new RenderWhitelist(deps),
     renderBlocklistFilters: new RenderBlocklistFilters(deps),
+    applyIpset: new ApplyIpset(deps),
     manageUserAddress: new ManageUserAddress(deps),
   };
 }
@@ -185,6 +214,7 @@ export interface SecurityUseCaseDeps {
   readonly firewall: FirewallApplyPort;
   readonly files: ManagedFilesPort;
   readonly reload: NetworkServicePort;
+  readonly ipset: Pick<IpsetPort, 'ensureBlocklistSet'>;
   readonly resolver: DynDnsResolverPort;
   readonly pki: VpnPkiPort;
   readonly pkiProvision: VpnPkiProvisionPort;

@@ -42,6 +42,9 @@ export const JOB_TYPES = [
   'provision-vpn-user',
   'deprovision-vpn-user',
   'evaluate-fair-use',
+  'send-mails',
+  'run-backup',
+  'apply-ipset',
 ] as const;
 
 export type JobType = (typeof JOB_TYPES)[number];
@@ -146,6 +149,9 @@ export const jobPayloadSchemas = {
   'provision-vpn-user': usernameOnly,
   'deprovision-vpn-user': usernameOnly,
   'evaluate-fair-use': z.strictObject({}),
+  'send-mails': z.strictObject({}),
+  'run-backup': z.strictObject({}),
+  'apply-ipset': z.strictObject({}),
 } satisfies Record<JobType, z.ZodType>;
 
 export type JobPayload<T extends JobType> = z.infer<(typeof jobPayloadSchemas)[T]>;

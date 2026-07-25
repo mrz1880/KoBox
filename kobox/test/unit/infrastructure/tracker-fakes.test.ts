@@ -75,9 +75,7 @@ describe('FakeNetworkServiceReload', () => {
   it('should_record_reload_calls', async () => {
     const fake = new FakeNetworkServiceReload();
     await fake.reloadDns();
-    await fake.reloadPeerGuardian();
     expect(fake.dnsReloads).toBe(1);
-    expect(fake.peerGuardianReloads).toBe(1);
   });
 });
 

@@ -1,28 +1,25 @@
-import { runOrThrow, type CommandRunner } from '../system/CommandRunner.js';
+import type { CommandRunner } from '../system/CommandRunner.js';
+import { SendmailTransport } from './SendmailTransport.js';
 import type { FormattedEvent, NotificationChannel } from './formatEvent.js';
 
-// Rides the existing Postfix relay: sendmail -t reads the envelope from the
-// message itself (argv-only, message via stdin).
+// Direct (non-durable) email channel: delivers immediately through the shared
+// sendmail transport. Production wiring prefers OutboxEmailChannel; this one
+// remains for contexts without a database (and for tests).
 export class EmailChannel implements NotificationChannel {
+  private readonly transport: SendmailTransport;
+
   constructor(
-    private readonly runner: CommandRunner,
+    runner: CommandRunner,
     private readonly recipient: string,
-  ) {}
+  ) {
+    this.transport = new SendmailTransport(runner);
+  }
 
   async send(message: FormattedEvent): Promise<void> {
-    const mail = [
-      `To: ${this.recipient}`,
-      `Subject: ${message.title}`,
-      'Content-Type: text/plain; charset=utf-8',
-      '',
-      message.body,
-      '',
-    ].join('\n');
-    await runOrThrow(this.runner, {
-      command: 'sendmail',
-      args: ['-t'],
-      stdin: mail,
-      timeoutMs: 10_000,
+    await this.transport.deliver({
+      recipient: this.recipient,
+      subject: message.title,
+      body: message.body,
     });
   }
 }

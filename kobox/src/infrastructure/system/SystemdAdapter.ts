@@ -28,6 +28,10 @@ export class SystemdAdapter implements SystemdPort {
     await this.systemctl(['start', unit]);
   }
 
+  async stop(unit: string): Promise<void> {
+    await this.systemctl(['stop', unit]);
+  }
+
   async reloadOrRestart(unit: string): Promise<void> {
     await this.systemctl(['reload-or-restart', unit]);
   }

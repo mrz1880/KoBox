@@ -60,8 +60,14 @@ describe('planInstallation', () => {
   });
 
   it('should_re_evaluate_skipped_components_so_a_fixed_cause_recovers_by_re_run', () => {
-    const plan = planInstallation(COMPONENT_CATALOG, states({ pgl: 'skipped' }));
-    expect(names(plan)).toContain('pgl');
+    const plan = planInstallation(COMPONENT_CATALOG, states({ dnscrypt: 'skipped' }));
+    expect(names(plan)).toContain('dnscrypt');
+  });
+
+  it('should_schedule_the_cron_component_after_kobox_core', () => {
+    const order = names(planInstallation(COMPONENT_CATALOG, freshStates));
+    expect(order.indexOf('kobox-core')).toBeLessThan(order.indexOf('scheduler'));
+    expect(order).not.toContain('pgl');
   });
 
   it('should_return_an_empty_plan_when_everything_is_installed', () => {
@@ -94,10 +100,12 @@ describe('planUninstall', () => {
     const all = Object.fromEntries(
       COMPONENT_CATALOG.map((spec) => [spec.name.value, 'installed']),
     );
-    const uninstall = names(planUninstall(COMPONENT_CATALOG, states({ ...all, pgl: 'skipped' })));
+    const uninstall = names(
+      planUninstall(COMPONENT_CATALOG, states({ ...all, dnscrypt: 'skipped' })),
+    );
 
     const install = names(planInstallation(COMPONENT_CATALOG, freshStates)).filter(
-      (name) => name !== 'pgl',
+      (name) => name !== 'dnscrypt',
     );
     expect(uninstall).toEqual([...install].reverse());
   });

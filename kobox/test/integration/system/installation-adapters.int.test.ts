@@ -101,3 +101,30 @@ describe.runIf(inContainerAsRoot)('sshd guard (real sshd -t)', () => {
     expect(await checks.sshd()).toEqual({ ok: true });
   });
 });
+
+describe.runIf(inContainerAsRoot)('InstallHostAdapter postmap (real postfix tools)', () => {
+  it('should_compile_a_credentials_map_next_to_its_source', async () => {
+    const host = new InstallHostAdapter(runner);
+    // the test owns its precondition (Phase 3 lesson): postfix may or may not
+    // be installed yet depending on suite order
+    await host.preseedDebconf([
+      'postfix postfix/main_mailer_type select Local only',
+      'postfix postfix/mailname string kobox-test',
+    ]);
+    await new AptPackageAdapter(runner).ensureInstalled(['postfix']);
+    const source = '/etc/postfix/kobox-postmap-test';
+    await host.ensureFile({
+      path: source,
+      content: '[relay.example.net]:587 login:secret\n',
+      mode: '0600',
+      owner: 'root',
+      group: 'root',
+    });
+
+    await host.postmap(source);
+
+    expect(existsSync(`${source}.db`)).toBe(true);
+    await host.removeFile(source);
+    await host.removeFile(`${source}.db`);
+  }, 180_000);
+});

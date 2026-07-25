@@ -30,6 +30,10 @@ export interface FirewallPolicyProps {
   readonly portalPort: number;
   readonly vpn: VpnSettings;
   readonly users: readonly FirewallUser[];
+  // true when the kernel ipset kobox-bl exists: the render then includes the
+  // blocklist drop (pgl successor); false keeps the ruleset loadable on
+  // hosts without the ip_set module
+  readonly blocklistSet: boolean;
 }
 
 function assertPort(value: number, what: string): void {
@@ -47,6 +51,7 @@ export class FirewallPolicy {
     readonly portalPort: number,
     readonly vpn: VpnSettings,
     readonly users: readonly FirewallUser[],
+    readonly blocklistSet: boolean,
   ) {}
 
   static create(props: FirewallPolicyProps): FirewallPolicy {
@@ -79,6 +84,12 @@ export class FirewallPolicy {
     const sorted = [...props.users].sort((a, b) =>
       a.username.value.localeCompare(b.username.value),
     );
-    return new FirewallPolicy(props.sshPort, props.portalPort, props.vpn, sorted);
+    return new FirewallPolicy(
+      props.sshPort,
+      props.portalPort,
+      props.vpn,
+      sorted,
+      props.blocklistSet,
+    );
   }
 }

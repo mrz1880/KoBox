@@ -40,8 +40,23 @@ let addresses: InMemoryUserAddressRepository;
 let identity: FakeUserIdentity;
 let firewall: FakeFirewallApply;
 let reload: FakeNetworkServices;
+let ipset: FakeIpset;
 let notifications: RecordingSecurityNotifications;
 let useCase: ApplyFirewall;
+
+class FakeIpset {
+  supported = true;
+  readonly restored: string[] = [];
+
+  ensureBlocklistSet(): Promise<boolean> {
+    return Promise.resolve(this.supported);
+  }
+
+  restore(filePath: string): Promise<void> {
+    this.restored.push(filePath);
+    return Promise.resolve();
+  }
+}
 
 beforeEach(() => {
   repo = new InMemoryUserRepository();
@@ -49,6 +64,7 @@ beforeEach(() => {
   identity = new FakeUserIdentity();
   firewall = new FakeFirewallApply();
   reload = new FakeNetworkServices();
+  ipset = new FakeIpset();
   notifications = new RecordingSecurityNotifications();
   useCase = new ApplyFirewall({
     users: repo,
@@ -56,6 +72,7 @@ beforeEach(() => {
     identity,
     firewall,
     reload,
+    ipset,
     notifications,
     settings: testSettings,
   });
@@ -79,18 +96,41 @@ describe('ApplyFirewall', () => {
     );
   });
 
-  it('should_reload_peerguardian_and_notify_only_when_rules_actually_changed', async () => {
+  it('should_notify_only_when_rules_actually_changed', async () => {
     await repo.save(aUser().build());
     identity.setUid('alice', 1001);
 
     await useCase.execute();
-    expect(reload.reloads).toEqual(['pgl']);
     expect(notifications.published).toEqual([{ type: 'FirewallApplied', outcome: 'applied' }]);
 
     const second = await useCase.execute();
     expect(second.outcome).toBe('unchanged');
-    expect(reload.reloads).toEqual(['pgl']); // no second reload
     expect(notifications.published).toHaveLength(1);
+  });
+
+  it('should_include_the_blocklist_drop_only_when_the_kernel_accepts_the_set', async () => {
+    await repo.save(aUser().build());
+    identity.setUid('alice', 1001);
+
+    await useCase.execute();
+    expect(firewall.applied[0]?.content ?? '').toContain(
+      '-A INPUT -m set --match-set kobox-bl src -j DROP',
+    );
+
+    // a host without the ip_set module still converges, without the rule
+    ipset.supported = false;
+    const degraded = new ApplyFirewall({
+      users: repo,
+      addresses,
+      identity,
+      firewall,
+      reload,
+      ipset,
+      notifications,
+      settings: testSettings,
+    });
+    await degraded.execute();
+    expect(firewall.applied.at(-1)?.content ?? '').not.toContain('--match-set');
   });
 
   it('should_ensure_the_vpn_masquerade_outside_the_rendered_ruleset', async () => {
@@ -128,6 +168,5 @@ describe('ApplyFirewall', () => {
     expect(notifications.published).toEqual([
       { type: 'FirewallApplied', outcome: 'rolled-back' },
     ]);
-    expect(reload.reloads).toEqual([]); // pgl untouched: old rules still live
   });
 });

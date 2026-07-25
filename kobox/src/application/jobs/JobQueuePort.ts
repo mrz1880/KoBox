@@ -7,6 +7,10 @@ export interface ClaimedJob {
 
 export interface JobQueuePort {
   enqueue(job: Job): Promise<number>;
+  // Scheduler entry point: skips the insert when an identical (type, payload)
+  // job is already pending, so repeated ticks never grow a backlog while the
+  // worker is down. Returns the new id, or undefined when deduped.
+  enqueueUnique(job: Job): Promise<number | undefined>;
   claimNextPending(): Promise<ClaimedJob | undefined>;
   markDone(id: number): Promise<void>;
   markFailed(id: number, error: string): Promise<void>;

@@ -28,6 +28,7 @@ const SSH_PROBE_PORT = 42222;
 const settings = {
   sshPort: SSH_PROBE_PORT,
   portalPort: 8189,
+  blocklistSet: false,
   vpn: {
     tunGwPort: 8193,
     tunPort: 8194,
