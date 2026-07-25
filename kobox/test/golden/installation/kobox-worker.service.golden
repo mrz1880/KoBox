@@ -8,6 +8,7 @@ StartLimitIntervalSec=0
 Type=simple
 ExecStart=/usr/bin/node /opt/kobox/current/dist/interfaces/worker/main.js
 EnvironmentFile=-/etc/kobox/worker.env
+UMask=0007
 Restart=on-failure
 RestartSec=2
 

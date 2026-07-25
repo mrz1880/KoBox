@@ -1,0 +1,19 @@
+# KoBox-managed — DO NOT EDIT (rendered declaratively).
+[Unit]
+Description=KoBox SSR portal (non-privileged web interface)
+After=network.target kobox-worker.service
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User=kobox-portal
+Group=kobox-portal
+ExecStart=/usr/bin/node /opt/kobox/current/kobox/dist/interfaces/http/main.js
+EnvironmentFile=-/etc/kobox/worker.env
+UMask=0007
+SyslogIdentifier=kobox-portal
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

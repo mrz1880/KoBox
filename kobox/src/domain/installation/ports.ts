@@ -62,6 +62,11 @@ export interface InstallHostPort {
   preseedDebconf(selections: readonly string[]): Promise<void>;
   mountOptions(mountPoint: string): Promise<readonly string[]>;
   activateQuota(mountPoint: string): Promise<void>;
+  // creates an idempotent nologin system account (group + user) — the portal
+  // runs under it (Phase 6)
+  ensureServiceAccount(name: string): Promise<void>;
+  // owner:group + mode on an existing path (the shared DB dir/file)
+  setOwnership(path: string, owner: string, group: string, mode: string): Promise<void>;
 }
 
 // apt behind a port: installers declare desired packages, the adapter keeps

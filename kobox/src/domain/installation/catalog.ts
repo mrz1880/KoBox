@@ -34,4 +34,6 @@ export const COMPONENT_CATALOG: readonly ComponentSpec[] = [
   spec('letsencrypt', ['nginx']),
   // cron entries call the kobox CLI which the core component laid down
   spec('scheduler', ['kobox-core']),
+  // Phase 6 — the SSR portal sits behind nginx and needs the core account/DB
+  spec('portal', ['kobox-core', 'nginx']),
 ];

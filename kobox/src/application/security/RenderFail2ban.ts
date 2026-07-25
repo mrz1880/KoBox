@@ -1,6 +1,7 @@
 import type { NetworkServicePort } from '../../domain/security/ports.js';
 import {
   renderFail2banJails,
+  renderPortalLoginFilter,
   renderPublickeyFloodFilter,
 } from '../../domain/security/rendering.js';
 import type { ManagedFilesPort } from '../../domain/shared/files.js';
@@ -31,6 +32,7 @@ export class RenderFail2ban {
     const changedFiles = await files.apply([
       renderFail2banJails(userIps, settings.sshPort),
       renderPublickeyFloodFilter(),
+      renderPortalLoginFilter(),
     ]);
 
     if (changedFiles.length > 0) {

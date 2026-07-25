@@ -22,6 +22,11 @@ export const COMPONENT_NAMES = [
   'scheduler',
   'letsencrypt',
   'ipset',
+  // Phase 6 — Portal & Access
+  'portal',
+  'nfs',
+  'samba',
+  'shellinabox',
 ] as const;
 
 export type ComponentNameValue = (typeof COMPONENT_NAMES)[number];

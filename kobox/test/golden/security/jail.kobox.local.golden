@@ -20,3 +20,12 @@ port = 22
 maxretry = 30
 findtime = 3600
 bantime = 3600
+
+[kobox-portal]
+enabled = true
+backend = systemd
+filter = kobox-portal
+port = http,https
+maxretry = 10
+findtime = 600
+bantime = 3600

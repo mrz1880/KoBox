@@ -132,6 +132,42 @@ export class InstallHostAdapter implements InstallHostPort {
     });
   }
 
+  async ensureServiceAccount(name: string): Promise<void> {
+    // groupadd/useradd are idempotent-friendly: exit 9 = "already exists".
+    await this.runAllowing([9], 'groupadd', ['--system', name]);
+    await this.runAllowing(
+      [9],
+      'useradd',
+      ['--system', '--gid', name, '--no-create-home', '--shell', '/usr/sbin/nologin', name],
+    );
+  }
+
+  async setOwnership(path: string, owner: string, group: string, mode: string): Promise<void> {
+    await chmod(path, parseInt(mode, 8));
+    if (process.geteuid?.() !== 0) {
+      return;
+    }
+    await runOrThrow(this.runner, {
+      command: 'chown',
+      args: [`${owner}:${group}`, path],
+      timeoutMs: 10_000,
+    });
+  }
+
+  private async runAllowing(
+    okExitCodes: readonly number[],
+    command: string,
+    args: readonly string[],
+  ): Promise<void> {
+    if (process.geteuid?.() !== 0) {
+      return;
+    }
+    const result = await this.runner.run({ command, args: [...args], timeoutMs: HOST_TIMEOUT_MS });
+    if (result.exitCode !== 0 && !okExitCodes.includes(result.exitCode)) {
+      throw new Error(`${command} ${args.join(' ')} failed (${String(result.exitCode)}): ${result.stderr.trim()}`);
+    }
+  }
+
   private async chownIfPossible(file: RenderedFile): Promise<void> {
     // non-root test environments have no business chowning; the real install
     // path always runs as root — and there a failed chown is a real failure

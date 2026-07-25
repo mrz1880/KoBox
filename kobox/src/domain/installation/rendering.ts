@@ -25,6 +25,50 @@ export function renderWorkerUnit(settings: WorkerUnitSettings): RenderedFile {
       'Type=simple',
       `ExecStart=${settings.nodeBin} ${settings.workerMain}`,
       'EnvironmentFile=-/etc/kobox/worker.env',
+      // the DB is shared with the non-root portal (same kobox-portal group):
+      // 0007 keeps SQLite's WAL/-shm files group-writable
+      'UMask=0007',
+      'Restart=on-failure',
+      'RestartSec=2',
+      '',
+      '[Install]',
+      'WantedBy=multi-user.target',
+      '',
+    ].join('\n'),
+    mode: '0644',
+    owner: 'root',
+    group: 'root',
+  };
+}
+
+export interface PortalUnitSettings {
+  readonly nodeBin: string;
+  readonly portalMain: string;
+}
+
+// The SSR portal (Phase 6): runs NON-ROOT under the kobox-portal identity — it
+// only reads repositories and enqueues typed jobs, never touching a privileged
+// adapter (AUDIT §3.5). SyslogIdentifier keys the fail2ban portal jail.
+export function renderPortalUnit(settings: PortalUnitSettings): RenderedFile {
+  return {
+    path: '/etc/systemd/system/kobox-portal.service',
+    content: [
+      MANAGED_HEADER,
+      '[Unit]',
+      'Description=KoBox SSR portal (non-privileged web interface)',
+      'After=network.target kobox-worker.service',
+      'StartLimitIntervalSec=0',
+      '',
+      '[Service]',
+      'Type=simple',
+      'User=kobox-portal',
+      'Group=kobox-portal',
+      `ExecStart=${settings.nodeBin} ${settings.portalMain}`,
+      'EnvironmentFile=-/etc/kobox/worker.env',
+      // shares the DB with the root worker (kobox-portal group); 0007 keeps
+      // new SQLite WAL/-shm files group-writable
+      'UMask=0007',
+      'SyslogIdentifier=kobox-portal',
       'Restart=on-failure',
       'RestartSec=2',
       '',

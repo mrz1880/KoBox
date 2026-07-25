@@ -18,6 +18,7 @@ import {
   renderDnscryptConfig,
   renderFirewallBootUnit,
   renderNginxVhost,
+  renderPortalUnit,
   renderRutorrentConfig,
   renderSshdDropin,
   renderSysctlTweaks,
@@ -28,7 +29,7 @@ import {
 import { renderCronFile } from '../../domain/maintenance/rendering.js';
 import type { IpsetPort } from '../../domain/tracker/ports.js';
 import type { VpnPkiPort, VpnPkiProvisionPort } from '../../domain/security/ports.js';
-import { VPN_VARIANTS, renderOpenVpnServer } from '../../domain/security/vpn.js';
+import { PORTAL_GROUP, VPN_VARIANTS, renderOpenVpnServer } from '../../domain/security/vpn.js';
 import type { ManagedFilesPort, RenderedFile } from '../../domain/shared/files.js';
 import type { SecuritySettings } from '../security/settings.js';
 
@@ -162,8 +163,14 @@ class KoboxCoreInstaller implements ComponentInstaller {
 
   async install(): Promise<InstallOutcome> {
     const { host, files, systemd, install } = this.ctx;
+    // the non-root identity the SSR portal runs under (Phase 6)
+    await host.ensureServiceAccount(PORTAL_GROUP);
     await host.ensureDir('/etc/kobox', '0755');
-    await host.ensureDir('/var/lib/kobox', '0700');
+    // the DB is shared: the root worker writes, the portal (kobox-portal group)
+    // reads and writes sessions/credentials. 2770 + setgid keeps new WAL/-shm
+    // files group-owned so both processes can open them.
+    await host.ensureDir('/var/lib/kobox', '2770');
+    await host.setOwnership('/var/lib/kobox', 'root', PORTAL_GROUP, '2770');
     await host.ensureDir('/var/spool/kobox/events', '1733');
     // first install: current -> the tree the installer runs from; upgrades
     // own the link afterwards (ensureSymlink never overwrites an existing one)
@@ -300,15 +307,11 @@ class NginxInstaller implements ComponentInstaller {
     // challenge (server_name _ never matches a Host) and Let's Encrypt can
     // never validate — remove it; sites-available/default stays untouched
     await host.removeFile('/etc/nginx/sites-enabled/default');
-    // deny-by-default: an EMPTY htpasswd rejects everyone until the portal
-    // phase wires real accounts; an existing file is never overwritten
-    await host.ensureFile({
-      path: HTPASSWD,
-      content: '',
-      mode: '0640',
-      owner: 'root',
-      group: 'www-data',
-    });
+    // Phase 6: the shared Basic Auth is retired — the vhost authenticates via
+    // the portal now. Drop any leftover htpasswd and hold the include dir the
+    // per-user /RPC-<USER> mounts land in.
+    await host.removeFile(HTPASSWD);
+    await host.ensureDir('/etc/nginx/kobox.d', '0755');
     const changed = await guardedApply(
       this.ctx,
       this.name,
@@ -594,6 +597,36 @@ class Fail2banInstaller implements ComponentInstaller {
     await this.ctx.systemd.disable('fail2ban', { now: true });
     await this.ctx.host.removeFile('/etc/fail2ban/jail.d/kobox.local');
     await this.ctx.host.removeFile('/etc/fail2ban/filter.d/kobox-publickey-flood.conf');
+    await this.ctx.host.removeFile('/etc/fail2ban/filter.d/kobox-portal.conf');
+  }
+}
+
+// The SSR portal service (Phase 6): renders and enables kobox-portal.service.
+// The kobox-portal account and DB group perms are set by kobox-core; nginx
+// proxies this unit and gates /ru + /RPC-* against its session.
+class PortalInstaller implements ComponentInstaller {
+  readonly name = 'portal';
+
+  constructor(private readonly ctx: InstallerContext) {}
+
+  async install(): Promise<InstallOutcome> {
+    const { files, systemd, install } = this.ctx;
+    await files.apply([
+      renderPortalUnit({
+        nodeBin: install.nodeBin,
+        portalMain: `${install.currentLink}/dist/interfaces/http/main.js`,
+      }),
+    ]);
+    await systemd.daemonReload();
+    await systemd.enable('kobox-portal', { now: true });
+    return installed();
+  }
+
+  async uninstall(): Promise<void> {
+    const { host, systemd } = this.ctx;
+    await systemd.disable('kobox-portal', { now: true });
+    await host.removeFile('/etc/systemd/system/kobox-portal.service');
+    await systemd.daemonReload();
   }
 }
 
@@ -684,6 +717,7 @@ export function buildInstallers(ctx: InstallerContext): ReadonlyMap<string, Comp
     new Fail2banInstaller(ctx),
     new OpenVpnInstaller(ctx),
     new PostfixInstaller(ctx),
+    new PortalInstaller(ctx),
   ];
   return new Map(list.map((entry) => [entry.name, entry]));
 }

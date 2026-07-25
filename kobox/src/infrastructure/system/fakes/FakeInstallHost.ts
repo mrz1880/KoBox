@@ -15,6 +15,8 @@ export class FakeInstallHost implements ManagedFilesPort, InstallHostPort, Artif
   readonly postmapped: string[] = [];
   readonly symlinks = new Map<string, string>();
   readonly quotaActivated: string[] = [];
+  readonly serviceAccounts = new Set<string>();
+  readonly ownership = new Map<string, { owner: string; group: string; mode: string }>();
   readonly fetched: [string, string][] = [];
   readonly extracted: [string, string][] = [];
   sysctlApplies = 0;
@@ -112,6 +114,16 @@ export class FakeInstallHost implements ManagedFilesPort, InstallHostPort, Artif
 
   activateQuota(mountPoint: string): Promise<void> {
     this.quotaActivated.push(mountPoint);
+    return Promise.resolve();
+  }
+
+  ensureServiceAccount(name: string): Promise<void> {
+    this.serviceAccounts.add(name);
+    return Promise.resolve();
+  }
+
+  setOwnership(path: string, owner: string, group: string, mode: string): Promise<void> {
+    this.ownership.set(path, { owner, group, mode });
     return Promise.resolve();
   }
 

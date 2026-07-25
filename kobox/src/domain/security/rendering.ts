@@ -137,6 +137,35 @@ export function renderFail2banJails(
       'findtime = 3600',
       'bantime = 3600',
       '',
+      // the Phase 6 replacement for the legacy shared Basic Auth brute-force
+      // surface: counts failed portal logins from the portal's journal
+      '[kobox-portal]',
+      'enabled = true',
+      'backend = systemd',
+      'filter = kobox-portal',
+      'port = http,https',
+      'maxretry = 10',
+      'findtime = 600',
+      'bantime = 3600',
+      '',
+    ].join('\n'),
+    ...ROOT_FILE,
+  };
+}
+
+// Bans repeated failed portal logins. The portal logs one line per failure to
+// the journal under SyslogIdentifier=kobox-portal (see the systemd unit); the
+// IP is the client address the portal saw behind nginx.
+export function renderPortalLoginFilter(): RenderedFile {
+  return {
+    path: '/etc/fail2ban/filter.d/kobox-portal.conf',
+    content: [
+      '# KoBox — bans repeated failed portal logins (application auth, Phase 6).',
+      '[Definition]',
+      'journalmatch = SYSLOG_IDENTIFIER=kobox-portal',
+      String.raw`failregex = portal login failed for .* from <HOST>`,
+      'ignoreregex =',
+      '',
     ].join('\n'),
     ...ROOT_FILE,
   };

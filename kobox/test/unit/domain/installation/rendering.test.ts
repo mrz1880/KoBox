@@ -11,6 +11,7 @@ import {
   renderDnscryptConfig,
   renderFirewallBootUnit,
   renderNginxVhost,
+  renderPortalUnit,
   renderRutorrentConfig,
   renderRutorrentUserConfig,
   renderRutorrentUsersInclude,
@@ -43,6 +44,24 @@ describe('installation rendering', () => {
     // never leave the worker permanently dead on the start-rate limit
     expect(file.content).toContain('StartLimitIntervalSec=0');
     expectGolden('kobox-worker.service.golden', file.content);
+  });
+
+  it('should_render_the_portal_systemd_unit_golden', () => {
+    const file = renderPortalUnit({
+      nodeBin: '/usr/bin/node',
+      portalMain: '/opt/kobox/current/kobox/dist/interfaces/http/main.js',
+    });
+    expect(file.path).toBe('/etc/systemd/system/kobox-portal.service');
+    // runs non-root under the portal identity (AUDIT §3.5)
+    expect(file.content).toContain('User=kobox-portal');
+    expect(file.content).toContain('Group=kobox-portal');
+    // journald identifier the fail2ban portal jail keys on
+    expect(file.content).toContain('SyslogIdentifier=kobox-portal');
+    expect(file.content).toContain('EnvironmentFile=-/etc/kobox/worker.env');
+    expect(file.content).toContain(
+      'ExecStart=/usr/bin/node /opt/kobox/current/kobox/dist/interfaces/http/main.js',
+    );
+    expectGolden('kobox-portal.service.golden', file.content);
   });
 
   it('should_render_the_firewall_boot_unit_golden_guarded_by_the_rules_file', () => {
