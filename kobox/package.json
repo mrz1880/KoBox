@@ -7,7 +7,8 @@
   "type": "module",
   "bin": {
     "kobox": "dist/interfaces/cli/main.js",
-    "kobox-worker": "dist/interfaces/worker/main.js"
+    "kobox-worker": "dist/interfaces/worker/main.js",
+    "kobox-portal": "dist/interfaces/http/main.js"
   },
   "engines": {
     "node": ">=24"
