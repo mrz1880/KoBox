@@ -16,6 +16,8 @@ import { buildPortalServer } from '../../../src/interfaces/http/server.js';
 import { UserBuilder } from '../../builders/UserBuilder.js';
 import { InMemoryBlocklistRepository } from '../../../src/infrastructure/persistence/InMemoryBlocklistRepository.js';
 import { InMemoryTrackerRepository } from '../../../src/infrastructure/persistence/InMemoryTrackerRepository.js';
+import { InMemoryFairUseRepository } from '../../../src/infrastructure/persistence/InMemoryFairUseRepository.js';
+import { InMemoryUserAddressRepository } from '../../../src/infrastructure/persistence/InMemoryUserAddressRepository.js';
 import { RecordingQueue } from './portalWorld.js';
 
 const NOW = '2026-07-25 10:00:00';
@@ -60,6 +62,9 @@ beforeEach(async () => {
     hasher,
     trackers: new InMemoryTrackerRepository(),
     blocklists: new InMemoryBlocklistRepository(),
+    addresses: new InMemoryUserAddressRepository(),
+    bindings: new InMemoryUserAddressRepository(),
+    fairUse: new InMemoryFairUseRepository(),
   });
   world = { server, users, credentials, sessions };
   await users.save(new UserBuilder().build());

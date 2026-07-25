@@ -328,6 +328,7 @@ export interface Container {
   readonly repo: SqliteUserRepository;
   readonly trackerRepo: SqliteTrackerRepository;
   readonly blocklistRepo: SqliteBlocklistRepository;
+  readonly addressRepo: SqliteUserAddressRepository;
   readonly healthProbe: ProcessSocketHealthProbe;
   readonly spoolSweeper: TorrentEventSpoolSweeper;
   readonly fairUseRepo: SqliteFairUseRepository;
@@ -473,6 +474,7 @@ export function buildContainer(name: string): Container {
     repo,
     trackerRepo,
     blocklistRepo,
+    addressRepo,
     healthProbe,
     spoolSweeper: new TorrentEventSpoolSweeper(
       spoolDir(),

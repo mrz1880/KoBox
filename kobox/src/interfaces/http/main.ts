@@ -36,6 +36,9 @@ async function main(): Promise<void> {
     hasher: container.hasher,
     trackers: container.trackerRepo,
     blocklists: container.blocklistRepo,
+    addresses: container.addressRepo,
+    bindings: container.addressRepo,
+    fairUse: container.fairUseRepo,
   });
 
   const port = Number(process.env.KOBOX_PORTAL_HTTP_PORT ?? DEFAULT_PORTAL_HTTP_PORT);

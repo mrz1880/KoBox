@@ -9,8 +9,10 @@ import type { Password } from '../../../src/domain/user/Password.js';
 import { Username } from '../../../src/domain/user/Username.js';
 import type { PasswordHasherPort } from '../../../src/domain/user/ports.js';
 import { InMemoryBlocklistRepository } from '../../../src/infrastructure/persistence/InMemoryBlocklistRepository.js';
+import { InMemoryFairUseRepository } from '../../../src/infrastructure/persistence/InMemoryFairUseRepository.js';
 import { InMemoryLoginAttemptsRepository } from '../../../src/infrastructure/persistence/InMemoryLoginAttemptsRepository.js';
 import { InMemoryTrackerRepository } from '../../../src/infrastructure/persistence/InMemoryTrackerRepository.js';
+import { InMemoryUserAddressRepository } from '../../../src/infrastructure/persistence/InMemoryUserAddressRepository.js';
 import { InMemoryPortalCredentialsRepository } from '../../../src/infrastructure/persistence/InMemoryPortalCredentialsRepository.js';
 import { InMemoryPortalSessionRepository } from '../../../src/infrastructure/persistence/InMemoryPortalSessionRepository.js';
 import { InMemoryUserRepository } from '../../../src/infrastructure/persistence/InMemoryUserRepository.js';
@@ -99,6 +101,9 @@ export async function buildPortalWorld(
     hasher,
     trackers: new InMemoryTrackerRepository(),
     blocklists: new InMemoryBlocklistRepository(),
+    addresses: new InMemoryUserAddressRepository(),
+    bindings: new InMemoryUserAddressRepository(),
+    fairUse: new InMemoryFairUseRepository(),
     ...extra,
   });
   await users.save(new UserBuilder().build());
