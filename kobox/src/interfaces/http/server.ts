@@ -10,6 +10,8 @@ import { Password } from '../../domain/user/Password.js';
 import { USERNAME_PATTERN, Username } from '../../domain/user/Username.js';
 import type { MailOutboxPort } from '../../application/maintenance/MailOutboxPort.js';
 import type { ReleaseRepositoryPort } from '../../application/maintenance/ReleaseRepositoryPort.js';
+import type { VpnProfileStorePort } from '../../application/portal/ports.js';
+import type { PortalCredentialsPort } from '../../domain/portal/ports.js';
 import type { ComponentRegistry } from '../../domain/installation/ports.js';
 import type { DynDnsBindingRepository, FairUseRepository } from '../../domain/security/ports.js';
 import type {
@@ -19,13 +21,12 @@ import type {
 } from '../../domain/tracker/ports.js';
 import type { HealthProbePort, PasswordHasherPort, UserRepository } from '../../domain/user/ports.js';
 import type { Logger } from '../../infrastructure/logging/logger.js';
-import { buildGuards, viewerOf, SESSION_COOKIE } from './guards.js';
-import { html } from './html.js';
+import { buildGuards, SESSION_COOKIE } from './guards.js';
 import { registerAdminNetworkRoutes } from './routes/adminNetwork.js';
 import { registerAdminOpsRoutes } from './routes/adminOps.js';
 import { registerAdminTrackerRoutes } from './routes/adminTrackers.js';
 import { registerAdminUserRoutes } from './routes/adminUsers.js';
-import { page } from './views/layout.js';
+import { registerUserRoutes } from './routes/user.js';
 import { loginPage } from './views/loginPage.js';
 
 export { SESSION_COOKIE } from './guards.js';
@@ -47,6 +48,8 @@ export interface PortalServerDeps {
   readonly components: ComponentRegistry;
   readonly releases: ReleaseRepositoryPort;
   readonly outbox: MailOutboxPort;
+  readonly credentials: PortalCredentialsPort;
+  readonly profiles: VpnProfileStorePort;
   readonly logger?: Logger;
 }
 
@@ -122,21 +125,6 @@ export function buildPortalServer(deps: PortalServerDeps): FastifyInstance {
       .send();
   });
 
-  server.get('/', async (request, reply) => {
-    const session = await guards.requireSession(request, reply);
-    if (session === undefined) {
-      return;
-    }
-    return reply.type('text/html').send(
-      page(
-        'Overview',
-        html`<h1>Hello ${session.username.value}</h1>
-<input type="hidden" name="_csrf" value="${session.csrfToken}">`,
-        viewerOf(session),
-      ),
-    );
-  });
-
   server.get('/healthz', async (_request, reply) => reply.code(200).send({ status: 'ok' }));
 
   // nginx auth_request subrequests: bare status codes, no redirects. The
@@ -177,6 +165,7 @@ export function buildPortalServer(deps: PortalServerDeps): FastifyInstance {
     return reply.header('x-kobox-user', session.username.value).code(204).send();
   });
 
+  registerUserRoutes(server, deps, guards);
   registerAdminUserRoutes(server, deps, guards);
   registerAdminTrackerRoutes(server, deps, guards);
   registerAdminNetworkRoutes(server, deps, guards);

@@ -3,6 +3,7 @@ import { Authenticate } from '../../application/portal/Authenticate.js';
 import { Login } from '../../application/portal/Login.js';
 import { Logout } from '../../application/portal/Logout.js';
 import { CryptoSessionTokens } from '../../infrastructure/system/CryptoSessionTokens.js';
+import { FsVpnProfileStore } from '../../infrastructure/system/FsVpnProfileStore.js';
 import { buildContainer } from '../composition.js';
 import { buildPortalServer } from './server.js';
 
@@ -43,6 +44,8 @@ async function main(): Promise<void> {
     components: container.componentRegistry,
     releases: container.releaseRepo,
     outbox: container.outbox,
+    credentials: container.credentials,
+    profiles: new FsVpnProfileStore(process.env.KOBOX_VPN_PROFILES_DIR),
   });
 
   const port = Number(process.env.KOBOX_PORTAL_HTTP_PORT ?? DEFAULT_PORTAL_HTTP_PORT);

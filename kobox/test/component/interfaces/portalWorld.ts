@@ -7,6 +7,7 @@ import { Logout } from '../../../src/application/portal/Logout.js';
 import { HashedPassword } from '../../../src/domain/user/HashedPassword.js';
 import type { Password } from '../../../src/domain/user/Password.js';
 import { Username } from '../../../src/domain/user/Username.js';
+import type { VpnProfileStorePort } from '../../../src/application/portal/ports.js';
 import type { HealthCheckResult, HealthProbePort, PasswordHasherPort } from '../../../src/domain/user/ports.js';
 import { InMemoryBlocklistRepository } from '../../../src/infrastructure/persistence/InMemoryBlocklistRepository.js';
 import { InMemoryFairUseRepository } from '../../../src/infrastructure/persistence/InMemoryFairUseRepository.js';
@@ -38,6 +39,13 @@ class AllHealthyProbe implements HealthProbePort {
     return Promise.resolve({ name: `${host}:${port}`, state: 'healthy' });
   }
 }
+// A profile store that has no files unless a test swaps its own in.
+class NoProfiles implements VpnProfileStorePort {
+  read(): Promise<string | undefined> {
+    return Promise.resolve(undefined);
+  }
+}
+
 // FakeHasher output for the 8-character test password
 const GOOD_HASH = HashedPassword.parse(`$6$fakesalt$${'x'.repeat(20)}8`);
 export const TEST_PASSWORD = '8chars!!';
@@ -124,6 +132,8 @@ export async function buildPortalWorld(
     components: new InMemoryComponentRegistry(),
     releases: new InMemoryReleaseRepository(),
     outbox,
+    credentials,
+    profiles: new NoProfiles(),
     ...extra,
   });
   await users.save(new UserBuilder().build());
