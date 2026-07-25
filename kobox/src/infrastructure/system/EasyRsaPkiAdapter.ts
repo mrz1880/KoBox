@@ -35,7 +35,9 @@ export class EasyRsaPkiAdapter implements VpnPkiPort, VpnPkiProvisionPort {
       await this.easyrsa(['init-pki']);
     }
     if (!existsSync(join(this.baseDir, 'ca.crt'))) {
-      await this.easyrsa(['build-ca', 'nopass']);
+      // REQ_CN only here: build-*-full derive the CN from their name argument
+      // and refuse an external one
+      await this.easyrsa(['build-ca', 'nopass'], { EASYRSA_REQ_CN: 'kobox-ca' });
     }
     if (!existsSync(join(this.baseDir, 'issued/server.crt'))) {
       await this.easyrsa(['build-server-full', 'server', 'nopass']);
@@ -61,7 +63,10 @@ export class EasyRsaPkiAdapter implements VpnPkiPort, VpnPkiProvisionPort {
     }
   }
 
-  private async easyrsa(args: readonly string[]): Promise<void> {
+  private async easyrsa(
+    args: readonly string[],
+    extraEnv: Readonly<Record<string, string>> = {},
+  ): Promise<void> {
     await runOrThrow(this.runner, {
       command: EASYRSA_BIN,
       args: [...args],
@@ -71,7 +76,7 @@ export class EasyRsaPkiAdapter implements VpnPkiPort, VpnPkiProvisionPort {
         EASYRSA_PKI: this.baseDir,
         EASYRSA_ALGO: 'ec',
         EASYRSA_CURVE: 'secp384r1',
-        EASYRSA_REQ_CN: 'kobox-ca',
+        ...extraEnv,
       },
     });
   }
