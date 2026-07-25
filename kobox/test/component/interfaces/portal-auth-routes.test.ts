@@ -1,97 +1,18 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import type { FastifyInstance } from 'fastify';
-import { Authenticate } from '../../../src/application/portal/Authenticate.js';
-import { Login } from '../../../src/application/portal/Login.js';
-import { Logout } from '../../../src/application/portal/Logout.js';
-import { HashedPassword } from '../../../src/domain/user/HashedPassword.js';
-import { Password } from '../../../src/domain/user/Password.js';
-import { Username } from '../../../src/domain/user/Username.js';
-import type { PasswordHasherPort } from '../../../src/domain/user/ports.js';
-import { InMemoryLoginAttemptsRepository } from '../../../src/infrastructure/persistence/InMemoryLoginAttemptsRepository.js';
-import { InMemoryPortalCredentialsRepository } from '../../../src/infrastructure/persistence/InMemoryPortalCredentialsRepository.js';
-import { InMemoryPortalSessionRepository } from '../../../src/infrastructure/persistence/InMemoryPortalSessionRepository.js';
-import { InMemoryUserRepository } from '../../../src/infrastructure/persistence/InMemoryUserRepository.js';
-import { FakeSessionTokens } from '../../../src/infrastructure/system/fakes/FakeSessionTokens.js';
-import { buildPortalServer } from '../../../src/interfaces/http/server.js';
-import { UserBuilder } from '../../builders/UserBuilder.js';
-import { InMemoryBlocklistRepository } from '../../../src/infrastructure/persistence/InMemoryBlocklistRepository.js';
-import { InMemoryTrackerRepository } from '../../../src/infrastructure/persistence/InMemoryTrackerRepository.js';
-import { InMemoryFairUseRepository } from '../../../src/infrastructure/persistence/InMemoryFairUseRepository.js';
-import { InMemoryUserAddressRepository } from '../../../src/infrastructure/persistence/InMemoryUserAddressRepository.js';
-import { RecordingQueue } from './portalWorld.js';
+import {
+  buildPortalWorld,
+  loginAs as loginTo,
+  type PortalWorld,
+} from './portalWorld.js';
 
-const NOW = '2026-07-25 10:00:00';
-const GOOD_HASH = HashedPassword.parse(`$6$fakesalt$${'x'.repeat(20)}8`);
-
-class FakeHasher implements PasswordHasherPort {
-  hash(password: Password): Promise<HashedPassword> {
-    return Promise.resolve(
-      HashedPassword.parse(`$6$fakesalt$${'x'.repeat(20)}${String(password.reveal().length)}`),
-    );
-  }
-
-  async verify(password: Password, hash: HashedPassword): Promise<boolean> {
-    return (await this.hash(password)).value === hash.value;
-  }
-}
-
-interface World {
-  server: FastifyInstance;
-  users: InMemoryUserRepository;
-  credentials: InMemoryPortalCredentialsRepository;
-  sessions: InMemoryPortalSessionRepository;
-}
-
-let world: World;
+let world: PortalWorld;
 
 beforeEach(async () => {
-  const users = new InMemoryUserRepository();
-  const credentials = new InMemoryPortalCredentialsRepository();
-  const sessions = new InMemoryPortalSessionRepository();
-  const attempts = new InMemoryLoginAttemptsRepository();
-  const tokens = new FakeSessionTokens();
-  const hasher = new FakeHasher();
-  const authDeps = { users, credentials, sessions, attempts, tokens, hasher };
-  const server = buildPortalServer({
-    login: new Login(authDeps),
-    logout: new Logout(authDeps),
-    authenticate: new Authenticate(authDeps),
-    now: () => NOW,
-    users,
-    queue: new RecordingQueue(),
-    hasher,
-    trackers: new InMemoryTrackerRepository(),
-    blocklists: new InMemoryBlocklistRepository(),
-    addresses: new InMemoryUserAddressRepository(),
-    bindings: new InMemoryUserAddressRepository(),
-    fairUse: new InMemoryFairUseRepository(),
-  });
-  world = { server, users, credentials, sessions };
-  await users.save(new UserBuilder().build());
-  await credentials.save(
-    { username: Username.parse('alice'), passwordHash: GOOD_HASH, role: 'user' },
-    NOW,
-  );
-  await users.save(new UserBuilder().withUsername('boss').withScgiPort(51102).withRtorrentPort(45001).build());
-  await credentials.save(
-    { username: Username.parse('boss'), passwordHash: GOOD_HASH, role: 'admin' },
-    NOW,
-  );
+  world = await buildPortalWorld();
 });
 
 async function loginAs(username: string): Promise<{ cookie: string; csrf: string }> {
-  const response = await world.server.inject({
-    method: 'POST',
-    url: '/login',
-    payload: `username=${username}&password=8chars!!`,
-    headers: { 'content-type': 'application/x-www-form-urlencoded' },
-  });
-  const setCookie = response.headers['set-cookie'];
-  const raw = Array.isArray(setCookie) ? setCookie[0] : setCookie;
-  const cookie = (raw ?? '').split(';')[0] ?? '';
-  const home = await world.server.inject({ method: 'GET', url: '/', headers: { cookie } });
-  const csrf = /name="_csrf" value="([^"]+)"/.exec(home.body)?.[1] ?? '';
-  return { cookie, csrf };
+  return loginTo(world, username);
 }
 
 describe('login page and flow', () => {

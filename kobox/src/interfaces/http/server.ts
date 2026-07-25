@@ -8,17 +8,21 @@ import type { Login } from '../../application/portal/Login.js';
 import type { Logout } from '../../application/portal/Logout.js';
 import { Password } from '../../domain/user/Password.js';
 import { USERNAME_PATTERN, Username } from '../../domain/user/Username.js';
+import type { MailOutboxPort } from '../../application/maintenance/MailOutboxPort.js';
+import type { ReleaseRepositoryPort } from '../../application/maintenance/ReleaseRepositoryPort.js';
+import type { ComponentRegistry } from '../../domain/installation/ports.js';
 import type { DynDnsBindingRepository, FairUseRepository } from '../../domain/security/ports.js';
 import type {
   BlocklistRepository,
   TrackerRepository,
   UserAddressRepository,
 } from '../../domain/tracker/ports.js';
-import type { PasswordHasherPort, UserRepository } from '../../domain/user/ports.js';
+import type { HealthProbePort, PasswordHasherPort, UserRepository } from '../../domain/user/ports.js';
 import type { Logger } from '../../infrastructure/logging/logger.js';
 import { buildGuards, viewerOf, SESSION_COOKIE } from './guards.js';
 import { html } from './html.js';
 import { registerAdminNetworkRoutes } from './routes/adminNetwork.js';
+import { registerAdminOpsRoutes } from './routes/adminOps.js';
 import { registerAdminTrackerRoutes } from './routes/adminTrackers.js';
 import { registerAdminUserRoutes } from './routes/adminUsers.js';
 import { page } from './views/layout.js';
@@ -39,6 +43,10 @@ export interface PortalServerDeps {
   readonly addresses: UserAddressRepository;
   readonly bindings: DynDnsBindingRepository;
   readonly fairUse: FairUseRepository;
+  readonly health: HealthProbePort;
+  readonly components: ComponentRegistry;
+  readonly releases: ReleaseRepositoryPort;
+  readonly outbox: MailOutboxPort;
   readonly logger?: Logger;
 }
 
@@ -172,6 +180,7 @@ export function buildPortalServer(deps: PortalServerDeps): FastifyInstance {
   registerAdminUserRoutes(server, deps, guards);
   registerAdminTrackerRoutes(server, deps, guards);
   registerAdminNetworkRoutes(server, deps, guards);
+  registerAdminOpsRoutes(server, deps, guards);
 
   return server;
 }

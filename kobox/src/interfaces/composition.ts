@@ -336,6 +336,8 @@ export interface Container {
   readonly credentials: SqlitePortalCredentialsRepository;
   readonly sessions: SqlitePortalSessionRepository;
   readonly loginAttempts: SqliteLoginAttemptsRepository;
+  readonly componentRegistry: SqliteComponentRegistry;
+  readonly releaseRepo: SqliteReleaseRepository;
 }
 
 export function buildContainer(name: string): Container {
@@ -485,5 +487,7 @@ export function buildContainer(name: string): Container {
     credentials,
     sessions,
     loginAttempts,
+    componentRegistry: new SqliteComponentRegistry(db),
+    releaseRepo: new SqliteReleaseRepository(db),
   };
 }

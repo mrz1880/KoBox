@@ -7,10 +7,13 @@ import { Logout } from '../../../src/application/portal/Logout.js';
 import { HashedPassword } from '../../../src/domain/user/HashedPassword.js';
 import type { Password } from '../../../src/domain/user/Password.js';
 import { Username } from '../../../src/domain/user/Username.js';
-import type { PasswordHasherPort } from '../../../src/domain/user/ports.js';
+import type { HealthCheckResult, HealthProbePort, PasswordHasherPort } from '../../../src/domain/user/ports.js';
 import { InMemoryBlocklistRepository } from '../../../src/infrastructure/persistence/InMemoryBlocklistRepository.js';
 import { InMemoryFairUseRepository } from '../../../src/infrastructure/persistence/InMemoryFairUseRepository.js';
+import { InMemoryComponentRegistry } from '../../../src/infrastructure/persistence/InMemoryComponentRegistry.js';
 import { InMemoryLoginAttemptsRepository } from '../../../src/infrastructure/persistence/InMemoryLoginAttemptsRepository.js';
+import { InMemoryMailOutbox } from '../../../src/infrastructure/persistence/InMemoryMailOutbox.js';
+import { InMemoryReleaseRepository } from '../../../src/infrastructure/persistence/InMemoryReleaseRepository.js';
 import { InMemoryTrackerRepository } from '../../../src/infrastructure/persistence/InMemoryTrackerRepository.js';
 import { InMemoryUserAddressRepository } from '../../../src/infrastructure/persistence/InMemoryUserAddressRepository.js';
 import { InMemoryPortalCredentialsRepository } from '../../../src/infrastructure/persistence/InMemoryPortalCredentialsRepository.js';
@@ -24,6 +27,17 @@ import {
 import { UserBuilder } from '../../builders/UserBuilder.js';
 
 export const NOW = '2026-07-25 10:00:00';
+
+// A stub probe: everything healthy unless a test swaps in its own.
+class AllHealthyProbe implements HealthProbePort {
+  checkProcess(processName: string): Promise<HealthCheckResult> {
+    return Promise.resolve({ name: processName, state: 'healthy' });
+  }
+
+  checkSocket(host: string, port: number): Promise<HealthCheckResult> {
+    return Promise.resolve({ name: `${host}:${port}`, state: 'healthy' });
+  }
+}
 // FakeHasher output for the 8-character test password
 const GOOD_HASH = HashedPassword.parse(`$6$fakesalt$${'x'.repeat(20)}8`);
 export const TEST_PASSWORD = '8chars!!';
@@ -76,6 +90,7 @@ export interface PortalWorld {
   readonly credentials: InMemoryPortalCredentialsRepository;
   readonly sessions: InMemoryPortalSessionRepository;
   readonly queue: RecordingQueue;
+  readonly outbox: InMemoryMailOutbox;
 }
 
 // Builds a portal server over in-memory fakes with two accounts:
@@ -90,6 +105,7 @@ export async function buildPortalWorld(
   const tokens = new FakeSessionTokens();
   const hasher = new FakeHasher();
   const queue = new RecordingQueue();
+  const outbox = new InMemoryMailOutbox();
   const authDeps = { users, credentials, sessions, attempts, tokens, hasher };
   const server = buildPortalServer({
     login: new Login(authDeps),
@@ -104,6 +120,10 @@ export async function buildPortalWorld(
     addresses: new InMemoryUserAddressRepository(),
     bindings: new InMemoryUserAddressRepository(),
     fairUse: new InMemoryFairUseRepository(),
+    health: new AllHealthyProbe(),
+    components: new InMemoryComponentRegistry(),
+    releases: new InMemoryReleaseRepository(),
+    outbox,
     ...extra,
   });
   await users.save(new UserBuilder().build());
@@ -123,7 +143,7 @@ export async function buildPortalWorld(
     { username: Username.parse('boss'), passwordHash: GOOD_HASH, role: 'admin' },
     NOW,
   );
-  return { server, users, credentials, sessions, queue };
+  return { server, users, credentials, sessions, queue, outbox };
 }
 
 export interface AgentSession {
