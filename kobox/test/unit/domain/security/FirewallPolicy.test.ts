@@ -150,11 +150,14 @@ describe('renderFirewallRules', () => {
     );
   });
 
-  it('should_masquerade_only_the_with_gateway_vpn_subnet', () => {
+  it('should_own_only_the_filter_table', () => {
     const content = renderFirewallRules(policyWith(users)).content;
-    expect(content).toContain('*nat');
-    expect(content).toContain('-A POSTROUTING -s 10.0.0.0/24 ! -d 10.0.0.0/24 -j MASQUERADE');
-    expect(content).not.toContain('-A POSTROUTING -s 10.0.1.0/24');
+    // nat is SHARED (Docker's embedded DNS and bridges live there — on the
+    // container AND on the real box): iptables-restore replaces whole tables,
+    // so nat must never appear here. The VPN masquerade is ensured by a
+    // targeted check-then-add, like the shaper owns mangle.
+    expect(content).not.toContain('*nat');
+    expect(content).not.toContain('MASQUERADE');
     // mangle is owned by the shaper: a firewall re-apply must not wipe live throttles
     expect(content).not.toContain('*mangle');
   });

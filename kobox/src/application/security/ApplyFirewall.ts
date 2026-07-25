@@ -63,6 +63,11 @@ export class ApplyFirewall {
       users: firewallUsers,
     });
     const outcome = await firewall.apply(renderFirewallRules(policy));
+    // re-ensured every run (a Docker restart can rebuild the shared nat
+    // table): targeted append, never part of the restored ruleset
+    if (outcome !== 'rolled-back') {
+      await firewall.ensureMasquerade(settings.vpn.tunGwSubnet);
+    }
 
     if (outcome === 'rolled-back') {
       await notifications.notify({ type: 'FirewallApplied', outcome: 'rolled-back' });

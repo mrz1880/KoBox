@@ -12,6 +12,7 @@ import type {
   CommandResult,
   CommandRunner,
 } from '../../../../src/infrastructure/system/CommandRunner.js';
+import { Cidr } from '../../../../src/domain/security/Cidr.js';
 import { DynDnsHost } from '../../../../src/domain/security/DynDnsHost.js';
 import { DynDnsLookupAdapter } from '../../../../src/infrastructure/system/DynDnsLookupAdapter.js';
 import { FsVpnPkiAdapter } from '../../../../src/infrastructure/system/FsVpnPkiAdapter.js';
@@ -155,7 +156,44 @@ describe('IptablesRestoreAdapter', () => {
     await expect(adapter.apply(rules)).rejects.toThrow('line 2 failed');
     expect(files.applied).toHaveLength(0);
   });
+
+  // nat is shared with Docker: the masquerade is a targeted check-then-add,
+  // never part of the restored ruleset
+  it('should_ensure_the_masquerade_with_a_targeted_check_then_add', async () => {
+    const natRunner = new NatCheckRunner(1); // -C says absent
+
+    await new IptablesRestoreAdapter(natRunner, files, probe, 22).ensureMasquerade(
+      Cidr.parse('10.0.0.0/24'),
+    );
+
+    expect(natRunner.lines).toEqual([
+      'iptables -t nat -C POSTROUTING -s 10.0.0.0/24 ! -d 10.0.0.0/24 -j MASQUERADE',
+      'iptables -t nat -A POSTROUTING -s 10.0.0.0/24 ! -d 10.0.0.0/24 -j MASQUERADE',
+    ]);
+  });
+
+  it('should_not_duplicate_an_existing_masquerade', async () => {
+    const natRunner = new NatCheckRunner(0); // -C says present
+
+    await new IptablesRestoreAdapter(natRunner, files, probe, 22).ensureMasquerade(
+      Cidr.parse('10.0.0.0/24'),
+    );
+
+    expect(natRunner.lines.filter((line) => line.includes(' -A '))).toEqual([]);
+  });
 });
+
+class NatCheckRunner implements CommandRunner {
+  readonly lines: string[] = [];
+
+  constructor(private readonly checkExit: number) {}
+
+  run(request: CommandRequest): Promise<CommandResult> {
+    this.lines.push([request.command, ...request.args].join(' '));
+    const exitCode = request.args.includes('-C') ? this.checkExit : 0;
+    return Promise.resolve({ stdout: '', stderr: '', exitCode });
+  }
+}
 
 class PrefixRunner implements CommandRunner {
   readonly calls: CommandRequest[] = [];

@@ -78,23 +78,16 @@ export function renderFirewallRules(policy: FirewallPolicy): RenderedFile {
     'COMMIT',
   ];
 
-  const nat = [
-    '*nat',
-    ':PREROUTING ACCEPT [0:0]',
-    ':INPUT ACCEPT [0:0]',
-    ':OUTPUT ACCEPT [0:0]',
-    ':POSTROUTING ACCEPT [0:0]',
-    `-A POSTROUTING -s ${vpn.tunGwSubnet.value} ! -d ${vpn.tunGwSubnet.value} -j MASQUERADE`,
-    'COMMIT',
-  ];
-
+  // ONLY the filter table is owned. iptables-restore replaces whole tables:
+  // nat is shared with Docker (embedded DNS DNAT, bridge rules — in dev
+  // containers AND on the real box) so the VPN masquerade is ensured by a
+  // targeted check-then-add in the adapter; mangle belongs to the shaper.
   return {
     path: '/etc/kobox/firewall.rules',
     content: [
       '# KoBox-managed firewall — DO NOT EDIT (rendered declaratively).',
       '# Applied atomically via iptables-restore; pgl chains reload after apply.',
       ...filter,
-      ...nat,
       '',
     ].join('\n'),
     mode: '0600',

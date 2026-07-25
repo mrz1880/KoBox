@@ -1,5 +1,6 @@
 import type { RenderedFile } from '../shared/files.js';
 import type { IpAddress } from '../shared/IpAddress.js';
+import type { Cidr } from './Cidr.js';
 import type { Username } from '../user/Username.js';
 import type { Bandwidth } from './Bandwidth.js';
 import type { DynDnsHost } from './DynDnsHost.js';
@@ -14,6 +15,9 @@ export type FirewallApplyOutcome = 'applied' | 'unchanged' | 'rolled-back';
 
 export interface FirewallApplyPort {
   apply(rules: RenderedFile): Promise<FirewallApplyOutcome>;
+  // the ONE nat mutation KoBox makes: the with-gateway VPN masquerade,
+  // check-then-add (the nat table is shared with Docker, never restored)
+  ensureMasquerade(subnet: Cidr): Promise<void>;
 }
 
 export interface ShapingPort {
