@@ -16,6 +16,34 @@ export class SqliteJobQueue implements JobQueuePort {
     return Promise.resolve(inserted.id);
   }
 
+  enqueueUnique(job: Job): Promise<number | undefined> {
+    const payloadJson = JSON.stringify(job.payload);
+    // check + insert inside one immediate write transaction: two concurrent
+    // ticks cannot both pass the existence check
+    const id = this.db.orm.transaction(
+      (tx) => {
+        const existing = tx
+          .select({ id: jobs.id })
+          .from(jobs)
+          .where(
+            sql`${jobs.type} = ${job.type} AND ${jobs.payloadJson} = ${payloadJson} AND ${jobs.status} = 'pending'`,
+          )
+          .limit(1)
+          .get();
+        if (existing) {
+          return undefined;
+        }
+        return tx
+          .insert(jobs)
+          .values({ type: job.type, payloadJson })
+          .returning({ id: jobs.id })
+          .get().id;
+      },
+      { behavior: 'immediate' },
+    );
+    return Promise.resolve(id);
+  }
+
   // pending -> running flips inside one write transaction so two workers can
   // never claim the same job. Payload is re-parsed: the queue trusts nothing.
   claimNextPending(): Promise<ClaimedJob | undefined> {

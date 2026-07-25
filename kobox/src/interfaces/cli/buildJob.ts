@@ -139,4 +139,16 @@ export const buildJob = {
   evaluateFairUse(): Job {
     return parseJob('evaluate-fair-use', {});
   },
+
+  sendMails(): Job {
+    return parseJob('send-mails', {});
+  },
+
+  runBackup(): Job {
+    return parseJob('run-backup', {});
+  },
+
+  applyIpset(): Job {
+    return parseJob('apply-ipset', {});
+  },
 };

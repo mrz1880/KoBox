@@ -68,6 +68,18 @@ class InMemoryJobQueue implements JobQueuePort {
     return Promise.resolve(id);
   }
 
+  enqueueUnique(job: Job): Promise<number | undefined> {
+    const payloadJson = JSON.stringify(job.payload);
+    const existing = this.rows.find(
+      (r) =>
+        r.status === 'pending' &&
+        r.job.type === job.type &&
+        JSON.stringify(r.job.payload) === payloadJson,
+    );
+    if (existing) return Promise.resolve(undefined);
+    return this.enqueue(job);
+  }
+
   claimNextPending(): Promise<ClaimedJob | undefined> {
     const row = this.rows.find((r) => r.status === 'pending');
     if (!row) return Promise.resolve(undefined);

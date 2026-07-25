@@ -38,7 +38,18 @@ describe('job contract', () => {
       'provision-vpn-user',
       'deprovision-vpn-user',
       'evaluate-fair-use',
+      'send-mails',
+      'run-backup',
+      'apply-ipset',
     ]);
+  });
+
+  it('should_parse_maintenance_jobs', () => {
+    expect(parseJob('send-mails', {}).type).toBe('send-mails');
+    expect(parseJob('run-backup', {}).type).toBe('run-backup');
+    expect(parseJob('apply-ipset', {}).type).toBe('apply-ipset');
+    expect(() => parseJob('send-mails', { extra: 1 })).toThrow(); // strict object
+    expect(() => parseJob('run-backup', { extra: 1 })).toThrow();
   });
 
   it('should_parse_security_jobs', () => {

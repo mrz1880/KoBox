@@ -182,6 +182,40 @@ describe('SqliteJobQueue', () => {
     expect(row.error).toMatch(/username/);
   });
 
+  it('should_dedupe_identical_pending_jobs_on_enqueue_unique', async () => {
+    const queue = new SqliteJobQueue(db);
+
+    const first = await queue.enqueueUnique(parseJob('send-mails', {}));
+    const second = await queue.enqueueUnique(parseJob('send-mails', {}));
+
+    // scheduler idempotence: a stopped worker never accumulates a backlog
+    expect(first).toBeDefined();
+    expect(second).toBeUndefined();
+    const count = db.raw
+      .prepare("SELECT COUNT(*) AS n FROM jobs WHERE type = 'send-mails'")
+      .get() as { n: number };
+    expect(count.n).toBe(1);
+  });
+
+  it('should_enqueue_unique_again_once_the_pending_job_is_claimed', async () => {
+    const queue = new SqliteJobQueue(db);
+    await queue.enqueueUnique(parseJob('send-mails', {}));
+    await queue.claimNextPending(); // running now — a new tick must re-enqueue
+
+    const again = await queue.enqueueUnique(parseJob('send-mails', {}));
+
+    expect(again).toBeDefined();
+  });
+
+  it('should_not_dedupe_jobs_with_different_payloads', async () => {
+    const queue = new SqliteJobQueue(db);
+
+    await queue.enqueueUnique(parseJob('suspend-user', { username: 'alice' }));
+    const other = await queue.enqueueUnique(parseJob('suspend-user', { username: 'bob' }));
+
+    expect(other).toBeDefined();
+  });
+
   it('should_fail_stale_running_jobs_on_recovery', async () => {
     const queue = new SqliteJobQueue(db);
     await queue.enqueue(parseJob('suspend-user', { username: 'alice' }));
