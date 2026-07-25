@@ -45,6 +45,9 @@ export const JOB_TYPES = [
   'send-mails',
   'run-backup',
   'apply-ipset',
+  'set-fair-use-override',
+  'render-rutorrent-users',
+  'render-nfs-exports',
 ] as const;
 
 export type JobType = (typeof JOB_TYPES)[number];
@@ -103,6 +106,8 @@ export const jobPayloadSchemas = {
     quotaBytes: z.number().int().nonnegative(),
     proxyPort: z.number().int().min(1).max(65535),
     passwordHash: passwordHashField,
+    // portal capability level (Phase 6); provisioning is identical either way
+    role: z.enum(['admin', 'user']).default('user'),
   }),
   'delete-user': usernameOnly,
   'change-password': z.strictObject({
@@ -152,6 +157,16 @@ export const jobPayloadSchemas = {
   'send-mails': z.strictObject({}),
   'run-backup': z.strictObject({}),
   'apply-ipset': z.strictObject({}),
+  // per-user fair-use budget override: absent = untouched, null = clear,
+  // number = set (bits/s for the bandwidth fields)
+  'set-fair-use-override': z.strictObject({
+    username: usernameField,
+    egressLimitBps: z.number().int().positive().nullable().optional(),
+    authRatePerHour: z.number().int().positive().nullable().optional(),
+    throttleToBps: z.number().int().positive().nullable().optional(),
+  }),
+  'render-rutorrent-users': z.strictObject({}),
+  'render-nfs-exports': z.strictObject({}),
 } satisfies Record<JobType, z.ZodType>;
 
 export type JobPayload<T extends JobType> = z.infer<(typeof jobPayloadSchemas)[T]>;

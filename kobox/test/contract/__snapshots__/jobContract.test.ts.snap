@@ -122,6 +122,14 @@ exports[`job contract > should_keep_the_wire_contract_stable 1`] = `
         "minimum": 0,
         "type": "integer",
       },
+      "role": {
+        "default": "user",
+        "enum": [
+          "admin",
+          "user",
+        ],
+        "type": "string",
+      },
       "username": {
         "pattern": "^[a-z][a-z0-9]{0,31}$",
         "type": "string",
@@ -134,6 +142,7 @@ exports[`job contract > should_keep_the_wire_contract_stable 1`] = `
       "quotaBytes",
       "proxyPort",
       "passwordHash",
+      "role",
     ],
     "type": "object",
   },
@@ -328,6 +337,12 @@ exports[`job contract > should_keep_the_wire_contract_stable 1`] = `
     "properties": {},
     "type": "object",
   },
+  "render-nfs-exports": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {},
+    "type": "object",
+  },
   "render-openvpn": {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "additionalProperties": false,
@@ -346,6 +361,12 @@ exports[`job contract > should_keep_the_wire_contract_stable 1`] = `
     "required": [
       "username",
     ],
+    "type": "object",
+  },
+  "render-rutorrent-users": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {},
     "type": "object",
   },
   "render-whitelist": {
@@ -415,6 +436,56 @@ exports[`job contract > should_keep_the_wire_contract_stable 1`] = `
     "required": [
       "username",
       "allowed",
+    ],
+    "type": "object",
+  },
+  "set-fair-use-override": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "authRatePerHour": {
+        "anyOf": [
+          {
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991,
+            "type": "integer",
+          },
+          {
+            "type": "null",
+          },
+        ],
+      },
+      "egressLimitBps": {
+        "anyOf": [
+          {
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991,
+            "type": "integer",
+          },
+          {
+            "type": "null",
+          },
+        ],
+      },
+      "throttleToBps": {
+        "anyOf": [
+          {
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991,
+            "type": "integer",
+          },
+          {
+            "type": "null",
+          },
+        ],
+      },
+      "username": {
+        "pattern": "^[a-z][a-z0-9]{0,31}$",
+        "type": "string",
+      },
+    },
+    "required": [
+      "username",
     ],
     "type": "object",
   },

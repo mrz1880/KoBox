@@ -64,6 +64,7 @@ program
   .option('--quota-gib <number>', 'disk quota in GiB', '500')
   .option('--account-type <type>', 'normal|plex', 'normal')
   .option('--proxy-port <port>', 'shared proxy port', '8080')
+  .option('--admin', 'grant the portal admin role')
   .description('create a seedbox user (password read from stdin)')
   .action(async (username: string, options: Record<string, string>) => {
     const { direct } = program.opts<GlobalOptions>();
@@ -89,6 +90,7 @@ program
         accountType: options.accountType ?? 'normal',
         quotaGib: Number(options.quotaGib ?? '500'),
         proxyPort: Number(options.proxyPort ?? '8080'),
+        role: options.admin === undefined ? 'user' : 'admin',
       },
       password,
       c.hasher,
@@ -512,6 +514,45 @@ program
     }
     process.stdout.write(`${JSON.stringify(rows, null, 2)}\n`);
     c.db.close();
+  });
+
+// "clear" resets that budget dimension to the installation default; a number
+// overrides it for this user only.
+function parseOverride(raw: string | undefined): number | null | undefined {
+  if (raw === undefined) {
+    return undefined;
+  }
+  if (raw === 'clear') {
+    return null;
+  }
+  const value = Number(raw);
+  if (!Number.isInteger(value) || value <= 0) {
+    throw new Error(`expected a positive integer or "clear", got ${JSON.stringify(raw)}`);
+  }
+  return value;
+}
+
+program
+  .command('set-fair-use-override')
+  .argument('<username>')
+  .option('--egress-bps <n|clear>', 'sustained egress budget override, bits per second')
+  .option('--auth-per-hour <n|clear>', 'SSH auth rate budget override')
+  .option('--throttle-bps <n|clear>', 'throttle target override, bits per second')
+  .description('override the fair-use budget for one user (audited)')
+  .action(async (username: string, options: Record<string, string>) => {
+    const c = container();
+    const egressLimitBps = parseOverride(options.egressBps);
+    const authRatePerHour = parseOverride(options.authPerHour);
+    const throttleToBps = parseOverride(options.throttleBps);
+    const id = await c.queue.enqueue(
+      buildJob.setFairUseOverride({
+        username,
+        ...(egressLimitBps !== undefined && { egressLimitBps }),
+        ...(authRatePerHour !== undefined && { authRatePerHour }),
+        ...(throttleToBps !== undefined && { throttleToBps }),
+      }),
+    );
+    await done(c, `job ${String(id)} enqueued: set-fair-use-override ${username}`);
   });
 
 program
