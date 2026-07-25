@@ -55,6 +55,7 @@ export interface InstallHostPort {
   extractTarGz(archive: string, destDir: string): Promise<void>;
   applySysctl(): Promise<void>;
   postconf(settings: Readonly<Record<string, string>>): Promise<void>;
+  postmap(path: string): Promise<void>;
   preseedDebconf(selections: readonly string[]): Promise<void>;
   mountOptions(mountPoint: string): Promise<readonly string[]>;
   activateQuota(mountPoint: string): Promise<void>;

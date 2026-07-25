@@ -9,6 +9,11 @@ import { Password } from '../../domain/user/Password.js';
 import { ProxyPort } from '../../domain/user/Port.js';
 import { Quota } from '../../domain/user/Quota.js';
 import { Username } from '../../domain/user/Username.js';
+import { ConfigureMailRelay } from '../../application/maintenance/ConfigureMailRelay.js';
+import { ExecFileRunner } from '../../infrastructure/system/CommandRunner.js';
+import { InstallHostAdapter } from '../../infrastructure/system/InstallHostAdapter.js';
+import { RtorrentConfigAdapter } from '../../infrastructure/system/RtorrentConfigAdapter.js';
+import { SystemdAdapter } from '../../infrastructure/system/SystemdAdapter.js';
 import { TorrentEventSpoolWriter } from '../../infrastructure/spool/TorrentEventSpool.js';
 import { buildContainer, buildInstallation, spoolDir, type Container } from '../composition.js';
 import { buildJob } from './buildJob.js';
@@ -592,6 +597,30 @@ program
     } finally {
       c.db.close();
     }
+  });
+
+program
+  .command('configure-mail-relay')
+  .requiredOption('--host <fqdn>', 'SMTP relay hostname')
+  .requiredOption('--port <port>', 'SMTP relay port (e.g. 587)')
+  .requiredOption('--user <login>', 'SASL login (password read from stdin)')
+  .description('wire Postfix to an authenticated SMTP relay (direct root, secret stays on disk 0600)')
+  .action(async (options: Record<string, string>) => {
+    // no container: this command touches Postfix only, never the database
+    const password = await readStdin();
+    const runner = new ExecFileRunner();
+    const configure = new ConfigureMailRelay({
+      files: new RtorrentConfigAdapter(runner),
+      host: new InstallHostAdapter(runner),
+      systemd: new SystemdAdapter(runner),
+    });
+    await configure.execute({
+      host: options.host ?? '',
+      port: Number(options.port ?? '0'),
+      user: options.user ?? '',
+      password,
+    });
+    process.stdout.write('postfix relay configured (sasl_passwd 0600, postmap, reload)\n');
   });
 
 program

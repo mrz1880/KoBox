@@ -73,6 +73,14 @@ export class InstallHostAdapter implements InstallHostPort {
     }
   }
 
+  async postmap(path: string): Promise<void> {
+    await runOrThrow(this.runner, {
+      command: 'postmap',
+      args: [path],
+      timeoutMs: HOST_TIMEOUT_MS,
+    });
+  }
+
   async preseedDebconf(selections: readonly string[]): Promise<void> {
     await runOrThrow(this.runner, {
       command: 'debconf-set-selections',
