@@ -17,8 +17,10 @@ import { SystemFactsAdapter } from '../infrastructure/system/SystemFactsAdapter.
 import { createLogger, type Logger } from '../infrastructure/logging/logger.js';
 import { ConsoleNotificationAdapter } from '../infrastructure/notifications/ConsoleNotificationAdapter.js';
 import { DiscordChannel } from '../infrastructure/notifications/DiscordChannel.js';
-import { EmailChannel } from '../infrastructure/notifications/EmailChannel.js';
 import { MultiChannelNotifier } from '../infrastructure/notifications/MultiChannelNotifier.js';
+import { OutboxEmailChannel } from '../infrastructure/notifications/OutboxEmailChannel.js';
+import { SendmailTransport } from '../infrastructure/notifications/SendmailTransport.js';
+import { SqliteMailOutbox } from '../infrastructure/persistence/SqliteMailOutbox.js';
 import { NtfyChannel } from '../infrastructure/notifications/NtfyChannel.js';
 import type { NotificationChannel } from '../infrastructure/notifications/formatEvent.js';
 import type { SecurityNotificationPort } from '../domain/security/ports.js';
@@ -74,10 +76,12 @@ import { WatchDirAdapter } from '../infrastructure/system/WatchDirAdapter.js';
 import { loadRtorrentTemplates } from '../infrastructure/templates/TemplateProvider.js';
 import { JobWorker } from './worker/JobWorker.js';
 import {
+  buildMaintenanceUseCases,
   buildSecurityUseCases,
   buildTorrentUseCases,
   buildTrackerUseCases,
   buildUseCases,
+  type MaintenanceUseCases,
   type SecurityUseCases,
   type TorrentUseCases,
   type TrackerUseCases,
@@ -97,11 +101,17 @@ function envInt(name: string, fallback: number): number {
   return value;
 }
 
+function nowStamp(): string {
+  return new Date().toISOString().slice(0, 19).replace('T', ' ');
+}
+
 // The frozen alert channels (ntfy + email via Postfix + Discord), each armed
 // by its env var; with none configured the Phase 0 console stub remains.
+// Email is durable since Phase 5: alerts land in the mails outbox and the
+// scheduled send-mails job flushes them through the relay.
 function buildNotifier(
   logger: Logger,
-  runner: ExecFileRunner,
+  outbox: SqliteMailOutbox,
 ): NotificationPort & TrackerNotificationPort & SecurityNotificationPort {
   const channels: NotificationChannel[] = [];
   const ntfyUrl = process.env.KOBOX_NTFY_URL;
@@ -114,7 +124,7 @@ function buildNotifier(
   }
   const email = process.env.KOBOX_ALERT_EMAIL;
   if (email !== undefined && email !== '') {
-    channels.push(new EmailChannel(runner, email));
+    channels.push(new OutboxEmailChannel(outbox, email, nowStamp));
   }
   return channels.length > 0
     ? new MultiChannelNotifier(channels, logger)
@@ -250,6 +260,8 @@ export interface Container {
   readonly torrentUseCases: TorrentUseCases;
   readonly trackerUseCases: TrackerUseCases;
   readonly securityUseCases: SecurityUseCases;
+  readonly maintenanceUseCases: MaintenanceUseCases;
+  readonly outbox: SqliteMailOutbox;
   readonly queue: SqliteJobQueue;
   readonly worker: JobWorker;
   readonly hasher: OpensslPasswordHasher;
@@ -274,7 +286,8 @@ export function buildContainer(name: string): Container {
         logger.warn({ username }, 'quota enforcement skipped: KOBOX_QUOTA_FS not set');
       });
   const services = new SystemdServiceControlAdapter(runner);
-  const notifications = buildNotifier(logger, runner);
+  const outbox = new SqliteMailOutbox(db);
+  const notifications = buildNotifier(logger, outbox);
   const useCases = buildUseCases({
     repo,
     accounts: new SystemAccountAdapter(runner),
@@ -357,6 +370,10 @@ export function buildContainer(name: string): Container {
     notifications,
     settings,
   });
+  const maintenanceUseCases = buildMaintenanceUseCases({
+    outbox,
+    transport: new SendmailTransport(runner),
+  });
   return {
     db,
     logger,
@@ -364,8 +381,17 @@ export function buildContainer(name: string): Container {
     torrentUseCases,
     trackerUseCases,
     securityUseCases,
+    maintenanceUseCases,
+    outbox,
     queue,
-    worker: new JobWorker(queue, useCases, torrentUseCases, trackerUseCases, securityUseCases),
+    worker: new JobWorker(
+      queue,
+      useCases,
+      torrentUseCases,
+      trackerUseCases,
+      securityUseCases,
+      maintenanceUseCases,
+    ),
     hasher: new OpensslPasswordHasher(runner),
     repo,
     trackerRepo,

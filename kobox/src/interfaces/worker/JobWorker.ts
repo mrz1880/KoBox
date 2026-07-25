@@ -12,7 +12,13 @@ import { HashedPassword } from '../../domain/user/HashedPassword.js';
 import { ProxyPort } from '../../domain/user/Port.js';
 import { Quota } from '../../domain/user/Quota.js';
 import { Username } from '../../domain/user/Username.js';
-import type { SecurityUseCases, TorrentUseCases, TrackerUseCases, UseCases } from '../useCases.js';
+import type {
+  MaintenanceUseCases,
+  SecurityUseCases,
+  TorrentUseCases,
+  TrackerUseCases,
+  UseCases,
+} from '../useCases.js';
 
 // What a completed job asks the worker to enqueue next. Use cases stay
 // queue-agnostic: they return reports, the worker turns them into jobs.
@@ -38,6 +44,7 @@ export class JobWorker {
     private readonly torrents: TorrentUseCases,
     private readonly trackers: TrackerUseCases,
     private readonly security: SecurityUseCases,
+    private readonly maintenance: MaintenanceUseCases,
   ) {}
 
   async processNext(): Promise<boolean> {
@@ -277,6 +284,14 @@ export class JobWorker {
       case 'evaluate-fair-use':
         await this.security.evaluateFairUse.execute({ now: nowStamp() });
         return;
+      case 'send-mails':
+        await this.maintenance.sendMails.execute({ now: nowStamp() });
+        return;
+      // run-backup and apply-ipset land with their use cases later in this
+      // phase; an explicit error beats a silent no-op if enqueued early
+      case 'run-backup':
+      case 'apply-ipset':
+        throw new Error(`${job.type}: not implemented yet`);
       case 'add-user-address':
       case 'remove-user-address': {
         const report = await this.trackers.manageUserAddress.execute({

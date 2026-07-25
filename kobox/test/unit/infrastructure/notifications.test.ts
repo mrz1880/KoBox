@@ -4,6 +4,9 @@ import { DiscordChannel } from '../../../src/infrastructure/notifications/Discor
 import { EmailChannel } from '../../../src/infrastructure/notifications/EmailChannel.js';
 import { MultiChannelNotifier } from '../../../src/infrastructure/notifications/MultiChannelNotifier.js';
 import { NtfyChannel } from '../../../src/infrastructure/notifications/NtfyChannel.js';
+import { OutboxEmailChannel } from '../../../src/infrastructure/notifications/OutboxEmailChannel.js';
+import { SendmailTransport } from '../../../src/infrastructure/notifications/SendmailTransport.js';
+import { InMemoryMailOutbox } from '../../../src/infrastructure/persistence/InMemoryMailOutbox.js';
 import { formatEvent } from '../../../src/infrastructure/notifications/formatEvent.js';
 import type {
   CommandRequest,
@@ -118,6 +121,42 @@ describe('EmailChannel', () => {
     expect(runner.calls[0]?.stdin).toContain('To: admin@example.org');
     expect(runner.calls[0]?.stdin).toContain('Subject: KoBox: alert');
     expect(runner.calls[0]?.stdin).toContain('details');
+  });
+});
+
+describe('SendmailTransport', () => {
+  it('should_pipe_a_complete_delivery_through_sendmail', async () => {
+    const runner = new RecordingRunner();
+    const transport = new SendmailTransport(runner);
+
+    await transport.deliver({
+      recipient: 'admin@example.org',
+      subject: 'KoBox: alert',
+      body: 'details',
+    });
+
+    expect(runner.calls[0]?.command).toBe('sendmail');
+    expect(runner.calls[0]?.args).toEqual(['-t']);
+    expect(runner.calls[0]?.stdin).toContain('To: admin@example.org');
+    expect(runner.calls[0]?.stdin).toContain('Subject: KoBox: alert');
+    expect(runner.calls[0]?.stdin).toContain('details');
+  });
+});
+
+describe('OutboxEmailChannel', () => {
+  it('should_enqueue_a_pending_outbox_row_instead_of_sending', async () => {
+    const outbox = new InMemoryMailOutbox();
+    const channel = new OutboxEmailChannel(outbox, 'admin@example.org', () => '2026-07-25 10:00:00');
+
+    await channel.send({ title: 'KoBox: alert', body: 'details', priority: 'high' });
+
+    const rows = await outbox.listRecent(10);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.status).toBe('pending');
+    expect(rows[0]?.recipient).toBe('admin@example.org');
+    expect(rows[0]?.subject).toBe('KoBox: alert');
+    expect(rows[0]?.body).toBe('details');
+    expect(rows[0]?.nextAttemptAt).toBe('2026-07-25 10:00:00');
   });
 });
 

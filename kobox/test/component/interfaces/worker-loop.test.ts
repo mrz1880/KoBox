@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { parseJob, type Job } from '../../../src/application/jobs/contract.js';
+import type { MailDelivery } from '../../../src/application/maintenance/MailTransportPort.js';
+import { InMemoryMailOutbox } from '../../../src/infrastructure/persistence/InMemoryMailOutbox.js';
 import type { ClaimedJob, JobQueuePort } from '../../../src/application/jobs/JobQueuePort.js';
 import { InfoHash } from '../../../src/domain/torrent/InfoHash.js';
 import { HashedPassword } from '../../../src/domain/user/HashedPassword.js';
@@ -52,6 +54,7 @@ import { FakeVpnPki } from '../../../src/infrastructure/system/fakes/FakeVpnPki.
 import { buildJob } from '../../../src/interfaces/cli/buildJob.js';
 import { JobWorker } from '../../../src/interfaces/worker/JobWorker.js';
 import {
+  buildMaintenanceUseCases,
   buildSecurityUseCases,
   buildTorrentUseCases,
   buildTrackerUseCases,
@@ -149,8 +152,19 @@ interface World {
   identity: FakeUserIdentity;
   dyndns: FakeDynDnsResolver;
   pki: FakeVpnPki;
+  outbox: InMemoryMailOutbox;
+  mailTransport: RecordingMailTransport;
   worker: JobWorker;
   hasher: FakePasswordHasher;
+}
+
+class RecordingMailTransport {
+  readonly delivered: MailDelivery[] = [];
+
+  deliver(mail: MailDelivery): Promise<void> {
+    this.delivered.push(mail);
+    return Promise.resolve();
+  }
 }
 
 let world: World;
@@ -267,6 +281,9 @@ beforeEach(() => {
     },
   });
   const queue = new InMemoryJobQueue();
+  const outbox = new InMemoryMailOutbox();
+  const mailTransport = new RecordingMailTransport();
+  const maintenanceUseCases = buildMaintenanceUseCases({ outbox, transport: mailTransport });
   world = {
     queue,
     accounts,
@@ -287,7 +304,16 @@ beforeEach(() => {
     dyndns,
     pki,
     hasher: new FakePasswordHasher(),
-    worker: new JobWorker(queue, useCases, torrentUseCases, trackerUseCases, securityUseCases),
+    outbox,
+    mailTransport,
+    worker: new JobWorker(
+      queue,
+      useCases,
+      torrentUseCases,
+      trackerUseCases,
+      securityUseCases,
+      maintenanceUseCases,
+    ),
   };
 });
 
@@ -636,5 +662,21 @@ describe('tracker job chains (discover -> cert -> whitelist, blocklists -> filte
     expect(world.networkFiles.contentAt('/etc/bind/kobox.zones.blacklists')).toContain(
       'zone "tracker.example.org"',
     );
+  });
+});
+
+describe('maintenance jobs', () => {
+  it('should_flush_the_outbox_when_the_send_mails_job_runs', async () => {
+    await world.outbox.enqueue(
+      { recipient: 'admin@example.org', subject: 'KoBox alert', body: 'details' },
+      '2026-07-25 10:00:00',
+    );
+
+    await world.queue.enqueue(parseJob('send-mails', {}));
+    await world.worker.drain();
+
+    expect(world.mailTransport.delivered).toHaveLength(1);
+    expect(world.mailTransport.delivered[0]?.recipient).toBe('admin@example.org');
+    expect((await world.outbox.listRecent(1))[0]?.status).toBe('sent');
   });
 });

@@ -14,6 +14,9 @@ import { ProvisionRtorrentInstance } from '../application/torrent/ProvisionRtorr
 import { RenderRtorrentConfig } from '../application/torrent/RenderRtorrentConfig.js';
 import { SetAllowPublicTracker } from '../application/torrent/SetAllowPublicTracker.js';
 import { SetSyncDisabled } from '../application/torrent/SetSyncDisabled.js';
+import type { MailOutboxPort } from '../application/maintenance/MailOutboxPort.js';
+import type { MailTransportPort } from '../application/maintenance/MailTransportPort.js';
+import { SendMails } from '../application/maintenance/SendMails.js';
 import { ApplyFirewall } from '../application/security/ApplyFirewall.js';
 import { DeprovisionVpnUser } from '../application/security/DeprovisionVpnUser.js';
 import { EvaluateFairUse } from '../application/security/EvaluateFairUse.js';
@@ -104,6 +107,21 @@ export function buildUseCases(deps: UseCaseDeps): UseCases {
     changePassword: new ChangePassword(deps),
     suspendUser: new SuspendUser(deps),
     resumeUser: new ResumeUser(deps),
+  };
+}
+
+export interface MaintenanceUseCaseDeps {
+  readonly outbox: MailOutboxPort;
+  readonly transport: MailTransportPort;
+}
+
+export interface MaintenanceUseCases {
+  readonly sendMails: SendMails;
+}
+
+export function buildMaintenanceUseCases(deps: MaintenanceUseCaseDeps): MaintenanceUseCases {
+  return {
+    sendMails: new SendMails(deps),
   };
 }
 

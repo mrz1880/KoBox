@@ -288,10 +288,17 @@ program
   .action(async () => {
     const c = container();
     const today = new Date().toISOString().slice(0, 10);
-    const id = await c.queue.enqueue(buildJob.renewTrackerCerts({ today }));
-    await done(c, `job ${String(id)} enqueued: renew-tracker-certs ${today}`);
+    const id = await c.queue.enqueueUnique(buildJob.renewTrackerCerts({ today }));
+    await done(
+      c,
+      id === undefined
+        ? `renew-tracker-certs ${today} already pending`
+        : `job ${String(id)} enqueued: renew-tracker-certs ${today}`,
+    );
   });
 
+// cron re-runs these blindly every tick: enqueueUnique keeps a stopped
+// worker from accumulating a duplicate backlog (they are all idempotent)
 function parameterlessTrackerCommand(
   name: 'import-blocklist-catalog' | 'update-blocklists' | 'render-whitelist',
   description: string,
@@ -302,8 +309,11 @@ function parameterlessTrackerCommand(
     .description(description)
     .action(async () => {
       const c = container();
-      const id = await c.queue.enqueue(build());
-      await done(c, `job ${String(id)} enqueued: ${name}`);
+      const id = await c.queue.enqueueUnique(build());
+      await done(
+        c,
+        id === undefined ? `${name} already pending` : `job ${String(id)} enqueued: ${name}`,
+      );
     });
 }
 
@@ -405,8 +415,13 @@ program
   .description('re-resolve DynDNS hostnames; refreshes whitelist/firewall/fail2ban on change')
   .action(async () => {
     const c = container();
-    const id = await c.queue.enqueue(buildJob.resolveDynDns());
-    await done(c, `job ${String(id)} enqueued: resolve-dyndns`);
+    const id = await c.queue.enqueueUnique(buildJob.resolveDynDns());
+    await done(
+      c,
+      id === undefined
+        ? 'resolve-dyndns already pending'
+        : `job ${String(id)} enqueued: resolve-dyndns`,
+    );
   });
 
 program
@@ -414,8 +429,25 @@ program
   .description('meter usage per user and run the graduated response (cron entry point)')
   .action(async () => {
     const c = container();
-    const id = await c.queue.enqueue(buildJob.evaluateFairUse());
-    await done(c, `job ${String(id)} enqueued: evaluate-fair-use`);
+    const id = await c.queue.enqueueUnique(buildJob.evaluateFairUse());
+    await done(
+      c,
+      id === undefined
+        ? 'evaluate-fair-use already pending'
+        : `job ${String(id)} enqueued: evaluate-fair-use`,
+    );
+  });
+
+program
+  .command('send-mails')
+  .description('flush the pending mail outbox through the Postfix relay (cron entry point)')
+  .action(async () => {
+    const c = container();
+    const id = await c.queue.enqueueUnique(buildJob.sendMails());
+    await done(
+      c,
+      id === undefined ? 'send-mails already pending' : `job ${String(id)} enqueued: send-mails`,
+    );
   });
 
 program
