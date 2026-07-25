@@ -2,7 +2,11 @@ import { existsSync } from 'node:fs';
 import { rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { VpnPkiPort, VpnPkiProvisionPort } from '../../domain/security/ports.js';
-import type { VpnClientMaterial, VpnServerPaths } from '../../domain/security/vpn.js';
+import {
+  VPN_PROFILES_BASE,
+  type VpnClientMaterial,
+  type VpnServerPaths,
+} from '../../domain/security/vpn.js';
 import type { Username } from '../../domain/user/Username.js';
 import { runOrThrow, type CommandRunner } from './CommandRunner.js';
 import { DEFAULT_PKI_DIR, FsVpnPkiAdapter } from './FsVpnPkiAdapter.js';
@@ -18,6 +22,7 @@ export class EasyRsaPkiAdapter implements VpnPkiPort, VpnPkiProvisionPort {
   constructor(
     private readonly runner: CommandRunner,
     private readonly baseDir: string = DEFAULT_PKI_DIR,
+    private readonly profilesBaseDir: string = VPN_PROFILES_BASE,
   ) {
     this.reader = new FsVpnPkiAdapter(baseDir);
   }
@@ -51,8 +56,9 @@ export class EasyRsaPkiAdapter implements VpnPkiPort, VpnPkiProvisionPort {
     await this.easyrsa(['build-client-full', username.value, 'nopass']);
   }
 
-  // Removal (not revocation — CRLs are Phase 5): profiles stop rendering the
-  // moment the material is gone, which is the delete-user parity we need.
+  // Removal (not revocation — CRLs are Phase 5): the issued material AND the
+  // rendered .ovpn profiles go together — a profile embeds the private key
+  // and must not outlive the user.
   async removeClientMaterial(username: Username): Promise<void> {
     for (const file of [
       `issued/${username.value}.crt`,
@@ -61,6 +67,7 @@ export class EasyRsaPkiAdapter implements VpnPkiPort, VpnPkiProvisionPort {
     ]) {
       await rm(join(this.baseDir, file), { force: true });
     }
+    await rm(join(this.profilesBaseDir, username.value), { recursive: true, force: true });
   }
 
   private async easyrsa(

@@ -98,14 +98,20 @@ describe('EasyRsaPkiAdapter', () => {
     expect(runner.argvs()).toHaveLength(1);
   });
 
-  it('should_remove_client_material_so_profiles_stop_rendering', async () => {
+  it('should_remove_client_material_and_rendered_profiles', async () => {
     seedPki('issued/alice.crt', 'private/alice.key', 'reqs/alice.req');
+    const profilesDir = join(pkiDir, '..', 'vpn-profiles');
+    mkdirSync(join(profilesDir, 'alice'), { recursive: true });
+    // the .ovpn embeds the private key: it must not outlive the user
+    writeFileSync(join(profilesDir, 'alice/kobox-tun.ovpn'), 'KEY-MATERIAL');
+    const withProfiles = new EasyRsaPkiAdapter(runner, pkiDir, profilesDir);
 
-    await adapter.removeClientMaterial(alice);
+    await withProfiles.removeClientMaterial(alice);
 
     expect(existsSync(join(pkiDir, 'issued/alice.crt'))).toBe(false);
     expect(existsSync(join(pkiDir, 'private/alice.key'))).toBe(false);
     expect(existsSync(join(pkiDir, 'reqs/alice.req'))).toBe(false);
+    expect(existsSync(join(profilesDir, 'alice'))).toBe(false);
   });
 
   it('should_read_client_material_like_the_fs_adapter', async () => {
