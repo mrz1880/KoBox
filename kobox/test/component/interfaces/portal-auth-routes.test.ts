@@ -14,6 +14,7 @@ import { InMemoryUserRepository } from '../../../src/infrastructure/persistence/
 import { FakeSessionTokens } from '../../../src/infrastructure/system/fakes/FakeSessionTokens.js';
 import { buildPortalServer } from '../../../src/interfaces/http/server.js';
 import { UserBuilder } from '../../builders/UserBuilder.js';
+import { RecordingQueue } from './portalWorld.js';
 
 const NOW = '2026-07-25 10:00:00';
 const GOOD_HASH = HashedPassword.parse(`$6$fakesalt$${'x'.repeat(20)}8`);
@@ -52,6 +53,9 @@ beforeEach(async () => {
     logout: new Logout(authDeps),
     authenticate: new Authenticate(authDeps),
     now: () => NOW,
+    users,
+    queue: new RecordingQueue(),
+    hasher,
   });
   world = { server, users, credentials, sessions };
   await users.save(new UserBuilder().build());

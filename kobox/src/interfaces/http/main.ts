@@ -31,6 +31,9 @@ async function main(): Promise<void> {
     authenticate: new Authenticate(authDeps),
     now: nowStamp,
     logger: container.logger,
+    users: container.repo,
+    queue: container.queue,
+    hasher: container.hasher,
   });
 
   const port = Number(process.env.KOBOX_PORTAL_HTTP_PORT ?? DEFAULT_PORTAL_HTTP_PORT);

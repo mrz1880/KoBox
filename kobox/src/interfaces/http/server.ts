@@ -1,24 +1,31 @@
 import fastifyCookie from '@fastify/cookie';
 import fastifyFormbody from '@fastify/formbody';
-import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from 'fastify';
+import Fastify, { type FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import type { Authenticate, AuthenticatedSession } from '../../application/portal/Authenticate.js';
+import type { JobQueuePort } from '../../application/jobs/JobQueuePort.js';
+import type { Authenticate } from '../../application/portal/Authenticate.js';
 import type { Login } from '../../application/portal/Login.js';
 import type { Logout } from '../../application/portal/Logout.js';
 import { Password } from '../../domain/user/Password.js';
 import { USERNAME_PATTERN, Username } from '../../domain/user/Username.js';
+import type { PasswordHasherPort, UserRepository } from '../../domain/user/ports.js';
 import type { Logger } from '../../infrastructure/logging/logger.js';
+import { buildGuards, viewerOf, SESSION_COOKIE } from './guards.js';
 import { html } from './html.js';
+import { registerAdminUserRoutes } from './routes/adminUsers.js';
 import { page } from './views/layout.js';
 import { loginPage } from './views/loginPage.js';
 
-export const SESSION_COOKIE = 'kobox_session';
+export { SESSION_COOKIE } from './guards.js';
 
 export interface PortalServerDeps {
   readonly login: Login;
   readonly logout: Logout;
   readonly authenticate: Authenticate;
   readonly now: () => string;
+  readonly users: UserRepository;
+  readonly queue: JobQueuePort;
+  readonly hasher: PasswordHasherPort;
   readonly logger?: Logger;
 }
 
@@ -29,55 +36,15 @@ const loginFormSchema = z.object({
   password: z.string().min(8).max(256),
 });
 
-const csrfFormSchema = z.looseObject({ _csrf: z.string().min(1) });
-
 export function buildPortalServer(deps: PortalServerDeps): FastifyInstance {
   const server = Fastify({ logger: false, trustProxy: '127.0.0.1' });
   void server.register(fastifyCookie);
   void server.register(fastifyFormbody);
 
-  const sessionOf = async (request: FastifyRequest): Promise<AuthenticatedSession | undefined> => {
-    const token = request.cookies[SESSION_COOKIE];
-    if (token === undefined || token === '') {
-      return undefined;
-    }
-    return deps.authenticate.execute({ token, now: deps.now() });
-  };
-
-  // Guard for pages: redirects anonymous visitors to the login form.
-  const requireSession = async (
-    request: FastifyRequest,
-    reply: FastifyReply,
-  ): Promise<AuthenticatedSession | undefined> => {
-    const session = await sessionOf(request);
-    if (session === undefined) {
-      await reply.code(303).header('location', '/login').send();
-      return undefined;
-    }
-    return session;
-  };
-
-  // Guard for mutations: synchronizer-token CSRF check on top of the session.
-  const requireCsrf = async (
-    request: FastifyRequest,
-    reply: FastifyReply,
-  ): Promise<AuthenticatedSession | undefined> => {
-    const session = await requireSession(request, reply);
-    if (session === undefined) {
-      return undefined;
-    }
-    const parsed = csrfFormSchema.safeParse(request.body);
-    if (!parsed.success || parsed.data._csrf !== session.csrfToken) {
-      await reply.code(403).type('text/html').send(
-        page('Forbidden', html`<h1>Forbidden</h1><p>Invalid or missing CSRF token.</p>`),
-      );
-      return undefined;
-    }
-    return session;
-  };
+  const guards = buildGuards(deps.authenticate, deps.now);
 
   server.get('/login', async (request, reply) => {
-    if ((await sessionOf(request)) !== undefined) {
+    if ((await guards.sessionOf(request)) !== undefined) {
       return reply.code(303).header('location', '/').send();
     }
     return reply.type('text/html').send(loginPage());
@@ -119,7 +86,7 @@ export function buildPortalServer(deps: PortalServerDeps): FastifyInstance {
   });
 
   server.post('/logout', async (request, reply) => {
-    const session = await requireCsrf(request, reply);
+    const session = await guards.requireCsrf(request, reply);
     if (session === undefined) {
       return;
     }
@@ -135,7 +102,7 @@ export function buildPortalServer(deps: PortalServerDeps): FastifyInstance {
   });
 
   server.get('/', async (request, reply) => {
-    const session = await requireSession(request, reply);
+    const session = await guards.requireSession(request, reply);
     if (session === undefined) {
       return;
     }
@@ -144,11 +111,7 @@ export function buildPortalServer(deps: PortalServerDeps): FastifyInstance {
         'Overview',
         html`<h1>Hello ${session.username.value}</h1>
 <input type="hidden" name="_csrf" value="${session.csrfToken}">`,
-        {
-          username: session.username.value,
-          role: session.role,
-          csrfToken: session.csrfToken,
-        },
+        viewerOf(session),
       ),
     );
   });
@@ -158,7 +121,7 @@ export function buildPortalServer(deps: PortalServerDeps): FastifyInstance {
   // nginx auth_request subrequests: bare status codes, no redirects. The
   // authenticated username travels back on a header for REMOTE_USER wiring.
   server.get('/internal/auth', async (request, reply) => {
-    const session = await sessionOf(request);
+    const session = await guards.sessionOf(request);
     if (session === undefined) {
       return reply.code(401).send();
     }
@@ -166,7 +129,7 @@ export function buildPortalServer(deps: PortalServerDeps): FastifyInstance {
   });
 
   server.get('/internal/auth/rpc', async (request, reply) => {
-    const session = await sessionOf(request);
+    const session = await guards.sessionOf(request);
     if (session === undefined) {
       return reply.code(401).send();
     }
@@ -183,7 +146,7 @@ export function buildPortalServer(deps: PortalServerDeps): FastifyInstance {
   });
 
   server.get('/internal/auth/admin', async (request, reply) => {
-    const session = await sessionOf(request);
+    const session = await guards.sessionOf(request);
     if (session === undefined) {
       return reply.code(401).send();
     }
@@ -192,6 +155,8 @@ export function buildPortalServer(deps: PortalServerDeps): FastifyInstance {
     }
     return reply.header('x-kobox-user', session.username.value).code(204).send();
   });
+
+  registerAdminUserRoutes(server, deps, guards);
 
   return server;
 }
