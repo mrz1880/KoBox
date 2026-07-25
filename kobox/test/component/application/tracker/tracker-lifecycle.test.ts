@@ -354,23 +354,19 @@ describe('MarkTrackerDead', () => {
 });
 
 describe('RenderWhitelist', () => {
-  it('should_apply_the_three_network_files_and_reload_services_when_changed', async () => {
+  it('should_apply_the_dns_files_and_reload_when_changed', async () => {
+    // allow.p2p died with pgl (Phase 5): member trust lives in the firewall
     await trackers.save(aTracker().withAddresses('192.0.2.10').build());
-    await addresses.add(Username.parse('alice'), IpAddress.parse('198.51.100.7'));
 
-    const useCase = new RenderWhitelist({ trackers, addresses, files, reload });
+    const useCase = new RenderWhitelist({ trackers, files, reload });
     const report = await useCase.execute();
 
     expect(report.changedFiles).toEqual([
       '/etc/bind/kobox.zones.blacklists',
       '/etc/dnscrypt-proxy/blocked-names.txt',
-      '/etc/pgl/allow.p2p',
     ]);
-    expect(files.contentAt('/etc/pgl/allow.p2p')).toContain(
-      'tracker.example.org:192.0.2.10-255.255.255.255',
-    );
+    expect(files.contentAt('/etc/pgl/allow.p2p')).toBeUndefined();
     expect(reload.dnsReloads).toBe(1);
-    expect(reload.peerGuardianReloads).toBe(1);
 
     // idempotence: a second render changes nothing and reloads nothing
     const second = await useCase.execute();

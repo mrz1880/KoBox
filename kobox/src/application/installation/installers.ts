@@ -22,6 +22,7 @@ import {
   renderWorkerUnit,
 } from '../../domain/installation/rendering.js';
 import { renderCronFile } from '../../domain/maintenance/rendering.js';
+import type { IpsetPort } from '../../domain/tracker/ports.js';
 import type { VpnPkiPort, VpnPkiProvisionPort } from '../../domain/security/ports.js';
 import { VPN_VARIANTS, renderOpenVpnServer } from '../../domain/security/vpn.js';
 import type { ManagedFilesPort, RenderedFile } from '../../domain/shared/files.js';
@@ -49,6 +50,7 @@ export interface InstallerContext {
   readonly systemd: SystemdPort;
   readonly checks: ConfigCheckPort;
   readonly host: InstallHostPort;
+  readonly ipset: IpsetPort;
   readonly pki: VpnPkiPort;
   readonly pkiProvision: VpnPkiProvisionPort;
   readonly artifacts: ArtifactFetchPort;
@@ -446,6 +448,31 @@ class DnscryptInstaller implements ComponentInstaller {
   }
 }
 
+class IpsetInstaller implements ComponentInstaller {
+  readonly name = 'ipset';
+
+  constructor(private readonly ctx: InstallerContext) {}
+
+  async install(): Promise<InstallOutcome> {
+    const { packages, ipset } = this.ctx;
+    await packages.ensureInstalled(['ipset']);
+    // the tool can be present while the kernel lacks ip_set (containers):
+    // probe by actually creating the live set
+    if (!(await ipset.ensureBlocklistSet())) {
+      return {
+        state: 'skipped',
+        reason:
+          'kernel lacks ip_set support (container?) — rtorrent ipv4_filter enforcement continues; re-run kobox install on a host with the module',
+      };
+    }
+    return installed(await packages.installedVersion('ipset'));
+  }
+
+  async uninstall(): Promise<void> {
+    // the in-kernel set evaporates at reboot; the package stays (harmless)
+  }
+}
+
 class SchedulerInstaller implements ComponentInstaller {
   readonly name = 'scheduler';
 
@@ -566,6 +593,7 @@ export function buildInstallers(ctx: InstallerContext): ReadonlyMap<string, Comp
     new RutorrentInstaller(ctx),
     new BindInstaller(ctx),
     new DnscryptInstaller(ctx),
+    new IpsetInstaller(ctx),
     new SchedulerInstaller(ctx),
     new Fail2banInstaller(ctx),
     new OpenVpnInstaller(ctx),

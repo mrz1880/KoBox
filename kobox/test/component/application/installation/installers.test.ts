@@ -9,6 +9,7 @@ import type { SystemFacts } from '../../../../src/domain/installation/ports.js';
 import { Cidr } from '../../../../src/domain/security/Cidr.js';
 import { FakeConfigChecks } from '../../../../src/infrastructure/system/fakes/FakeConfigChecks.js';
 import { FakeInstallHost } from '../../../../src/infrastructure/system/fakes/FakeInstallHost.js';
+import { FakeIpset } from '../../../../src/infrastructure/system/fakes/FakeIpset.js';
 import { FakePackages } from '../../../../src/infrastructure/system/fakes/FakePackages.js';
 import { FakeSystemd } from '../../../../src/infrastructure/system/fakes/FakeSystemd.js';
 import { FakeVpnPki } from '../../../../src/infrastructure/system/fakes/FakeVpnPki.js';
@@ -29,6 +30,7 @@ interface World {
   readonly systemd: FakeSystemd;
   readonly checks: FakeConfigChecks;
   readonly pki: FakeVpnPki;
+  readonly ipset: FakeIpset;
   readonly installers: ReadonlyMap<string, ComponentInstaller>;
 }
 
@@ -43,12 +45,14 @@ function buildWorld(overrides?: {
   const systemd = new FakeSystemd();
   const checks = new FakeConfigChecks();
   const pki = new FakeVpnPki();
+  const ipset = new FakeIpset();
   const ctx: InstallerContext = {
     packages,
     files: host,
     systemd,
     checks,
     host,
+    ipset,
     pki,
     pkiProvision: pki,
     artifacts: host,
@@ -79,7 +83,7 @@ function buildWorld(overrides?: {
       workerEnv: new Map([['KOBOX_DB', '/var/lib/kobox/kobox.db']]),
     },
   };
-  return { packages, host, systemd, checks, pki, installers: buildInstallers(ctx) };
+  return { packages, host, systemd, checks, pki, ipset, installers: buildInstallers(ctx) };
 }
 
 function installer(world: World, name: string): ComponentInstaller {
@@ -281,6 +285,25 @@ describe('dnscrypt installer', () => {
     expect(outcome).toMatchObject({ state: 'skipped' });
     expect(outcome.state === 'skipped' && outcome.reason).toContain('not packaged');
     expect(world.packages.installed).not.toContain('dnscrypt-proxy');
+  });
+});
+
+describe('ipset installer', () => {
+  it('should_install_the_tool_and_create_the_live_set', async () => {
+    const outcome = await installer(world, 'ipset').install();
+
+    expect(outcome.state).toBe('installed');
+    expect(world.packages.installed).toContain('ipset');
+    expect(world.ipset.ensured).toBe(1);
+  });
+
+  it('should_skip_honestly_when_the_kernel_lacks_ip_set', async () => {
+    world.ipset.supported = false;
+
+    const outcome = await installer(world, 'ipset').install();
+
+    expect(outcome).toMatchObject({ state: 'skipped' });
+    expect(outcome.state === 'skipped' && outcome.reason).toContain('kernel');
   });
 });
 

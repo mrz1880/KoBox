@@ -54,6 +54,7 @@ import { DnsLookupResolverAdapter } from '../infrastructure/system/DnsLookupReso
 import { FsBlocklistCacheAdapter } from '../infrastructure/system/FsBlocklistCacheAdapter.js';
 import { HttpsBlocklistDownloadAdapter } from '../infrastructure/system/HttpsBlocklistDownloadAdapter.js';
 import { IblocklistCatalogAdapter } from '../infrastructure/system/IblocklistCatalogAdapter.js';
+import { IpsetAdapter } from '../infrastructure/system/IpsetAdapter.js';
 import { Cidr } from '../domain/security/Cidr.js';
 import { Bandwidth } from '../domain/security/Bandwidth.js';
 import { DynDnsHost } from '../domain/security/DynDnsHost.js';
@@ -219,6 +220,7 @@ export async function buildInstallation(
     systemd: new SystemdAdapter(runner),
     checks: new ConfigCheckAdapter(runner),
     host: new InstallHostAdapter(runner),
+    ipset: new IpsetAdapter(runner),
     pki: installPki,
     pkiProvision: installPki,
     artifacts: new ArtifactFetchAdapter(defaultBodyFetcher()),
@@ -357,13 +359,14 @@ export function buildContainer(name: string): Container {
   const networkFiles = new RtorrentConfigAdapter(runner);
   const networkServices = new NetworkServiceAdapter(runner, logger, {
     // post-install contract: absent units are breakage, except components
-    // kobox install honestly skips (neither pgl nor dnscrypt-proxy is
-    // packaged for Debian 12)
+    // kobox install honestly skips (dnscrypt-proxy is not packaged for
+    // Debian 12)
     strict: process.env.KOBOX_STRICT_SERVICES === '1',
-    tolerateAbsent: ['pgl', 'dnscrypt-proxy'],
+    tolerateAbsent: ['dnscrypt-proxy'],
   });
   const trackerRepo = new SqliteTrackerRepository(db);
   const addressRepo = new SqliteUserAddressRepository(db);
+  const ipset = new IpsetAdapter(runner);
   const healthProbe = new ProcessSocketHealthProbe(runner);
   const settings = securitySettings();
   const fairUseRepo = new SqliteFairUseRepository(db);
@@ -382,6 +385,7 @@ export function buildContainer(name: string): Container {
     cache: new FsBlocklistCacheAdapter(process.env.KOBOX_BLOCKLIST_CACHE),
     files: networkFiles,
     reload: networkServices,
+    ipset,
     notifications,
     ...(iblocklistUser !== undefined &&
       iblocklistPin !== undefined && {
@@ -396,6 +400,7 @@ export function buildContainer(name: string): Container {
     firewall: new IptablesRestoreAdapter(runner, networkFiles, healthProbe, settings.sshPort),
     files: networkFiles,
     reload: networkServices,
+    ipset,
     resolver: new DynDnsLookupAdapter(),
     // one adapter serves both the read side (renders) and the mutating side
     // (client cert lifecycle chained from create/delete-user)

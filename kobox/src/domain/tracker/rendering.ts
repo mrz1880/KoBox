@@ -1,7 +1,6 @@
 import type { RenderedFile } from '../shared/files.js';
 import type { Username } from '../user/Username.js';
 import type { Tracker } from './Tracker.js';
-import type { UserAddress } from './ports.js';
 
 // Pure, deterministic renders of the whole desired state of each network
 // file. The legacy built these with appended `echo`/`sed -i` passes over live
@@ -38,51 +37,35 @@ export function renderBlockedNames(trackers: readonly Tracker[]): RenderedFile {
   };
 }
 
-const ALLOW_P2P_HEADER = `# allow.p2p - allow list for pglcmd
-#
-# This file contains IP ranges that shall not be checked.
-# They must be in the PeerGuardian .p2p text format like this:
-#   Some organization:1.0.0.0-1.255.255.255
-# Lines beginning with a hash (#) are comments and will be ignored.
-#
-# KoBox-managed file — DO NOT EDIT (rendered declaratively).`;
-
 function ipSortKey(ip: string): number {
   return ip
     .split('.')
     .reduce((acc, octet) => acc * 256 + Number(octet), 0);
 }
 
-export function renderAllowP2p(
-  users: readonly UserAddress[],
-  trackers: readonly Tracker[],
-): RenderedFile {
-  const lines: string[] = [ALLOW_P2P_HEADER];
+export const IPSET_NAME = 'kobox-bl';
+export const IPSET_STAGING = `${IPSET_NAME}-next`;
+export const IPSET_FILE = '/etc/kobox/blocklist.ipset';
+// hash:net splits a-b ranges into prefixes internally; big lists need room
+const IPSET_CREATE = 'hash:net family inet maxelem 1048576';
+// exactly an address, a CIDR or an a-b range — anything else could smuggle
+// ipset directives into the restore stream
+const IPSET_ENTRY = /^\d{1,3}(\.\d{1,3}){3}(-\d{1,3}(\.\d{1,3}){3}|\/\d{1,2})?$/;
 
-  const userLines = [...users]
-    .sort(
-      (a, b) =>
-        a.username.value.localeCompare(b.username.value) ||
-        ipSortKey(a.ip.value) - ipSortKey(b.ip.value),
-    )
-    .map((address) => `${address.username.value}:${address.ip.value}-255.255.255.255`);
-  if (userLines.length > 0) {
-    lines.push('## Allow all KoBox users', ...userLines);
-  }
-
-  const trackerLines = trackers
-    .filter((tracker) => tracker.isActive)
-    .sort(byHost)
-    .flatMap((tracker) =>
-      [...tracker.ipv4]
-        .sort((a, b) => ipSortKey(a.value) - ipSortKey(b.value))
-        .map((ip) => `${tracker.host.value}:${ip.value}-255.255.255.255`),
-    );
-  if (trackerLines.length > 0) {
-    lines.push('## Trackers enabled', ...trackerLines);
-  }
-
-  return { path: '/etc/pgl/allow.p2p', content: `${lines.join('\n')}\n`, ...ROOT_FILE };
+// pgl replacement (Phase 5 decision): the merged blocklist becomes a kernel
+// ipset. Staging set + swap keeps enforcement atomic — the live set never
+// has a half-loaded state, exactly like iptables-restore for rules.
+export function renderIpsetRestore(ranges: readonly string[]): RenderedFile {
+  const entries = ranges.filter((range) => IPSET_ENTRY.test(range));
+  const lines = [
+    `create ${IPSET_NAME} ${IPSET_CREATE} -exist`,
+    `create ${IPSET_STAGING} ${IPSET_CREATE} -exist`,
+    `flush ${IPSET_STAGING}`,
+    ...entries.map((entry) => `add ${IPSET_STAGING} ${entry}`),
+    `swap ${IPSET_NAME} ${IPSET_STAGING}`,
+    `destroy ${IPSET_STAGING}`,
+  ];
+  return { path: IPSET_FILE, content: `${lines.join('\n')}\n`, ...ROOT_FILE };
 }
 
 export function renderUserBlocklistDropin(username: Username, enabled: boolean): RenderedFile {

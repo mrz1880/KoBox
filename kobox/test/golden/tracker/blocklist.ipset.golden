@@ -1,0 +1,8 @@
+create kobox-bl hash:net family inet maxelem 1048576 -exist
+create kobox-bl-next hash:net family inet maxelem 1048576 -exist
+flush kobox-bl-next
+add kobox-bl-next 9.9.9.9-9.9.9.9
+add kobox-bl-next 10.0.0.0/8
+add kobox-bl-next 192.0.2.0-192.0.2.255
+swap kobox-bl kobox-bl-next
+destroy kobox-bl-next

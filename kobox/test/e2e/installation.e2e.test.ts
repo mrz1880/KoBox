@@ -296,9 +296,13 @@ describe.skipIf(!onDebianAsRoot)('E2E: fresh Debian 12 -> bootstrap -> full stac
         alreadyInstalled: string[];
       };
       expect(report.installed).toEqual([]);
-      // the whole catalog minus the two Debian 12 skips (dnscrypt,
-      // apt-sources)
-      expect(report.alreadyInstalled.length).toBe(12);
+      // the whole catalog converged: every component is either already
+      // installed or honestly skipped (dnscrypt, apt-sources, and ipset on
+      // kernels without ip_set)
+      const status = JSON.parse(kobox(['install-status'])) as { state: string }[];
+      const skipped = status.filter((row) => row.state === 'skipped').length;
+      expect(report.alreadyInstalled.length + skipped).toBe(status.length);
+      expect(report.alreadyInstalled.length).toBeGreaterThanOrEqual(12);
     },
     INSTALL_TIMEOUT_MS,
   );
@@ -317,7 +321,7 @@ describe.skipIf(!onDebianAsRoot)('E2E: fresh Debian 12 -> bootstrap -> full stac
     sh('sshd', ['-t']); // stock sshd config still valid after drop-in removal
 
     const status = JSON.parse(kobox(['install-status'])) as { name: string; state: string }[];
-    const skippedOnDebian12 = ['dnscrypt', 'apt-sources'];
+    const skippedOnDebian12 = ['dnscrypt', 'apt-sources', 'ipset'];
     for (const row of status) {
       if (!skippedOnDebian12.includes(row.name)) {
         expect(row.state, row.name).toBe('to_install');

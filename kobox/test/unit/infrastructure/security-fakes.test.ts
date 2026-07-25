@@ -101,8 +101,7 @@ describe('security fakes', () => {
     const fake = new FakeNetworkServices();
     await fake.reloadFail2ban();
     await fake.reloadDns();
-    await fake.reloadPeerGuardian();
-    expect(fake.reloads).toEqual(['fail2ban', 'dns', 'pgl']);
+    expect(fake.reloads).toEqual(['fail2ban', 'dns']);
 
     fake.failWith(new Error('rndc: connect failed'));
     await expect(fake.reloadDns()).rejects.toThrow('rndc: connect failed');

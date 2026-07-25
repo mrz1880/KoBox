@@ -16,10 +16,6 @@ export class FakeNetworkServices implements NetworkServicePort {
     return this.record('dns');
   }
 
-  reloadPeerGuardian(): Promise<void> {
-    return this.record('pgl');
-  }
-
   private record(name: string): Promise<void> {
     if (this.failure) {
       return Promise.reject(this.failure);

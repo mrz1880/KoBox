@@ -26,6 +26,7 @@ export const COMPONENT_CATALOG: readonly ComponentSpec[] = [
   spec('nginx'),
   spec('rtorrent'),
   spec('rutorrent', ['nginx', 'rtorrent']),
+  spec('ipset'),
   spec('fail2ban', ['sshd']),
   spec('openvpn'),
   spec('postfix'),

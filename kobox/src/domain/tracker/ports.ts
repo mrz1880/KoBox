@@ -100,5 +100,12 @@ export interface TrackerNotificationPort {
 // files; reloading the services is best-effort until Phase 3 owns them.
 export interface NetworkServiceReloadPort {
   reloadDns(): Promise<void>;
-  reloadPeerGuardian(): Promise<void>;
+}
+
+// Kernel-level blocklist enforcement (pgl successor, Phase 5): ensure the
+// live set exists (false = kernel without ip_set, honest degradation) and
+// load a rendered restore file (staging + swap, atomic).
+export interface IpsetPort {
+  ensureBlocklistSet(): Promise<boolean>;
+  restore(filePath: string): Promise<void>;
 }

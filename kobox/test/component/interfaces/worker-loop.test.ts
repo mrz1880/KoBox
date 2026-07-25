@@ -25,6 +25,7 @@ import { FakeBlocklistDownload } from '../../../src/infrastructure/system/fakes/
 import { FakeCertStore } from '../../../src/infrastructure/system/fakes/FakeCertStore.js';
 import { FakeDnsResolver } from '../../../src/infrastructure/system/fakes/FakeDnsResolver.js';
 import { FakeIblocklistCatalog } from '../../../src/infrastructure/system/fakes/FakeIblocklistCatalog.js';
+import { FakeIpset } from '../../../src/infrastructure/system/fakes/FakeIpset.js';
 import { FakeNetworkServiceReload } from '../../../src/infrastructure/system/fakes/FakeNetworkServiceReload.js';
 import { FakeTrackerCert } from '../../../src/infrastructure/system/fakes/FakeTrackerCert.js';
 import { FakeAnnouncerSink } from '../../../src/infrastructure/system/fakes/FakeAnnouncerSink.js';
@@ -153,6 +154,7 @@ interface World {
   identity: FakeUserIdentity;
   dyndns: FakeDynDnsResolver;
   pki: FakeVpnPki;
+  ipset: FakeIpset;
   outbox: InMemoryMailOutbox;
   mailTransport: RecordingMailTransport;
   worker: JobWorker;
@@ -242,6 +244,7 @@ beforeEach(() => {
   const networkFiles = new FakeRtorrentConfig();
   const addresses = new InMemoryUserAddressRepository();
   const blocklistCache = new FakeBlocklistCache();
+  const ipset = new FakeIpset();
   const trackerUseCases = buildTrackerUseCases({
     trackers,
     blocklists,
@@ -256,10 +259,12 @@ beforeEach(() => {
     cache: blocklistCache,
     files: networkFiles,
     reload: new FakeNetworkServiceReload(),
+    ipset,
     notifications,
   });
   const firewall = new FakeFirewallApply();
   const identity = new FakeUserIdentity();
+
   const dyndns = new FakeDynDnsResolver();
   const pki = new FakeVpnPki();
   const securityUseCases = buildSecurityUseCases({
@@ -270,6 +275,7 @@ beforeEach(() => {
     firewall,
     files: networkFiles,
     reload: new FakeNetworkServices(),
+    ipset,
     resolver: dyndns,
     pki,
     pkiProvision: pki,
@@ -331,6 +337,7 @@ beforeEach(() => {
     dyndns,
     pki,
     hasher: new FakePasswordHasher(),
+    ipset,
     outbox,
     mailTransport,
     worker: new JobWorker(
@@ -540,9 +547,6 @@ describe('security job chains (provision -> firewall)', () => {
 
     await world.worker.drain();
 
-    expect(world.networkFiles.contentAt('/etc/pgl/allow.p2p')).toContain(
-      'alice:203.0.113.9-255.255.255.255',
-    );
     expect(world.networkFiles.contentAt('/etc/fail2ban/jail.d/kobox.local')).toContain(
       '203.0.113.9',
     );
@@ -589,7 +593,7 @@ describe('security job chains (provision -> firewall)', () => {
     await world.worker.drain();
 
     expect(world.firewall.applied).toHaveLength(0);
-    expect(world.networkFiles.contentAt('/etc/pgl/allow.p2p')).toBeUndefined();
+    expect(world.networkFiles.contentAt('/etc/bind/kobox.zones.blacklists')).toBeUndefined();
   });
 });
 
@@ -609,9 +613,10 @@ describe('tracker job chains (discover -> cert -> whitelist, blocklists -> filte
     const tracker = await world.trackers.findByHost(TrackerHost.parse('tracker.example.org'));
     expect(tracker?.isSsl).toBe(true);
     expect(world.certStore.installed.get('tracker.example.org')).toBe('PEM');
-    expect(world.networkFiles.contentAt('/etc/pgl/allow.p2p')).toContain(
-      'tracker.example.org:192.0.2.10-255.255.255.255',
-    );
+    // whitelist rendered: the ACTIVE tracker is absent from the DNS blacklist
+    const zones = world.networkFiles.contentAt('/etc/bind/kobox.zones.blacklists');
+    expect(zones).toBeDefined();
+    expect(zones).not.toContain('tracker.example.org');
   });
 
   it('should_not_chain_anything_for_an_unresolvable_unknown_host', async () => {
@@ -625,18 +630,21 @@ describe('tracker job chains (discover -> cert -> whitelist, blocklists -> filte
     await world.worker.drain();
 
     expect(world.certPort.fetchedHosts).toEqual([]);
-    expect(world.networkFiles.contentAt('/etc/pgl/allow.p2p')).toBeUndefined();
+    expect(world.networkFiles.contentAt('/etc/bind/kobox.zones.blacklists')).toBeUndefined();
   });
 
-  it('should_render_the_whitelist_after_a_user_address_change', async () => {
+  it('should_trust_a_new_user_address_in_the_firewall', async () => {
+    world.identity.setUid('alice', 1001);
+    await enqueueCreateAlice();
+    await world.worker.drain();
     await world.queue.enqueue(
       parseJob('add-user-address', { username: 'alice', ipv4: '198.51.100.7' }),
     );
 
     await world.worker.drain();
 
-    expect(world.networkFiles.contentAt('/etc/pgl/allow.p2p')).toContain(
-      'alice:198.51.100.7-255.255.255.255',
+    expect(world.firewall.applied.at(-1)?.content).toContain(
+      '-A INPUT -s 198.51.100.7 -m comment --comment "kobox:trusted:alice" -j ACCEPT',
     );
   });
 
@@ -705,5 +713,43 @@ describe('maintenance jobs', () => {
     expect(world.mailTransport.delivered).toHaveLength(1);
     expect(world.mailTransport.delivered[0]?.recipient).toBe('admin@example.org');
     expect((await world.outbox.listRecent(1))[0]?.status).toBe('sent');
+  });
+});
+
+describe('ipset chain (blocklists -> kernel set)', () => {
+  it('should_apply_the_ipset_after_a_blocklist_update', async () => {
+    await world.blocklists.save(
+      Blocklist.create({
+        source: BlocklistSource.parse('personal'),
+        author: 'me',
+        name: 'mine',
+        url: BlocklistUrl.parse('https://lists.example.net/mine.txt'),
+        subscription: false,
+        enabled: true,
+      }),
+    );
+    world.download.givenList('https://lists.example.net/mine.txt', {
+      ranges: ['192.0.2.0/24'],
+      sha256: 'bb',
+    });
+    await world.queue.enqueue(parseJob('update-blocklists', {}));
+
+    await world.worker.drain();
+
+    expect(world.ipset.restored).toEqual(['/etc/kobox/blocklist.ipset']);
+    expect(world.networkFiles.contentAt('/etc/kobox/blocklist.ipset')).toContain(
+      'add kobox-bl-next 192.0.2.0/24',
+    );
+  });
+
+  it('should_render_but_not_load_when_the_kernel_lacks_ipset', async () => {
+    world.ipset.supported = false;
+    const id = await world.queue.enqueue(parseJob('apply-ipset', {}));
+
+    await world.worker.drain();
+
+    expect(world.queue.statusOf(id)).toBe('done'); // honest skip, not a failure
+    expect(world.ipset.restored).toEqual([]);
+    expect(world.networkFiles.contentAt('/etc/kobox/blocklist.ipset')).toContain('flush kobox-bl-next');
   });
 });

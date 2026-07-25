@@ -38,7 +38,6 @@ export function renderFirewallRules(policy: FirewallPolicy): RenderedFile {
     ':INPUT DROP [0:0]',
     ':FORWARD DROP [0:0]',
     ':OUTPUT ACCEPT [0:0]',
-    ':pgl_in - [0:0]',
     ':kobox-meter-in - [0:0]',
     ':kobox-meter-out - [0:0]',
     ...users.map((user) => `:${chainOf(user)} - [0:0]`),
@@ -47,7 +46,12 @@ export function renderFirewallRules(policy: FirewallPolicy): RenderedFile {
     '-A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT',
     '-A INPUT -p icmp -j ACCEPT',
     ...trustedRules(users),
-    '-A INPUT -j pgl_in',
+    // pgl successor: blocklisted sources die before any service accept.
+    // Trusted members and established flows were already accepted above —
+    // the allow.p2p semantics, structurally.
+    ...(policy.blocklistSet
+      ? ['-A INPUT -m set --match-set kobox-bl src -j DROP']
+      : []),
     `-A INPUT -p tcp --dport ${String(policy.sshPort)} -j ACCEPT`,
     `-A INPUT -p tcp --dport ${String(policy.portalPort)} -j ACCEPT`,
     '-A INPUT -p tcp --dport 80 -j ACCEPT',
@@ -86,7 +90,7 @@ export function renderFirewallRules(policy: FirewallPolicy): RenderedFile {
     path: '/etc/kobox/firewall.rules',
     content: [
       '# KoBox-managed firewall — DO NOT EDIT (rendered declaratively).',
-      '# Applied atomically via iptables-restore; pgl chains reload after apply.',
+      '# Applied atomically via iptables-restore; blocklist lives in the kobox-bl ipset.',
       ...filter,
       '',
     ].join('\n'),

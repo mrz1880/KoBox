@@ -343,9 +343,21 @@ parameterlessTrackerCommand(
 );
 parameterlessTrackerCommand(
   'render-whitelist',
-  're-render BIND zones, dnscrypt blocked-names and PGL allow.p2p',
+  're-render the BIND blacklist zones and dnscrypt blocked-names',
   () => buildJob.renderWhitelist(),
 );
+
+program
+  .command('apply-ipset')
+  .description('load the merged blocklist into the kernel kobox-bl ipset (atomic swap)')
+  .action(async () => {
+    const c = container();
+    const id = await c.queue.enqueueUnique(buildJob.applyIpset());
+    await done(
+      c,
+      id === undefined ? 'apply-ipset already pending' : `job ${String(id)} enqueued: apply-ipset`,
+    );
+  });
 
 program
   .command('render-blocklist-filters')

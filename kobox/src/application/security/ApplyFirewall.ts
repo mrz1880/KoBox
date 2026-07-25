@@ -7,7 +7,7 @@ import type {
   UserIdentityPort,
 } from '../../domain/security/ports.js';
 import { renderFirewallRules } from '../../domain/security/rendering.js';
-import type { UserAddressRepository } from '../../domain/tracker/ports.js';
+import type { IpsetPort, UserAddressRepository } from '../../domain/tracker/ports.js';
 import type { UserRepository } from '../../domain/user/ports.js';
 import { FirewallRolledBackError } from './errors.js';
 import type { SecuritySettings } from './settings.js';
@@ -23,6 +23,7 @@ interface Deps {
   readonly identity: UserIdentityPort;
   readonly firewall: FirewallApplyPort;
   readonly reload: NetworkServicePort;
+  readonly ipset: Pick<IpsetPort, 'ensureBlocklistSet'>;
   readonly notifications: SecurityNotificationPort;
   readonly settings: SecuritySettings;
 }
@@ -33,7 +34,7 @@ export class ApplyFirewall {
   constructor(private readonly deps: Deps) {}
 
   async execute(): Promise<ApplyFirewallReport> {
-    const { users, addresses, identity, firewall, reload, notifications, settings } = this.deps;
+    const { users, addresses, identity, firewall, ipset, notifications, settings } = this.deps;
 
     const allAddresses = await addresses.listAll();
     const firewallUsers: FirewallUser[] = [];
@@ -56,11 +57,15 @@ export class ApplyFirewall {
       });
     }
 
+    // the rule referencing the set only renders when the set exists — an
+    // iptables-restore naming a missing ipset would refuse the whole ruleset
+    const blocklistSet = await ipset.ensureBlocklistSet();
     const policy = FirewallPolicy.create({
       sshPort: settings.sshPort,
       portalPort: settings.portalPort,
       vpn: settings.vpn,
       users: firewallUsers,
+      blocklistSet,
     });
     const outcome = await firewall.apply(renderFirewallRules(policy));
     // re-ensured every run (a Docker restart can rebuild the shared nat
@@ -74,8 +79,6 @@ export class ApplyFirewall {
       throw new FirewallRolledBackError();
     }
     if (outcome === 'applied') {
-      // the restore wiped pgl's own chains — let pglcmd repopulate its seam
-      await reload.reloadPeerGuardian();
       await notifications.notify({ type: 'FirewallApplied', outcome: 'applied' });
     }
     return { outcome, skippedUsers };

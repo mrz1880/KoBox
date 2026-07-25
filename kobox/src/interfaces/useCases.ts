@@ -1,6 +1,7 @@
 import { DiscoverTrackerFromTorrent } from '../application/tracker/DiscoverTrackerFromTorrent.js';
 import { FetchTrackerCert } from '../application/tracker/FetchTrackerCert.js';
 import { ImportBlocklistCatalog } from '../application/tracker/ImportBlocklistCatalog.js';
+import { ApplyIpset } from '../application/tracker/ApplyIpset.js';
 import { ManageUserAddress } from '../application/tracker/ManageUserAddress.js';
 import { MarkTrackerDead } from '../application/tracker/MarkTrackerDead.js';
 import { RenderBlocklistFilters } from '../application/tracker/RenderBlocklistFilters.js';
@@ -51,6 +52,7 @@ import type {
   CertStorePort,
   DnsResolverPort,
   IblocklistCatalogPort,
+  IpsetPort,
   NetworkServiceReloadPort,
   TrackerCertPort,
   TrackerNotificationPort,
@@ -170,6 +172,7 @@ export interface TrackerUseCaseDeps {
   readonly cache: BlocklistCachePort;
   readonly files: ManagedFilesPort;
   readonly reload: NetworkServiceReloadPort;
+  readonly ipset: IpsetPort;
   readonly notifications: TrackerNotificationPort;
   readonly credentials?: IblocklistCredentials;
 }
@@ -183,6 +186,7 @@ export interface TrackerUseCases {
   readonly updateBlocklists: UpdateBlocklists;
   readonly renderWhitelist: RenderWhitelist;
   readonly renderBlocklistFilters: RenderBlocklistFilters;
+  readonly applyIpset: ApplyIpset;
   readonly manageUserAddress: ManageUserAddress;
 }
 
@@ -197,6 +201,7 @@ export function buildTrackerUseCases(deps: TrackerUseCaseDeps): TrackerUseCases 
     updateBlocklists: new UpdateBlocklists(deps),
     renderWhitelist: new RenderWhitelist(deps),
     renderBlocklistFilters: new RenderBlocklistFilters(deps),
+    applyIpset: new ApplyIpset(deps),
     manageUserAddress: new ManageUserAddress(deps),
   };
 }
@@ -209,6 +214,7 @@ export interface SecurityUseCaseDeps {
   readonly firewall: FirewallApplyPort;
   readonly files: ManagedFilesPort;
   readonly reload: NetworkServicePort;
+  readonly ipset: Pick<IpsetPort, 'ensureBlocklistSet'>;
   readonly resolver: DynDnsResolverPort;
   readonly pki: VpnPkiPort;
   readonly pkiProvision: VpnPkiProvisionPort;

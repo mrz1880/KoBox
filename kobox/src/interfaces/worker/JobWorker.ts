@@ -114,6 +114,8 @@ export class JobWorker {
     }
     if (hints?.blocklistsUpdated === true) {
       await this.queue.enqueue(parseJob('render-blocklist-filters', {}));
+      // fresh merged ranges reach the kernel set too (pgl successor)
+      await this.queue.enqueue(parseJob('apply-ipset', {}));
     }
     if (hints?.firewallDirty === true) {
       await this.queue.enqueue(parseJob('apply-firewall', {}));
@@ -290,10 +292,9 @@ export class JobWorker {
       case 'run-backup':
         await this.maintenance.runBackup.execute({ now: nowStamp() });
         return;
-      // apply-ipset lands with its use case later in this phase; an explicit
-      // error beats a silent no-op if enqueued early
       case 'apply-ipset':
-        throw new Error(`${job.type}: not implemented yet`);
+        await this.trackers.applyIpset.execute();
+        return;
       case 'add-user-address':
       case 'remove-user-address': {
         const report = await this.trackers.manageUserAddress.execute({

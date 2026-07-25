@@ -51,6 +51,12 @@ export function renderFirewallBootUnit(): RenderedFile {
       '',
       '[Service]',
       'Type=oneshot',
+      // the ruleset may reference the kobox-bl ipset: the set must exist
+      // before the restore, and the rendered entries reload best-effort
+      // (`-` prefix: a kernel without ip_set must not fail the boot restore
+      // — the rules file on such a host carries no match-set rule anyway)
+      'ExecStartPre=-/usr/sbin/ipset create kobox-bl hash:net family inet maxelem 1048576 -exist',
+      'ExecStartPre=-/usr/sbin/ipset restore -exist -file /etc/kobox/blocklist.ipset',
       'ExecStart=/usr/sbin/iptables-restore /etc/kobox/firewall.rules',
       'RemainAfterExit=yes',
       '',

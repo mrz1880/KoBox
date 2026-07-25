@@ -234,7 +234,6 @@ describe('NetworkServiceAdapter', () => {
 
     await adapter.reloadFail2ban();
     await adapter.reloadDns();
-    await adapter.reloadPeerGuardian();
 
     const reloadCalls = runner
       .commandLines()
@@ -268,29 +267,19 @@ describe('NetworkServiceAdapter', () => {
     expect(runner.commandLines()).toContain('systemctl try-restart dnscrypt-proxy');
   });
 
-  it('should_reload_peerguardian_through_pglcmd_when_the_unit_exists', async () => {
-    const runner = new PrefixRunner();
-    runner.on('systemctl list-unit-files pgl.service', { stdout: 'pgl.service enabled\n' });
-    const adapter = new NetworkServiceAdapter(runner, logger);
-
-    await adapter.reloadPeerGuardian();
-
-    expect(runner.commandLines()).toContain('pglcmd reload');
-  });
-
   it('should_treat_absent_units_as_errors_in_strict_mode', async () => {
     // post-install this path must never be taken (Phase 4 brief): a box that
     // kobox install provisioned HAS fail2ban/bind — absence means breakage
     const runner = new PrefixRunner(); // nothing installed
     const adapter = new NetworkServiceAdapter(runner, logger, {
       strict: true,
-      tolerateAbsent: ['pgl'],
+      tolerateAbsent: ['dnscrypt-proxy'],
     });
 
     await expect(adapter.reloadFail2ban()).rejects.toThrow('strict');
+    // dnscrypt-proxy is skipped on Debian 12 (not packaged): tolerated even
+    // in strict; named alone is still breakage
     await expect(adapter.reloadDns()).rejects.toThrow('strict');
-    // pgl is skipped on Debian 12 (not packaged): tolerated even in strict
-    await expect(adapter.reloadPeerGuardian()).resolves.toBeUndefined();
   });
 });
 
