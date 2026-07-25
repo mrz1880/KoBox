@@ -65,6 +65,15 @@ describe.skipIf(!onDebianAsRoot)('SystemAccountAdapter on real Debian', () => {
     expect(shadow).toContain(hash.value);
     await adapter.deleteAccount(username);
   });
+
+  it('should_verify_a_password_against_a_real_openssl_hash', async () => {
+    const hasher = new OpensslPasswordHasher(runner);
+
+    const hash = await hasher.hash(Password.parse('s3cretpw!'));
+
+    expect(await hasher.verify(Password.parse('s3cretpw!'), hash)).toBe(true);
+    expect(await hasher.verify(Password.parse('not-the-password'), hash)).toBe(false);
+  });
 });
 
 describe.skipIf(!onDebianAsRoot)('SftpAdapter on real Debian', () => {

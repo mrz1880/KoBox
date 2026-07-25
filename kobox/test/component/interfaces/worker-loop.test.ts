@@ -131,6 +131,10 @@ class FakePasswordHasher implements PasswordHasherPort {
       HashedPassword.parse(`$6$fakesalt$${'x'.repeat(20)}${String(password.reveal().length)}`),
     );
   }
+
+  async verify(password: Password, hash: HashedPassword): Promise<boolean> {
+    return (await this.hash(password)).value === hash.value;
+  }
 }
 
 const alice = Username.parse('alice');

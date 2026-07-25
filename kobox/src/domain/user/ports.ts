@@ -50,8 +50,11 @@ export interface ServiceControlPort {
 }
 
 // Hashing happens at the unprivileged boundary (CLI/web) so plaintext dies there.
+// verify() re-hashes the candidate with the stored salt and compares in
+// constant time — the portal login path (Phase 6).
 export interface PasswordHasherPort {
   hash(password: Password): Promise<HashedPassword>;
+  verify(password: Password, hash: HashedPassword): Promise<boolean>;
 }
 
 export interface NotificationPort {
