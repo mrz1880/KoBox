@@ -7,6 +7,7 @@ import {
   renderAptSources,
   renderBindLocal,
   renderBindOptions,
+  renderCertbotDeployHook,
   renderDnscryptConfig,
   renderFirewallBootUnit,
   renderNginxVhost,
@@ -94,7 +95,38 @@ describe('installation rendering', () => {
     expect(file.path).toBe('/etc/nginx/conf.d/kobox.conf');
     expect(file.content).toContain('listen 8189 ssl');
     expect(file.content).toContain('auth_basic_user_file /etc/nginx/kobox.htpasswd');
+    // the ACME webroot is always served on :80 so certbot can validate
+    // before any certificate exists
+    expect(file.content).toContain('listen 80;');
+    expect(file.content).toContain('location /.well-known/acme-challenge/');
+    expect(file.content).toContain('root /var/www/acme;');
+    expect(file.content).toContain('ssl-cert-snakeoil');
     expectGolden('nginx-kobox.conf.golden', file.content);
+  });
+
+  it('should_switch_to_the_lets_encrypt_paths_once_a_cert_was_issued', () => {
+    const file = renderNginxVhost({
+      portalPort: 8189,
+      letsencrypt: { domain: 'box.example.org' },
+    });
+    expect(file.content).toContain('server_name box.example.org;');
+    expect(file.content).toContain(
+      'ssl_certificate /etc/letsencrypt/live/box.example.org/fullchain.pem;',
+    );
+    expect(file.content).toContain(
+      'ssl_certificate_key /etc/letsencrypt/live/box.example.org/privkey.pem;',
+    );
+    expect(file.content).not.toContain('snakeoil');
+    expectGolden('nginx-kobox.conf-letsencrypt.golden', file.content);
+  });
+
+  it('should_render_the_certbot_deploy_hook_golden', () => {
+    const file = renderCertbotDeployHook();
+    expect(file.path).toBe('/etc/letsencrypt/renewal-hooks/deploy/kobox-nginx');
+    expect(file.mode).toBe('0755');
+    expect(file.content.startsWith('#!/bin/sh\n')).toBe(true);
+    expect(file.content).toContain('systemctl reload nginx');
+    expectGolden('certbot-deploy-hook.golden', file.content);
   });
 
   it('should_render_the_global_rutorrent_config_golden', () => {

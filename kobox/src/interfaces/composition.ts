@@ -10,6 +10,7 @@ import {
   ArtifactFetchAdapter,
   defaultBodyFetcher,
 } from '../infrastructure/system/ArtifactFetchAdapter.js';
+import { CertbotAdapter } from '../infrastructure/system/CertbotAdapter.js';
 import { ConfigCheckAdapter } from '../infrastructure/system/ConfigCheckAdapter.js';
 import { InstallHostAdapter } from '../infrastructure/system/InstallHostAdapter.js';
 import { SystemdAdapter } from '../infrastructure/system/SystemdAdapter.js';
@@ -213,6 +214,9 @@ export async function buildInstallation(
   const rutorrentUrl = process.env.KOBOX_RUTORRENT_URL;
   const rutorrentSha256 = process.env.KOBOX_RUTORRENT_SHA256;
   const quotaFs = process.env.KOBOX_QUOTA_FS;
+  const leDomain = process.env.KOBOX_LE_DOMAIN;
+  const leEmail = process.env.KOBOX_LE_EMAIL;
+  const acmeUrl = process.env.KOBOX_ACME_URL;
   const installPki = new EasyRsaPkiAdapter(runner, process.env.KOBOX_VPN_PKI ?? DEFAULT_PKI_DIR);
   const ctx: InstallerContext = {
     packages: new AptPackageAdapter(runner),
@@ -221,6 +225,7 @@ export async function buildInstallation(
     checks: new ConfigCheckAdapter(runner),
     host: new InstallHostAdapter(runner),
     ipset: new IpsetAdapter(runner),
+    certbot: new CertbotAdapter(runner, process.env.KOBOX_ACME_CA_BUNDLE),
     pki: installPki,
     pkiProvision: installPki,
     artifacts: new ArtifactFetchAdapter(defaultBodyFetcher()),
@@ -237,6 +242,16 @@ export async function buildInstallation(
       ...(rutorrentSha256 !== undefined &&
         rutorrentSha256 !== '' && { rutorrentSha256 }),
       ...(quotaFs !== undefined && quotaFs !== '' && { quotaFs }),
+      ...(leDomain !== undefined &&
+        leDomain !== '' &&
+        leEmail !== undefined &&
+        leEmail !== '' && {
+          letsencrypt: {
+            domain: leDomain,
+            email: leEmail,
+            ...(acmeUrl !== undefined && acmeUrl !== '' && { acmeUrl }),
+          },
+        }),
       workerEnv: koboxEnvSnapshot(),
     },
   };

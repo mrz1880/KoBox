@@ -5,6 +5,7 @@ import {
   type ComponentInstaller,
   type InstallerContext,
 } from '../../../../src/application/installation/installers.js';
+import type { CertbotRequest } from '../../../../src/application/maintenance/CertbotPort.js';
 import type { SystemFacts } from '../../../../src/domain/installation/ports.js';
 import { Cidr } from '../../../../src/domain/security/Cidr.js';
 import { FakeConfigChecks } from '../../../../src/infrastructure/system/fakes/FakeConfigChecks.js';
@@ -31,7 +32,30 @@ interface World {
   readonly checks: FakeConfigChecks;
   readonly pki: FakeVpnPki;
   readonly ipset: FakeIpset;
+  readonly certbot: FakeCertbot;
   readonly installers: ReadonlyMap<string, ComponentInstaller>;
+}
+
+// records requests and materializes the live chain like real certbot would
+class FakeCertbot {
+  readonly requests: CertbotRequest[] = [];
+  failWith: string | undefined = undefined;
+
+  constructor(private readonly host: FakeInstallHost) {}
+
+  async obtain(request: CertbotRequest): Promise<void> {
+    if (this.failWith !== undefined) {
+      throw new Error(this.failWith);
+    }
+    this.requests.push(request);
+    await this.host.ensureFile({
+      path: `/etc/letsencrypt/live/${request.domain}/fullchain.pem`,
+      content: 'CHAIN',
+      mode: '0644',
+      owner: 'root',
+      group: 'root',
+    });
+  }
 }
 
 function buildWorld(overrides?: {
@@ -39,6 +63,7 @@ function buildWorld(overrides?: {
   manageAptSources?: boolean;
   quotaFs?: string;
   rutorrentPin?: 'none';
+  letsencrypt?: { domain: string; email: string; acmeUrl?: string };
 }): World {
   const packages = new FakePackages();
   const host = new FakeInstallHost();
@@ -46,6 +71,7 @@ function buildWorld(overrides?: {
   const checks = new FakeConfigChecks();
   const pki = new FakeVpnPki();
   const ipset = new FakeIpset();
+  const certbot = new FakeCertbot(host);
   const ctx: InstallerContext = {
     packages,
     files: host,
@@ -53,6 +79,7 @@ function buildWorld(overrides?: {
     checks,
     host,
     ipset,
+    certbot,
     pki,
     pkiProvision: pki,
     artifacts: host,
@@ -80,10 +107,11 @@ function buildWorld(overrides?: {
         rutorrentSha256: 'a'.repeat(64),
       }),
       ...(overrides?.quotaFs !== undefined && { quotaFs: overrides.quotaFs }),
+      ...(overrides?.letsencrypt !== undefined && { letsencrypt: overrides.letsencrypt }),
       workerEnv: new Map([['KOBOX_DB', '/var/lib/kobox/kobox.db']]),
     },
   };
-  return { packages, host, systemd, checks, pki, ipset, installers: buildInstallers(ctx) };
+  return { packages, host, systemd, checks, pki, ipset, certbot, installers: buildInstallers(ctx) };
 }
 
 function installer(world: World, name: string): ComponentInstaller {
@@ -285,6 +313,74 @@ describe('dnscrypt installer', () => {
     expect(outcome).toMatchObject({ state: 'skipped' });
     expect(outcome.state === 'skipped' && outcome.reason).toContain('not packaged');
     expect(world.packages.installed).not.toContain('dnscrypt-proxy');
+  });
+});
+
+describe('letsencrypt installer', () => {
+  it('should_skip_with_guidance_when_no_public_fqdn_is_configured', async () => {
+    const outcome = await installer(world, 'letsencrypt').install();
+
+    expect(outcome).toMatchObject({ state: 'skipped' });
+    expect(outcome.state === 'skipped' && outcome.reason).toContain('KOBOX_LE_DOMAIN');
+    // snakeoil stays: no vhost rewrite happened
+    expect(world.certbot.requests).toEqual([]);
+  });
+
+  it('should_obtain_the_cert_via_webroot_and_flip_the_vhost_to_the_live_chain', async () => {
+    const w = buildWorld({ letsencrypt: { domain: 'box.example.org', email: 'ops@example.org' } });
+    await installer(w, 'nginx').install(); // snakeoil first
+
+    const outcome = await installer(w, 'letsencrypt').install();
+
+    expect(outcome.state).toBe('installed');
+    expect(w.packages.installed).toContain('certbot');
+    expect(w.host.dirs.get('/var/www/acme')).toBe('0755');
+    expect(w.certbot.requests).toEqual([
+      { domain: 'box.example.org', email: 'ops@example.org', webroot: '/var/www/acme' },
+    ]);
+    const vhost = w.host.contentAt('/etc/nginx/conf.d/kobox.conf') ?? '';
+    expect(vhost).toContain('ssl_certificate /etc/letsencrypt/live/box.example.org/fullchain.pem;');
+    expect(vhost).not.toContain('snakeoil');
+    expect(w.host.contentAt('/etc/letsencrypt/renewal-hooks/deploy/kobox-nginx')).toContain(
+      'systemctl reload nginx',
+    );
+    expect(w.systemd.log).toContain('enable-now certbot.timer');
+  });
+
+  it('should_fail_the_component_and_keep_snakeoil_when_issuance_fails', async () => {
+    const w = buildWorld({ letsencrypt: { domain: 'box.example.org', email: 'ops@example.org' } });
+    await installer(w, 'nginx').install();
+    w.certbot.failWith = 'challenge failed';
+
+    await expect(installer(w, 'letsencrypt').install()).rejects.toThrow('challenge failed');
+
+    expect(w.host.contentAt('/etc/nginx/conf.d/kobox.conf')).toContain('snakeoil');
+  });
+
+  it('should_pass_a_custom_acme_directory_through_to_certbot', async () => {
+    const w = buildWorld({
+      letsencrypt: {
+        domain: 'box.example.org',
+        email: 'ops@example.org',
+        acmeUrl: 'https://acme.example.net:14000/dir',
+      },
+    });
+    await installer(w, 'nginx').install();
+
+    await installer(w, 'letsencrypt').install();
+
+    expect(w.certbot.requests[0]?.acmeUrl).toBe('https://acme.example.net:14000/dir');
+  });
+
+  it('should_render_the_live_chain_directly_on_nginx_re_runs_once_issued', async () => {
+    // anti-drift: a full re-install must not flap the vhost back to snakeoil
+    const w = buildWorld({ letsencrypt: { domain: 'box.example.org', email: 'ops@example.org' } });
+    await installer(w, 'nginx').install();
+    await installer(w, 'letsencrypt').install();
+
+    await installer(w, 'nginx').install();
+
+    expect(w.host.contentAt('/etc/nginx/conf.d/kobox.conf')).not.toContain('snakeoil');
   });
 });
 

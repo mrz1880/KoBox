@@ -321,7 +321,7 @@ describe.skipIf(!onDebianAsRoot)('E2E: fresh Debian 12 -> bootstrap -> full stac
     sh('sshd', ['-t']); // stock sshd config still valid after drop-in removal
 
     const status = JSON.parse(kobox(['install-status'])) as { name: string; state: string }[];
-    const skippedOnDebian12 = ['dnscrypt', 'apt-sources', 'ipset'];
+    const skippedOnDebian12 = ['dnscrypt', 'apt-sources', 'ipset', 'letsencrypt'];
     for (const row of status) {
       if (!skippedOnDebian12.includes(row.name)) {
         expect(row.state, row.name).toBe('to_install');

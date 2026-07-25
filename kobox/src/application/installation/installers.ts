@@ -8,9 +8,12 @@ import type {
   SystemFacts,
   SystemdPort,
 } from '../../domain/installation/ports.js';
+import type { CertbotPort } from '../maintenance/CertbotPort.js';
 import {
+  ACME_WEBROOT,
   renderAptSources,
   renderBindLocal,
+  renderCertbotDeployHook,
   renderBindOptions,
   renderDnscryptConfig,
   renderFirewallBootUnit,
@@ -20,6 +23,7 @@ import {
   renderSysctlTweaks,
   renderWorkerEnv,
   renderWorkerUnit,
+  type NginxVhostSettings,
 } from '../../domain/installation/rendering.js';
 import { renderCronFile } from '../../domain/maintenance/rendering.js';
 import type { IpsetPort } from '../../domain/tracker/ports.js';
@@ -41,6 +45,13 @@ export interface InstallSettings {
   readonly rutorrentUrl?: string;
   readonly rutorrentSha256?: string;
   readonly quotaFs?: string;
+  // env-driven: KOBOX_LE_DOMAIN/KOBOX_LE_EMAIL (+ KOBOX_ACME_URL for the
+  // pebble fixture); unset = honest skip, snakeoil stays
+  readonly letsencrypt?: {
+    readonly domain: string;
+    readonly email: string;
+    readonly acmeUrl?: string;
+  };
   readonly workerEnv: ReadonlyMap<string, string>;
 }
 
@@ -51,6 +62,7 @@ export interface InstallerContext {
   readonly checks: ConfigCheckPort;
   readonly host: InstallHostPort;
   readonly ipset: IpsetPort;
+  readonly certbot: CertbotPort;
   readonly pki: VpnPkiPort;
   readonly pkiProvision: VpnPkiProvisionPort;
   readonly artifacts: ArtifactFetchPort;
@@ -281,7 +293,7 @@ class NginxInstaller implements ComponentInstaller {
   constructor(private readonly ctx: InstallerContext) {}
 
   async install(): Promise<InstallOutcome> {
-    const { packages, host, systemd, checks, security } = this.ctx;
+    const { packages, host, systemd, checks } = this.ctx;
     await packages.ensureInstalled(['nginx', 'php-fpm', 'ssl-cert']);
     // deny-by-default: an EMPTY htpasswd rejects everyone until the portal
     // phase wires real accounts; an existing file is never overwritten
@@ -295,7 +307,7 @@ class NginxInstaller implements ComponentInstaller {
     const changed = await guardedApply(
       this.ctx,
       this.name,
-      [renderNginxVhost({ portalPort: security.portalPort })],
+      [renderNginxVhost(await nginxVhostSettings(this.ctx))],
       () => checks.nginx(),
     );
     await systemd.enable('nginx', { now: true });
@@ -448,6 +460,74 @@ class DnscryptInstaller implements ComponentInstaller {
   }
 }
 
+// Shared with NginxInstaller: once a live chain exists for the configured
+// domain, EVERY vhost render uses it — a full re-install must never flap the
+// portal back to snakeoil.
+async function nginxVhostSettings(ctx: InstallerContext): Promise<NginxVhostSettings> {
+  const le = ctx.install.letsencrypt;
+  if (le && (await ctx.host.pathExists(`/etc/letsencrypt/live/${le.domain}/fullchain.pem`))) {
+    return { portalPort: ctx.security.portalPort, letsencrypt: { domain: le.domain } };
+  }
+  return { portalPort: ctx.security.portalPort };
+}
+
+class LetsencryptInstaller implements ComponentInstaller {
+  readonly name = 'letsencrypt';
+
+  constructor(private readonly ctx: InstallerContext) {}
+
+  async install(): Promise<InstallOutcome> {
+    const { packages, host, files, systemd, checks, certbot, install } = this.ctx;
+    const le = install.letsencrypt;
+    if (!le) {
+      return {
+        state: 'skipped',
+        reason:
+          'no public FQDN configured — set KOBOX_LE_DOMAIN and KOBOX_LE_EMAIL, then re-run kobox install (snakeoil certificate stays)',
+      };
+    }
+    await packages.ensureInstalled(['certbot']);
+    await host.ensureDir(ACME_WEBROOT, '0755');
+    // the :80 ACME block is already part of the nginx vhost — certbot can
+    // validate through the running server (webroot, no downtime)
+    await certbot.obtain({
+      domain: le.domain,
+      email: le.email,
+      webroot: ACME_WEBROOT,
+      ...(le.acmeUrl !== undefined && { acmeUrl: le.acmeUrl }),
+    });
+    const changed = await guardedApply(
+      this.ctx,
+      this.name,
+      [renderNginxVhost(await nginxVhostSettings(this.ctx))],
+      () => checks.nginx(),
+    );
+    if (changed.length > 0) {
+      await systemd.reloadOrRestart('nginx');
+    }
+    await files.apply([renderCertbotDeployHook()]);
+    await systemd.enable('certbot.timer', { now: true });
+    return installed(await packages.installedVersion('certbot'));
+  }
+
+  async uninstall(): Promise<void> {
+    const { host, systemd, checks } = this.ctx;
+    await host.removeFile('/etc/letsencrypt/renewal-hooks/deploy/kobox-nginx');
+    await systemd.disable('certbot.timer', { now: true });
+    // certificates are operator data and stay; the vhost falls back to
+    // snakeoil only when nginx re-installs
+    if (await this.ctx.systemd.isActive('nginx')) {
+      await guardedApply(
+        this.ctx,
+        this.name,
+        [renderNginxVhost({ portalPort: this.ctx.security.portalPort })],
+        () => checks.nginx(),
+      );
+      await systemd.reloadOrRestart('nginx');
+    }
+  }
+}
+
 class IpsetInstaller implements ComponentInstaller {
   readonly name = 'ipset';
 
@@ -594,6 +674,7 @@ export function buildInstallers(ctx: InstallerContext): ReadonlyMap<string, Comp
     new BindInstaller(ctx),
     new DnscryptInstaller(ctx),
     new IpsetInstaller(ctx),
+    new LetsencryptInstaller(ctx),
     new SchedulerInstaller(ctx),
     new Fail2banInstaller(ctx),
     new OpenVpnInstaller(ctx),

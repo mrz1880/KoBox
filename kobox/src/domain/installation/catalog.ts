@@ -30,6 +30,8 @@ export const COMPONENT_CATALOG: readonly ComponentSpec[] = [
   spec('fail2ban', ['sshd']),
   spec('openvpn'),
   spec('postfix'),
+  // certbot validates through the running nginx (:80 ACME block)
+  spec('letsencrypt', ['nginx']),
   // cron entries call the kobox CLI which the core component laid down
   spec('scheduler', ['kobox-core']),
 ];
