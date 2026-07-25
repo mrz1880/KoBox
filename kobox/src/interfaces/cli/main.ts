@@ -12,7 +12,7 @@ import { Username } from '../../domain/user/Username.js';
 import { ConfigureMailRelay } from '../../application/maintenance/ConfigureMailRelay.js';
 import { RestoreBackup } from '../../application/maintenance/RestoreBackup.js';
 import { BackupHostAdapter } from '../../infrastructure/system/BackupHostAdapter.js';
-import { ExecFileRunner } from '../../infrastructure/system/CommandRunner.js';
+import { ExecFileRunner, runOrThrow } from '../../infrastructure/system/CommandRunner.js';
 import { InstallHostAdapter } from '../../infrastructure/system/InstallHostAdapter.js';
 import { RtorrentConfigAdapter } from '../../infrastructure/system/RtorrentConfigAdapter.js';
 import { SystemdAdapter } from '../../infrastructure/system/SystemdAdapter.js';
@@ -696,6 +696,25 @@ program
       password,
     });
     process.stdout.write('postfix relay configured (sasl_passwd 0600, postmap, reload)\n');
+  });
+
+program
+  .command('set-samba-password')
+  .argument('<username>')
+  .description('set a user Samba password (read from stdin; direct root, never in the DB or a job)')
+  .action(async (username: string) => {
+    // no container: the secret goes straight to smbpasswd via stdin and never
+    // touches the database or a job payload (AUDIT §5.5)
+    const password = await readStdin();
+    const name = Username.parse(username).value;
+    const runner = new ExecFileRunner();
+    // -s: read from stdin (new password + confirmation); -a: add/update
+    await runOrThrow(runner, {
+      command: 'smbpasswd',
+      args: ['-s', '-a', name],
+      stdin: `${password}\n${password}\n`,
+    });
+    process.stdout.write(`samba password set for ${name}\n`);
   });
 
 program

@@ -36,4 +36,8 @@ export const COMPONENT_CATALOG: readonly ComponentSpec[] = [
   spec('scheduler', ['kobox-core']),
   // Phase 6 — the SSR portal sits behind nginx and needs the core account/DB
   spec('portal', ['kobox-core', 'nginx']),
+  // Phase 6 — vendored extras (KEEP from prod): NFS/Samba homes, hardened shell
+  spec('nfs', ['kobox-core']),
+  spec('samba', ['kobox-core']),
+  spec('shellinabox', ['nginx']),
 ];

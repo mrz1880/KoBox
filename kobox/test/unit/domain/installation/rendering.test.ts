@@ -10,9 +10,12 @@ import {
   renderCertbotDeployHook,
   renderDnscryptConfig,
   renderFirewallBootUnit,
+  renderNfsExports,
   renderNginxVhost,
   renderPortalUnit,
   renderRutorrentConfig,
+  renderShellinaboxDefault,
+  renderSmbConf,
   renderRutorrentUserConfig,
   renderRutorrentUsersInclude,
   renderSshdDropin,
@@ -195,6 +198,37 @@ describe('installation rendering', () => {
     const file = renderRutorrentConfig();
     expect(file.path).toBe('/var/www/rutorrent/conf/config.php');
     expectGolden('rutorrent-config.php.golden', file.content);
+  });
+
+  it('should_render_nfs_exports_per_user_and_trusted_address_golden', () => {
+    const file = renderNfsExports([
+      { username: 'alice', ips: ['203.0.113.9', '198.51.100.7'] },
+      { username: 'bob', ips: [] },
+    ]);
+    expect(file.path).toBe('/etc/exports.d/kobox.exports');
+    // one export line per user home, scoped to each trusted address
+    expect(file.content).toContain('/home/alice 203.0.113.9(rw,sync,no_subtree_check,root_squash)');
+    expect(file.content).toContain('/home/alice 198.51.100.7(rw,sync,no_subtree_check,root_squash)');
+    // a user with no trusted address exports to nobody (no wildcard)
+    expect(file.content).not.toContain('/home/bob ');
+    expectGolden('nfs-kobox.exports.golden', file.content);
+  });
+
+  it('should_render_the_samba_config_golden', () => {
+    const file = renderSmbConf();
+    expect(file.path).toBe('/etc/samba/smb.conf');
+    expect(file.content).toContain('security = user');
+    expect(file.content).toContain('[homes]');
+    expectGolden('smb.conf.golden', file.content);
+  });
+
+  it('should_render_shellinabox_bound_to_localhost_golden', () => {
+    const file = renderShellinaboxDefault();
+    expect(file.path).toBe('/etc/default/shellinabox');
+    // hardened: localhost only, behind the portal's admin-gated proxy
+    expect(file.content).toContain('--localhost-only');
+    expect(file.content).toContain('127.0.0.1');
+    expectGolden('shellinabox.default.golden', file.content);
   });
 
   it('should_render_bind_files_wired_to_the_phase2_blacklist_zones', () => {

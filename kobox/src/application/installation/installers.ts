@@ -20,6 +20,8 @@ import {
   renderNginxVhost,
   renderPortalUnit,
   renderRutorrentConfig,
+  renderShellinaboxDefault,
+  renderSmbConf,
   renderSshdDropin,
   renderSysctlTweaks,
   renderWorkerEnv,
@@ -699,6 +701,75 @@ class PostfixInstaller implements ComponentInstaller {
   }
 }
 
+// NFS (KEEP from prod: active): the per-user home exports arrive via the
+// chained render-nfs-exports job; here we just install the server and enable it.
+class NfsInstaller implements ComponentInstaller {
+  readonly name = 'nfs';
+
+  constructor(private readonly ctx: InstallerContext) {}
+
+  async install(): Promise<InstallOutcome> {
+    const { packages, host, systemd } = this.ctx;
+    await packages.ensureInstalled(['nfs-kernel-server']);
+    await host.ensureDir('/etc/exports.d', '0755');
+    await systemd.enable('nfs-server', { now: true });
+    return installed(await packages.installedVersion('nfs-kernel-server'));
+  }
+
+  async uninstall(): Promise<void> {
+    await this.ctx.systemd.disable('nfs-server', { now: true });
+    await this.ctx.host.removeFile('/etc/exports.d/kobox.exports');
+  }
+}
+
+// Samba (KEEP from prod): user-level [homes] shares. Passwords are set
+// out-of-band via `kobox set-samba-password` — never through the DB or a job.
+class SambaInstaller implements ComponentInstaller {
+  readonly name = 'samba';
+
+  constructor(private readonly ctx: InstallerContext) {}
+
+  async install(): Promise<InstallOutcome> {
+    const { packages, systemd, checks } = this.ctx;
+    await packages.ensureInstalled(['samba']);
+    const changed = await guardedApply(this.ctx, this.name, [renderSmbConf()], () => checks.samba());
+    await systemd.enable('smbd', { now: true });
+    if (changed.length > 0) {
+      await systemd.reloadOrRestart('smbd');
+    }
+    return installed(await packages.installedVersion('samba'));
+  }
+
+  async uninstall(): Promise<void> {
+    await this.ctx.systemd.disable('smbd', { now: true });
+    await this.ctx.host.removeFile('/etc/samba/smb.conf');
+  }
+}
+
+// ShellInABox hardened to localhost (Phase 5 debt): reachable only through the
+// portal's admin-gated /shell proxy.
+class ShellinaboxInstaller implements ComponentInstaller {
+  readonly name = 'shellinabox';
+
+  constructor(private readonly ctx: InstallerContext) {}
+
+  async install(): Promise<InstallOutcome> {
+    const { packages, files, systemd } = this.ctx;
+    await packages.ensureInstalled(['shellinabox']);
+    const changed = await files.apply([renderShellinaboxDefault()]);
+    await systemd.enable('shellinabox', { now: true });
+    if (changed.length > 0) {
+      await systemd.reloadOrRestart('shellinabox');
+    }
+    return installed(await packages.installedVersion('shellinabox'));
+  }
+
+  async uninstall(): Promise<void> {
+    await this.ctx.systemd.disable('shellinabox', { now: true });
+    await this.ctx.host.removeFile('/etc/default/shellinabox');
+  }
+}
+
 export function buildInstallers(ctx: InstallerContext): ReadonlyMap<string, ComponentInstaller> {
   const list: readonly ComponentInstaller[] = [
     new KoboxCoreInstaller(ctx),
@@ -718,6 +789,9 @@ export function buildInstallers(ctx: InstallerContext): ReadonlyMap<string, Comp
     new OpenVpnInstaller(ctx),
     new PostfixInstaller(ctx),
     new PortalInstaller(ctx),
+    new NfsInstaller(ctx),
+    new SambaInstaller(ctx),
+    new ShellinaboxInstaller(ctx),
   ];
   return new Map(list.map((entry) => [entry.name, entry]));
 }

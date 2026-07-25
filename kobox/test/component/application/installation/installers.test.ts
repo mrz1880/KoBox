@@ -291,6 +291,41 @@ describe('portal installer', () => {
   });
 });
 
+describe('vendored extras installers', () => {
+  it('should_install_the_nfs_server_and_hold_the_exports_dir', async () => {
+    const outcome = await installer(world, 'nfs').install();
+
+    expect(outcome.state).toBe('installed');
+    expect(world.packages.installed).toContain('nfs-kernel-server');
+    expect(world.host.dirs.get('/etc/exports.d')).toBe('0755');
+    expect(world.systemd.log).toContain('enable-now nfs-server');
+  });
+
+  it('should_render_the_samba_config_under_the_testparm_guard', async () => {
+    const outcome = await installer(world, 'samba').install();
+
+    expect(outcome.state).toBe('installed');
+    expect(world.host.contentAt('/etc/samba/smb.conf')).toContain('[homes]');
+    expect(world.systemd.log).toContain('enable-now smbd');
+  });
+
+  it('should_roll_back_the_samba_config_when_testparm_fails', async () => {
+    world.checks.failSamba('Unknown parameter encountered');
+
+    await expect(installer(world, 'samba').install()).rejects.toThrow(InstallGuardError);
+
+    expect(world.host.contentAt('/etc/samba/smb.conf')).toBeUndefined();
+  });
+
+  it('should_bind_shellinabox_to_localhost', async () => {
+    const outcome = await installer(world, 'shellinabox').install();
+
+    expect(outcome.state).toBe('installed');
+    expect(world.host.contentAt('/etc/default/shellinabox')).toContain('--localhost-only');
+    expect(world.systemd.log).toContain('enable-now shellinabox');
+  });
+});
+
 describe('bind installer', () => {
   it('should_restore_the_previous_stock_config_when_named_checkconf_fails', async () => {
     await world.host.apply([

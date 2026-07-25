@@ -24,6 +24,7 @@ import { SendMails } from '../application/maintenance/SendMails.js';
 import { ApplyFirewall } from '../application/security/ApplyFirewall.js';
 import { DeprovisionVpnUser } from '../application/security/DeprovisionVpnUser.js';
 import { EvaluateFairUse } from '../application/security/EvaluateFairUse.js';
+import { RenderNfsExports } from '../application/security/RenderNfsExports.js';
 import { SetFairUseOverride } from '../application/security/SetFairUseOverride.js';
 import { ProvisionVpnUser } from '../application/security/ProvisionVpnUser.js';
 import { ManageUserHostname } from '../application/security/ManageUserHostname.js';
@@ -247,6 +248,7 @@ export interface SecurityUseCases {
   readonly provisionVpnUser: ProvisionVpnUser;
   readonly deprovisionVpnUser: DeprovisionVpnUser;
   readonly evaluateFairUse: EvaluateFairUse;
+  readonly renderNfsExports: RenderNfsExports;
 }
 
 export function buildSecurityUseCases(deps: SecurityUseCaseDeps): SecurityUseCases {
@@ -260,6 +262,7 @@ export function buildSecurityUseCases(deps: SecurityUseCaseDeps): SecurityUseCas
     deprovisionVpnUser: new DeprovisionVpnUser(deps),
     evaluateFairUse: new EvaluateFairUse(deps),
     setFairUseOverride: new SetFairUseOverride(deps),
+    renderNfsExports: new RenderNfsExports(deps),
   };
 }
 

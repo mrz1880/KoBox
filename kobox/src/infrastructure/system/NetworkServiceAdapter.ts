@@ -47,6 +47,12 @@ export class NetworkServiceAdapter implements NetworkServicePort, NetworkService
     }
   }
 
+  async reloadNfsExports(): Promise<void> {
+    if (await this.unitExists('nfs-server')) {
+      await this.run('exportfs', ['-ra']);
+    }
+  }
+
   private async run(command: string, args: readonly string[]): Promise<void> {
     await runOrThrow(this.runner, { command, args: [...args], timeoutMs: RELOAD_TIMEOUT_MS });
   }

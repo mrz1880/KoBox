@@ -551,6 +551,18 @@ describe('security job chains (provision -> firewall)', () => {
     expect(include).toContain('location = /RPC-ALICE');
   });
 
+  it('should_render_nfs_exports_after_creating_a_user_with_a_trusted_address', async () => {
+    await enqueueCreateAlice();
+    await world.worker.drain();
+    await world.queue.enqueue(buildJob.addUserAddress({ username: 'alice', ipv4: '203.0.113.9' }));
+
+    await world.worker.drain();
+
+    expect(world.networkFiles.contentAt('/etc/exports.d/kobox.exports')).toContain(
+      '/home/alice 203.0.113.9(rw,sync,no_subtree_check,root_squash)',
+    );
+  });
+
   it('should_reapply_the_firewall_after_deprovisioning', async () => {
     world.identity.setUid('alice', 1001);
     await enqueueCreateAlice();

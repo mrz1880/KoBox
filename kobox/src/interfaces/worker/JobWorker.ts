@@ -31,6 +31,7 @@ interface ChainHints {
   readonly firewallDirty?: boolean;
   readonly fail2banDirty?: boolean;
   readonly openVpnDirty?: boolean;
+  readonly nfsDirty?: boolean;
 }
 
 function nowStamp(): string {
@@ -112,6 +113,10 @@ export class JobWorker {
         parseJob('deprovision-vpn-user', { username: job.payload.username }),
       );
     }
+    // a user's home appears/disappears with the account: re-render NFS exports
+    if (job.type === 'create-user' || job.type === 'delete-user') {
+      await this.queue.enqueue(parseJob('render-nfs-exports', {}));
+    }
     // legacy parity: a fresh instance gets its blocklist filter immediately,
     // not at the next update-blocklists run
     if (job.type === 'provision-rtorrent') {
@@ -145,6 +150,9 @@ export class JobWorker {
     }
     if (hints?.openVpnDirty === true) {
       await this.queue.enqueue(parseJob('render-openvpn', {}));
+    }
+    if (hints?.nfsDirty === true) {
+      await this.queue.enqueue(parseJob('render-nfs-exports', {}));
     }
   }
 
@@ -334,6 +342,9 @@ export class JobWorker {
       case 'render-rutorrent-users':
         await this.torrents.renderRutorrentUsers.execute();
         return;
+      case 'render-nfs-exports':
+        await this.security.renderNfsExports.execute();
+        return;
       case 'add-user-address':
       case 'remove-user-address': {
         const report = await this.trackers.manageUserAddress.execute({
@@ -341,12 +352,13 @@ export class JobWorker {
           username: Username.parse(job.payload.username),
           ip: IpAddress.parse(job.payload.ipv4),
         });
-        // a member address is rendered in three places: allow.p2p, the
-        // firewall trusted rules and fail2ban ignoreip — refresh all of them
+        // a member address is rendered in four places: the whitelist, the
+        // firewall trusted rules, fail2ban ignoreip and the NFS home exports
         return {
           whitelistDirty: report.whitelistDirty,
           firewallDirty: report.whitelistDirty,
           fail2banDirty: report.whitelistDirty,
+          nfsDirty: true,
         };
       }
     }

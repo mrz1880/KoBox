@@ -311,7 +311,88 @@ export function renderNginxVhost(settings: NginxVhostSettings): RenderedFile {
       '',
       '    # per-user SCGI mounts (/RPC-<USER>), each gated to its owner or an admin',
       '    include /etc/nginx/kobox.d/*.conf;',
+      '',
+      '    # ShellInABox (localhost:4200), admin-only through the portal session',
+      '    location /shell/ {',
+      '        auth_request /internal/auth/admin;',
+      '        proxy_pass http://127.0.0.1:4200/;',
+      '        proxy_set_header Host $host;',
+      '    }',
       '}',
+      '',
+    ].join('\n'),
+    mode: '0644',
+    owner: 'root',
+    group: 'root',
+  };
+}
+
+export interface NfsExportWiring {
+  readonly username: string;
+  readonly ips: readonly string[];
+}
+
+// Per-user home exports scoped to each trusted address (the legacy exported
+// homes to whitelisted IPs). A user with no trusted address exports to
+// nobody — never a wildcard, which would open the home to the whole net.
+export function renderNfsExports(users: readonly NfsExportWiring[]): RenderedFile {
+  const lines: string[] = [];
+  for (const user of users) {
+    for (const ip of user.ips) {
+      lines.push(`/home/${user.username} ${ip}(rw,sync,no_subtree_check,root_squash)`);
+    }
+  }
+  return {
+    path: '/etc/exports.d/kobox.exports',
+    content: [MANAGED_HEADER, ...lines, ''].join('\n'),
+    mode: '0644',
+    owner: 'root',
+    group: 'root',
+  };
+}
+
+// Samba: user-level security with per-user [homes] shares (KEEP from prod).
+// Passwords live in the Samba tdb, set out-of-band via `kobox set-samba-password`
+// (stdin → smbpasswd) — never in the DB or a job payload.
+export function renderSmbConf(): RenderedFile {
+  return {
+    path: '/etc/samba/smb.conf',
+    content: [
+      MANAGED_HEADER,
+      '[global]',
+      '    workgroup = WORKGROUP',
+      '    server string = KoBox',
+      '    security = user',
+      '    map to guest = never',
+      '    server role = standalone server',
+      '    disable netbios = yes',
+      '    smb ports = 445',
+      '',
+      '[homes]',
+      '    comment = Home directory',
+      '    browseable = no',
+      '    read only = no',
+      '    create mask = 0600',
+      '    directory mask = 0700',
+      '    valid users = %S',
+      '',
+    ].join('\n'),
+    mode: '0644',
+    owner: 'root',
+    group: 'root',
+  };
+}
+
+// ShellInABox hardened to localhost (Phase 5 debt): it only ever listens on
+// 127.0.0.1:4200 behind the portal's admin-gated /shell proxy, never exposed.
+export function renderShellinaboxDefault(): RenderedFile {
+  return {
+    path: '/etc/default/shellinabox',
+    content: [
+      MANAGED_HEADER,
+      'SHELLINABOX_DAEMON_START=1',
+      'SHELLINABOX_PORT=4200',
+      'SHELLINABOX_ARGS="--no-beep --localhost-only --disable-ssl --service=/:LOGIN --bind=127.0.0.1"',
       '',
     ].join('\n'),
     mode: '0644',

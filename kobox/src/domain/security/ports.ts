@@ -60,6 +60,7 @@ export interface NetworkServicePort {
   reloadFail2ban(): Promise<void>;
   reloadDns(): Promise<void>;
   reloadNginx(): Promise<void>;
+  reloadNfsExports(): Promise<void>;
 }
 
 export interface DynDnsBinding {

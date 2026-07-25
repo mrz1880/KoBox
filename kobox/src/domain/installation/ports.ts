@@ -40,6 +40,7 @@ export interface ConfigCheckPort {
   sshd(): Promise<ConfigCheckResult>;
   nginx(): Promise<ConfigCheckResult>;
   bind(): Promise<ConfigCheckResult>;
+  samba(): Promise<ConfigCheckResult>;
 }
 
 // Small host mutations installers need beyond packages/files/units. The one

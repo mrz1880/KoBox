@@ -21,6 +21,10 @@ export class ConfigCheckAdapter implements ConfigCheckPort {
     return this.check('named-checkconf', []);
   }
 
+  samba(): Promise<ConfigCheckResult> {
+    return this.check('testparm', ['-s']);
+  }
+
   private async check(command: string, args: readonly string[]): Promise<ConfigCheckResult> {
     const result = await this.runner.run({ command, args: [...args], timeoutMs: CHECK_TIMEOUT_MS });
     if (result.exitCode === 0) {
