@@ -115,3 +115,13 @@ export interface VpnPkiPort {
   serverPaths(): VpnServerPaths;
   clientMaterial(username: Username): Promise<VpnClientMaterial | undefined>;
 }
+
+// The mutating side (Phase 4 easy-rsa bootstrap), segregated from the read
+// side so render-only consumers keep the narrow port. ensure* never
+// regenerates existing material: re-runs must not invalidate distributed
+// certificates.
+export interface VpnPkiProvisionPort {
+  ensurePki(): Promise<void>;
+  ensureClientMaterial(username: Username): Promise<void>;
+  removeClientMaterial(username: Username): Promise<void>;
+}
