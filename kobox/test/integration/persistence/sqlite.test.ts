@@ -22,7 +22,10 @@ import { TrackerPrivacy } from '../../../src/domain/tracker/TrackerPrivacy.js';
 import { TrackerProto } from '../../../src/domain/tracker/TrackerProto.js';
 import { Bandwidth } from '../../../src/domain/security/Bandwidth.js';
 import { DynDnsHost } from '../../../src/domain/security/DynDnsHost.js';
+import { ComponentName } from '../../../src/domain/installation/ComponentName.js';
+import { Version } from '../../../src/domain/installation/Version.js';
 import { KoboxDatabase } from '../../../src/infrastructure/persistence/db.js';
+import { SqliteComponentRegistry } from '../../../src/infrastructure/persistence/SqliteComponentRegistry.js';
 import { SqliteFairUseRepository } from '../../../src/infrastructure/persistence/SqliteFairUseRepository.js';
 import { SqliteBlocklistRepository } from '../../../src/infrastructure/persistence/SqliteBlocklistRepository.js';
 import { SqliteTrackerRepository } from '../../../src/infrastructure/persistence/SqliteTrackerRepository.js';
@@ -568,5 +571,51 @@ describe('SqliteFairUseRepository', () => {
       ingressBytes: 900,
       sampledAt: '2026-07-24 10:05:00',
     });
+  });
+});
+
+describe('SqliteComponentRegistry', () => {
+  const now = '2026-07-24 12:00:00';
+
+  it('should_default_every_component_to_absent_and_round_trip_state_transitions', async () => {
+    const registry = new SqliteComponentRegistry(db);
+    const nginx = ComponentName.parse('nginx');
+
+    expect(await registry.get(nginx)).toBeUndefined();
+    expect((await registry.states()).size).toBe(0);
+
+    await registry.markInstalled(nginx, Version.parse('1.22.1-9'), now);
+    const installed = await registry.get(nginx);
+    expect(installed?.state.value).toBe('installed');
+    expect(installed?.version?.value).toBe('1.22.1-9');
+    expect(installed?.installedAt).toBe(now);
+
+    expect((await registry.states()).get('nginx')?.value).toBe('installed');
+  });
+
+  it('should_record_failures_with_reason_and_let_a_re_run_mark_installed', async () => {
+    const registry = new SqliteComponentRegistry(db);
+    const bind = ComponentName.parse('bind');
+
+    await registry.markFailed(bind, 'named-checkconf exited 1', now);
+    const failed = await registry.get(bind);
+    expect(failed?.state.value).toBe('failed');
+    expect(failed?.reason).toBe('named-checkconf exited 1');
+
+    await registry.markInstalled(bind, undefined, '2026-07-24 12:30:00');
+    const recovered = await registry.get(bind);
+    expect(recovered?.state.value).toBe('installed');
+    expect(recovered?.reason).toBeUndefined();
+  });
+
+  it('should_record_skips_with_reason_and_reset_back_to_to_install', async () => {
+    const registry = new SqliteComponentRegistry(db);
+    const pgl = ComponentName.parse('pgl');
+
+    await registry.markSkipped(pgl, 'pgl not packaged for Debian 12', now);
+    expect((await registry.get(pgl))?.state.value).toBe('skipped');
+
+    await registry.reset(pgl, '2026-07-24 13:00:00');
+    expect((await registry.get(pgl))?.state.value).toBe('to_install');
   });
 });
