@@ -11,9 +11,15 @@ import type {
   SessionStorePort,
   SessionTokenPort,
 } from '../../domain/portal/ports.js';
+import { HashedPassword } from '../../domain/user/HashedPassword.js';
 import type { Password } from '../../domain/user/Password.js';
 import type { Username } from '../../domain/user/Username.js';
 import type { PasswordHasherPort, UserRepository } from '../../domain/user/ports.js';
+
+// A well-formed sha512-crypt hash no real password maps to: verified against on
+// the unknown-user path so an attacker cannot distinguish a missing account
+// from a wrong password by response timing.
+const DUMMY_HASH = HashedPassword.parse(`$6$koboxdummy$${'.'.repeat(43)}`);
 
 export interface LoginCommand {
   readonly username: Username;
@@ -49,20 +55,21 @@ export class Login {
     }
 
     const user = await users.findByUsername(username);
-    if (user?.status.isSuspended() === true) {
-      return { ok: false, reason: 'suspended' };
-    }
-
     const stored = await credentials.find(username);
-    if (user === undefined || stored === undefined) {
-      // count the miss anyway: username probing costs like password probing
+
+    // Always run a verify — against the real hash if the account exists, a dummy
+    // otherwise — so an unknown username costs the same as a wrong password and
+    // cannot be enumerated by timing.
+    const ok = await hasher.verify(password, stored?.passwordHash ?? DUMMY_HASH);
+    if (user === undefined || stored === undefined || !ok) {
       await this.recordFailure(username, attempt?.failures ?? 0, now);
       return { ok: false, reason: 'invalid-credentials' };
     }
 
-    if (!(await hasher.verify(password, stored.passwordHash))) {
-      await this.recordFailure(username, attempt?.failures ?? 0, now);
-      return { ok: false, reason: 'invalid-credentials' };
+    // Only reveal suspension AFTER the password is proven: an unauthenticated
+    // caller must not be able to probe account state (anti-§5.5).
+    if (user.status.isSuspended()) {
+      return { ok: false, reason: 'suspended' };
     }
 
     await attempts.clear(username);

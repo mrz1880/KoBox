@@ -92,10 +92,13 @@ export function registerUserRoutes(
         .send(passwordPage(viewerOf(session), 'Please choose a new password of at least 8 characters.'));
     }
     const stored = await deps.credentials.find(session.username);
-    if (
-      stored === undefined ||
-      !(await deps.hasher.verify(Password.parse(parsed.data.current), stored.passwordHash))
-    ) {
+    // a valid password is always >= 8 chars, so a shorter `current` is simply
+    // incorrect — never let Password.parse throw into an unhandled 500
+    const currentValid =
+      parsed.data.current.length >= 8 &&
+      stored !== undefined &&
+      (await deps.hasher.verify(Password.parse(parsed.data.current), stored.passwordHash));
+    if (!currentValid) {
       return reply
         .code(200)
         .type('text/html')

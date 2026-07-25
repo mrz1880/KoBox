@@ -11,6 +11,7 @@ Group=kobox-portal
 ExecStart=/usr/bin/node /opt/kobox/current/kobox/dist/interfaces/http/main.js
 EnvironmentFile=-/etc/kobox/worker.env
 UMask=0007
+NoNewPrivileges=yes
 SyslogIdentifier=kobox-portal
 Restart=on-failure
 RestartSec=2

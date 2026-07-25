@@ -20,6 +20,8 @@ const NOW = '2026-07-25 10:00:00';
 
 // Mirrors FakePasswordHasher in worker-loop tests: hash depends only on length.
 class FakeHasher implements PasswordHasherPort {
+  verifyCalls = 0;
+
   hash(password: Password): Promise<HashedPassword> {
     return Promise.resolve(
       HashedPassword.parse(`$6$fakesalt$${'x'.repeat(20)}${String(password.reveal().length)}`),
@@ -27,6 +29,7 @@ class FakeHasher implements PasswordHasherPort {
   }
 
   async verify(password: Password, hash: HashedPassword): Promise<boolean> {
+    this.verifyCalls += 1;
     return (await this.hash(password)).value === hash.value;
   }
 }
@@ -37,6 +40,7 @@ interface World {
   sessions: InMemoryPortalSessionRepository;
   attempts: InMemoryLoginAttemptsRepository;
   tokens: FakeSessionTokens;
+  hasher: FakeHasher;
   login: Login;
   logout: Logout;
   authenticate: Authenticate;
@@ -58,6 +62,7 @@ beforeEach(async () => {
     sessions,
     attempts,
     tokens,
+    hasher,
     login: new Login(deps),
     logout: new Logout(deps),
     authenticate: new Authenticate(deps),
@@ -123,13 +128,35 @@ describe('Login', () => {
     expect(await world.attempts.get(alice)).toBeUndefined();
   });
 
-  it('should_refuse_suspended_users_without_counting_a_failure', async () => {
+  it('should_refuse_suspended_users_only_after_a_correct_password', async () => {
     await world.users.save(new UserBuilder().suspended());
 
     const result = await world.login.execute({ username: alice, password: goodPassword(), now: NOW });
 
     expect(result).toEqual({ ok: false, reason: 'suspended' });
     expect(await world.attempts.get(alice)).toBeUndefined();
+  });
+
+  it('should_not_disclose_suspension_to_someone_without_the_password', async () => {
+    // pre-auth probing must not distinguish suspended from a normal bad login
+    await world.users.save(new UserBuilder().suspended());
+
+    const result = await world.login.execute({ username: alice, password: badPassword(), now: NOW });
+
+    expect(result).toEqual({ ok: false, reason: 'invalid-credentials' });
+  });
+
+  it('should_verify_against_a_dummy_hash_on_unknown_users_to_equalize_timing', async () => {
+    const before = world.hasher.verifyCalls;
+
+    await world.login.execute({
+      username: Username.parse('mallory'),
+      password: goodPassword(),
+      now: NOW,
+    });
+
+    // an unknown username still triggers a verify (constant-time vs a real miss)
+    expect(world.hasher.verifyCalls).toBe(before + 1);
   });
 });
 

@@ -1,4 +1,4 @@
-import type { PortalCredentialsPort } from '../../domain/portal/ports.js';
+import type { PortalCredentialsPort, SessionStorePort } from '../../domain/portal/ports.js';
 import type { HashedPassword } from '../../domain/user/HashedPassword.js';
 import type { Username } from '../../domain/user/Username.js';
 import type { NotificationPort, SystemAccountPort, UserRepository } from '../../domain/user/ports.js';
@@ -14,6 +14,7 @@ interface Deps {
   readonly accounts: SystemAccountPort;
   readonly notifications: NotificationPort;
   readonly credentials: PortalCredentialsPort;
+  readonly sessions: SessionStorePort;
   readonly clock: () => string;
 }
 
@@ -21,7 +22,7 @@ export class ChangePassword {
   constructor(private readonly deps: Deps) {}
 
   async execute(command: ChangePasswordCommand): Promise<void> {
-    const { repo, accounts, notifications, credentials, clock } = this.deps;
+    const { repo, accounts, notifications, credentials, sessions, clock } = this.deps;
 
     const user = await repo.findByUsername(command.username);
     if (!user) {
@@ -40,6 +41,9 @@ export class ChangePassword {
       },
       clock(),
     );
+    // a password change contains a compromise: every existing session dies with
+    // it (self-change or admin reset), so a stolen cookie cannot outlive it
+    await sessions.deleteForUser(user.username);
     await notifications.notify({ type: 'PasswordChanged', username: user.username.value });
   }
 }

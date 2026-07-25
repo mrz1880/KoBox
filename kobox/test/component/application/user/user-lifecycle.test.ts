@@ -228,6 +228,21 @@ describe('ChangePassword', () => {
     expect(credentials?.role).toBe('admin');
   });
 
+  it('should_revoke_live_sessions_so_a_stolen_cookie_dies_with_the_password', async () => {
+    await world.createUser.execute(createUserCommand());
+    await world.sessions.create({
+      id: 'a'.repeat(64),
+      username: alice,
+      csrfToken: 'b'.repeat(64),
+      createdAt: '2026-07-25 10:00:00',
+      expiresAt: '2026-08-01 10:00:00',
+    });
+
+    await world.changePassword.execute({ username: alice, passwordHash: aHash });
+
+    expect(await world.sessions.find('a'.repeat(64))).toBeUndefined();
+  });
+
   it('should_create_portal_credentials_for_a_user_predating_the_portal', async () => {
     await world.createUser.execute(createUserCommand());
     await world.credentials.delete(alice); // simulate a pre-Phase-6 row

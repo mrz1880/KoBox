@@ -68,6 +68,10 @@ export function renderPortalUnit(settings: PortalUnitSettings): RenderedFile {
       // shares the DB with the root worker (kobox-portal group); 0007 keeps
       // new SQLite WAL/-shm files group-writable
       'UMask=0007',
+      // defense-in-depth for a process whose whole design is zero-privilege
+      // (PrivateTmp is deliberately omitted: it would hide a /tmp-based DB in
+      // tests, and the portal keeps no secrets in /tmp)
+      'NoNewPrivileges=yes',
       'SyslogIdentifier=kobox-portal',
       'Restart=on-failure',
       'RestartSec=2',
@@ -278,6 +282,13 @@ export function renderNginxVhost(settings: NginxVhostSettings): RenderedFile {
       '    location = /internal/auth/rpc {',
       '        internal;',
       `        proxy_pass ${portal}/internal/auth/rpc;`,
+      '        proxy_pass_request_body off;',
+      '        proxy_set_header Content-Length "";',
+      '        proxy_set_header X-Original-URI $request_uri;',
+      '    }',
+      '    location = /internal/auth/admin {',
+      '        internal;',
+      `        proxy_pass ${portal}/internal/auth/admin;`,
       '        proxy_pass_request_body off;',
       '        proxy_set_header Content-Length "";',
       '        proxy_set_header X-Original-URI $request_uri;',

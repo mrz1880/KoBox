@@ -99,6 +99,19 @@ describe('self password change', () => {
     expect(response.statusCode).toBe(403);
     expect(world.queue.jobs).toHaveLength(0);
   });
+
+  it('should_reject_a_too_short_current_password_gracefully_not_500', async () => {
+    const response = await world.server.inject({
+      method: 'POST',
+      url: '/password',
+      headers: { cookie: user.cookie, 'content-type': 'application/x-www-form-urlencoded' },
+      payload: form({ _csrf: user.csrf, current: 'short', next: 'a-fresh-password' }),
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.body).toContain('current password');
+    expect(world.queue.jobs).toHaveLength(0);
+  });
 });
 
 describe('my access', () => {
