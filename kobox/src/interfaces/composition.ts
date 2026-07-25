@@ -327,6 +327,7 @@ export interface Container {
   readonly hasher: OpensslPasswordHasher;
   readonly repo: SqliteUserRepository;
   readonly trackerRepo: SqliteTrackerRepository;
+  readonly blocklistRepo: SqliteBlocklistRepository;
   readonly healthProbe: ProcessSocketHealthProbe;
   readonly spoolSweeper: TorrentEventSpoolSweeper;
   readonly fairUseRepo: SqliteFairUseRepository;
@@ -392,6 +393,7 @@ export function buildContainer(name: string): Container {
     tolerateAbsent: ['dnscrypt-proxy'],
   });
   const trackerRepo = new SqliteTrackerRepository(db);
+  const blocklistRepo = new SqliteBlocklistRepository(db);
   const addressRepo = new SqliteUserAddressRepository(db);
   const ipset = new IpsetAdapter(runner);
   const healthProbe = new ProcessSocketHealthProbe(runner);
@@ -400,7 +402,7 @@ export function buildContainer(name: string): Container {
   const vpnPki = new EasyRsaPkiAdapter(runner, process.env.KOBOX_VPN_PKI ?? DEFAULT_PKI_DIR);
   const trackerUseCases = buildTrackerUseCases({
     trackers: trackerRepo,
-    blocklists: new SqliteBlocklistRepository(db),
+    blocklists: blocklistRepo,
     addresses: addressRepo,
     users: repo,
     instances: new SqliteTorrentInstanceRepository(db),
@@ -470,6 +472,7 @@ export function buildContainer(name: string): Container {
     hasher: new OpensslPasswordHasher(runner),
     repo,
     trackerRepo,
+    blocklistRepo,
     healthProbe,
     spoolSweeper: new TorrentEventSpoolSweeper(
       spoolDir(),

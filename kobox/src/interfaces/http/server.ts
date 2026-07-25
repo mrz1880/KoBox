@@ -8,10 +8,12 @@ import type { Login } from '../../application/portal/Login.js';
 import type { Logout } from '../../application/portal/Logout.js';
 import { Password } from '../../domain/user/Password.js';
 import { USERNAME_PATTERN, Username } from '../../domain/user/Username.js';
+import type { BlocklistRepository, TrackerRepository } from '../../domain/tracker/ports.js';
 import type { PasswordHasherPort, UserRepository } from '../../domain/user/ports.js';
 import type { Logger } from '../../infrastructure/logging/logger.js';
 import { buildGuards, viewerOf, SESSION_COOKIE } from './guards.js';
 import { html } from './html.js';
+import { registerAdminTrackerRoutes } from './routes/adminTrackers.js';
 import { registerAdminUserRoutes } from './routes/adminUsers.js';
 import { page } from './views/layout.js';
 import { loginPage } from './views/loginPage.js';
@@ -26,6 +28,8 @@ export interface PortalServerDeps {
   readonly users: UserRepository;
   readonly queue: JobQueuePort;
   readonly hasher: PasswordHasherPort;
+  readonly trackers: TrackerRepository;
+  readonly blocklists: BlocklistRepository;
   readonly logger?: Logger;
 }
 
@@ -157,6 +161,7 @@ export function buildPortalServer(deps: PortalServerDeps): FastifyInstance {
   });
 
   registerAdminUserRoutes(server, deps, guards);
+  registerAdminTrackerRoutes(server, deps, guards);
 
   return server;
 }

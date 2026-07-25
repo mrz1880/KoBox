@@ -14,6 +14,8 @@ import { InMemoryUserRepository } from '../../../src/infrastructure/persistence/
 import { FakeSessionTokens } from '../../../src/infrastructure/system/fakes/FakeSessionTokens.js';
 import { buildPortalServer } from '../../../src/interfaces/http/server.js';
 import { UserBuilder } from '../../builders/UserBuilder.js';
+import { InMemoryBlocklistRepository } from '../../../src/infrastructure/persistence/InMemoryBlocklistRepository.js';
+import { InMemoryTrackerRepository } from '../../../src/infrastructure/persistence/InMemoryTrackerRepository.js';
 import { RecordingQueue } from './portalWorld.js';
 
 const NOW = '2026-07-25 10:00:00';
@@ -56,6 +58,8 @@ beforeEach(async () => {
     users,
     queue: new RecordingQueue(),
     hasher,
+    trackers: new InMemoryTrackerRepository(),
+    blocklists: new InMemoryBlocklistRepository(),
   });
   world = { server, users, credentials, sessions };
   await users.save(new UserBuilder().build());
