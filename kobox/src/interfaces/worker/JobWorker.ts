@@ -22,6 +22,7 @@ interface ChainHints {
   readonly blocklistsUpdated?: boolean;
   readonly firewallDirty?: boolean;
   readonly fail2banDirty?: boolean;
+  readonly openVpnDirty?: boolean;
 }
 
 function nowStamp(): string {
@@ -75,10 +76,15 @@ export class JobWorker {
   private async chainAfter(job: Job, hints: ChainHints | undefined): Promise<void> {
     if (job.type === 'create-user') {
       await this.queue.enqueue(parseJob('provision-rtorrent', { username: job.payload.username }));
+      // Phase 3 debt #2: client cert issuance rides the same seam
+      await this.queue.enqueue(parseJob('provision-vpn-user', { username: job.payload.username }));
     }
     if (job.type === 'delete-user') {
       await this.queue.enqueue(
         parseJob('deprovision-rtorrent', { username: job.payload.username }),
+      );
+      await this.queue.enqueue(
+        parseJob('deprovision-vpn-user', { username: job.payload.username }),
       );
     }
     // legacy parity: a fresh instance gets its blocklist filter immediately,
@@ -107,6 +113,9 @@ export class JobWorker {
     }
     if (hints?.fail2banDirty === true) {
       await this.queue.enqueue(parseJob('render-fail2ban', {}));
+    }
+    if (hints?.openVpnDirty === true) {
+      await this.queue.enqueue(parseJob('render-openvpn', {}));
     }
   }
 
@@ -257,6 +266,14 @@ export class JobWorker {
       case 'render-openvpn':
         await this.security.renderOpenVpn.execute();
         return;
+      case 'provision-vpn-user':
+        return await this.security.provisionVpnUser.execute({
+          username: Username.parse(job.payload.username),
+        });
+      case 'deprovision-vpn-user':
+        return await this.security.deprovisionVpnUser.execute({
+          username: Username.parse(job.payload.username),
+        });
       case 'evaluate-fair-use':
         await this.security.evaluateFairUse.execute({ now: nowStamp() });
         return;

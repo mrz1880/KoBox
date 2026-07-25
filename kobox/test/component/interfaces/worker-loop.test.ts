@@ -38,6 +38,7 @@ import { FakeWatchDirs } from '../../../src/infrastructure/system/fakes/FakeWatc
 import { loadRtorrentTemplates } from '../../../src/infrastructure/templates/TemplateProvider.js';
 import { Bandwidth } from '../../../src/domain/security/Bandwidth.js';
 import { Cidr } from '../../../src/domain/security/Cidr.js';
+import { DynDnsHost } from '../../../src/domain/security/DynDnsHost.js';
 import { FairUsePolicy } from '../../../src/domain/security/FairUsePolicy.js';
 import { InMemoryFairUseRepository } from '../../../src/infrastructure/persistence/InMemoryFairUseRepository.js';
 import { FakeDynDnsResolver } from '../../../src/infrastructure/system/fakes/FakeDynDnsResolver.js';
@@ -135,6 +136,7 @@ interface World {
   firewall: FakeFirewallApply;
   identity: FakeUserIdentity;
   dyndns: FakeDynDnsResolver;
+  pki: FakeVpnPki;
   worker: JobWorker;
   hasher: FakePasswordHasher;
 }
@@ -211,6 +213,7 @@ beforeEach(() => {
   const firewall = new FakeFirewallApply();
   const identity = new FakeUserIdentity();
   const dyndns = new FakeDynDnsResolver();
+  const pki = new FakeVpnPki();
   const securityUseCases = buildSecurityUseCases({
     users: repo,
     addresses,
@@ -220,7 +223,8 @@ beforeEach(() => {
     files: networkFiles,
     reload: new FakeNetworkServices(),
     resolver: dyndns,
-    pki: new FakeVpnPki(),
+    pki,
+    pkiProvision: pki,
     fairUse: new InMemoryFairUseRepository(),
     meter: new FakeUsageMeter(),
     authLog: new FakeSshAuthLog(),
@@ -239,6 +243,7 @@ beforeEach(() => {
     settings: {
       sshPort: 22,
       portalPort: 8189,
+      vpnRemote: DynDnsHost.parse('seedbox.example.org'),
       vpn: {
         tunGwPort: 8193,
         tunPort: 8194,
@@ -268,6 +273,7 @@ beforeEach(() => {
     firewall,
     identity,
     dyndns,
+    pki,
     hasher: new FakePasswordHasher(),
     worker: new JobWorker(queue, useCases, torrentUseCases, trackerUseCases, securityUseCases),
   };
@@ -336,6 +342,28 @@ describe('CLI enqueue -> root worker loop (the privilege seam)', () => {
 
     expect(await world.instances.findByUsername(alice)).toBeUndefined();
     expect(world.services.unitContentFor(alice)).toBeUndefined();
+  });
+
+  it('should_chain_vpn_material_and_openvpn_render_after_create_user', async () => {
+    // Phase 3 debt #2: a new user gets a client cert and rendered profiles
+    await enqueueCreateAlice();
+
+    await world.worker.drain();
+
+    expect(world.pki.ensuredClients).toEqual(['alice']);
+    expect(
+      world.networkFiles.contentAt('/etc/kobox/vpn-profiles/alice/kobox-tun-gw.ovpn'),
+    ).toContain('remote seedbox.example.org 8193');
+  });
+
+  it('should_remove_vpn_material_after_delete_user', async () => {
+    await enqueueCreateAlice();
+    await world.worker.drain();
+    await world.queue.enqueue(buildJob.deleteUser({ username: 'alice' }));
+
+    await world.worker.drain();
+
+    expect(await world.pki.clientMaterial(alice)).toBeUndefined();
   });
 
   it('should_execute_a_torrent_event_job_end_to_end', async () => {

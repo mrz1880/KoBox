@@ -36,7 +36,8 @@ import { DynDnsHost } from '../domain/security/DynDnsHost.js';
 import { FairUsePolicy } from '../domain/security/FairUsePolicy.js';
 import { SqliteFairUseRepository } from '../infrastructure/persistence/SqliteFairUseRepository.js';
 import { DynDnsLookupAdapter } from '../infrastructure/system/DynDnsLookupAdapter.js';
-import { FsVpnPkiAdapter, DEFAULT_PKI_DIR } from '../infrastructure/system/FsVpnPkiAdapter.js';
+import { DEFAULT_PKI_DIR } from '../infrastructure/system/FsVpnPkiAdapter.js';
+import { EasyRsaPkiAdapter } from '../infrastructure/system/EasyRsaPkiAdapter.js';
 import { IptablesUsageMeterAdapter } from '../infrastructure/system/IptablesUsageMeterAdapter.js';
 import { JournaldSshAuthAdapter } from '../infrastructure/system/JournaldSshAuthAdapter.js';
 import { TcShapingAdapter } from '../infrastructure/system/TcShapingAdapter.js';
@@ -201,6 +202,7 @@ export function buildContainer(name: string): Container {
   const healthProbe = new ProcessSocketHealthProbe(runner);
   const settings = securitySettings();
   const fairUseRepo = new SqliteFairUseRepository(db);
+  const vpnPki = new EasyRsaPkiAdapter(runner, process.env.KOBOX_VPN_PKI ?? DEFAULT_PKI_DIR);
   const trackerUseCases = buildTrackerUseCases({
     trackers: trackerRepo,
     blocklists: new SqliteBlocklistRepository(db),
@@ -230,7 +232,10 @@ export function buildContainer(name: string): Container {
     files: networkFiles,
     reload: networkServices,
     resolver: new DynDnsLookupAdapter(),
-    pki: new FsVpnPkiAdapter(process.env.KOBOX_VPN_PKI ?? DEFAULT_PKI_DIR),
+    // one adapter serves both the read side (renders) and the mutating side
+    // (client cert lifecycle chained from create/delete-user)
+    pki: vpnPki,
+    pkiProvision: vpnPki,
     fairUse: fairUseRepo,
     meter: new IptablesUsageMeterAdapter(runner),
     authLog: new JournaldSshAuthAdapter(runner),
