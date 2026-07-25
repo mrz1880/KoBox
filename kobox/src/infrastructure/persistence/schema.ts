@@ -241,3 +241,38 @@ export const jobs = sqliteTable('jobs', {
     .notNull()
     .default(sql`(datetime('now'))`),
 });
+
+// Portal login credentials (Phase 6): the same crypt sha512 hash the system
+// account gets, written by the root worker on create-user/change-password.
+// Replaces the shared nginx Basic Auth of the legacy portal (AUDIT §5.5).
+export const portalCredentials = sqliteTable('portal_credentials', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  username: text('username').notNull().unique(),
+  passwordHash: text('password_hash').notNull(),
+  role: text('role', { enum: ['admin', 'user'] })
+    .notNull()
+    .default('user'),
+  updatedAt: text('updated_at').notNull(),
+});
+
+// Server-side sessions; `id` is the sha256 of the cookie token, never the
+// token itself.
+export const portalSessions = sqliteTable(
+  'portal_sessions',
+  {
+    id: text('id').primaryKey(),
+    username: text('username').notNull(),
+    csrfToken: text('csrf_token').notNull(),
+    createdAt: text('created_at').notNull(),
+    expiresAt: text('expires_at').notNull(),
+  },
+  (table) => [index('portal_sessions_username_idx').on(table.username)],
+);
+
+// Portal login throttle state (5 failures -> timed lock); fail2ban reads the
+// journald log line, this table backs the in-app lockout.
+export const loginAttempts = sqliteTable('login_attempts', {
+  username: text('username').primaryKey(),
+  failures: integer('failures').notNull().default(0),
+  lockedUntil: text('locked_until'),
+});
