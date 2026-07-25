@@ -18,7 +18,11 @@ import { createLogger, type Logger } from '../infrastructure/logging/logger.js';
 import { ConsoleNotificationAdapter } from '../infrastructure/notifications/ConsoleNotificationAdapter.js';
 import { DiscordChannel } from '../infrastructure/notifications/DiscordChannel.js';
 import type { BackupSettings } from '../application/maintenance/RunBackup.js';
+import { UpgradeRelease } from '../application/maintenance/UpgradeRelease.js';
 import { BackupHostAdapter } from '../infrastructure/system/BackupHostAdapter.js';
+import { GitAdapter } from '../infrastructure/system/GitAdapter.js';
+import { UpgradeHostAdapter } from '../infrastructure/system/UpgradeHostAdapter.js';
+import { SqliteReleaseRepository } from '../infrastructure/persistence/SqliteReleaseRepository.js';
 import { MultiChannelNotifier } from '../infrastructure/notifications/MultiChannelNotifier.js';
 import { OutboxEmailChannel } from '../infrastructure/notifications/OutboxEmailChannel.js';
 import { SendmailTransport } from '../infrastructure/notifications/SendmailTransport.js';
@@ -267,6 +271,26 @@ export async function buildInstallation(
 
 export function spoolDir(): string {
   return process.env.KOBOX_SPOOL ?? DEFAULT_SPOOL_DIR;
+}
+
+// Upgrades run DIRECT as root (never as a job: the worker cannot restart
+// itself mid-job); they share the container's DB for the ledger and backups.
+export function buildUpgrade(c: Container): UpgradeRelease {
+  const runner = new ExecFileRunner();
+  const sourceDir = fileURLToPath(new URL('../..', import.meta.url)).replace(/\/$/, '');
+  return new UpgradeRelease({
+    git: new GitAdapter(runner),
+    releases: new SqliteReleaseRepository(c.db),
+    host: new UpgradeHostAdapter(runner),
+    backup: c.maintenanceUseCases.runBackup,
+    settings: {
+      // the source repo root: the checkout the box was bootstrapped from
+      repoDir: process.env.KOBOX_REPO_DIR ?? sourceDir.slice(0, sourceDir.lastIndexOf('/')),
+      releasesDir: process.env.KOBOX_RELEASES_DIR ?? DEFAULT_RELEASES_DIR,
+      currentLink: process.env.KOBOX_CURRENT_LINK ?? DEFAULT_CURRENT_LINK,
+      packageSubdir: 'kobox',
+    },
+  });
 }
 
 export interface Container {

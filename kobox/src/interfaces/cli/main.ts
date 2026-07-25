@@ -20,6 +20,7 @@ import { TorrentEventSpoolWriter } from '../../infrastructure/spool/TorrentEvent
 import {
   buildContainer,
   buildInstallation,
+  buildUpgrade,
   spoolDir,
   DEFAULT_DB_PATH,
   type Container,
@@ -641,6 +642,49 @@ program
       password,
     });
     process.stdout.write('postfix relay configured (sasl_passwd 0600, postmap, reload)\n');
+  });
+
+program
+  .command('migrate')
+  .description('apply pending database migrations and exit (used by kobox upgrade)')
+  .action(async () => {
+    // migrations run inside KoboxDatabase.open — reaching this line means
+    // the schema is current
+    const c = container();
+    await done(c, 'database schema is up to date');
+  });
+
+program
+  .command('upgrade')
+  .option('--to <ref>', 'git tag or commit to upgrade to (pinned, verified to exist)')
+  .option('--rollback', 'switch back to the previous release')
+  .option('--offline', 'skip git fetch (air-gapped or already-fetched repos)')
+  .description('transactional upgrade: staged worktree, build, backup, migrate, atomic switch')
+  .action(async (options: Record<string, string | boolean | undefined>) => {
+    const c = container();
+    try {
+      const upgrade = buildUpgrade(c);
+      const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
+      if (options.rollback === true) {
+        const report = await upgrade.rollback({ now });
+        process.stdout.write(`rolled back to ${report.to} (${report.path})\n`);
+        return;
+      }
+      const to = typeof options.to === 'string' ? options.to : '';
+      if (to === '') {
+        throw new Error('kobox upgrade requires --to <ref> (or --rollback)');
+      }
+      const report = await upgrade.execute({
+        to,
+        now,
+        ...(options.offline === true && { offline: true }),
+      });
+      process.stdout.write(
+        `upgraded ${report.from ?? '(unrecorded)'} -> ${report.to} (${report.sha})\nDB backup: ${report.backupDir}\n`,
+      );
+    } finally {
+      c.db.close();
+    }
   });
 
 program
