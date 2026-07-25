@@ -14,6 +14,10 @@ export type VpnVariant = (typeof VPN_VARIANTS)[number];
 // per-user subtree (the .ovpn embeds the private key).
 export const VPN_PROFILES_BASE = '/etc/kobox/vpn-profiles';
 
+// The non-root system group the portal process runs under; it owns the
+// rendered .ovpn profiles so the portal can stream them (Phase 6).
+export const PORTAL_GROUP = 'kobox-portal';
+
 // EC PKI (easy-rsa EASYRSA_ALGO=ec): no dh.pem exists anywhere — the server
 // runs `dh none` and OpenVPN negotiates ECDHE.
 export interface VpnServerPaths {
@@ -136,6 +140,8 @@ export function renderOpenVpnClientProfile(
     ].join('\n'),
     mode: '0640',
     owner: 'root',
-    group: username.value,
+    // the portal (kobox-portal group) streams these on /access/ovpn; the
+    // chrooted user never reaches the filesystem path directly (Phase 6)
+    group: PORTAL_GROUP,
   };
 }

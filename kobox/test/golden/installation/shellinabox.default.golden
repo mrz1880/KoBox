@@ -1,0 +1,4 @@
+# KoBox-managed — DO NOT EDIT (rendered declaratively).
+SHELLINABOX_DAEMON_START=1
+SHELLINABOX_PORT=4200
+SHELLINABOX_ARGS="--no-beep --localhost-only --disable-ssl --service=/:LOGIN --bind=127.0.0.1"

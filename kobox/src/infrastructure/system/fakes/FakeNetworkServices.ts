@@ -16,6 +16,14 @@ export class FakeNetworkServices implements NetworkServicePort {
     return this.record('dns');
   }
 
+  reloadNginx(): Promise<void> {
+    return this.record('nginx');
+  }
+
+  reloadNfsExports(): Promise<void> {
+    return this.record('nfs');
+  }
+
   private record(name: string): Promise<void> {
     if (this.failure) {
       return Promise.reject(this.failure);

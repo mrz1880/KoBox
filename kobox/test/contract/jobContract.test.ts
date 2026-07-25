@@ -41,7 +41,55 @@ describe('job contract', () => {
       'send-mails',
       'run-backup',
       'apply-ipset',
+      'set-fair-use-override',
+      'render-rutorrent-users',
+      'render-nfs-exports',
     ]);
+  });
+
+  it('should_default_create_user_role_to_user_and_accept_admin', () => {
+    const payload = {
+      username: 'alice',
+      email: 'alice@example.org',
+      accountType: 'normal',
+      quotaBytes: 1,
+      proxyPort: 8080,
+      passwordHash: HASH,
+    };
+
+    const plain = parseJob('create-user', payload);
+    const admin = parseJob('create-user', { ...payload, role: 'admin' });
+
+    if (plain.type === 'create-user' && admin.type === 'create-user') {
+      expect(plain.payload.role).toBe('user');
+      expect(admin.payload.role).toBe('admin');
+    }
+    expect(() => parseJob('create-user', { ...payload, role: 'superuser' })).toThrow();
+  });
+
+  it('should_parse_fair_use_override_jobs_with_nullable_clears', () => {
+    const set = parseJob('set-fair-use-override', {
+      username: 'alice',
+      egressLimitBps: 10_000_000,
+      throttleToBps: null,
+    });
+
+    expect(set.type).toBe('set-fair-use-override');
+    if (set.type === 'set-fair-use-override') {
+      expect(set.payload.egressLimitBps).toBe(10_000_000);
+      expect(set.payload.throttleToBps).toBeNull();
+      expect(set.payload.authRatePerHour).toBeUndefined();
+    }
+    expect(() =>
+      parseJob('set-fair-use-override', { username: 'alice', egressLimitBps: -1 }),
+    ).toThrow();
+    expect(() => parseJob('set-fair-use-override', { username: 'alice', extra: 1 })).toThrow();
+  });
+
+  it('should_parse_portal_phase_render_jobs', () => {
+    expect(parseJob('render-rutorrent-users', {}).type).toBe('render-rutorrent-users');
+    expect(parseJob('render-nfs-exports', {}).type).toBe('render-nfs-exports');
+    expect(() => parseJob('render-rutorrent-users', { extra: 1 })).toThrow();
   });
 
   it('should_parse_maintenance_jobs', () => {

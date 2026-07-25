@@ -15,6 +15,8 @@ import { ProxyPort, RtorrentPort, ScgiPort } from '../../../../src/domain/user/P
 import type { PortAllocatorPort } from '../../../../src/domain/user/PortAllocatorPort.js';
 import { Quota } from '../../../../src/domain/user/Quota.js';
 import { Username } from '../../../../src/domain/user/Username.js';
+import { InMemoryPortalCredentialsRepository } from '../../../../src/infrastructure/persistence/InMemoryPortalCredentialsRepository.js';
+import { InMemoryPortalSessionRepository } from '../../../../src/infrastructure/persistence/InMemoryPortalSessionRepository.js';
 import { InMemoryUserRepository } from '../../../../src/infrastructure/persistence/InMemoryUserRepository.js';
 import { FakeNotifications } from '../../../../src/infrastructure/system/fakes/FakeNotifications.js';
 import { FakeQuota } from '../../../../src/infrastructure/system/fakes/FakeQuota.js';
@@ -58,6 +60,7 @@ function createUserCommand() {
     quota: Quota.gib(412),
     proxyPort: ProxyPort.parse(8080),
     passwordHash: aHash,
+    role: 'user' as const,
   };
 }
 
@@ -68,6 +71,8 @@ interface World {
   sftp: FakeSftp;
   services: FakeServiceControl;
   notifications: FakeNotifications;
+  credentials: InMemoryPortalCredentialsRepository;
+  sessions: InMemoryPortalSessionRepository;
   createUser: CreateUser;
   deleteUser: DeleteUser;
   changePassword: ChangePassword;
@@ -84,8 +89,11 @@ beforeEach(() => {
   const sftp = new FakeSftp();
   const services = new FakeServiceControl();
   const notifications = new FakeNotifications();
+  const credentials = new InMemoryPortalCredentialsRepository();
+  const sessions = new InMemoryPortalSessionRepository();
   const allocator = new SequentialPortAllocator();
-  const deps = { repo, accounts, quota, sftp, services, notifications };
+  const clock = (): string => '2026-07-25 10:00:00';
+  const deps = { repo, accounts, quota, sftp, services, notifications, credentials, sessions, clock };
   world = {
     ...deps,
     createUser: new CreateUser({ ...deps, allocator }),
@@ -131,6 +139,22 @@ describe('CreateUser', () => {
     );
   });
 
+  it('should_store_portal_credentials_with_the_requested_role', async () => {
+    await world.createUser.execute({ ...createUserCommand(), role: 'admin' });
+
+    const credentials = await world.credentials.find(alice);
+    expect(credentials?.passwordHash.value).toBe(aHash.value);
+    expect(credentials?.role).toBe('admin');
+  });
+
+  it('should_not_leave_portal_credentials_behind_after_a_compensated_failure', async () => {
+    world.quota.failNextSetQuota('quota tooling exploded');
+
+    await expect(world.createUser.execute(createUserCommand())).rejects.toThrow(/exploded/);
+
+    expect(await world.credentials.find(alice)).toBeUndefined();
+  });
+
   it('should_allocate_distinct_ports_for_successive_users', async () => {
     const first = await world.createUser.execute(createUserCommand());
     const second = await world.createUser.execute({
@@ -160,6 +184,22 @@ describe('DeleteUser', () => {
     });
   });
 
+  it('should_remove_portal_credentials_and_sessions', async () => {
+    await world.createUser.execute(createUserCommand());
+    await world.sessions.create({
+      id: 'a'.repeat(64),
+      username: alice,
+      csrfToken: 'b'.repeat(64),
+      createdAt: '2026-07-25 10:00:00',
+      expiresAt: '2026-08-01 10:00:00',
+    });
+
+    await world.deleteUser.execute({ username: alice });
+
+    expect(await world.credentials.find(alice)).toBeUndefined();
+    expect(await world.sessions.find('a'.repeat(64))).toBeUndefined();
+  });
+
   it('should_reject_deleting_an_unknown_user', async () => {
     await expect(world.deleteUser.execute({ username: alice })).rejects.toThrow(UserNotFoundError);
   });
@@ -175,6 +215,41 @@ describe('ChangePassword', () => {
       type: 'PasswordChanged',
       username: 'alice',
     });
+  });
+
+  it('should_update_the_portal_credential_hash_preserving_the_role', async () => {
+    await world.createUser.execute({ ...createUserCommand(), role: 'admin' });
+    const newHash = HashedPassword.parse('$6$newsalt00$abcdefghijklmnopqrstuvwxyz012345');
+
+    await world.changePassword.execute({ username: alice, passwordHash: newHash });
+
+    const credentials = await world.credentials.find(alice);
+    expect(credentials?.passwordHash.value).toBe(newHash.value);
+    expect(credentials?.role).toBe('admin');
+  });
+
+  it('should_revoke_live_sessions_so_a_stolen_cookie_dies_with_the_password', async () => {
+    await world.createUser.execute(createUserCommand());
+    await world.sessions.create({
+      id: 'a'.repeat(64),
+      username: alice,
+      csrfToken: 'b'.repeat(64),
+      createdAt: '2026-07-25 10:00:00',
+      expiresAt: '2026-08-01 10:00:00',
+    });
+
+    await world.changePassword.execute({ username: alice, passwordHash: aHash });
+
+    expect(await world.sessions.find('a'.repeat(64))).toBeUndefined();
+  });
+
+  it('should_create_portal_credentials_for_a_user_predating_the_portal', async () => {
+    await world.createUser.execute(createUserCommand());
+    await world.credentials.delete(alice); // simulate a pre-Phase-6 row
+
+    await world.changePassword.execute({ username: alice, passwordHash: aHash });
+
+    expect((await world.credentials.find(alice))?.role).toBe('user');
   });
 
   it('should_reject_unknown_users', async () => {
@@ -228,6 +303,21 @@ describe('SuspendUser / ResumeUser', () => {
       type: 'UserResumed',
       username: 'alice',
     });
+  });
+
+  it('should_kill_live_portal_sessions_on_suspend', async () => {
+    await world.createUser.execute(createUserCommand());
+    await world.sessions.create({
+      id: 'a'.repeat(64),
+      username: alice,
+      csrfToken: 'b'.repeat(64),
+      createdAt: '2026-07-25 10:00:00',
+      expiresAt: '2026-08-01 10:00:00',
+    });
+
+    await world.suspendUser.execute({ username: alice });
+
+    expect(await world.sessions.find('a'.repeat(64))).toBeUndefined();
   });
 
   it('should_reject_suspending_an_unknown_user', async () => {

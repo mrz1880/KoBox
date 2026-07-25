@@ -5,7 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { Bandwidth } from '../../../src/domain/security/Bandwidth.js';
 import { Cidr } from '../../../src/domain/security/Cidr.js';
 import { FirewallPolicy } from '../../../src/domain/security/FirewallPolicy.js';
-import { renderFail2banJails, renderFirewallRules, renderPublickeyFloodFilter } from '../../../src/domain/security/rendering.js';
+import { renderFail2banJails, renderFirewallRules, renderPortalLoginFilter, renderPublickeyFloodFilter } from '../../../src/domain/security/rendering.js';
 import type { HealthCheckResult, HealthProbePort } from '../../../src/domain/user/ports.js';
 import { Username } from '../../../src/domain/user/Username.js';
 import { ExecFileRunner } from '../../../src/infrastructure/system/CommandRunner.js';
@@ -148,7 +148,14 @@ describe.skipIf(!inContainerAsRoot)('security adapters against the real containe
     mkdirSync('/var/log/nginx', { recursive: true });
     writeFileSync('/var/log/nginx/error.log', '');
     const files = new RtorrentConfigAdapter(runner);
-    await files.apply([renderFail2banJails([], 22), renderPublickeyFloodFilter()]);
+    // render the whole set the jail file references (jail + both filters):
+    // the [kobox-portal] jail points at kobox-portal.conf, so -t rejects the
+    // config if it is missing
+    await files.apply([
+      renderFail2banJails([], 22),
+      renderPublickeyFloodFilter(),
+      renderPortalLoginFilter(),
+    ]);
 
     // exit 0 = full configuration (including the publickey-flood jail) parses
     execFileSync('fail2ban-client', ['-t'], { stdio: 'ignore' });

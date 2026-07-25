@@ -36,6 +36,9 @@ import type { NotificationPort } from '../domain/user/ports.js';
 import { KoboxDatabase } from '../infrastructure/persistence/db.js';
 import { SqliteBlocklistRepository } from '../infrastructure/persistence/SqliteBlocklistRepository.js';
 import { SqliteJobQueue } from '../infrastructure/persistence/SqliteJobQueue.js';
+import { SqliteLoginAttemptsRepository } from '../infrastructure/persistence/SqliteLoginAttemptsRepository.js';
+import { SqlitePortalCredentialsRepository } from '../infrastructure/persistence/SqlitePortalCredentialsRepository.js';
+import { SqlitePortalSessionRepository } from '../infrastructure/persistence/SqlitePortalSessionRepository.js';
 import { SqlitePortAllocator } from '../infrastructure/persistence/SqlitePortAllocator.js';
 import { SqliteTorrentInstanceRepository } from '../infrastructure/persistence/SqliteTorrentInstanceRepository.js';
 import { SqliteTorrentRepository } from '../infrastructure/persistence/SqliteTorrentRepository.js';
@@ -324,10 +327,17 @@ export interface Container {
   readonly hasher: OpensslPasswordHasher;
   readonly repo: SqliteUserRepository;
   readonly trackerRepo: SqliteTrackerRepository;
+  readonly blocklistRepo: SqliteBlocklistRepository;
+  readonly addressRepo: SqliteUserAddressRepository;
   readonly healthProbe: ProcessSocketHealthProbe;
   readonly spoolSweeper: TorrentEventSpoolSweeper;
   readonly fairUseRepo: SqliteFairUseRepository;
   readonly usageMeter: IptablesUsageMeterAdapter;
+  readonly credentials: SqlitePortalCredentialsRepository;
+  readonly sessions: SqlitePortalSessionRepository;
+  readonly loginAttempts: SqliteLoginAttemptsRepository;
+  readonly componentRegistry: SqliteComponentRegistry;
+  readonly releaseRepo: SqliteReleaseRepository;
 }
 
 export function buildContainer(name: string): Container {
@@ -345,6 +355,9 @@ export function buildContainer(name: string): Container {
   const services = new SystemdServiceControlAdapter(runner);
   const outbox = new SqliteMailOutbox(db);
   const notifications = buildNotifier(logger, outbox);
+  const credentials = new SqlitePortalCredentialsRepository(db);
+  const sessions = new SqlitePortalSessionRepository(db);
+  const loginAttempts = new SqliteLoginAttemptsRepository(db);
   const useCases = buildUseCases({
     repo,
     accounts: new SystemAccountAdapter(runner),
@@ -353,8 +366,18 @@ export function buildContainer(name: string): Container {
     services,
     notifications,
     allocator: new SqlitePortAllocator(db),
+    credentials,
+    sessions,
+    clock: nowStamp,
   });
   const queue = new SqliteJobQueue(db);
+  const networkServices = new NetworkServiceAdapter(runner, logger, {
+    // post-install contract: absent units are breakage, except components
+    // kobox install honestly skips (dnscrypt-proxy is not packaged for
+    // Debian 12)
+    strict: process.env.KOBOX_STRICT_SERVICES === '1',
+    tolerateAbsent: ['dnscrypt-proxy'],
+  });
   const torrentUseCases = buildTorrentUseCases({
     users: repo,
     instances: new SqliteTorrentInstanceRepository(db),
@@ -368,18 +391,13 @@ export function buildContainer(name: string): Container {
     announcers: new EnqueueAnnouncerSink(queue),
     templates: loadRtorrentTemplates(),
     settings: { koboxBin: process.env.KOBOX_BIN ?? DEFAULT_KOBOX_BIN },
+    nginx: networkServices,
   });
   const iblocklistUser = process.env.KOBOX_IBLOCKLIST_USER;
   const iblocklistPin = process.env.KOBOX_IBLOCKLIST_PIN;
   const networkFiles = new RtorrentConfigAdapter(runner);
-  const networkServices = new NetworkServiceAdapter(runner, logger, {
-    // post-install contract: absent units are breakage, except components
-    // kobox install honestly skips (dnscrypt-proxy is not packaged for
-    // Debian 12)
-    strict: process.env.KOBOX_STRICT_SERVICES === '1',
-    tolerateAbsent: ['dnscrypt-proxy'],
-  });
   const trackerRepo = new SqliteTrackerRepository(db);
+  const blocklistRepo = new SqliteBlocklistRepository(db);
   const addressRepo = new SqliteUserAddressRepository(db);
   const ipset = new IpsetAdapter(runner);
   const healthProbe = new ProcessSocketHealthProbe(runner);
@@ -388,7 +406,7 @@ export function buildContainer(name: string): Container {
   const vpnPki = new EasyRsaPkiAdapter(runner, process.env.KOBOX_VPN_PKI ?? DEFAULT_PKI_DIR);
   const trackerUseCases = buildTrackerUseCases({
     trackers: trackerRepo,
-    blocklists: new SqliteBlocklistRepository(db),
+    blocklists: blocklistRepo,
     addresses: addressRepo,
     users: repo,
     instances: new SqliteTorrentInstanceRepository(db),
@@ -453,10 +471,13 @@ export function buildContainer(name: string): Container {
       trackerUseCases,
       securityUseCases,
       maintenanceUseCases,
+      outbox,
     ),
     hasher: new OpensslPasswordHasher(runner),
     repo,
     trackerRepo,
+    blocklistRepo,
+    addressRepo,
     healthProbe,
     spoolSweeper: new TorrentEventSpoolSweeper(
       spoolDir(),
@@ -464,5 +485,10 @@ export function buildContainer(name: string): Container {
     ),
     fairUseRepo,
     usageMeter: new IptablesUsageMeterAdapter(runner),
+    credentials,
+    sessions,
+    loginAttempts,
+    componentRegistry: new SqliteComponentRegistry(db),
+    releaseRepo: new SqliteReleaseRepository(db),
   };
 }

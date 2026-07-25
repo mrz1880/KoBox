@@ -18,7 +18,10 @@ import {
   renderDnscryptConfig,
   renderFirewallBootUnit,
   renderNginxVhost,
+  renderPortalUnit,
   renderRutorrentConfig,
+  renderShellinaboxDefault,
+  renderSmbConf,
   renderSshdDropin,
   renderSysctlTweaks,
   renderWorkerEnv,
@@ -28,7 +31,7 @@ import {
 import { renderCronFile } from '../../domain/maintenance/rendering.js';
 import type { IpsetPort } from '../../domain/tracker/ports.js';
 import type { VpnPkiPort, VpnPkiProvisionPort } from '../../domain/security/ports.js';
-import { VPN_VARIANTS, renderOpenVpnServer } from '../../domain/security/vpn.js';
+import { PORTAL_GROUP, VPN_VARIANTS, renderOpenVpnServer } from '../../domain/security/vpn.js';
 import type { ManagedFilesPort, RenderedFile } from '../../domain/shared/files.js';
 import type { SecuritySettings } from '../security/settings.js';
 
@@ -162,8 +165,14 @@ class KoboxCoreInstaller implements ComponentInstaller {
 
   async install(): Promise<InstallOutcome> {
     const { host, files, systemd, install } = this.ctx;
+    // the non-root identity the SSR portal runs under (Phase 6)
+    await host.ensureServiceAccount(PORTAL_GROUP);
     await host.ensureDir('/etc/kobox', '0755');
-    await host.ensureDir('/var/lib/kobox', '0700');
+    // the DB is shared: the root worker writes, the portal (kobox-portal group)
+    // reads and writes sessions/credentials. 2770 + setgid keeps new WAL/-shm
+    // files group-owned so both processes can open them.
+    await host.ensureDir('/var/lib/kobox', '2770');
+    await host.setOwnership('/var/lib/kobox', 'root', PORTAL_GROUP, '2770');
     await host.ensureDir('/var/spool/kobox/events', '1733');
     // first install: current -> the tree the installer runs from; upgrades
     // own the link afterwards (ensureSymlink never overwrites an existing one)
@@ -300,15 +309,11 @@ class NginxInstaller implements ComponentInstaller {
     // challenge (server_name _ never matches a Host) and Let's Encrypt can
     // never validate — remove it; sites-available/default stays untouched
     await host.removeFile('/etc/nginx/sites-enabled/default');
-    // deny-by-default: an EMPTY htpasswd rejects everyone until the portal
-    // phase wires real accounts; an existing file is never overwritten
-    await host.ensureFile({
-      path: HTPASSWD,
-      content: '',
-      mode: '0640',
-      owner: 'root',
-      group: 'www-data',
-    });
+    // Phase 6: the shared Basic Auth is retired — the vhost authenticates via
+    // the portal now. Drop any leftover htpasswd and hold the include dir the
+    // per-user /RPC-<USER> mounts land in.
+    await host.removeFile(HTPASSWD);
+    await host.ensureDir('/etc/nginx/kobox.d', '0755');
     const changed = await guardedApply(
       this.ctx,
       this.name,
@@ -594,6 +599,36 @@ class Fail2banInstaller implements ComponentInstaller {
     await this.ctx.systemd.disable('fail2ban', { now: true });
     await this.ctx.host.removeFile('/etc/fail2ban/jail.d/kobox.local');
     await this.ctx.host.removeFile('/etc/fail2ban/filter.d/kobox-publickey-flood.conf');
+    await this.ctx.host.removeFile('/etc/fail2ban/filter.d/kobox-portal.conf');
+  }
+}
+
+// The SSR portal service (Phase 6): renders and enables kobox-portal.service.
+// The kobox-portal account and DB group perms are set by kobox-core; nginx
+// proxies this unit and gates /ru + /RPC-* against its session.
+class PortalInstaller implements ComponentInstaller {
+  readonly name = 'portal';
+
+  constructor(private readonly ctx: InstallerContext) {}
+
+  async install(): Promise<InstallOutcome> {
+    const { files, systemd, install } = this.ctx;
+    await files.apply([
+      renderPortalUnit({
+        nodeBin: install.nodeBin,
+        portalMain: `${install.currentLink}/dist/interfaces/http/main.js`,
+      }),
+    ]);
+    await systemd.daemonReload();
+    await systemd.enable('kobox-portal', { now: true });
+    return installed();
+  }
+
+  async uninstall(): Promise<void> {
+    const { host, systemd } = this.ctx;
+    await systemd.disable('kobox-portal', { now: true });
+    await host.removeFile('/etc/systemd/system/kobox-portal.service');
+    await systemd.daemonReload();
   }
 }
 
@@ -666,6 +701,75 @@ class PostfixInstaller implements ComponentInstaller {
   }
 }
 
+// NFS (KEEP from prod: active): the per-user home exports arrive via the
+// chained render-nfs-exports job; here we just install the server and enable it.
+class NfsInstaller implements ComponentInstaller {
+  readonly name = 'nfs';
+
+  constructor(private readonly ctx: InstallerContext) {}
+
+  async install(): Promise<InstallOutcome> {
+    const { packages, host, systemd } = this.ctx;
+    await packages.ensureInstalled(['nfs-kernel-server']);
+    await host.ensureDir('/etc/exports.d', '0755');
+    await systemd.enable('nfs-server', { now: true });
+    return installed(await packages.installedVersion('nfs-kernel-server'));
+  }
+
+  async uninstall(): Promise<void> {
+    await this.ctx.systemd.disable('nfs-server', { now: true });
+    await this.ctx.host.removeFile('/etc/exports.d/kobox.exports');
+  }
+}
+
+// Samba (KEEP from prod): user-level [homes] shares. Passwords are set
+// out-of-band via `kobox set-samba-password` — never through the DB or a job.
+class SambaInstaller implements ComponentInstaller {
+  readonly name = 'samba';
+
+  constructor(private readonly ctx: InstallerContext) {}
+
+  async install(): Promise<InstallOutcome> {
+    const { packages, systemd, checks } = this.ctx;
+    await packages.ensureInstalled(['samba']);
+    const changed = await guardedApply(this.ctx, this.name, [renderSmbConf()], () => checks.samba());
+    await systemd.enable('smbd', { now: true });
+    if (changed.length > 0) {
+      await systemd.reloadOrRestart('smbd');
+    }
+    return installed(await packages.installedVersion('samba'));
+  }
+
+  async uninstall(): Promise<void> {
+    await this.ctx.systemd.disable('smbd', { now: true });
+    await this.ctx.host.removeFile('/etc/samba/smb.conf');
+  }
+}
+
+// ShellInABox hardened to localhost (Phase 5 debt): reachable only through the
+// portal's admin-gated /shell proxy.
+class ShellinaboxInstaller implements ComponentInstaller {
+  readonly name = 'shellinabox';
+
+  constructor(private readonly ctx: InstallerContext) {}
+
+  async install(): Promise<InstallOutcome> {
+    const { packages, files, systemd } = this.ctx;
+    await packages.ensureInstalled(['shellinabox']);
+    const changed = await files.apply([renderShellinaboxDefault()]);
+    await systemd.enable('shellinabox', { now: true });
+    if (changed.length > 0) {
+      await systemd.reloadOrRestart('shellinabox');
+    }
+    return installed(await packages.installedVersion('shellinabox'));
+  }
+
+  async uninstall(): Promise<void> {
+    await this.ctx.systemd.disable('shellinabox', { now: true });
+    await this.ctx.host.removeFile('/etc/default/shellinabox');
+  }
+}
+
 export function buildInstallers(ctx: InstallerContext): ReadonlyMap<string, ComponentInstaller> {
   const list: readonly ComponentInstaller[] = [
     new KoboxCoreInstaller(ctx),
@@ -684,6 +788,10 @@ export function buildInstallers(ctx: InstallerContext): ReadonlyMap<string, Comp
     new Fail2banInstaller(ctx),
     new OpenVpnInstaller(ctx),
     new PostfixInstaller(ctx),
+    new PortalInstaller(ctx),
+    new NfsInstaller(ctx),
+    new SambaInstaller(ctx),
+    new ShellinaboxInstaller(ctx),
   ];
   return new Map(list.map((entry) => [entry.name, entry]));
 }

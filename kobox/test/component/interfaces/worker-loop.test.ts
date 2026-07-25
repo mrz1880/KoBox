@@ -19,6 +19,8 @@ import { InMemoryTorrentInstanceRepository } from '../../../src/infrastructure/p
 import { InMemoryTorrentRepository } from '../../../src/infrastructure/persistence/InMemoryTorrentRepository.js';
 import { InMemoryTrackerRepository } from '../../../src/infrastructure/persistence/InMemoryTrackerRepository.js';
 import { InMemoryUserAddressRepository } from '../../../src/infrastructure/persistence/InMemoryUserAddressRepository.js';
+import { InMemoryPortalCredentialsRepository } from '../../../src/infrastructure/persistence/InMemoryPortalCredentialsRepository.js';
+import { InMemoryPortalSessionRepository } from '../../../src/infrastructure/persistence/InMemoryPortalSessionRepository.js';
 import { InMemoryUserRepository } from '../../../src/infrastructure/persistence/InMemoryUserRepository.js';
 import { FakeBlocklistCache } from '../../../src/infrastructure/system/fakes/FakeBlocklistCache.js';
 import { FakeBlocklistDownload } from '../../../src/infrastructure/system/fakes/FakeBlocklistDownload.js';
@@ -131,6 +133,10 @@ class FakePasswordHasher implements PasswordHasherPort {
       HashedPassword.parse(`$6$fakesalt$${'x'.repeat(20)}${String(password.reveal().length)}`),
     );
   }
+
+  async verify(password: Password, hash: HashedPassword): Promise<boolean> {
+    return (await this.hash(password)).value === hash.value;
+  }
 }
 
 const alice = Username.parse('alice');
@@ -149,6 +155,7 @@ interface World {
   certStore: FakeCertStore;
   download: FakeBlocklistDownload;
   networkFiles: FakeRtorrentConfig;
+  rutorrentFiles: FakeRtorrentConfig;
   blocklistCache: FakeBlocklistCache;
   firewall: FakeFirewallApply;
   identity: FakeUserIdentity;
@@ -202,6 +209,8 @@ beforeEach(() => {
   const notifications = new FakeNotifications();
   let nextScgi = 51101;
   let nextRtorrent = 45000;
+  const credentials = new InMemoryPortalCredentialsRepository();
+  const sessions = new InMemoryPortalSessionRepository();
   const useCases = buildUseCases({
     repo,
     accounts,
@@ -209,6 +218,9 @@ beforeEach(() => {
     sftp,
     services,
     notifications,
+    credentials,
+    sessions,
+    clock: () => '2026-07-25 10:00:00',
     allocator: {
       allocateScgiPort: () =>
         import('../../../src/domain/user/Port.js').then((m) => m.ScgiPort.parse(nextScgi++)),
@@ -221,11 +233,12 @@ beforeEach(() => {
   const instances = new InMemoryTorrentInstanceRepository();
   const torrents = new InMemoryTorrentRepository();
   const scripts = new FakeUserScriptRunner();
+  const rutorrentFiles = new FakeRtorrentConfig();
   const torrentUseCases = buildTorrentUseCases({
     users: repo,
     instances,
     torrents,
-    config: new FakeRtorrentConfig(),
+    config: rutorrentFiles,
     watchDirs: new FakeWatchDirs(),
     services,
     metainfo: new FakeTorrentMetainfo(),
@@ -234,6 +247,7 @@ beforeEach(() => {
     announcers: new FakeAnnouncerSink(),
     templates: loadRtorrentTemplates(),
     settings: { koboxBin: '/usr/local/bin/kobox' },
+    nginx: new FakeNetworkServices(),
   });
   const trackers = new InMemoryTrackerRepository();
   const blocklists = new InMemoryBlocklistRepository();
@@ -331,6 +345,7 @@ beforeEach(() => {
     certStore,
     download,
     networkFiles,
+    rutorrentFiles,
     blocklistCache,
     firewall,
     identity,
@@ -347,6 +362,7 @@ beforeEach(() => {
       trackerUseCases,
       securityUseCases,
       maintenanceUseCases,
+      outbox,
     ),
   };
 });
@@ -377,6 +393,18 @@ describe('CLI enqueue -> root worker loop (the privilege seam)', () => {
     expect(await world.accounts.accountExists(alice)).toBe(true);
     // provisioning is a separate chained job: not yet executed after one step
     expect(await world.services.isUserServiceRunning(alice)).toBe(false);
+  });
+
+  it('should_enqueue_a_welcome_mail_without_any_password_in_it', async () => {
+    await enqueueCreateAlice();
+
+    await world.worker.drain();
+
+    const recent = await world.outbox.listRecent(10);
+    const welcome = recent.find((mail) => mail.subject.includes('ready'));
+    expect(welcome?.recipient).toBe('alice@example.org');
+    expect(welcome?.body).toContain('alice');
+    expect(welcome?.body).not.toContain('s3cretpw');
   });
 
   it('should_chain_the_user_blocklist_filter_render_after_provisioning', async () => {
@@ -511,6 +539,28 @@ describe('security job chains (provision -> firewall)', () => {
     const content = world.firewall.applied.at(-1)?.content ?? '';
     expect(content).toContain(':kobox-u-alice - [0:0]');
     expect(content).toContain('-m owner --uid-owner 1001');
+  });
+
+  it('should_render_the_per_user_rpc_mounts_after_provisioning', async () => {
+    world.identity.setUid('alice', 1001);
+    await enqueueCreateAlice();
+
+    await world.worker.drain();
+
+    const include = world.rutorrentFiles.contentAt('/etc/nginx/kobox.d/rutorrent-users.conf');
+    expect(include).toContain('location = /RPC-ALICE');
+  });
+
+  it('should_render_nfs_exports_after_creating_a_user_with_a_trusted_address', async () => {
+    await enqueueCreateAlice();
+    await world.worker.drain();
+    await world.queue.enqueue(buildJob.addUserAddress({ username: 'alice', ipv4: '203.0.113.9' }));
+
+    await world.worker.drain();
+
+    expect(world.networkFiles.contentAt('/etc/exports.d/kobox.exports')).toContain(
+      '/home/alice 203.0.113.9(rw,sync,no_subtree_check,root_squash)',
+    );
   });
 
   it('should_reapply_the_firewall_after_deprovisioning', async () => {

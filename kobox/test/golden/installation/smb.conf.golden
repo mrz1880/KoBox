@@ -1,0 +1,17 @@
+# KoBox-managed — DO NOT EDIT (rendered declaratively).
+[global]
+    workgroup = WORKGROUP
+    server string = KoBox
+    security = user
+    map to guest = never
+    server role = standalone server
+    disable netbios = yes
+    smb ports = 445
+
+[homes]
+    comment = Home directory
+    browseable = no
+    read only = no
+    create mask = 0600
+    directory mask = 0700
+    valid users = %S

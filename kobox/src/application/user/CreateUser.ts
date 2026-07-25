@@ -1,3 +1,5 @@
+import type { Role } from '../../domain/portal/Role.js';
+import type { PortalCredentialsPort } from '../../domain/portal/ports.js';
 import type { AccountType } from '../../domain/user/AccountType.js';
 import type { EmailAddress } from '../../domain/user/EmailAddress.js';
 import type { HashedPassword } from '../../domain/user/HashedPassword.js';
@@ -22,6 +24,7 @@ export interface CreateUserCommand {
   readonly quota: Quota;
   readonly proxyPort: ProxyPort;
   readonly passwordHash: HashedPassword;
+  readonly role: Role;
 }
 
 interface Deps {
@@ -31,13 +34,16 @@ interface Deps {
   readonly sftp: SftpPort;
   readonly notifications: NotificationPort;
   readonly allocator: PortAllocatorPort;
+  readonly credentials: PortalCredentialsPort;
+  readonly clock: () => string;
 }
 
 export class CreateUser {
   constructor(private readonly deps: Deps) {}
 
   async execute(command: CreateUserCommand): Promise<SeedboxUser> {
-    const { repo, accounts, quota, sftp, notifications, allocator } = this.deps;
+    const { repo, accounts, quota, sftp, notifications, allocator, credentials, clock } =
+      this.deps;
 
     if (await repo.findByUsername(command.username)) {
       throw new UserAlreadyExistsError(command.username.value);
@@ -70,6 +76,11 @@ export class CreateUser {
       await quota.setQuota(user.username, user.quota);
       await sftp.enableChrootAccess(user.username);
       const saved = await repo.save(user);
+      // portal login mirrors the system password (same crypt hash)
+      await credentials.save(
+        { username: user.username, passwordHash: command.passwordHash, role: command.role },
+        clock(),
+      );
       await notifications.notify(event);
       return saved;
     } catch (error) {
@@ -77,6 +88,7 @@ export class CreateUser {
       if (accountCreated) {
         await accounts.deleteAccount(user.username).catch(() => undefined);
       }
+      await credentials.delete(user.username).catch(() => undefined);
       await allocator.releaseScgiPort(scgiPort).catch(() => undefined);
       await allocator.releaseRtorrentPort(rtorrentPort).catch(() => undefined);
       throw error;

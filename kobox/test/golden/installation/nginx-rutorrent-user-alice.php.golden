@@ -1,0 +1,5 @@
+<?php
+// KoBox-managed — DO NOT EDIT (rendered declaratively).
+$scgi_port = 51101;
+$scgi_host = '127.0.0.1';
+$XMLRPCMountPoint = '/RPC-ALICE';

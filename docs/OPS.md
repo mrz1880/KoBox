@@ -135,3 +135,49 @@ kobox install        # re-vendors when the sha differs from the installed marker
 
 Upgrading ruTorrent later = the same three lines with the new tag inside a
 `kobox upgrade`d release, or standalone via `kobox install`.
+
+## The portal & application auth (Phase 6)
+
+The SSR portal (`kobox-portal.service`) replaces the legacy Wolf CMS theme and
+the shared nginx Basic Auth. It runs **non-root** on `127.0.0.1:8190`; nginx
+(`:8189`, unchanged URL) reverse-proxies it and delegates `/ru`, `/RPC-<USER>`
+and `/shell` to it via `auth_request`. The portal holds no privilege — every
+mutation enqueues a typed job the root worker executes.
+
+- **Accounts & roles**: `kobox create-user <name> --admin` grants the portal
+  admin role; without `--admin` the user gets the `user` role. The credential
+  (a sha512-crypt hash, the same one the system account receives) is written by
+  the worker into `portal_credentials` on create-user / change-password, and
+  removed on delete-user. There is no separate portal password to manage.
+- **Sessions**: server-side rows (`portal_sessions`), keyed by the sha256 of an
+  opaque cookie token (`kobox_session`, HttpOnly/Secure/SameSite=Lax), 7-day
+  TTL, purged hourly. Suspending or deleting a user kills their live sessions.
+- **Lockout & fail2ban**: 5 failed logins → 15-minute in-app lock
+  (`login_attempts`); each failure logs one line to the journal under
+  `SyslogIdentifier=kobox-portal`, which the `kobox-portal` fail2ban jail bans on
+  (10 in 10 min).
+- **Shared database**: the portal reads/writes the same SQLite as the root
+  worker. `/var/lib/kobox` is `2770 root:kobox-portal` (setgid) and both units
+  run `UMask=0007`, so SQLite's WAL/-shm files stay group-writable. If the portal
+  logs `unable to open database file`, check those perms first.
+- **Per-user ruTorrent**: each active user gets an nginx `/RPC-<UPPERCASE>` SCGI
+  mount (rendered into `/etc/nginx/kobox.d/rutorrent-users.conf`) and a matching
+  `conf/users/<user>/config.php`; the render is chained after
+  provision/deprovision and reloads nginx.
+- **Fair-use override**: `kobox set-fair-use-override <user> --egress-bps <n|clear>
+  --auth-per-hour <n|clear> --throttle-bps <n|clear>` (also from the admin
+  fair-use screen) — audited, per-field (`clear` resets to the install default).
+
+## Samba passwords
+
+Samba uses its own password store (tdb), never the KoBox database. Set or
+update one directly (the secret is read from stdin and never enters a job):
+
+```
+printf '%s' 'the-password' | kobox set-samba-password alice
+```
+
+## ShellInABox
+
+`shellinabox` is bound to `127.0.0.1:4200` and reachable only through the
+portal's admin-gated `/shell/` proxy — never exposed directly.

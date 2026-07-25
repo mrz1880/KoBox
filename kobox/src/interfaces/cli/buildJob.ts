@@ -10,6 +10,7 @@ export interface CreateUserInput {
   readonly accountType: string;
   readonly quotaGib: number;
   readonly proxyPort: number;
+  readonly role?: string;
 }
 
 // The unprivileged side of the seam: plaintext is hashed here and dies here;
@@ -28,6 +29,7 @@ export const buildJob = {
       quotaBytes: Math.round(input.quotaGib * BYTES_PER_GIB),
       proxyPort: input.proxyPort,
       passwordHash,
+      ...(input.role !== undefined && { role: input.role }),
     });
   },
 
@@ -150,5 +152,22 @@ export const buildJob = {
 
   applyIpset(): Job {
     return parseJob('apply-ipset', {});
+  },
+
+  setFairUseOverride(input: {
+    username: string;
+    egressLimitBps?: number | null;
+    authRatePerHour?: number | null;
+    throttleToBps?: number | null;
+  }): Job {
+    return parseJob('set-fair-use-override', input);
+  },
+
+  renderRutorrentUsers(): Job {
+    return parseJob('render-rutorrent-users', {});
+  },
+
+  renderNfsExports(): Job {
+    return parseJob('render-nfs-exports', {});
   },
 };

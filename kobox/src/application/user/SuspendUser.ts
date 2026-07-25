@@ -1,3 +1,4 @@
+import type { SessionStorePort } from '../../domain/portal/ports.js';
 import type { Username } from '../../domain/user/Username.js';
 import type {
   NotificationPort,
@@ -18,6 +19,7 @@ interface Deps {
   readonly sftp: SftpPort;
   readonly services: ServiceControlPort;
   readonly notifications: NotificationPort;
+  readonly sessions: SessionStorePort;
 }
 
 // Reversible suspension (issue #39): cut all access, keep account and data.
@@ -27,7 +29,7 @@ export class SuspendUser {
   constructor(private readonly deps: Deps) {}
 
   async execute(command: SuspendUserCommand): Promise<void> {
-    const { repo, accounts, sftp, services, notifications } = this.deps;
+    const { repo, accounts, sftp, services, notifications, sessions } = this.deps;
 
     const user = await repo.findByUsername(command.username);
     if (!user) {
@@ -39,6 +41,8 @@ export class SuspendUser {
     await accounts.terminateSessions(suspended.username);
     await sftp.disableChrootAccess(suspended.username);
     await services.stopUserService(suspended.username);
+    // live portal sessions die with the SSH ones
+    await sessions.deleteForUser(suspended.username);
     await repo.save(suspended);
     if (event) {
       await notifications.notify(event);

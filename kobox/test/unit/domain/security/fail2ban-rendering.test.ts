@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
   renderFail2banJails,
+  renderPortalLoginFilter,
   renderPublickeyFloodFilter,
 } from '../../../../src/domain/security/rendering.js';
 import { IpAddress } from '../../../../src/domain/shared/IpAddress.js';
@@ -48,6 +49,28 @@ describe('renderFail2banJails', () => {
     // user-h: ~82 accepted keys/hour; 30/h is unreachable by hand, caught by script
     expect(content).toMatch(/\[kobox-publickey-flood\][^[]*maxretry = 30/);
     expect(content).toMatch(/\[kobox-publickey-flood\][^[]*findtime = 3600/);
+  });
+
+  it('should_enable_the_portal_login_jail', () => {
+    const content = renderFail2banJails([], 22).content;
+    expect(content).toContain('[kobox-portal]');
+    expect(content).toContain('filter = kobox-portal');
+  });
+});
+
+describe('renderPortalLoginFilter', () => {
+  it('should_match_the_portal_login_failed_line_from_the_journal', () => {
+    const file = renderPortalLoginFilter();
+    expect(file.path).toBe('/etc/fail2ban/filter.d/kobox-portal.conf');
+    expect(file.content).toContain('journalmatch = SYSLOG_IDENTIFIER=kobox-portal');
+    expectGolden('filter.kobox-portal.conf.golden', file.content);
+  });
+
+  it('should_capture_the_host_from_a_portal_login_failed_line', () => {
+    const failregex = /^failregex = (.+)$/m.exec(renderPortalLoginFilter().content)?.[1];
+    const pattern = new RegExp((failregex ?? '').replace('<HOST>', '(?<host>[0-9.]+)'));
+    const line = 'portal login failed for alice from 203.0.113.9 (invalid-credentials)';
+    expect(pattern.exec(line)?.groups?.host).toBe('203.0.113.9');
   });
 });
 

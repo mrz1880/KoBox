@@ -1,0 +1,5 @@
+# KoBox — bans repeated failed portal logins (application auth, Phase 6).
+[Definition]
+journalmatch = SYSLOG_IDENTIFIER=kobox-portal
+failregex = portal login failed for .* from <HOST>
+ignoreregex =

@@ -1,5 +1,7 @@
 import { parseJob, type Job } from '../../application/jobs/contract.js';
 import type { JobQueuePort } from '../../application/jobs/JobQueuePort.js';
+import type { MailOutboxPort } from '../../application/maintenance/MailOutboxPort.js';
+import { parseRole } from '../../domain/portal/Role.js';
 import { DynDnsHost } from '../../domain/security/DynDnsHost.js';
 import { IpAddress } from '../../domain/shared/IpAddress.js';
 import { TrackerHost } from '../../domain/tracker/TrackerHost.js';
@@ -29,6 +31,7 @@ interface ChainHints {
   readonly firewallDirty?: boolean;
   readonly fail2banDirty?: boolean;
   readonly openVpnDirty?: boolean;
+  readonly nfsDirty?: boolean;
 }
 
 function nowStamp(): string {
@@ -45,6 +48,7 @@ export class JobWorker {
     private readonly trackers: TrackerUseCases,
     private readonly security: SecurityUseCases,
     private readonly maintenance: MaintenanceUseCases,
+    private readonly outbox: MailOutboxPort,
   ) {}
 
   async processNext(): Promise<boolean> {
@@ -85,6 +89,21 @@ export class JobWorker {
       await this.queue.enqueue(parseJob('provision-rtorrent', { username: job.payload.username }));
       // Phase 3 debt #2: client cert issuance rides the same seam
       await this.queue.enqueue(parseJob('provision-vpn-user', { username: job.payload.username }));
+      // welcome mail through the durable outbox — never a password in it
+      await this.outbox.enqueue(
+        {
+          recipient: job.payload.email,
+          subject: 'Your KoBox account is ready',
+          body: [
+            `Hello ${job.payload.username},`,
+            '',
+            'Your seedbox account has been created. Sign in to the portal with',
+            'your username and the password you were given, then change it from',
+            'the "Password" page.',
+          ].join('\n'),
+        },
+        nowStamp(),
+      );
     }
     if (job.type === 'delete-user') {
       await this.queue.enqueue(
@@ -93,6 +112,10 @@ export class JobWorker {
       await this.queue.enqueue(
         parseJob('deprovision-vpn-user', { username: job.payload.username }),
       );
+    }
+    // a user's home appears/disappears with the account: re-render NFS exports
+    if (job.type === 'create-user' || job.type === 'delete-user') {
+      await this.queue.enqueue(parseJob('render-nfs-exports', {}));
     }
     // legacy parity: a fresh instance gets its blocklist filter immediately,
     // not at the next update-blocklists run
@@ -105,6 +128,8 @@ export class JobWorker {
     // provisioned population changes
     if (job.type === 'provision-rtorrent' || job.type === 'deprovision-rtorrent') {
       await this.queue.enqueue(parseJob('apply-firewall', {}));
+      // and the per-user nginx /RPC-<USER> SCGI mounts (Phase 6)
+      await this.queue.enqueue(parseJob('render-rutorrent-users', {}));
     }
     if (hints?.fetchCertHost !== undefined) {
       await this.queue.enqueue(parseJob('fetch-tracker-cert', { host: hints.fetchCertHost }));
@@ -126,6 +151,9 @@ export class JobWorker {
     if (hints?.openVpnDirty === true) {
       await this.queue.enqueue(parseJob('render-openvpn', {}));
     }
+    if (hints?.nfsDirty === true) {
+      await this.queue.enqueue(parseJob('render-nfs-exports', {}));
+    }
   }
 
   private async execute(job: Job): Promise<ChainHints | undefined> {
@@ -138,6 +166,7 @@ export class JobWorker {
           quota: Quota.bytes(job.payload.quotaBytes),
           proxyPort: ProxyPort.parse(job.payload.proxyPort),
           passwordHash: HashedPassword.parse(job.payload.passwordHash),
+          role: parseRole(job.payload.role),
         });
         return;
       case 'delete-user':
@@ -286,6 +315,21 @@ export class JobWorker {
       case 'evaluate-fair-use':
         await this.security.evaluateFairUse.execute({ now: nowStamp() });
         return;
+      case 'set-fair-use-override':
+        await this.security.setFairUseOverride.execute({
+          username: Username.parse(job.payload.username),
+          ...(job.payload.egressLimitBps !== undefined && {
+            egressLimitBps: job.payload.egressLimitBps,
+          }),
+          ...(job.payload.authRatePerHour !== undefined && {
+            authRatePerHour: job.payload.authRatePerHour,
+          }),
+          ...(job.payload.throttleToBps !== undefined && {
+            throttleToBps: job.payload.throttleToBps,
+          }),
+          now: nowStamp(),
+        });
+        return;
       case 'send-mails':
         await this.maintenance.sendMails.execute({ now: nowStamp() });
         return;
@@ -295,6 +339,12 @@ export class JobWorker {
       case 'apply-ipset':
         await this.trackers.applyIpset.execute();
         return;
+      case 'render-rutorrent-users':
+        await this.torrents.renderRutorrentUsers.execute();
+        return;
+      case 'render-nfs-exports':
+        await this.security.renderNfsExports.execute();
+        return;
       case 'add-user-address':
       case 'remove-user-address': {
         const report = await this.trackers.manageUserAddress.execute({
@@ -302,12 +352,13 @@ export class JobWorker {
           username: Username.parse(job.payload.username),
           ip: IpAddress.parse(job.payload.ipv4),
         });
-        // a member address is rendered in three places: allow.p2p, the
-        // firewall trusted rules and fail2ban ignoreip — refresh all of them
+        // a member address is rendered in four places: the whitelist, the
+        // firewall trusted rules, fail2ban ignoreip and the NFS home exports
         return {
           whitelistDirty: report.whitelistDirty,
           firewallDirty: report.whitelistDirty,
           fail2banDirty: report.whitelistDirty,
+          nfsDirty: true,
         };
       }
     }

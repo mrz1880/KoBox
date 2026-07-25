@@ -134,7 +134,14 @@ describe('kobox-core installer', () => {
 
     expect(outcome.state).toBe('installed');
     expect(world.host.dirs.get('/etc/kobox')).toBe('0755');
-    expect(world.host.dirs.get('/var/lib/kobox')).toBe('0700');
+    // Phase 6: the DB dir is shared with the non-root portal (setgid group)
+    expect(world.host.dirs.get('/var/lib/kobox')).toBe('2770');
+    expect(world.host.serviceAccounts.has('kobox-portal')).toBe(true);
+    expect(world.host.ownership.get('/var/lib/kobox')).toEqual({
+      owner: 'root',
+      group: 'kobox-portal',
+      mode: '2770',
+    });
     expect(world.host.dirs.get('/var/spool/kobox/events')).toBe('1733');
     // the unit executes THROUGH the current symlink: upgrades flip the link,
     // never the unit (§5.6 versioned releases)
@@ -223,18 +230,21 @@ describe('nginx installer', () => {
     expect(world.host.contentAt('/etc/nginx/sites-enabled/default')).toBeUndefined();
   });
 
-  it('should_install_render_the_vhost_and_seed_an_empty_htpasswd_once', async () => {
+  it('should_render_a_session_authed_vhost_and_hold_the_rpc_include_dir', async () => {
     await installer(world, 'nginx').install();
 
     expect(world.packages.installed).toEqual(
       expect.arrayContaining(['nginx', 'php-fpm', 'ssl-cert']),
     );
-    expect(world.host.contentAt('/etc/nginx/conf.d/kobox.conf')).toContain('listen 8189 ssl');
-    expect(world.host.contentAt('/etc/nginx/kobox.htpasswd')).toBe('');
+    const vhost = world.host.contentAt('/etc/nginx/conf.d/kobox.conf') ?? '';
+    expect(vhost).toContain('listen 8189 ssl');
+    // Phase 6: no shared Basic Auth; the portal owns auth
+    expect(vhost).not.toContain('auth_basic');
+    expect(world.host.dirs.get('/etc/nginx/kobox.d')).toBe('0755');
     expect(world.systemd.log).toContain('enable-now nginx');
   });
 
-  it('should_never_overwrite_an_existing_htpasswd', async () => {
+  it('should_drop_a_leftover_htpasswd_from_an_earlier_phase', async () => {
     await world.host.apply([
       {
         path: '/etc/nginx/kobox.htpasswd',
@@ -247,7 +257,7 @@ describe('nginx installer', () => {
 
     await installer(world, 'nginx').install();
 
-    expect(world.host.contentAt('/etc/nginx/kobox.htpasswd')).toBe('alice:$hash');
+    expect(world.host.contentAt('/etc/nginx/kobox.htpasswd')).toBeUndefined();
   });
 
   it('should_roll_back_the_vhost_when_nginx_t_fails', async () => {
@@ -256,6 +266,63 @@ describe('nginx installer', () => {
     await expect(installer(world, 'nginx').install()).rejects.toThrow(InstallGuardError);
 
     expect(world.host.contentAt('/etc/nginx/conf.d/kobox.conf')).toBeUndefined();
+  });
+});
+
+describe('portal installer', () => {
+  it('should_render_the_non_root_unit_and_enable_it', async () => {
+    const outcome = await installer(world, 'portal').install();
+
+    expect(outcome.state).toBe('installed');
+    const unit = world.host.contentAt('/etc/systemd/system/kobox-portal.service') ?? '';
+    expect(unit).toContain('User=kobox-portal');
+    expect(unit).toContain('ExecStart=/usr/bin/node /opt/kobox/current/dist/interfaces/http/main.js');
+    expect(world.systemd.log).toContain('daemon-reload');
+    expect(world.systemd.log).toContain('enable-now kobox-portal');
+  });
+
+  it('should_disable_and_remove_the_unit_on_uninstall', async () => {
+    await installer(world, 'portal').install();
+
+    await installer(world, 'portal').uninstall();
+
+    expect(world.systemd.log).toContain('disable-now kobox-portal');
+    expect(world.host.contentAt('/etc/systemd/system/kobox-portal.service')).toBeUndefined();
+  });
+});
+
+describe('vendored extras installers', () => {
+  it('should_install_the_nfs_server_and_hold_the_exports_dir', async () => {
+    const outcome = await installer(world, 'nfs').install();
+
+    expect(outcome.state).toBe('installed');
+    expect(world.packages.installed).toContain('nfs-kernel-server');
+    expect(world.host.dirs.get('/etc/exports.d')).toBe('0755');
+    expect(world.systemd.log).toContain('enable-now nfs-server');
+  });
+
+  it('should_render_the_samba_config_under_the_testparm_guard', async () => {
+    const outcome = await installer(world, 'samba').install();
+
+    expect(outcome.state).toBe('installed');
+    expect(world.host.contentAt('/etc/samba/smb.conf')).toContain('[homes]');
+    expect(world.systemd.log).toContain('enable-now smbd');
+  });
+
+  it('should_roll_back_the_samba_config_when_testparm_fails', async () => {
+    world.checks.failSamba('Unknown parameter encountered');
+
+    await expect(installer(world, 'samba').install()).rejects.toThrow(InstallGuardError);
+
+    expect(world.host.contentAt('/etc/samba/smb.conf')).toBeUndefined();
+  });
+
+  it('should_bind_shellinabox_to_localhost', async () => {
+    const outcome = await installer(world, 'shellinabox').install();
+
+    expect(outcome.state).toBe('installed');
+    expect(world.host.contentAt('/etc/default/shellinabox')).toContain('--localhost-only');
+    expect(world.systemd.log).toContain('enable-now shellinabox');
   });
 });
 

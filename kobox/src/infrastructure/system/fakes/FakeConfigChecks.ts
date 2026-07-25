@@ -4,6 +4,7 @@ export class FakeConfigChecks implements ConfigCheckPort {
   private sshdFailure: string | undefined;
   private nginxFailure: string | undefined;
   private bindFailure: string | undefined;
+  private sambaFailure: string | undefined;
   private sshdError: Error | undefined;
 
   failSshd(detail: string): void {
@@ -23,6 +24,10 @@ export class FakeConfigChecks implements ConfigCheckPort {
     this.bindFailure = detail;
   }
 
+  failSamba(detail: string): void {
+    this.sambaFailure = detail;
+  }
+
   sshd(): Promise<ConfigCheckResult> {
     if (this.sshdError) {
       return Promise.reject(this.sshdError);
@@ -36,6 +41,10 @@ export class FakeConfigChecks implements ConfigCheckPort {
 
   bind(): Promise<ConfigCheckResult> {
     return Promise.resolve(this.result(this.bindFailure));
+  }
+
+  samba(): Promise<ConfigCheckResult> {
+    return Promise.resolve(this.result(this.sambaFailure));
   }
 
   private result(failure: string | undefined): ConfigCheckResult {

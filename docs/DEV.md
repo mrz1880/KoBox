@@ -114,6 +114,27 @@ Notes :
   s'applique). Le worker systemd du conteneur draine les jobs pendant l'E2E : pour
   observer des jobs `pending`, stoppe `kobox-worker` d'abord.
 
+- **Portal & Access (Phase 6)** : le portail SSR (`kobox-portal`, Fastify) tourne
+  **non-root** sur `127.0.0.1:8190` (`KOBOX_PORTAL_HTTP_PORT`/`KOBOX_PORTAL_HTTP_HOST`)
+  derrière nginx (`:8189`). L'auth est applicative : table `portal_credentials`
+  (même hash sha512-crypt que le compte système, écrit par le **worker** sur
+  create-user/change-password), sessions server-side hashées (`portal_sessions`),
+  CSRF sur toute mutation, lockout 5 échecs/15 min (`login_attempts`). nginx délègue
+  `/ru` + `/RPC-<USER>` + `/shell` au portail via `auth_request` (`/internal/auth[/rpc|/admin]`).
+  Boucle de dev pure Mac : `pnpm test` couvre le portail avec des fakes
+  (`test/component/interfaces/portalWorld.ts` : jar cookie + CSRF via `.inject()`).
+  ⚠️ **DB partagée** : `/var/lib/kobox` est `2770 root:kobox-portal` (setgid) et les
+  unités worker+portal tournent `UMask=0007` pour que les fichiers WAL/-shm de SQLite
+  restent group-writable — le portail non-root ouvre la même base que le worker root.
+  L'E2E portail (`test/e2e/portal-access.e2e.test.ts`) crée le groupe `kobox-portal`
+  (précondition normalement posée par `kobox-core`), fournit une **PKI fixture**
+  (easy-rsa absent du conteneur — l'émission réelle des certs VPN est le job de
+  l'E2E security), lance le portail en process enfant et le pilote en HTTP avec un
+  jar cookie (le cookie `Secure` est renvoyé manuellement en clair sur 127.0.0.1).
+  Env utiles : `KOBOX_VPN_PROFILES_DIR` (défaut `/etc/kobox/vpn-profiles`, lu par le
+  portail pour servir les `.ovpn`). `kobox set-samba-password <user>` lit le mot de
+  passe sur stdin (jamais en DB/job).
+
 ## VM Multipass (validation full-stack, quotas ext4 réels)
 
 ```bash

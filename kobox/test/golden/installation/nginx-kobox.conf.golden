@@ -18,19 +18,62 @@ server {
     ssl_certificate /etc/ssl/certs/ssl-cert-snakeoil.pem;
     ssl_certificate_key /etc/ssl/private/ssl-cert-snakeoil.key;
 
-    auth_basic "KoBox";
-    auth_basic_user_file /etc/nginx/kobox.htpasswd;
+    # auth_request targets: the portal answers 204 (allow) or 401/403
+    location = /internal/auth {
+        internal;
+        proxy_pass http://127.0.0.1:8190/internal/auth;
+        proxy_pass_request_body off;
+        proxy_set_header Content-Length "";
+        proxy_set_header X-Original-URI $request_uri;
+    }
+    location = /internal/auth/rpc {
+        internal;
+        proxy_pass http://127.0.0.1:8190/internal/auth/rpc;
+        proxy_pass_request_body off;
+        proxy_set_header Content-Length "";
+        proxy_set_header X-Original-URI $request_uri;
+    }
+    location = /internal/auth/admin {
+        internal;
+        proxy_pass http://127.0.0.1:8190/internal/auth/admin;
+        proxy_pass_request_body off;
+        proxy_set_header Content-Length "";
+        proxy_set_header X-Original-URI $request_uri;
+    }
 
-    root /var/www/kobox;
+    # the SSR portal (application auth, sessions, CSRF)
+    location / {
+        proxy_pass http://127.0.0.1:8190;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Proto https;
+    }
 
+    # ruTorrent, gated by the portal session; the authenticated user is
+    # forwarded to php-fpm as REMOTE_USER for the per-user profile
     location /ru/ {
+        auth_request /internal/auth;
+        auth_request_set $kobox_user $upstream_http_x_kobox_user;
         alias /var/www/rutorrent/;
-        index index.html index.php;
+        index index.php;
     }
 
     location ~ ^/ru/(.+\.php)$ {
+        auth_request /internal/auth;
+        auth_request_set $kobox_user $upstream_http_x_kobox_user;
         include fastcgi_params;
         fastcgi_param SCRIPT_FILENAME /var/www/rutorrent/$1;
+        fastcgi_param REMOTE_USER $kobox_user;
         fastcgi_pass unix:/run/php/php8.2-fpm.sock;
+    }
+
+    # per-user SCGI mounts (/RPC-<USER>), each gated to its owner or an admin
+    include /etc/nginx/kobox.d/*.conf;
+
+    # ShellInABox (localhost:4200), admin-only through the portal session
+    location /shell/ {
+        auth_request /internal/auth/admin;
+        proxy_pass http://127.0.0.1:4200/;
+        proxy_set_header Host $host;
     }
 }

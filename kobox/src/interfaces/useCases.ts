@@ -13,6 +13,7 @@ import { DeprovisionRtorrentInstance } from '../application/torrent/DeprovisionR
 import { HandleTorrentEvent } from '../application/torrent/HandleTorrentEvent.js';
 import { ProvisionRtorrentInstance } from '../application/torrent/ProvisionRtorrentInstance.js';
 import { RenderRtorrentConfig } from '../application/torrent/RenderRtorrentConfig.js';
+import { RenderRutorrentUsers } from '../application/torrent/RenderRutorrentUsers.js';
 import { SetAllowPublicTracker } from '../application/torrent/SetAllowPublicTracker.js';
 import { SetSyncDisabled } from '../application/torrent/SetSyncDisabled.js';
 import type { BackupHostPort } from '../application/maintenance/BackupHostPort.js';
@@ -23,6 +24,8 @@ import { SendMails } from '../application/maintenance/SendMails.js';
 import { ApplyFirewall } from '../application/security/ApplyFirewall.js';
 import { DeprovisionVpnUser } from '../application/security/DeprovisionVpnUser.js';
 import { EvaluateFairUse } from '../application/security/EvaluateFairUse.js';
+import { RenderNfsExports } from '../application/security/RenderNfsExports.js';
+import { SetFairUseOverride } from '../application/security/SetFairUseOverride.js';
 import { ProvisionVpnUser } from '../application/security/ProvisionVpnUser.js';
 import { ManageUserHostname } from '../application/security/ManageUserHostname.js';
 import { RenderFail2ban } from '../application/security/RenderFail2ban.js';
@@ -75,6 +78,7 @@ import type {
   VpnPkiProvisionPort,
 } from '../domain/security/ports.js';
 import type { RenderSettings, RtorrentTemplates } from '../domain/torrent/rendering.js';
+import type { PortalCredentialsPort, SessionStorePort } from '../domain/portal/ports.js';
 import type { PortAllocatorPort } from '../domain/user/PortAllocatorPort.js';
 import type {
   HealthProbePort,
@@ -94,6 +98,9 @@ export interface UseCaseDeps {
   readonly services: ServiceControlPort;
   readonly notifications: NotificationPort;
   readonly allocator: PortAllocatorPort;
+  readonly credentials: PortalCredentialsPort;
+  readonly sessions: SessionStorePort;
+  readonly clock: () => string;
 }
 
 export interface UseCases {
@@ -146,6 +153,8 @@ export interface TorrentUseCaseDeps {
   readonly announcers: AnnouncerSink;
   readonly templates: RtorrentTemplates;
   readonly settings: RenderSettings;
+  // nginx reload for the per-user /RPC-<USER> SCGI mounts (Phase 6)
+  readonly nginx: NetworkServicePort;
 }
 
 export interface TorrentUseCases {
@@ -156,6 +165,7 @@ export interface TorrentUseCases {
   readonly setSyncDisabled: SetSyncDisabled;
   readonly setAllowPublicTracker: SetAllowPublicTracker;
   readonly handleEvent: HandleTorrentEvent;
+  readonly renderRutorrentUsers: RenderRutorrentUsers;
 }
 
 export interface TrackerUseCaseDeps {
@@ -230,6 +240,7 @@ export interface SecurityUseCaseDeps {
 
 export interface SecurityUseCases {
   readonly applyFirewall: ApplyFirewall;
+  readonly setFairUseOverride: SetFairUseOverride;
   readonly renderFail2ban: RenderFail2ban;
   readonly manageUserHostname: ManageUserHostname;
   readonly resolveDynDns: ResolveDynDns;
@@ -237,6 +248,7 @@ export interface SecurityUseCases {
   readonly provisionVpnUser: ProvisionVpnUser;
   readonly deprovisionVpnUser: DeprovisionVpnUser;
   readonly evaluateFairUse: EvaluateFairUse;
+  readonly renderNfsExports: RenderNfsExports;
 }
 
 export function buildSecurityUseCases(deps: SecurityUseCaseDeps): SecurityUseCases {
@@ -249,6 +261,8 @@ export function buildSecurityUseCases(deps: SecurityUseCaseDeps): SecurityUseCas
     provisionVpnUser: new ProvisionVpnUser(deps),
     deprovisionVpnUser: new DeprovisionVpnUser(deps),
     evaluateFairUse: new EvaluateFairUse(deps),
+    setFairUseOverride: new SetFairUseOverride(deps),
+    renderNfsExports: new RenderNfsExports(deps),
   };
 }
 
@@ -262,5 +276,10 @@ export function buildTorrentUseCases(deps: TorrentUseCaseDeps): TorrentUseCases 
     setSyncDisabled: new SetSyncDisabled(deps),
     setAllowPublicTracker: new SetAllowPublicTracker(deps),
     handleEvent: new HandleTorrentEvent(deps),
+    renderRutorrentUsers: new RenderRutorrentUsers({
+      users: deps.users,
+      files: deps.config,
+      reload: deps.nginx,
+    }),
   };
 }
