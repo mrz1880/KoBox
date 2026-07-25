@@ -56,7 +56,12 @@ interface HttpsResponse {
 
 // Every request path shares the same timeout: a server that accepts the
 // connection and stalls (the classic dying-mirror failure) is cut off.
-function httpsGet(url: string, options: HttpsDownloadOptions): Promise<HttpsResponse | undefined> {
+// Exported for the installation ArtifactFetchAdapter (same verified-download
+// discipline, different consumer).
+export function httpsGet(
+  url: string,
+  options: HttpsDownloadOptions,
+): Promise<HttpsResponse | undefined> {
   return new Promise((resolve) => {
     const requestOptions: RequestOptions = options.ca === undefined ? {} : { ca: options.ca };
     const request = get(url, requestOptions, (response) => {

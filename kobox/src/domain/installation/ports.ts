@@ -19,6 +19,22 @@ export interface SystemFactsPort {
   gather(): Promise<SystemFacts>;
 }
 
+// apt behind a port: installers declare desired packages, the adapter keeps
+// the calls argv-only and skips work already done (fast idempotent re-runs).
+export interface PackagePort {
+  refresh(): Promise<void>;
+  ensureInstalled(packages: readonly string[]): Promise<void>;
+  isAvailable(pkg: string): Promise<boolean>;
+  isInstalled(pkg: string): Promise<boolean>;
+  installedVersion(pkg: string): Promise<string | undefined>;
+}
+
+// §5.6 verified downloads: bytes reach destPath only after the sha256
+// matches; anything else throws and leaves no partial file behind.
+export interface ArtifactFetchPort {
+  fetchVerified(url: string, sha256: string, destPath: string): Promise<void>;
+}
+
 export interface ComponentRecord {
   readonly name: ComponentName;
   readonly state: InstallState;
