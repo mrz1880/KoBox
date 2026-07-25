@@ -60,6 +60,13 @@ export class UpgradeHostAdapter implements UpgradeHostPort {
   }
 
   async restartWorkerAndVerify(): Promise<boolean> {
+    // upgrade + rollback restart the worker in quick succession: clear any
+    // tripped start-rate counter first (best-effort; unit may not be failed)
+    await this.runner.run({
+      command: 'systemctl',
+      args: ['reset-failed', 'kobox-worker'],
+      timeoutMs: 10_000,
+    });
     const restart = await this.runner.run({
       command: 'systemctl',
       args: ['restart', 'kobox-worker'],

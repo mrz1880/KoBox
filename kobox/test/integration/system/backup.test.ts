@@ -72,6 +72,27 @@ describe('BackupHostAdapter (real sqlite + tar)', () => {
     db = KoboxDatabase.open(livePath); // for afterEach
   });
 
+  it('should_move_wal_and_shm_aside_with_the_old_db_instead_of_deleting_them', async () => {
+    // review #5: an uncheckpointed WAL holds committed transactions — the
+    // "never deleted" aside copy must keep it, under the aside's name so
+    // SQLite finds it when the aside DB is opened
+    const livePath = join(dir, 'kobox.db');
+    const backupDir = join(dir, 'backups', '20260725T053000Z');
+    mkdirSync(backupDir, { recursive: true });
+    await adapter.sqliteBackup(join(backupDir, 'kobox.db'));
+    db.close();
+    writeFileSync(`${livePath}-wal`, 'wal-bytes');
+    writeFileSync(`${livePath}-shm`, 'shm-bytes');
+
+    const aside = await adapter.restoreDatabase(join(backupDir, 'kobox.db'), livePath);
+
+    expect(existsSync(`${aside}-wal`)).toBe(true);
+    expect(existsSync(`${aside}-shm`)).toBe(true);
+    expect(existsSync(`${livePath}-wal`)).toBe(false);
+    expect(existsSync(`${livePath}-shm`)).toBe(false);
+    db = KoboxDatabase.open(livePath); // for afterEach
+  });
+
   it('should_list_and_remove_only_stamp_directories', async () => {
     const root = join(dir, 'backups');
     mkdirSync(join(root, '20260725T053000Z'), { recursive: true });

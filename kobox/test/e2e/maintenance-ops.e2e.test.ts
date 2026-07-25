@@ -333,6 +333,23 @@ describe.skipIf(!onDebianAsRoot)('E2E: maintenance keeps the installed box alive
     180_000,
   );
 
+  it('should_serve_acme_challenges_from_the_webroot_even_with_a_real_host_header', () => {
+    // pebble's VA is stubbed (PEBBLE_VA_ALWAYS_VALID) — prove the HTTP-01
+    // wiring ourselves: the Debian default site must be gone and the :80
+    // block must serve the webroot for the real domain's Host
+    expect(existsSync('/etc/nginx/sites-enabled/default')).toBe(false);
+    mkdirSync('/var/www/acme/.well-known/acme-challenge', { recursive: true });
+    writeFileSync('/var/www/acme/.well-known/acme-challenge/kobox-probe', 'acme-probe-ok\n');
+
+    const body = sh('curl', [
+      '-s', '-H', `Host: ${LE_DOMAIN}`,
+      'http://127.0.0.1/.well-known/acme-challenge/kobox-probe',
+    ]);
+
+    expect(body).toContain('acme-probe-ok');
+    rmSync('/var/www/acme/.well-known', { recursive: true, force: true });
+  });
+
   it.skipIf(!onDebianAsRoot)(
     'should_serve_the_pebble_issued_certificate_when_the_fixture_is_up',
     () => {
@@ -434,8 +451,10 @@ describe.skipIf(!onDebianAsRoot)('E2E: maintenance keeps the installed box alive
       ]);
 
       // hand the real tree back to the worker for the remaining suites
+      // (reset-failed first: this test just restarted the unit repeatedly)
       if (originalCurrentTarget !== undefined) {
         execFileSync('ln', ['-sfn', originalCurrentTarget, CURRENT_LINK]);
+        sh('systemctl', ['reset-failed', 'kobox-worker']);
         sh('systemctl', ['restart', 'kobox-worker']);
         await waitFor('real worker back', () => isActive('kobox-worker'), 60_000);
       }

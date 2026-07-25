@@ -27,6 +27,7 @@ export interface SystemdPort {
   enable(unit: string, opts?: { readonly now?: boolean }): Promise<void>;
   disable(unit: string, opts?: { readonly now?: boolean }): Promise<void>;
   start(unit: string): Promise<void>;
+  stop(unit: string): Promise<void>;
   reloadOrRestart(unit: string): Promise<void>;
   isActive(unit: string): Promise<boolean>;
 }

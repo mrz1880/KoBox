@@ -24,12 +24,14 @@ export class RestoreBackup {
 
   async execute(input: RestoreBackupInput): Promise<RestoreBackupReport> {
     const backupDb = `${input.backupDir}/kobox.db`;
-    await this.deps.systemd.disable('kobox-worker', { now: true });
+    // stop/start, never disable/enable: a restore must not flip the unit's
+    // boot enablement as a side effect
+    await this.deps.systemd.stop('kobox-worker');
     try {
       const asidePath = await this.deps.backupHost.restoreDatabase(backupDb, this.deps.liveDbPath);
       return { restoredFrom: backupDb, asidePath };
     } finally {
-      await this.deps.systemd.enable('kobox-worker', { now: true });
+      await this.deps.systemd.start('kobox-worker');
     }
   }
 }

@@ -295,6 +295,11 @@ class NginxInstaller implements ComponentInstaller {
   async install(): Promise<InstallOutcome> {
     const { packages, host, systemd, checks } = this.ctx;
     await packages.ensureInstalled(['nginx', 'php-fpm', 'ssl-cert']);
+    // stock Debian ships sites-enabled/default with `listen 80
+    // default_server`: while that symlink exists it swallows every HTTP-01
+    // challenge (server_name _ never matches a Host) and Let's Encrypt can
+    // never validate — remove it; sites-available/default stays untouched
+    await host.removeFile('/etc/nginx/sites-enabled/default');
     // deny-by-default: an EMPTY htpasswd rejects everyone until the portal
     // phase wires real accounts; an existing file is never overwritten
     await host.ensureFile({

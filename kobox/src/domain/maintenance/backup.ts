@@ -33,6 +33,10 @@ export function planBackupRotation(
   options: BackupRotationOptions,
 ): readonly string[] {
   const nowMs = Date.parse(`${now.replace(' ', 'T')}Z`);
+  if (Number.isNaN(nowMs)) {
+    // a malformed clock must fail loudly, not silently skip every rotation
+    throw new RangeError(`invalid timestamp ${JSON.stringify(now)}`);
+  }
   const dated = stamps
     .map((stamp) => ({ stamp, ms: parseStamp(stamp) }))
     .filter((entry): entry is { stamp: string; ms: number } => entry.ms !== undefined)

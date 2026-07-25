@@ -65,9 +65,13 @@ export class BackupHostAdapter implements BackupHostPort {
     if (existsSync(liveDbPath)) {
       await rename(liveDbPath, asidePath);
     }
-    // stale WAL/SHM from the moved-aside DB must not shadow the restored file
+    // an uncheckpointed WAL holds committed transactions: it moves WITH the
+    // aside copy (SQLite finds it by name when that file is opened) instead
+    // of being deleted — and must not shadow the restored database either
     for (const suffix of ['-wal', '-shm']) {
-      await rm(`${liveDbPath}${suffix}`, { force: true });
+      if (existsSync(`${liveDbPath}${suffix}`)) {
+        await rename(`${liveDbPath}${suffix}`, `${asidePath}${suffix}`);
+      }
     }
     await copyFile(backupDbPath, liveDbPath);
     await chmod(liveDbPath, 0o600);

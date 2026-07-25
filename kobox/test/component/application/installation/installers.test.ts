@@ -204,6 +204,25 @@ describe('sshd installer (the never-break-SSH guard)', () => {
 });
 
 describe('nginx installer', () => {
+  it('should_remove_the_debian_default_site_that_would_swallow_the_acme_port', async () => {
+    // stock Debian nginx ships sites-enabled/default with `listen 80
+    // default_server`: while it exists, every HTTP-01 challenge lands on the
+    // wrong vhost and Let's Encrypt issuance can never validate
+    await world.host.apply([
+      {
+        path: '/etc/nginx/sites-enabled/default',
+        content: 'server { listen 80 default_server; }',
+        mode: '0644',
+        owner: 'root',
+        group: 'root',
+      },
+    ]);
+
+    await installer(world, 'nginx').install();
+
+    expect(world.host.contentAt('/etc/nginx/sites-enabled/default')).toBeUndefined();
+  });
+
   it('should_install_render_the_vhost_and_seed_an_empty_htpasswd_once', async () => {
     await installer(world, 'nginx').install();
 

@@ -25,9 +25,16 @@ export class SqliteReleaseRepository implements ReleaseRepositoryPort {
 
   record(ref: string, path: string, now: string): Promise<number> {
     try {
+      // upsert by path: retrying a ref (failed build, re-upgrade after a
+      // rollback) re-stages the same release row instead of bricking on the
+      // UNIQUE constraint
       const inserted = this.db.orm
         .insert(releases)
         .values({ ref, path, state: 'staged', createdAt: now })
+        .onConflictDoUpdate({
+          target: releases.path,
+          set: { ref, state: 'staged', createdAt: now, switchedAt: null },
+        })
         .returning({ id: releases.id })
         .get();
       return Promise.resolve(inserted.id);

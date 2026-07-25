@@ -47,7 +47,9 @@ export class RunBackup {
       }
     }
     const existing = await backupHost.listBackups(settings.root);
-    const deleted = planBackupRotation([...existing, stamp], input.now, settings);
+    // listBackups already sees the dir created above: dedupe so today's
+    // stamp cannot occupy two keepMin survivor slots
+    const deleted = planBackupRotation([...new Set([...existing, stamp])], input.now, settings);
     for (const oldStamp of deleted) {
       await backupHost.removeBackup(settings.root, oldStamp);
     }

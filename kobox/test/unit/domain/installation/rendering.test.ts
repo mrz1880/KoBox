@@ -37,6 +37,9 @@ describe('installation rendering', () => {
     });
     expect(file.path).toBe('/etc/systemd/system/kobox-worker.service');
     expect(file.mode).toBe('0644');
+    // the watchdog replacement: a restart burst (upgrade + rollback) must
+    // never leave the worker permanently dead on the start-rate limit
+    expect(file.content).toContain('StartLimitIntervalSec=0');
     expectGolden('kobox-worker.service.golden', file.content);
   });
 

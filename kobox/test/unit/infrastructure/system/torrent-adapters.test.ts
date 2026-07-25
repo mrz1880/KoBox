@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { createServer, type Server } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -70,6 +70,28 @@ describe('RtorrentConfigAdapter', () => {
     expect(readFileSync(target, 'utf8')).toBe('content-v1\n');
     expect(runner.lines()).toContain(`chown root:alice ${target}`);
     expect(runner.lines()).toContain(`chmod 0640 ${target}`);
+  });
+
+  it('should_never_expose_a_secret_file_with_a_looser_mode_than_rendered', async () => {
+    // review #4: sasl_passwd rides this adapter — the file must be BORN with
+    // its final mode, not written 0644 and tightened after the rename
+    const modeAtChownTime: number[] = [];
+    const statingRunner: CommandRunner = {
+      run: (request) => {
+        if (request.command === 'chown') {
+          modeAtChownTime.push(statSync(request.args[1] ?? '').mode & 0o777);
+        }
+        return Promise.resolve({ stdout: '', stderr: '', exitCode: 0 });
+      },
+    };
+    const adapter = new RtorrentConfigAdapter(statingRunner);
+    const target = join(dir, 'sasl_passwd');
+
+    await adapter.apply([
+      { path: target, content: 'secret\n', mode: '0600', owner: 'root', group: 'root' },
+    ]);
+
+    expect(modeAtChownTime).toEqual([0o600]);
   });
 
   it('should_be_idempotent_when_content_is_identical', async () => {

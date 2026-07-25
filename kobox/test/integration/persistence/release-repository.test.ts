@@ -45,14 +45,19 @@ describe('SqliteReleaseRepository', () => {
     expect((await repo.findByState('current'))?.switchedAt).toBe('2026-07-25 10:05:00');
   });
 
-  it('should_list_releases_newest_first_and_reject_duplicate_paths', async () => {
-    await repo.record('v1.0.0', '/opt/kobox/releases/aaa', '2026-07-25 09:00:00');
-    await repo.record('v2.0.0', '/opt/kobox/releases/bbb', '2026-07-25 10:00:00');
+  it('should_list_releases_newest_first_and_restage_an_existing_path_in_place', async () => {
+    const first = await repo.record('v1.0.0', '/opt/kobox/releases/aaa', '2026-07-25 09:00:00');
+    const second = await repo.record('v2.0.0', '/opt/kobox/releases/bbb', '2026-07-25 10:00:00');
+    await repo.setState(first, 'failed', '2026-07-25 09:30:00');
+    await repo.setState(second, 'current', '2026-07-25 10:05:00');
 
     const rows = await repo.list();
     expect(rows.map((row) => row.ref)).toEqual(['v2.0.0', 'v1.0.0']);
-    await expect(
-      repo.record('v3.0.0', '/opt/kobox/releases/aaa', '2026-07-25 11:00:00'),
-    ).rejects.toThrow();
+
+    // upsert by path: retrying the ref reuses the row (no UNIQUE brick)
+    const retried = await repo.record('v1.0.0', '/opt/kobox/releases/aaa', '2026-07-25 11:00:00');
+    expect(retried).toBe(first);
+    expect((await repo.findByState('staged'))?.ref).toBe('v1.0.0');
+    expect(await repo.list()).toHaveLength(2);
   });
 });

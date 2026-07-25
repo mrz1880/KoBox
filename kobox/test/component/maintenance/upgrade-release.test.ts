@@ -37,6 +37,10 @@ class FakeGit implements GitPort {
   }
 
   worktreeAdd(_repo: string, path: string, ref: string): Promise<void> {
+    // mirrors git: adding over an existing worktree is an error
+    if (this.worktrees.has(path)) {
+      return Promise.reject(new Error(`fatal: '${path}' already exists`));
+    }
     this.worktrees.set(path, ref);
     return Promise.resolve();
   }
@@ -58,11 +62,20 @@ class InMemoryReleases implements ReleaseRepositoryPort {
     path: string;
     state: ReleaseState;
     createdAt: string;
-    switchedAt?: string;
+    switchedAt?: string | undefined;
   }[] = [];
   private nextId = 1;
 
   record(ref: string, path: string, now: string): Promise<number> {
+    // mirrors the Sqlite upsert: one row per path, re-staging reuses it
+    const existing = this.rows.find((r) => r.path === path);
+    if (existing) {
+      existing.ref = ref;
+      existing.state = 'staged';
+      existing.createdAt = now;
+      delete existing.switchedAt;
+      return Promise.resolve(existing.id);
+    }
     const id = this.nextId++;
     this.rows.push({ id, ref, path, state: 'staged', createdAt: now });
     return Promise.resolve(id);
@@ -79,13 +92,24 @@ class InMemoryReleases implements ReleaseRepositoryPort {
     return Promise.resolve();
   }
 
+  private snapshot(row: (typeof this.rows)[number]): ReleaseRecord {
+    return {
+      id: row.id,
+      ref: row.ref,
+      path: row.path,
+      state: row.state,
+      createdAt: row.createdAt,
+      ...(row.switchedAt !== undefined && { switchedAt: row.switchedAt }),
+    };
+  }
+
   findByState(state: ReleaseState): Promise<ReleaseRecord | undefined> {
     const row = [...this.rows].reverse().find((r) => r.state === state);
-    return Promise.resolve(row ? { ...row } : undefined);
+    return Promise.resolve(row ? this.snapshot(row) : undefined);
   }
 
   list(): Promise<readonly ReleaseRecord[]> {
-    return Promise.resolve([...this.rows].reverse().map((row) => ({ ...row })));
+    return Promise.resolve([...this.rows].reverse().map((row) => this.snapshot(row)));
   }
 }
 
@@ -228,6 +252,34 @@ describe('UpgradeRelease', () => {
     expect(w.host.switches).toEqual([STAGED_PATH, '/opt/KoBox/kobox']);
     expect(w.host.restarts).toBe(2); // failed verify + rollback restart
     expect((await w.releases.list())[0]?.state).toBe('failed');
+  });
+
+  it('should_retry_cleanly_after_a_failed_build', async () => {
+    // the natural response to a transient registry flake is `upgrade --to`
+    // again — the failed row and any leftover worktree must not block it
+    const w = world();
+    w.host.failBuild = true;
+    await expect(w.upgrade.execute({ to: 'v2.0.0', now: NOW })).rejects.toThrow(/pnpm build/);
+    w.host.failBuild = false;
+
+    const report = await w.upgrade.execute({ to: 'v2.0.0', now: '2026-07-25 11:00:00' });
+
+    expect(report.to).toBe('v2.0.0');
+    expect(w.host.current).toBe(STAGED_PATH);
+    expect((await w.releases.findByState('current'))?.path).toBe(STAGED_PATH);
+  });
+
+  it('should_re_upgrade_to_a_release_that_still_has_its_worktree_after_rollback', async () => {
+    const w = world();
+    await w.upgrade.execute({ to: 'v2.0.0', now: NOW });
+    w.git.refs.set('v3.0.0', 'c'.repeat(40));
+    await w.upgrade.execute({ to: 'v3.0.0', now: '2026-07-25 11:00:00' });
+    await w.upgrade.rollback({ now: '2026-07-25 12:00:00' }); // back on v2, v3 worktree remains
+
+    const report = await w.upgrade.execute({ to: 'v3.0.0', now: '2026-07-25 13:00:00' });
+
+    expect(report.to).toBe('v3.0.0');
+    expect(w.host.current).toBe(`/opt/kobox/releases/${'c'.repeat(40)}`);
   });
 
   it('should_refuse_when_a_staged_release_is_already_pending', async () => {

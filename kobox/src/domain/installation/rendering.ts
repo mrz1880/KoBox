@@ -16,6 +16,10 @@ export function renderWorkerUnit(settings: WorkerUnitSettings): RenderedFile {
       '[Unit]',
       'Description=KoBox root worker (typed job queue consumer)',
       'After=network.target',
+      // the watchdog replacement promise: the worker never gives up — the
+      // default start-rate limit would leave the box jobless after a burst
+      // of restarts (upgrade + rollback) until a manual reset-failed
+      'StartLimitIntervalSec=0',
       '',
       '[Service]',
       'Type=simple',

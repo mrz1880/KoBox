@@ -2,6 +2,7 @@
 [Unit]
 Description=KoBox root worker (typed job queue consumer)
 After=network.target
+StartLimitIntervalSec=0
 
 [Service]
 Type=simple

@@ -11,9 +11,12 @@ export class SendmailTransport implements MailTransportPort {
   constructor(private readonly runner: CommandRunner) {}
 
   async deliver(mail: MailDelivery): Promise<void> {
+    // header values are one line by definition: stripping CR/LF closes the
+    // header-injection class even if a future caller forwards user text
+    const headerSafe = (value: string): string => value.replace(/[\r\n]+/g, ' ');
     const message = [
-      `To: ${mail.recipient}`,
-      `Subject: ${mail.subject}`,
+      `To: ${headerSafe(mail.recipient)}`,
+      `Subject: ${headerSafe(mail.subject)}`,
       'Content-Type: text/plain; charset=utf-8',
       '',
       mail.body,

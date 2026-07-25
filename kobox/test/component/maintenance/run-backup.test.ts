@@ -12,6 +12,11 @@ class FakeBackupHost implements BackupHostPort {
 
   ensureDir(path: string, mode: string): Promise<void> {
     this.dirs.push([path, mode]);
+    // mirror the real adapter: a created stamp dir is visible to readdir
+    const stamp = path.split('/').at(-1) ?? '';
+    if (/^\d{8}T\d{6}Z$/.test(stamp)) {
+      this.existingStamps.push(stamp);
+    }
     return Promise.resolve();
   }
 
@@ -63,6 +68,19 @@ describe('RunBackup', () => {
     // /etc/kobox present -> archived; /etc/letsencrypt absent -> skipped
     expect(host.archived).toEqual([['/etc/kobox', `${dir}/etc-kobox.tar.gz`]]);
     expect(report.skippedDirs).toEqual(['/etc/letsencrypt']);
+  });
+
+  it('should_not_let_the_fresh_stamp_count_twice_against_keep_min', async () => {
+    // review #3: listBackups already sees today's dir (ensureDir ran first);
+    // the box-slept-a-month case must still keep keepMin DISTINCT backups
+    const host = new FakeBackupHost();
+    host.existingStamps = ['20260601T053000Z', '20260602T053000Z', '20260603T053000Z'];
+    const runBackup = new RunBackup({ backupHost: host, settings: SETTINGS });
+
+    const report = await runBackup.execute({ now: '2026-07-25 05:30:00' });
+
+    // survivors = today + the two newest expired = 3 distinct backups
+    expect(report.deleted).toEqual(['20260601T053000Z']);
   });
 
   it('should_rotate_expired_backups_beyond_keep_min', async () => {

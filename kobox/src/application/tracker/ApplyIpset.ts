@@ -5,6 +5,9 @@ import { renderIpsetRestore } from '../../domain/tracker/rendering.js';
 export interface ApplyIpsetReport {
   readonly applied: boolean;
   readonly entries: number;
+  // cache lines the render refused (not an address/CIDR/range) — silent
+  // filtering would hide a rotting cache
+  readonly rejected: number;
   readonly reason?: string;
 }
 
@@ -26,15 +29,17 @@ export class ApplyIpset {
     const ranges = await cache.read();
     const file = renderIpsetRestore(ranges);
     const entries = file.content.split('\n').filter((line) => line.startsWith('add ')).length;
+    const rejected = ranges.length - entries;
     await files.apply([file]);
     if (!(await ipset.ensureBlocklistSet())) {
       return {
         applied: false,
         entries,
+        rejected,
         reason: 'ipset unavailable (no binary or kernel ip_set support) — file rendered only',
       };
     }
     await ipset.restore(file.path);
-    return { applied: true, entries };
+    return { applied: true, entries, rejected };
   }
 }

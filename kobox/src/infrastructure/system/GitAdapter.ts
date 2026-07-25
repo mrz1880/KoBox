@@ -33,8 +33,10 @@ export class GitAdapter implements GitPort {
   }
 
   async worktreeAdd(repoDir: string, path: string, ref: string): Promise<void> {
-    // --detach: a release worktree is a frozen snapshot, never a branch
-    await this.git(repoDir, ['worktree', 'add', '--detach', path, ref]);
+    // --detach: a release worktree is a frozen snapshot, never a branch.
+    // --force: a path still registered from a hand-deleted worktree must not
+    // block a retry (the use case reaps live ones before calling this).
+    await this.git(repoDir, ['worktree', 'add', '--detach', '--force', path, ref]);
   }
 
   async worktreeRemove(repoDir: string, path: string): Promise<void> {
