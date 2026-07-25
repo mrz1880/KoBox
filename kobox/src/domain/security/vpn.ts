@@ -10,11 +10,12 @@ import type { VpnSettings } from './FirewallPolicy.js';
 export const VPN_VARIANTS = ['tun-gw', 'tun', 'tap'] as const;
 export type VpnVariant = (typeof VPN_VARIANTS)[number];
 
+// EC PKI (easy-rsa EASYRSA_ALGO=ec): no dh.pem exists anywhere — the server
+// runs `dh none` and OpenVPN negotiates ECDHE.
 export interface VpnServerPaths {
   readonly caCrt: string;
   readonly serverCrt: string;
   readonly serverKey: string;
-  readonly dhPem: string;
 }
 
 export interface VpnClientMaterial {
@@ -77,7 +78,7 @@ export function renderOpenVpnServer(
       `ca ${pki.caCrt}`,
       `cert ${pki.serverCrt}`,
       `key ${pki.serverKey}`,
-      `dh ${pki.dhPem}`,
+      'dh none',
       ...COMMON_CRYPTO,
       'keepalive 10 120',
       'persist-key',

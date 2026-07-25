@@ -37,7 +37,6 @@ const pki: VpnServerPaths = {
   caCrt: '/etc/openvpn/kobox-pki/ca.crt',
   serverCrt: '/etc/openvpn/kobox-pki/issued/server.crt',
   serverKey: '/etc/openvpn/kobox-pki/private/server.key',
-  dhPem: '/etc/openvpn/kobox-pki/dh.pem',
 };
 
 const material: VpnClientMaterial = {
@@ -61,6 +60,16 @@ describe('renderOpenVpnServer', () => {
       const content = renderOpenVpnServer(variant, vpn, pki).content;
       expect(content).not.toContain('comp-lzo');
       expect(content).not.toMatch(/^compress/m);
+    }
+  });
+
+  it('should_use_ec_key_exchange_with_dh_none', () => {
+    // the Phase 4 PKI bootstrap is EC (EASYRSA_ALGO=ec): no dh.pem exists,
+    // OpenVPN negotiates ECDHE — `dh none` is the matching server setting
+    for (const variant of VPN_VARIANTS) {
+      const content = renderOpenVpnServer(variant, vpn, pki).content;
+      expect(content).toContain('dh none');
+      expect(content).not.toContain('dh.pem');
     }
   });
 

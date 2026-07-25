@@ -1,0 +1,8 @@
+<?php
+// KoBox-managed — DO NOT EDIT (rendered declaratively).
+$topDirectory = '/home';
+$scgi_port = 5000;
+$scgi_host = '127.0.0.1';
+$XMLRPCMountPoint = '/RPC2';
+$saveUploadedTorrents = true;
+$overwriteUploadedTorrents = false;
