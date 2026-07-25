@@ -39,6 +39,8 @@ export const JOB_TYPES = [
   'remove-user-hostname',
   'resolve-dyndns',
   'render-openvpn',
+  'provision-vpn-user',
+  'deprovision-vpn-user',
   'evaluate-fair-use',
 ] as const;
 
@@ -141,6 +143,8 @@ export const jobPayloadSchemas = {
   'remove-user-hostname': userHostnamePayload,
   'resolve-dyndns': z.strictObject({}),
   'render-openvpn': z.strictObject({}),
+  'provision-vpn-user': usernameOnly,
+  'deprovision-vpn-user': usernameOnly,
   'evaluate-fair-use': z.strictObject({}),
 } satisfies Record<JobType, z.ZodType>;
 

@@ -1,0 +1,15 @@
+# KoBox-managed — DO NOT EDIT (rendered declaratively).
+[Unit]
+Description=KoBox firewall restore at boot
+ConditionPathExists=/etc/kobox/firewall.rules
+DefaultDependencies=no
+Before=network-pre.target
+Wants=network-pre.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/sbin/iptables-restore /etc/kobox/firewall.rules
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

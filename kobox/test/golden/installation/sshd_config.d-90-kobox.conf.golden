@@ -1,0 +1,8 @@
+# KoBox-managed — DO NOT EDIT (rendered declaratively).
+PermitRootLogin prohibit-password
+PasswordAuthentication yes
+X11Forwarding no
+MaxAuthTries 4
+LoginGraceTime 30
+ClientAliveInterval 300
+ClientAliveCountMax 2

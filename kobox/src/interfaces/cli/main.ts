@@ -10,7 +10,7 @@ import { ProxyPort } from '../../domain/user/Port.js';
 import { Quota } from '../../domain/user/Quota.js';
 import { Username } from '../../domain/user/Username.js';
 import { TorrentEventSpoolWriter } from '../../infrastructure/spool/TorrentEventSpool.js';
-import { buildContainer, spoolDir, type Container } from '../composition.js';
+import { buildContainer, buildInstallation, spoolDir, type Container } from '../composition.js';
 import { buildJob } from './buildJob.js';
 
 async function readStdin(): Promise<string> {
@@ -495,6 +495,71 @@ program
     const job = await buildJob.changePassword({ username: username.value }, password, c.hasher);
     const id = await c.queue.enqueue(job);
     await done(c, `job ${String(id)} enqueued: change-password ${username.value}`);
+  });
+
+// ---- Installation & Provisioning (Phase 4) ------------------------------
+
+program
+  .command('install')
+  .option('--allow-non-ext4', 'proceed on a non-ext4 root filesystem (containers/VMs)')
+  .option('--manage-apt-sources', 'let KoBox own /etc/apt/sources.list (canonical Debian 12)')
+  .description('install the KoBox stack on this host (direct root execution, resumable)')
+  .action(async (options: Record<string, boolean | undefined>) => {
+    const c = container();
+    try {
+      const wiring = await buildInstallation(c, {
+        allowNonExt4: options.allowNonExt4 === true,
+        manageAptSources: options.manageAptSources === true,
+      });
+      const report = await wiring.run.execute({ allowNonExt4: options.allowNonExt4 === true });
+      const summary = {
+        installed: report.installed,
+        skipped: report.skipped,
+        alreadyInstalled: report.alreadyInstalled,
+        convergenceJobs: report.drainedJobs,
+      };
+      process.stdout.write(`${JSON.stringify(summary, null, 2)}\n`);
+    } finally {
+      c.db.close();
+    }
+  });
+
+program
+  .command('install-status')
+  .description('print the component registry as JSON')
+  .action(async () => {
+    const c = container();
+    try {
+      const wiring = await buildInstallation(c, { allowNonExt4: false, manageAptSources: false });
+      const rows = (await wiring.registry.list()).map((record) => ({
+        name: record.name.value,
+        state: record.state.value,
+        version: record.version?.value ?? null,
+        reason: record.reason ?? null,
+        installedAt: record.installedAt ?? null,
+      }));
+      process.stdout.write(`${JSON.stringify(rows, null, 2)}\n`);
+    } finally {
+      c.db.close();
+    }
+  });
+
+program
+  .command('uninstall')
+  .option('--yes', 'confirm the teardown')
+  .description('uninstall KoBox-managed units and files (keeps packages, user data and the DB)')
+  .action(async (options: Record<string, boolean | undefined>) => {
+    if (options.yes !== true) {
+      throw new Error('refusing to uninstall without --yes');
+    }
+    const c = container();
+    try {
+      const wiring = await buildInstallation(c, { allowNonExt4: false, manageAptSources: false });
+      const report = await wiring.uninstall.execute();
+      process.stdout.write(`${JSON.stringify({ uninstalled: report.uninstalled }, null, 2)}\n`);
+    } finally {
+      c.db.close();
+    }
   });
 
 program

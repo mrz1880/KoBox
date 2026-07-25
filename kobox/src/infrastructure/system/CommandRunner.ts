@@ -5,6 +5,9 @@ export interface CommandRequest {
   readonly args: readonly string[];
   readonly stdin?: string;
   readonly timeoutMs?: number; // default 60 s; network probes want much less
+  // Overlay merged over process.env (apt wants DEBIAN_FRONTEND, easy-rsa its
+  // EASYRSA_* family). Still argv-only: no shell is ever involved.
+  readonly env?: Readonly<Record<string, string>>;
 }
 
 export interface CommandResult {
@@ -47,7 +50,11 @@ export class ExecFileRunner implements CommandRunner {
       const child = execFile(
         request.command,
         [...request.args],
-        { encoding: 'utf8', timeout: request.timeoutMs ?? 60_000 },
+        {
+          encoding: 'utf8',
+          timeout: request.timeoutMs ?? 60_000,
+          ...(request.env !== undefined && { env: { ...process.env, ...request.env } }),
+        },
         (error, stdout, stderr) => {
           if (error && typeof error.code !== 'number') {
             // spawn failure (ENOENT, timeout kill) — not a command exit code

@@ -45,6 +45,10 @@ async function main(): Promise<void> {
       c.logger.info({ count }, 'queue drained');
       return;
     }
+    // Daemon mode = systemd service = every boot: the oneshot restores the
+    // filter table from the persisted file, but the nat masquerade lives
+    // outside the ruleset (shared table) — reconverge it here.
+    await c.queue.enqueue(parseJob('apply-firewall', {}));
     while (!signal.stopping) {
       await sweepSpool(c);
       const processed = await c.worker.processNext();

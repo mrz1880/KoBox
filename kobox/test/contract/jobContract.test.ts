@@ -35,6 +35,8 @@ describe('job contract', () => {
       'remove-user-hostname',
       'resolve-dyndns',
       'render-openvpn',
+      'provision-vpn-user',
+      'deprovision-vpn-user',
       'evaluate-fair-use',
     ]);
   });

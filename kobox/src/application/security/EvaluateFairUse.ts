@@ -13,6 +13,7 @@ import type {
 import type { SecurityEvent } from '../../domain/security/events.js';
 import type { HealthProbePort, UserRepository } from '../../domain/user/ports.js';
 import type { SeedboxUser } from '../../domain/user/SeedboxUser.js';
+import type { Username } from '../../domain/user/Username.js';
 
 const AUTH_WINDOW_MINUTES = 60;
 
@@ -51,38 +52,71 @@ export class EvaluateFairUse {
     let throttled = 0;
     for (const user of await users.listAll()) {
       if (user.status.isSuspended()) {
-        continue; // suspended = already handled by a human
+        // suspended = already handled by a human; but a user throttled THEN
+        // suspended must not keep an inert tc class (Phase 3 review debt)
+        await this.releaseSuspendedThrottle(user.username, now);
+        continue;
       }
       const uid = await this.deps.identity.uidOf(user.username);
       if (uid === undefined) {
         continue;
       }
       evaluated += 1;
-      const { decision, budget } = await this.evaluateOne(
-        user,
-        counters.get(user.username.value),
-        now,
-      );
-      breaches += decision.events.some(
-        (event) => event.type === 'FairUseBreached' || event.type === 'AbnormalAuthRate',
-      )
-        ? 1
-        : 0;
-      throttled += decision.actions.includes('throttle') ? 1 : 0;
+      // one broken user (dead journal, uid beyond the classid space) must
+      // not blind the evaluator for everyone else — record and move on
+      try {
+        const { decision, budget } = await this.evaluateOne(
+          user,
+          counters.get(user.username.value),
+          now,
+        );
+        breaches += decision.events.some(
+          (event) => event.type === 'FairUseBreached' || event.type === 'AbnormalAuthRate',
+        )
+          ? 1
+          : 0;
+        throttled += decision.actions.includes('throttle') ? 1 : 0;
 
-      for (const action of decision.actions) {
-        if (action === 'throttle') {
-          await this.deps.shaping.throttle(user.username, uid, budget.throttleTo);
-        } else {
-          await this.deps.shaping.unthrottle(user.username, uid);
+        for (const action of decision.actions) {
+          if (action === 'throttle') {
+            await this.deps.shaping.throttle(user.username, uid, budget.throttleTo);
+          } else {
+            await this.deps.shaping.unthrottle(user.username, uid);
+          }
         }
-      }
-      for (const event of decision.events) {
-        await fairUse.appendEvent(user.username, event.type, JSON.stringify(event), now);
-        await this.deps.notifications.notify(event);
+        for (const event of decision.events) {
+          await fairUse.appendEvent(user.username, event.type, JSON.stringify(event), now);
+          await this.deps.notifications.notify(event);
+        }
+      } catch (error) {
+        await fairUse.appendEvent(
+          user.username,
+          'FairUseEvaluationError',
+          JSON.stringify({ message: error instanceof Error ? error.message : String(error) }),
+          now,
+        );
       }
     }
     return { evaluated, breaches, throttled };
+  }
+
+  private async releaseSuspendedThrottle(username: Username, now: string): Promise<void> {
+    const { fairUse, identity, shaping } = this.deps;
+    const state = await fairUse.getState(username);
+    if (state.level !== 'throttled') {
+      return;
+    }
+    const uid = await identity.uidOf(username);
+    if (uid !== undefined) {
+      await shaping.unthrottle(username, uid);
+    }
+    await fairUse.saveState(username, { ...state, level: 'none' }, now);
+    await fairUse.appendEvent(
+      username,
+      'SuspendedUserUnthrottled',
+      JSON.stringify({ username: username.value }),
+      now,
+    );
   }
 
   private async evaluateOne(

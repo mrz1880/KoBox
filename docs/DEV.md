@@ -78,6 +78,26 @@ Notes :
   fail2ban n'est validé que par `fail2ban-client -t` — le service reste coupé
   dans le conteneur pour qu'aucun ban ne perturbe les tests.
 
+- **Installation & Provisioning (Phase 4)** : `kobox install` s'exécute **en direct root**
+  (pas via la queue — le worker systemd n'existe pas encore) puis fait converger l'état
+  désiré en drainant les jobs de rendu des Phases 1-3. L'E2E d'install
+  (`test/e2e/installation.e2e.test.ts`) rejoue `bootstrap/install.sh` dans le conteneur :
+  apt parle aux vrais miroirs Debian (seul réseau sortant sanctionné) ; l'archive ruTorrent
+  vient d'une **fixture https locale** (`lists.example.net:8446` sur 127.0.0.2) — pin via
+  `KOBOX_RUTORRENT_URL`/`KOBOX_RUTORRENT_SHA256` (pas de défaut embarqué : sans pin le
+  composant est `skipped` avec guidance). Env utiles : `KOBOX_STRICT_SERVICES=1` (unité
+  absente = erreur, sauf `pgl`, honnêtement `skipped` sur Debian 12 — remplacement ipset à
+  trancher en Phase 5), `KOBOX_INSTALL_DIR`, `KOBOX_QUOTA_FS` (l'installeur n'édite JAMAIS
+  fstab : il active les quotas seulement si `usrquota` est déjà monté, sinon il imprime la
+  marche à suivre). Le snapshot des `KOBOX_*` du moment de l'install est rendu dans
+  `/etc/kobox/worker.env` (0600) pour que `kobox-worker.service` tourne avec la même
+  configuration. La PKI OpenVPN est **EC** (easy-rsa `EASYRSA_ALGO=ec`, `dh none`) ;
+  `create-user`/`delete-user` chaînent l'émission/suppression du matériel client (le
+  `.ovpn` embarque la clé : il ne survit pas à l'utilisateur). `kobox uninstall --yes` est
+  l'anti-CleanAll : désactive les unités, retire les fichiers KoBox, ne touche ni
+  `/home`, ni la DB, ni les paquets. ⚠️ L'E2E d'install active fail2ban puis le
+  redésactive en afterAll (règle Phase 3 : jamais de bans pendant les suites).
+
 ## VM Multipass (validation full-stack, quotas ext4 réels)
 
 ```bash

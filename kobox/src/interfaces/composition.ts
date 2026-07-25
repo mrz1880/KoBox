@@ -1,3 +1,19 @@
+import { fileURLToPath } from 'node:url';
+import { parseJob } from '../application/jobs/contract.js';
+import { buildInstallers, type InstallerContext } from '../application/installation/installers.js';
+import { RunInstallation } from '../application/installation/RunInstallation.js';
+import { UninstallComponents } from '../application/installation/UninstallComponents.js';
+import { COMPONENT_CATALOG } from '../domain/installation/catalog.js';
+import { SqliteComponentRegistry } from '../infrastructure/persistence/SqliteComponentRegistry.js';
+import { AptPackageAdapter } from '../infrastructure/system/AptPackageAdapter.js';
+import {
+  ArtifactFetchAdapter,
+  defaultBodyFetcher,
+} from '../infrastructure/system/ArtifactFetchAdapter.js';
+import { ConfigCheckAdapter } from '../infrastructure/system/ConfigCheckAdapter.js';
+import { InstallHostAdapter } from '../infrastructure/system/InstallHostAdapter.js';
+import { SystemdAdapter } from '../infrastructure/system/SystemdAdapter.js';
+import { SystemFactsAdapter } from '../infrastructure/system/SystemFactsAdapter.js';
 import { createLogger, type Logger } from '../infrastructure/logging/logger.js';
 import { ConsoleNotificationAdapter } from '../infrastructure/notifications/ConsoleNotificationAdapter.js';
 import { DiscordChannel } from '../infrastructure/notifications/DiscordChannel.js';
@@ -36,7 +52,8 @@ import { DynDnsHost } from '../domain/security/DynDnsHost.js';
 import { FairUsePolicy } from '../domain/security/FairUsePolicy.js';
 import { SqliteFairUseRepository } from '../infrastructure/persistence/SqliteFairUseRepository.js';
 import { DynDnsLookupAdapter } from '../infrastructure/system/DynDnsLookupAdapter.js';
-import { FsVpnPkiAdapter, DEFAULT_PKI_DIR } from '../infrastructure/system/FsVpnPkiAdapter.js';
+import { DEFAULT_PKI_DIR } from '../infrastructure/system/FsVpnPkiAdapter.js';
+import { EasyRsaPkiAdapter } from '../infrastructure/system/EasyRsaPkiAdapter.js';
 import { IptablesUsageMeterAdapter } from '../infrastructure/system/IptablesUsageMeterAdapter.js';
 import { JournaldSshAuthAdapter } from '../infrastructure/system/JournaldSshAuthAdapter.js';
 import { TcShapingAdapter } from '../infrastructure/system/TcShapingAdapter.js';
@@ -132,6 +149,96 @@ export function securitySettings(): SecuritySettings {
 export const DEFAULT_DB_PATH = '/var/lib/kobox/kobox.db';
 export const DEFAULT_KOBOX_BIN = '/usr/local/bin/kobox';
 
+// Snapshot of the KOBOX_* environment at install time: rendered into
+// /etc/kobox/worker.env (0600) so the systemd worker sees the same
+// configuration the installer was launched with.
+export function koboxEnvSnapshot(): ReadonlyMap<string, string> {
+  const snapshot = new Map<string, string>();
+  for (const [key, value] of Object.entries(process.env)) {
+    if (key.startsWith('KOBOX_') && value !== undefined) {
+      snapshot.set(key, value);
+    }
+  }
+  return snapshot;
+}
+
+export interface InstallFlags {
+  readonly allowNonExt4: boolean;
+  readonly manageAptSources: boolean;
+}
+
+export interface InstallationWiring {
+  readonly run: RunInstallation;
+  readonly uninstall: UninstallComponents;
+  readonly registry: SqliteComponentRegistry;
+}
+
+// Installation runs DIRECT as root (bootstrap problem: the worker unit does
+// not exist yet); convergence still flows through the same typed job queue
+// and JobWorker production uses.
+export async function buildInstallation(
+  c: Container,
+  flags: InstallFlags,
+): Promise<InstallationWiring> {
+  const runner = new ExecFileRunner();
+  const facts = await new SystemFactsAdapter(runner).gather();
+  const rutorrentUrl = process.env.KOBOX_RUTORRENT_URL;
+  const rutorrentSha256 = process.env.KOBOX_RUTORRENT_SHA256;
+  const quotaFs = process.env.KOBOX_QUOTA_FS;
+  const installPki = new EasyRsaPkiAdapter(runner, process.env.KOBOX_VPN_PKI ?? DEFAULT_PKI_DIR);
+  const ctx: InstallerContext = {
+    packages: new AptPackageAdapter(runner),
+    files: new RtorrentConfigAdapter(runner),
+    systemd: new SystemdAdapter(runner),
+    checks: new ConfigCheckAdapter(runner),
+    host: new InstallHostAdapter(runner),
+    pki: installPki,
+    pkiProvision: installPki,
+    artifacts: new ArtifactFetchAdapter(defaultBodyFetcher()),
+    facts,
+    security: securitySettings(),
+    install: {
+      nodeBin: process.execPath,
+      workerMain: fileURLToPath(new URL('./worker/main.js', import.meta.url)),
+      manageAptSources: flags.manageAptSources,
+      ...(rutorrentUrl !== undefined && rutorrentUrl !== '' && { rutorrentUrl }),
+      ...(rutorrentSha256 !== undefined &&
+        rutorrentSha256 !== '' && { rutorrentSha256 }),
+      ...(quotaFs !== undefined && quotaFs !== '' && { quotaFs }),
+      workerEnv: koboxEnvSnapshot(),
+    },
+  };
+  const installers = buildInstallers(ctx);
+  const registry = new SqliteComponentRegistry(c.db);
+  const now = (): string => new Date().toISOString().slice(0, 19).replace('T', ' ');
+  const onProgress = (line: string): void => {
+    process.stdout.write(`${line}\n`);
+  };
+  return {
+    run: new RunInstallation({
+      facts: { gather: () => Promise.resolve(facts) },
+      registry,
+      packages: ctx.packages,
+      installers,
+      catalog: COMPONENT_CATALOG,
+      enqueueConvergence: async (type) => {
+        await c.queue.enqueue(parseJob(type, {}));
+      },
+      drain: () => c.worker.drain(),
+      now,
+      onProgress,
+    }),
+    uninstall: new UninstallComponents({
+      registry,
+      installers,
+      catalog: COMPONENT_CATALOG,
+      now,
+      onProgress,
+    }),
+    registry,
+  };
+}
+
 export function spoolDir(): string {
   return process.env.KOBOX_SPOOL ?? DEFAULT_SPOOL_DIR;
 }
@@ -195,12 +302,19 @@ export function buildContainer(name: string): Container {
   const iblocklistUser = process.env.KOBOX_IBLOCKLIST_USER;
   const iblocklistPin = process.env.KOBOX_IBLOCKLIST_PIN;
   const networkFiles = new RtorrentConfigAdapter(runner);
-  const networkServices = new NetworkServiceAdapter(runner, logger);
+  const networkServices = new NetworkServiceAdapter(runner, logger, {
+    // post-install contract: absent units are breakage, except components
+    // kobox install honestly skips (neither pgl nor dnscrypt-proxy is
+    // packaged for Debian 12)
+    strict: process.env.KOBOX_STRICT_SERVICES === '1',
+    tolerateAbsent: ['pgl', 'dnscrypt-proxy'],
+  });
   const trackerRepo = new SqliteTrackerRepository(db);
   const addressRepo = new SqliteUserAddressRepository(db);
   const healthProbe = new ProcessSocketHealthProbe(runner);
   const settings = securitySettings();
   const fairUseRepo = new SqliteFairUseRepository(db);
+  const vpnPki = new EasyRsaPkiAdapter(runner, process.env.KOBOX_VPN_PKI ?? DEFAULT_PKI_DIR);
   const trackerUseCases = buildTrackerUseCases({
     trackers: trackerRepo,
     blocklists: new SqliteBlocklistRepository(db),
@@ -230,7 +344,10 @@ export function buildContainer(name: string): Container {
     files: networkFiles,
     reload: networkServices,
     resolver: new DynDnsLookupAdapter(),
-    pki: new FsVpnPkiAdapter(process.env.KOBOX_VPN_PKI ?? DEFAULT_PKI_DIR),
+    // one adapter serves both the read side (renders) and the mutating side
+    // (client cert lifecycle chained from create/delete-user)
+    pki: vpnPki,
+    pkiProvision: vpnPki,
     fairUse: fairUseRepo,
     meter: new IptablesUsageMeterAdapter(runner),
     authLog: new JournaldSshAuthAdapter(runner),

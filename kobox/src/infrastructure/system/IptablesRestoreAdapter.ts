@@ -1,4 +1,5 @@
 import { readFile } from 'node:fs/promises';
+import type { Cidr } from '../../domain/security/Cidr.js';
 import type { FirewallApplyOutcome, FirewallApplyPort } from '../../domain/security/ports.js';
 import type { ManagedFilesPort, RenderedFile } from '../../domain/shared/files.js';
 import type { HealthProbePort } from '../../domain/user/ports.js';
@@ -57,5 +58,30 @@ export class IptablesRestoreAdapter implements FirewallApplyPort {
 
     await this.files.apply([rules]);
     return 'applied';
+  }
+
+  // nat is shared with Docker (embedded DNS DNAT lives there): the VPN
+  // masquerade is appended only when missing, mirroring how the shaper owns
+  // its mangle rules.
+  async ensureMasquerade(subnet: Cidr): Promise<void> {
+    const ruleArgs = [
+      'POSTROUTING',
+      '-s', subnet.value,
+      '!', '-d', subnet.value,
+      '-j', 'MASQUERADE',
+    ];
+    const check = await this.runner.run({
+      command: 'iptables',
+      args: ['-t', 'nat', '-C', ...ruleArgs],
+      timeoutMs: RESTORE_TIMEOUT_MS,
+    });
+    if (check.exitCode === 0) {
+      return;
+    }
+    await runOrThrow(this.runner, {
+      command: 'iptables',
+      args: ['-t', 'nat', '-A', ...ruleArgs],
+      timeoutMs: RESTORE_TIMEOUT_MS,
+    });
   }
 }

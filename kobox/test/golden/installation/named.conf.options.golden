@@ -1,0 +1,12 @@
+// KoBox-managed — DO NOT EDIT (rendered declaratively).
+options {
+    directory "/var/cache/bind";
+    listen-on { 127.0.0.1; };
+    listen-on-v6 { ::1; };
+    allow-query { localhost; };
+    recursion yes;
+    forward only;
+    // dnscrypt-proxy validates DNSSEC upstream (require_dnssec)
+    forwarders { 127.0.0.1 port 52; };
+    dnssec-validation no;
+};

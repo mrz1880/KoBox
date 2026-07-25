@@ -15,7 +15,9 @@ import { RenderRtorrentConfig } from '../application/torrent/RenderRtorrentConfi
 import { SetAllowPublicTracker } from '../application/torrent/SetAllowPublicTracker.js';
 import { SetSyncDisabled } from '../application/torrent/SetSyncDisabled.js';
 import { ApplyFirewall } from '../application/security/ApplyFirewall.js';
+import { DeprovisionVpnUser } from '../application/security/DeprovisionVpnUser.js';
 import { EvaluateFairUse } from '../application/security/EvaluateFairUse.js';
+import { ProvisionVpnUser } from '../application/security/ProvisionVpnUser.js';
 import { ManageUserHostname } from '../application/security/ManageUserHostname.js';
 import { RenderFail2ban } from '../application/security/RenderFail2ban.js';
 import { RenderOpenVpn } from '../application/security/RenderOpenVpn.js';
@@ -63,6 +65,7 @@ import type {
   UsageMeterPort,
   UserIdentityPort,
   VpnPkiPort,
+  VpnPkiProvisionPort,
 } from '../domain/security/ports.js';
 import type { RenderSettings, RtorrentTemplates } from '../domain/torrent/rendering.js';
 import type { PortAllocatorPort } from '../domain/user/PortAllocatorPort.js';
@@ -184,6 +187,7 @@ export interface SecurityUseCaseDeps {
   readonly reload: NetworkServicePort;
   readonly resolver: DynDnsResolverPort;
   readonly pki: VpnPkiPort;
+  readonly pkiProvision: VpnPkiProvisionPort;
   readonly fairUse: FairUseRepository;
   readonly meter: UsageMeterPort;
   readonly authLog: SshAuthLogPort;
@@ -200,6 +204,8 @@ export interface SecurityUseCases {
   readonly manageUserHostname: ManageUserHostname;
   readonly resolveDynDns: ResolveDynDns;
   readonly renderOpenVpn: RenderOpenVpn;
+  readonly provisionVpnUser: ProvisionVpnUser;
+  readonly deprovisionVpnUser: DeprovisionVpnUser;
   readonly evaluateFairUse: EvaluateFairUse;
 }
 
@@ -210,6 +216,8 @@ export function buildSecurityUseCases(deps: SecurityUseCaseDeps): SecurityUseCas
     manageUserHostname: new ManageUserHostname(deps),
     resolveDynDns: new ResolveDynDns(deps),
     renderOpenVpn: new RenderOpenVpn(deps),
+    provisionVpnUser: new ProvisionVpnUser(deps),
+    deprovisionVpnUser: new DeprovisionVpnUser(deps),
     evaluateFairUse: new EvaluateFairUse(deps),
   };
 }

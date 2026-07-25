@@ -45,10 +45,3 @@
 -A kobox-meter-out -m owner --uid-owner 1001 -m comment --comment "kobox:egress:alice" -j RETURN
 -A kobox-meter-out -m owner --uid-owner 1002 -m comment --comment "kobox:egress:bob" -j RETURN
 COMMIT
-*nat
-:PREROUTING ACCEPT [0:0]
-:INPUT ACCEPT [0:0]
-:OUTPUT ACCEPT [0:0]
-:POSTROUTING ACCEPT [0:0]
--A POSTROUTING -s 10.0.0.0/24 ! -d 10.0.0.0/24 -j MASQUERADE
-COMMIT

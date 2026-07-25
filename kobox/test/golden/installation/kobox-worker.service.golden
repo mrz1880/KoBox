@@ -1,0 +1,14 @@
+# KoBox-managed — DO NOT EDIT (rendered declaratively).
+[Unit]
+Description=KoBox root worker (typed job queue consumer)
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/node /opt/kobox/dist/interfaces/worker/main.js
+EnvironmentFile=-/etc/kobox/worker.env
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

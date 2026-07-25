@@ -93,6 +93,19 @@ describe('ApplyFirewall', () => {
     expect(notifications.published).toHaveLength(1);
   });
 
+  it('should_ensure_the_vpn_masquerade_outside_the_rendered_ruleset', async () => {
+    // nat is shared with Docker: never restored wholesale, always a targeted
+    // check-then-add — and re-ensured on EVERY run (unchanged included)
+    await repo.save(aUser().build());
+    identity.setUid('alice', 1001);
+
+    await useCase.execute();
+    await useCase.execute(); // unchanged run
+
+    expect(firewall.masquerades).toEqual(['10.0.0.0/24', '10.0.0.0/24']);
+    expect(firewall.applied[0]?.content ?? '').not.toContain('MASQUERADE');
+  });
+
   it('should_skip_users_without_a_system_account_and_report_them', async () => {
     await repo.save(aUser().build());
     await repo.save(aUser().withUsername('bob').withScgiPort(51102).withRtorrentPort(45001).build());

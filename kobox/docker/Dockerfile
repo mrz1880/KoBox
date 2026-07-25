@@ -8,6 +8,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     systemd-sysv \
     dbus \
     bind9utils \
+    easy-rsa \
     ca-certificates \
     curl \
     fail2ban \

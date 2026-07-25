@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { integer, sqliteTable, text, unique } from 'drizzle-orm/sqlite-core';
+import { index, integer, sqliteTable, text, unique } from 'drizzle-orm/sqlite-core';
 
 export const users = sqliteTable('users', {
   id: integer('id').primaryKey({ autoIncrement: true }),
@@ -150,12 +150,29 @@ export const fairUseState = sqliteTable('fair_use_state', {
 
 // Append-only audit trail: every fair-use decision is traceable (locked
 // decision 2026-07-23 — reversible AND audited).
-export const fairUseEvents = sqliteTable('fair_use_events', {
+export const fairUseEvents = sqliteTable(
+  'fair_use_events',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    username: text('username').notNull(),
+    eventType: text('event_type').notNull(),
+    detailJson: text('detail_json').notNull(),
+    createdAt: text('created_at').notNull(),
+  },
+  (table) => [index('fair_use_events_username_idx').on(table.username)],
+);
+
+// The component registry (KoBox successor of the legacy `services` table):
+// what `kobox install` attempted, in which state it ended and why. `reason`
+// carries skip/failure detail; a failed row re-enters the next plan.
+export const components = sqliteTable('components', {
   id: integer('id').primaryKey({ autoIncrement: true }),
-  username: text('username').notNull(),
-  eventType: text('event_type').notNull(),
-  detailJson: text('detail_json').notNull(),
-  createdAt: text('created_at').notNull(),
+  name: text('name').notNull().unique(),
+  state: text('state', { enum: ['to_install', 'installed', 'failed', 'skipped'] }).notNull(),
+  version: text('version'),
+  reason: text('reason'),
+  installedAt: text('installed_at'),
+  updatedAt: text('updated_at').notNull(),
 });
 
 // Per-user overrides only; installation defaults live in composition.
