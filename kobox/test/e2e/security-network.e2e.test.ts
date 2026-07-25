@@ -26,7 +26,6 @@ const FIXTURE_IP = '127.0.0.2';
 const CHANGED_IP = '127.0.0.4';
 const RULES_PATH = '/etc/kobox/firewall.rules';
 const JAIL_PATH = '/etc/fail2ban/jail.d/kobox.local';
-const ALLOW_P2P = '/etc/pgl/allow.p2p';
 
 let env: NodeJS.ProcessEnv;
 let dbPath: string;
@@ -140,7 +139,7 @@ describe.skipIf(!onDebianAsRoot)('E2E: security & network — the user-h slice',
       KOBOX_VPN_REMOTE: DYN_HOST,
     };
 
-    for (const path of [RULES_PATH, JAIL_PATH, ALLOW_P2P]) {
+    for (const path of [RULES_PATH, JAIL_PATH]) {
       rmSync(path, { force: true });
     }
     wipeJournalWindow(); // older suites may have logged Accepted publickey lines
@@ -213,7 +212,6 @@ describe.skipIf(!onDebianAsRoot)('E2E: security & network — the user-h slice',
     kobox(['resolve-dyndns']);
     await drainQueue(); // resolve + chained render-whitelist/apply-firewall/render-fail2ban
 
-    expect(readFileSync(ALLOW_P2P, 'utf8')).toContain(`${USER}:${FIXTURE_IP}`);
     expect(readFileSync(JAIL_PATH, 'utf8')).toContain(FIXTURE_IP);
     expect(readFileSync(RULES_PATH, 'utf8')).toContain(
       `-A INPUT -s ${FIXTURE_IP} -m comment --comment "kobox:trusted:${USER}" -j ACCEPT`,
@@ -224,10 +222,11 @@ describe.skipIf(!onDebianAsRoot)('E2E: security & network — the user-h slice',
     kobox(['resolve-dyndns']);
     await drainQueue();
 
-    expect(readFileSync(ALLOW_P2P, 'utf8')).toContain(`${USER}:${CHANGED_IP}`);
-    expect(readFileSync(ALLOW_P2P, 'utf8')).not.toContain(`${USER}:${FIXTURE_IP}`);
     expect(readFileSync(JAIL_PATH, 'utf8')).toContain(CHANGED_IP);
     expect(readFileSync(RULES_PATH, 'utf8')).toContain(`-A INPUT -s ${CHANGED_IP}`);
+    // the old address left the LIVE trust surface (allow.p2p died with pgl:
+    // the firewall's trusted accepts ARE the member allow-list now)
+    expect(readFileSync(RULES_PATH, 'utf8')).not.toContain(`-A INPUT -s ${FIXTURE_IP}`);
     const row = dbRow('SELECT * FROM user_addresses WHERE check_by = ?', 'hostname');
     expect(row?.hostname).toBe(DYN_HOST);
     expect(row?.ipv4).toBe(CHANGED_IP);

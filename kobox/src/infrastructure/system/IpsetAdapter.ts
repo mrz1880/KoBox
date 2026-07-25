@@ -11,12 +11,18 @@ export class IpsetAdapter implements IpsetPort {
   constructor(private readonly runner: CommandRunner) {}
 
   async ensureBlocklistSet(): Promise<boolean> {
-    const result = await this.runner.run({
-      command: 'ipset',
-      args: ['create', 'kobox-bl', 'hash:net', 'family', 'inet', 'maxelem', '1048576', '-exist'],
-      timeoutMs: IPSET_TIMEOUT_MS,
-    });
-    return result.exitCode === 0;
+    try {
+      const result = await this.runner.run({
+        command: 'ipset',
+        args: ['create', 'kobox-bl', 'hash:net', 'family', 'inet', 'maxelem', '1048576', '-exist'],
+        timeoutMs: IPSET_TIMEOUT_MS,
+      });
+      return result.exitCode === 0;
+    } catch {
+      // spawn failure = no ipset binary at all: same honest answer as a
+      // kernel without ip_set
+      return false;
+    }
   }
 
   async restore(filePath: string): Promise<void> {
