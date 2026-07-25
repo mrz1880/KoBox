@@ -212,6 +212,19 @@ describe('bind installer', () => {
     expect(world.host.contentAt('/etc/bind/named.conf.options')).toBe('stock-debian-options');
   });
 
+  it('should_forward_to_dnscrypt_only_when_dnscrypt_is_actually_installed', async () => {
+    await installer(world, 'dnscrypt').install(); // dnscrypt-proxy available here
+    await installer(world, 'bind').install();
+    expect(world.host.contentAt('/etc/bind/named.conf.options')).toContain('port 52');
+
+    const debian12 = buildWorld();
+    debian12.packages.markUnavailable('dnscrypt-proxy');
+    await installer(debian12, 'dnscrypt').install(); // skipped
+    await installer(debian12, 'bind').install();
+    // forward-only to a dead port would break the box's DNS entirely
+    expect(debian12.host.contentAt('/etc/bind/named.conf.options')).not.toContain('port 52');
+  });
+
   it('should_seed_the_blacklist_zones_file_without_stealing_it_from_render_whitelist', async () => {
     await installer(world, 'bind').install();
     const seeded = world.host.contentAt('/etc/bind/kobox.zones.blacklists');
@@ -243,6 +256,17 @@ describe('dnscrypt installer', () => {
       "listen_addresses = ['127.0.0.1:52']",
     );
     expect(world.systemd.log).toContain('enable-now dnscrypt-proxy');
+  });
+
+  it('should_skip_honestly_where_debian_does_not_package_it', async () => {
+    // bookworm dropped dnscrypt-proxy (not even in backports)
+    world.packages.markUnavailable('dnscrypt-proxy');
+
+    const outcome = await installer(world, 'dnscrypt').install();
+
+    expect(outcome).toMatchObject({ state: 'skipped' });
+    expect(outcome.state === 'skipped' && outcome.reason).toContain('not packaged');
+    expect(world.packages.installed).not.toContain('dnscrypt-proxy');
   });
 });
 

@@ -356,10 +356,13 @@ class BindInstaller implements ComponentInstaller {
       owner: 'root',
       group: 'bind',
     });
+    // the dnscrypt component ran first (catalog dependency): forward to it
+    // only when it actually landed
+    const dnscryptForwarder = await packages.isInstalled('dnscrypt-proxy');
     const changed = await guardedApply(
       this.ctx,
       this.name,
-      [renderBindLocal(), renderBindOptions()],
+      [renderBindLocal(), renderBindOptions({ dnscryptForwarder })],
       () => checks.bind(),
     );
     await systemd.enable('named', { now: true });
@@ -382,6 +385,15 @@ class DnscryptInstaller implements ComponentInstaller {
 
   async install(): Promise<InstallOutcome> {
     const { packages, host, systemd, files } = this.ctx;
+    if (!(await packages.isAvailable('dnscrypt-proxy'))) {
+      // bookworm dropped dnscrypt-proxy (nor in backports); bind renders
+      // direct recursion instead — DNS-privacy alternative is a Phase 5 call
+      return {
+        state: 'skipped',
+        reason:
+          'dnscrypt-proxy is not packaged for Debian 12 (bookworm, incl. backports); bind falls back to direct recursion — DNS-privacy alternative deferred to Phase 5',
+      };
+    }
     await packages.ensureInstalled(['dnscrypt-proxy']);
     // Debian socket-activation hijacks the listen address — the rendered
     // toml owns 127.0.0.1:52, so the socket unit must go

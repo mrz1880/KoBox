@@ -303,9 +303,10 @@ export function buildContainer(name: string): Container {
   const networkFiles = new RtorrentConfigAdapter(runner);
   const networkServices = new NetworkServiceAdapter(runner, logger, {
     // post-install contract: absent units are breakage, except components
-    // kobox install honestly skips (pgl is not packaged for Debian 12)
+    // kobox install honestly skips (neither pgl nor dnscrypt-proxy is
+    // packaged for Debian 12)
     strict: process.env.KOBOX_STRICT_SERVICES === '1',
-    tolerateAbsent: ['pgl'],
+    tolerateAbsent: ['pgl', 'dnscrypt-proxy'],
   });
   const trackerRepo = new SqliteTrackerRepository(db);
   const addressRepo = new SqliteUserAddressRepository(db);

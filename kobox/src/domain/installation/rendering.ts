@@ -172,8 +172,8 @@ export function renderNginxVhost(settings: NginxVhostSettings): RenderedFile {
     content: [
       MANAGED_HEADER,
       'server {',
-      `    listen ${String(settings.portalPort)} ssl;`,
-      '    http2 on;',
+      // nginx 1.22 (Debian 12) syntax — `http2 on;` only exists from 1.25
+      `    listen ${String(settings.portalPort)} ssl http2;`,
       '    server_name _;',
       '    ssl_certificate /etc/ssl/certs/ssl-cert-snakeoil.pem;',
       '    ssl_certificate_key /etc/ssl/private/ssl-cert-snakeoil.key;',
@@ -240,7 +240,22 @@ export function renderBindLocal(): RenderedFile {
   };
 }
 
-export function renderBindOptions(): RenderedFile {
+export interface BindOptionsSettings {
+  // false where Debian does not package dnscrypt-proxy (bookworm dropped
+  // it): bind recurses directly — forward-only to a dead port would take the
+  // whole box's DNS down
+  readonly dnscryptForwarder: boolean;
+}
+
+export function renderBindOptions(settings: BindOptionsSettings): RenderedFile {
+  const resolution = settings.dnscryptForwarder
+    ? [
+        '    forward only;',
+        '    // dnscrypt-proxy validates DNSSEC upstream (require_dnssec)',
+        '    forwarders { 127.0.0.1 port 52; };',
+        '    dnssec-validation no;',
+      ]
+    : ['    dnssec-validation auto;'];
   return {
     path: '/etc/bind/named.conf.options',
     content: [
@@ -251,10 +266,7 @@ export function renderBindOptions(): RenderedFile {
       '    listen-on-v6 { ::1; };',
       '    allow-query { localhost; };',
       '    recursion yes;',
-      '    forward only;',
-      '    // dnscrypt-proxy validates DNSSEC upstream (require_dnssec)',
-      '    forwarders { 127.0.0.1 port 52; };',
-      '    dnssec-validation no;',
+      ...resolution,
       '};',
       '',
     ].join('\n'),

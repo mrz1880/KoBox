@@ -1,7 +1,6 @@
 # KoBox-managed — DO NOT EDIT (rendered declaratively).
 server {
-    listen 8189 ssl;
-    http2 on;
+    listen 8189 ssl http2;
     server_name _;
     ssl_certificate /etc/ssl/certs/ssl-cert-snakeoil.pem;
     ssl_certificate_key /etc/ssl/private/ssl-cert-snakeoil.key;

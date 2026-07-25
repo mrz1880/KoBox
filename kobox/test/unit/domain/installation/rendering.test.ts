@@ -109,10 +109,19 @@ describe('installation rendering', () => {
     expect(local.content).toContain('include "/etc/bind/kobox.zones.blacklists";');
     expectGolden('named.conf.local.golden', local.content);
 
-    const options = renderBindOptions();
+    const options = renderBindOptions({ dnscryptForwarder: true });
     expect(options.path).toBe('/etc/bind/named.conf.options');
     expect(options.content).toContain('port 52');
     expectGolden('named.conf.options.golden', options.content);
+  });
+
+  it('should_render_bind_with_direct_recursion_when_dnscrypt_is_unavailable', () => {
+    // dnscrypt-proxy is not packaged for Debian 12: bind must still resolve
+    // (forward-only to a dead port would break the whole box's DNS)
+    const options = renderBindOptions({ dnscryptForwarder: false });
+    expect(options.content).not.toContain('forward only');
+    expect(options.content).not.toContain('port 52');
+    expectGolden('named.conf.options-direct.golden', options.content);
   });
 
   it('should_render_dnscrypt_listening_on_52_with_the_phase2_blocked_names_file', () => {
