@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer as createHttpsServer, type Server } from 'node:https';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { promisify } from 'node:util';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
@@ -205,15 +205,39 @@ describe.skipIf(!onDebianAsRoot)('E2E: fresh Debian 12 -> bootstrap -> full stac
     for (const unit of ['nginx', 'named', 'postfix', 'kobox-worker']) {
       expect(isActive(unit), unit).toBe(true);
     }
+    // Phase 6: the portal is part of the installed stack
+    expect(isEnabled('kobox-portal')).toBe(true);
     // bind resolves directly (dnscrypt is not packaged for Debian 12)
     expect(sh('named-checkconf', [])).toBe('');
     expect(isEnabled('kobox-firewall')).toBe(true);
     expect(isEnabled('fail2ban')).toBe(true);
     sh('sshd', ['-t']);
     sh('fail2ban-client', ['-t'], { stdio: 'pipe' });
-    // deny-by-default portal: TLS up, auth required
-    const code = sh('curl', ['-ks', '-o', '/dev/null', '-w', '%{http_code}',
-      'https://127.0.0.1:8189/ru/']).trim();
+
+    // This suite runs on a /tmp DB (0700 root) the non-root portal cannot
+    // reach; a real install lives under /var/lib/kobox (setgid 2770
+    // root:kobox-portal). Reproduce those perms so the portal can boot, then
+    // prove the whole nginx auth_request -> portal chain denies /ru.
+    const dbDir = dirname(env.KOBOX_DB ?? '');
+    execFileSync('chmod', ['0711', dbDir]);
+    for (const suffix of ['', '-wal', '-shm']) {
+      const path = `${env.KOBOX_DB ?? ''}${suffix}`;
+      if (existsSync(path)) {
+        execFileSync('chgrp', ['kobox-portal', path]);
+        execFileSync('chmod', ['0660', path]);
+      }
+    }
+    sh('systemctl', ['restart', 'kobox-portal']);
+    let code = '000';
+    for (let i = 0; i < 50; i += 1) {
+      code = sh('curl', ['-ks', '-o', '/dev/null', '-w', '%{http_code}',
+        'https://127.0.0.1:8189/ru/']).trim();
+      if (code === '401') {
+        break;
+      }
+      execFileSync('sleep', ['0.2']);
+    }
+    // /ru is now gated by the portal session (auth_request), not Basic Auth
     expect(code).toBe('401');
     // vendored app landed from the verified fixture artifact
     expect(readFileSync('/var/www/rutorrent/index.html', 'utf8')).toContain('ruTorrent fixture');
