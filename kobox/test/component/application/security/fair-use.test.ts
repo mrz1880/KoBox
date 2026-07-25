@@ -166,6 +166,29 @@ describe('EvaluateFairUse — the user-h scenario end-to-end', () => {
     expect(notifications.published).toEqual([]);
   });
 
+  it('should_release_the_tc_class_of_a_suspended_user_once', async () => {
+    // Phase 3 review debt: a user throttled then manually suspended kept an
+    // inert tc class — release it and reset the graduated level
+    await users.save(aUser().withUsername('bob').withScgiPort(51102).withRtorrentPort(45001).suspended());
+    identity.setUid('bob', 1002);
+    const bob = Username.parse('bob');
+    await shaping.throttle(bob, 1002, Bandwidth.mbit(5));
+    await fairUse.saveState(bob, { level: 'throttled', healthState: 'healthy' }, '2026-07-24 09:00:00');
+
+    await useCase.execute({ now: '2026-07-24 10:00:00' });
+
+    expect(await shaping.isThrottled(1002)).toBe(false);
+    expect((await fairUse.getState(bob)).level).toBe('none');
+    const audit = await fairUse.listEvents(bob);
+    expect(audit.some((entry) => entry.eventType === 'SuspendedUserUnthrottled')).toBe(true);
+
+    // second run: nothing left to release, no duplicate audit row
+    await useCase.execute({ now: '2026-07-24 10:05:00' });
+    expect(
+      (await fairUse.listEvents(bob)).filter((e) => e.eventType === 'SuspendedUserUnthrottled'),
+    ).toHaveLength(1);
+  });
+
   it('should_report_an_unhealthy_service_once_not_every_run', async () => {
     health.healthy = false;
 

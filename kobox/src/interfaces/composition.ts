@@ -301,7 +301,12 @@ export function buildContainer(name: string): Container {
   const iblocklistUser = process.env.KOBOX_IBLOCKLIST_USER;
   const iblocklistPin = process.env.KOBOX_IBLOCKLIST_PIN;
   const networkFiles = new RtorrentConfigAdapter(runner);
-  const networkServices = new NetworkServiceAdapter(runner, logger);
+  const networkServices = new NetworkServiceAdapter(runner, logger, {
+    // post-install contract: absent units are breakage, except components
+    // kobox install honestly skips (pgl is not packaged for Debian 12)
+    strict: process.env.KOBOX_STRICT_SERVICES === '1',
+    tolerateAbsent: ['pgl'],
+  });
   const trackerRepo = new SqliteTrackerRepository(db);
   const addressRepo = new SqliteUserAddressRepository(db);
   const healthProbe = new ProcessSocketHealthProbe(runner);

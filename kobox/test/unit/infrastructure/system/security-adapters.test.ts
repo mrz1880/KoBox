@@ -239,6 +239,21 @@ describe('NetworkServiceAdapter', () => {
 
     expect(runner.commandLines()).toContain('pglcmd reload');
   });
+
+  it('should_treat_absent_units_as_errors_in_strict_mode', async () => {
+    // post-install this path must never be taken (Phase 4 brief): a box that
+    // kobox install provisioned HAS fail2ban/bind — absence means breakage
+    const runner = new PrefixRunner(); // nothing installed
+    const adapter = new NetworkServiceAdapter(runner, logger, {
+      strict: true,
+      tolerateAbsent: ['pgl'],
+    });
+
+    await expect(adapter.reloadFail2ban()).rejects.toThrow('strict');
+    await expect(adapter.reloadDns()).rejects.toThrow('strict');
+    // pgl is skipped on Debian 12 (not packaged): tolerated even in strict
+    await expect(adapter.reloadPeerGuardian()).resolves.toBeUndefined();
+  });
 });
 
 const METER_OUT_LISTING = `Chain kobox-meter-out (1 references)
@@ -324,6 +339,15 @@ describe('JournaldSshAuthAdapter', () => {
 
 describe('TcShapingAdapter', () => {
   const alice = Username.parse('alice');
+
+  it('should_refuse_a_uid_that_does_not_fit_a_16_bit_classid', async () => {
+    // tc minor ids are 16-bit: a silent wrap would throttle the WRONG user
+    const runner = new PrefixRunner();
+    const shaper = new TcShapingAdapter(runner, 'eth0');
+
+    await expect(shaper.throttle(alice, 70000, Bandwidth.mbit(5))).rejects.toThrow('65534');
+    expect(runner.commandLines()).toEqual([]);
+  });
 
   it('should_create_the_htb_tree_mark_and_filter_on_first_throttle', async () => {
     const runner = new PrefixRunner();

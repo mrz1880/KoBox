@@ -10,6 +10,18 @@ const TC_TIMEOUT_MS = 10_000;
 // HERE and never rendered into the firewall ruleset, so a firewall re-apply
 // keeps live throttles. tc parses class/handle minors as hex — the uid is
 // hex-encoded consistently on both sides of the filter.
+// tc minors are 16-bit: 0xffff is reserved, so 65534 is the last usable uid.
+const MAX_CLASSID_UID = 65534;
+
+function assertClassidFits(uid: number): void {
+  if (uid > MAX_CLASSID_UID) {
+    // a silent 16-bit wrap would throttle the WRONG user — refuse loudly
+    throw new Error(
+      `uid ${String(uid)} exceeds the tc 16-bit classid space (max 65534) — cannot shape this user`,
+    );
+  }
+}
+
 export class TcShapingAdapter implements ShapingPort {
   constructor(
     private readonly runner: CommandRunner,
@@ -17,6 +29,7 @@ export class TcShapingAdapter implements ShapingPort {
   ) {}
 
   async throttle(_username: Username, uid: number, rate: Bandwidth): Promise<void> {
+    assertClassidFits(uid);
     await this.ensureRootQdisc();
     const minor = uid.toString(16);
     await this.tc([
@@ -37,6 +50,7 @@ export class TcShapingAdapter implements ShapingPort {
   }
 
   async unthrottle(_username: Username, uid: number): Promise<void> {
+    assertClassidFits(uid);
     if (!(await this.isThrottled(uid))) {
       return;
     }

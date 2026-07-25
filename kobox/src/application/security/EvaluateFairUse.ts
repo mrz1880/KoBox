@@ -13,6 +13,7 @@ import type {
 import type { SecurityEvent } from '../../domain/security/events.js';
 import type { HealthProbePort, UserRepository } from '../../domain/user/ports.js';
 import type { SeedboxUser } from '../../domain/user/SeedboxUser.js';
+import type { Username } from '../../domain/user/Username.js';
 
 const AUTH_WINDOW_MINUTES = 60;
 
@@ -51,7 +52,10 @@ export class EvaluateFairUse {
     let throttled = 0;
     for (const user of await users.listAll()) {
       if (user.status.isSuspended()) {
-        continue; // suspended = already handled by a human
+        // suspended = already handled by a human; but a user throttled THEN
+        // suspended must not keep an inert tc class (Phase 3 review debt)
+        await this.releaseSuspendedThrottle(user.username, now);
+        continue;
       }
       const uid = await this.deps.identity.uidOf(user.username);
       if (uid === undefined) {
@@ -83,6 +87,25 @@ export class EvaluateFairUse {
       }
     }
     return { evaluated, breaches, throttled };
+  }
+
+  private async releaseSuspendedThrottle(username: Username, now: string): Promise<void> {
+    const { fairUse, identity, shaping } = this.deps;
+    const state = await fairUse.getState(username);
+    if (state.level !== 'throttled') {
+      return;
+    }
+    const uid = await identity.uidOf(username);
+    if (uid !== undefined) {
+      await shaping.unthrottle(username, uid);
+    }
+    await fairUse.saveState(username, { ...state, level: 'none' }, now);
+    await fairUse.appendEvent(
+      username,
+      'SuspendedUserUnthrottled',
+      JSON.stringify({ username: username.value }),
+      now,
+    );
   }
 
   private async evaluateOne(

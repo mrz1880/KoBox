@@ -5,6 +5,16 @@ import { runOrThrow, type CommandRunner } from './CommandRunner.js';
 
 const RELOAD_TIMEOUT_MS = 15_000;
 
+export interface NetworkServiceOptions {
+  // strict = post-install contract (KOBOX_STRICT_SERVICES=1): an absent unit
+  // is breakage, not tolerance. tolerateAbsent lists the components honestly
+  // skipped by kobox install (pgl on Debian 12).
+  readonly strict: boolean;
+  readonly tolerateAbsent: readonly string[];
+}
+
+const DEFAULT_OPTIONS: NetworkServiceOptions = { strict: false, tolerateAbsent: [] };
+
 // Real service management (replaces the Phase 2 best-effort adapter): a
 // failed reload now FAILS the calling job. The single tolerated case is an
 // absent unit (dev containers without bind9/pgl), detected explicitly via
@@ -13,6 +23,7 @@ export class NetworkServiceAdapter implements NetworkServicePort, NetworkService
   constructor(
     private readonly runner: CommandRunner,
     private readonly logger: Logger,
+    private readonly options: NetworkServiceOptions = DEFAULT_OPTIONS,
   ) {}
 
   async reloadFail2ban(): Promise<void> {
@@ -54,6 +65,11 @@ export class NetworkServiceAdapter implements NetworkServicePort, NetworkService
     }
     const exists = result.exitCode === 0 && result.stdout.trim().length > 0;
     if (!exists) {
+      if (this.options.strict && !this.options.tolerateAbsent.includes(unit)) {
+        throw new Error(
+          `strict services mode: unit ${unit} is not installed on a box kobox install provisioned`,
+        );
+      }
       this.logger.warn({ unit }, 'unit not installed — reload skipped');
     }
     return exists;
