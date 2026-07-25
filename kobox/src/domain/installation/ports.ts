@@ -88,6 +88,7 @@ export interface ComponentRecord {
 // what makes re-runs resumable (planInstallation reads states()).
 export interface ComponentRegistry {
   states(): Promise<ReadonlyMap<string, InstallState>>;
+  list(): Promise<readonly ComponentRecord[]>;
   get(name: ComponentName): Promise<ComponentRecord | undefined>;
   markInstalled(name: ComponentName, version: Version | undefined, now: string): Promise<void>;
   markFailed(name: ComponentName, reason: string, now: string): Promise<void>;

@@ -30,8 +30,10 @@ export interface InstallSettings {
   readonly nodeBin: string;
   readonly workerMain: string;
   readonly manageAptSources: boolean;
-  readonly rutorrentUrl: string;
-  readonly rutorrentSha256: string;
+  // release pin for the vendored ruTorrent archive (env-driven: shipping a
+  // baked sha for a moving upstream would be a lie) — unset = honest skip
+  readonly rutorrentUrl?: string;
+  readonly rutorrentSha256?: string;
   readonly quotaFs?: string;
   readonly workerEnv: ReadonlyMap<string, string>;
 }
@@ -305,6 +307,13 @@ class RutorrentInstaller implements ComponentInstaller {
 
   async install(): Promise<InstallOutcome> {
     const { packages, host, artifacts, files, install } = this.ctx;
+    if (install.rutorrentUrl === undefined || install.rutorrentSha256 === undefined) {
+      return {
+        state: 'skipped',
+        reason:
+          'no ruTorrent release pinned — set KOBOX_RUTORRENT_URL and KOBOX_RUTORRENT_SHA256, then re-run kobox install',
+      };
+    }
     await packages.ensureInstalled(['php-fpm', 'php-cli', 'unzip']);
     const marker = await host.readFile(RUTORRENT_MARKER);
     if (marker?.trim() !== install.rutorrentSha256) {

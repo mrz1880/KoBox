@@ -15,6 +15,12 @@ export class InMemoryComponentRegistry implements ComponentRegistry {
     );
   }
 
+  list(): Promise<readonly ComponentRecord[]> {
+    return Promise.resolve(
+      [...this.records.values()].sort((a, b) => a.name.value.localeCompare(b.name.value)),
+    );
+  }
+
   get(name: ComponentName): Promise<ComponentRecord | undefined> {
     return Promise.resolve(this.records.get(name.value));
   }

@@ -9,6 +9,16 @@ import type {
 import type { KoboxDatabase } from './db.js';
 import { components } from './schema.js';
 
+function toRecord(row: typeof components.$inferSelect): ComponentRecord {
+  return {
+    name: ComponentName.parse(row.name),
+    state: InstallState.parse(row.state),
+    ...(row.version !== null && { version: Version.parse(row.version) }),
+    ...(row.reason !== null && { reason: row.reason }),
+    ...(row.installedAt !== null && { installedAt: row.installedAt }),
+  };
+}
+
 export class SqliteComponentRegistry implements ComponentRegistry {
   constructor(private readonly db: KoboxDatabase) {}
 
@@ -17,22 +27,18 @@ export class SqliteComponentRegistry implements ComponentRegistry {
     return Promise.resolve(new Map(rows.map((row) => [row.name, InstallState.parse(row.state)])));
   }
 
+  list(): Promise<readonly ComponentRecord[]> {
+    const rows = this.db.orm.select().from(components).orderBy(components.name).all();
+    return Promise.resolve(rows.map((row) => toRecord(row)));
+  }
+
   get(name: ComponentName): Promise<ComponentRecord | undefined> {
     const row = this.db.orm
       .select()
       .from(components)
       .where(eq(components.name, name.value))
       .get();
-    if (!row) {
-      return Promise.resolve(undefined);
-    }
-    return Promise.resolve({
-      name: ComponentName.parse(row.name),
-      state: InstallState.parse(row.state),
-      ...(row.version !== null && { version: Version.parse(row.version) }),
-      ...(row.reason !== null && { reason: row.reason }),
-      ...(row.installedAt !== null && { installedAt: row.installedAt }),
-    });
+    return Promise.resolve(row ? toRecord(row) : undefined);
   }
 
   markInstalled(name: ComponentName, version: Version | undefined, now: string): Promise<void> {

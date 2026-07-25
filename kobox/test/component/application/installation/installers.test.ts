@@ -36,6 +36,7 @@ function buildWorld(overrides?: {
   facts?: Partial<SystemFacts>;
   manageAptSources?: boolean;
   quotaFs?: string;
+  rutorrentPin?: 'none';
 }): World {
   const packages = new FakePackages();
   const host = new FakeInstallHost();
@@ -68,8 +69,10 @@ function buildWorld(overrides?: {
       nodeBin: '/usr/bin/node',
       workerMain: '/opt/kobox/dist/interfaces/worker/main.js',
       manageAptSources: overrides?.manageAptSources ?? false,
-      rutorrentUrl: 'https://releases.example.net/rutorrent-4.3.9.tar.gz',
-      rutorrentSha256: 'a'.repeat(64),
+      ...(overrides?.rutorrentPin !== 'none' && {
+        rutorrentUrl: 'https://releases.example.net/rutorrent-4.3.9.tar.gz',
+        rutorrentSha256: 'a'.repeat(64),
+      }),
       ...(overrides?.quotaFs !== undefined && { quotaFs: overrides.quotaFs }),
       workerEnv: new Map([['KOBOX_DB', '/var/lib/kobox/kobox.db']]),
     },
@@ -333,6 +336,16 @@ describe('quota installer', () => {
 });
 
 describe('rutorrent installer', () => {
+  it('should_skip_with_guidance_when_no_release_pin_is_configured', async () => {
+    const unpinned = buildWorld({ rutorrentPin: 'none' });
+
+    const outcome = await installer(unpinned, 'rutorrent').install();
+
+    expect(outcome).toMatchObject({ state: 'skipped' });
+    expect(outcome.state === 'skipped' && outcome.reason).toContain('KOBOX_RUTORRENT_URL');
+    expect(unpinned.host.fetched).toHaveLength(0);
+  });
+
   it('should_fetch_verify_extract_once_and_render_the_global_config', async () => {
     await installer(world, 'rutorrent').install();
 
