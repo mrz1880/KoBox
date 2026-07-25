@@ -98,6 +98,22 @@ Notes :
   `/home`, ni la DB, ni les paquets. ⚠️ L'E2E d'install active fail2ban puis le
   redésactive en afterAll (règle Phase 3 : jamais de bans pendant les suites).
 
+- **Maintenance & Ops (Phase 5)** : `make up` démarre aussi le conteneur **pebble**
+  (fixture ACME locale, `PEBBLE_VA_ALWAYS_VALID=1`) — certbot ne parle **jamais** au
+  vrai Let's Encrypt depuis les tests. Sa CA de test est partagée via le volume
+  `pebble_test` (montée dans kobox-dev sous `/opt/pebble-test`). Env utiles :
+  `KOBOX_LE_DOMAIN`/`KOBOX_LE_EMAIL` (arment le composant letsencrypt),
+  `KOBOX_ACME_URL` (`https://pebble:14000/dir` en E2E), `KOBOX_ACME_CA_BUNDLE`,
+  `KOBOX_BACKUP_ROOT`/`KOBOX_BACKUP_TTL_DAYS`/`KOBOX_BACKUP_KEEP_MIN`,
+  `KOBOX_REPO_DIR`/`KOBOX_RELEASES_DIR`/`KOBOX_CURRENT_LINK` (upgrades).
+  ⚠️ Les tests git/upgrade créent leurs **propres dépôts scratch** (`file://`) — le
+  checkout monté n'est jamais muté (son `.git` est celui de ta machine). L'E2E
+  upgrade flippe `/opt/kobox/current` vers des releases factices puis **restaure le
+  lien en afterAll** ; pgl n'existe plus (ipset le remplace ; sur un kernel Docker
+  sans `ip_set`, le composant se `skipped` honnêtement et seul le filtre rtorrent
+  s'applique). Le worker systemd du conteneur draine les jobs pendant l'E2E : pour
+  observer des jobs `pending`, stoppe `kobox-worker` d'abord.
+
 ## VM Multipass (validation full-stack, quotas ext4 réels)
 
 ```bash
