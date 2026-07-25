@@ -456,6 +456,18 @@ program
   });
 
 program
+  .command('run-backup')
+  .description('dump the database and KoBox configs into a TTL-rotated backup (cron entry point)')
+  .action(async () => {
+    const c = container();
+    const id = await c.queue.enqueueUnique(buildJob.runBackup());
+    await done(
+      c,
+      id === undefined ? 'run-backup already pending' : `job ${String(id)} enqueued: run-backup`,
+    );
+  });
+
+program
   .command('show-usage')
   .description('print per-user usage, fair-use state and recent audit events as JSON')
   .action(async () => {

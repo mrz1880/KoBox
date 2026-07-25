@@ -68,6 +68,7 @@ function buildWorld(overrides?: {
     install: {
       nodeBin: '/usr/bin/node',
       workerMain: '/opt/kobox/dist/interfaces/worker/main.js',
+      koboxBin: '/usr/local/bin/kobox',
       manageAptSources: overrides?.manageAptSources ?? false,
       ...(overrides?.rutorrentPin !== 'none' && {
         rutorrentUrl: 'https://releases.example.net/rutorrent-4.3.9.tar.gz',
@@ -279,14 +280,26 @@ describe('dnscrypt installer', () => {
   });
 });
 
-describe('pgl installer', () => {
-  it('should_skip_honestly_on_debian_12_where_pgl_is_not_packaged', async () => {
-    world.packages.markUnavailable('pgld');
+describe('scheduler installer', () => {
+  it('should_render_the_declarative_cron_file_and_activate_cron', async () => {
+    const outcome = await installer(world, 'scheduler').install();
 
-    const outcome = await installer(world, 'pgl').install();
+    expect(outcome.state).toBe('installed');
+    expect(world.packages.installed).toContain('cron');
+    const content = world.host.contentAt('/etc/cron.d/kobox');
+    expect(content).toContain('*/5 * * * * root /usr/local/bin/kobox send-mails');
+    expect(content).toContain('30 5 * * * root /usr/local/bin/kobox run-backup');
+    expect(world.systemd.log).toContain('enable-now cron');
+  });
 
-    expect(outcome).toMatchObject({ state: 'skipped' });
-    expect(outcome.state === 'skipped' && outcome.reason).toContain('not packaged');
+  it('should_uninstall_by_removing_the_cron_file_only', async () => {
+    await installer(world, 'scheduler').install();
+
+    await installer(world, 'scheduler').uninstall();
+
+    expect(world.host.contentAt('/etc/cron.d/kobox')).toBeUndefined();
+    // cron itself stays: it is a stock Debian service, not ours
+    expect(world.systemd.log).not.toContain('disable-now cron');
   });
 });
 

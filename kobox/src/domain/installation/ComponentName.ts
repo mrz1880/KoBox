@@ -14,10 +14,14 @@ export const COMPONENT_NAMES = [
   'rutorrent',
   'bind',
   'dnscrypt',
-  'pgl',
   'fail2ban',
   'openvpn',
   'postfix',
+  // Phase 5 (pgl retired 2026-07-25: never packaged for Debian 12, kernel
+  // enforcement moves to ipset)
+  'scheduler',
+  'letsencrypt',
+  'ipset',
 ] as const;
 
 export type ComponentNameValue = (typeof COMPONENT_NAMES)[number];

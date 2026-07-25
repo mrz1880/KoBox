@@ -26,8 +26,9 @@ export const COMPONENT_CATALOG: readonly ComponentSpec[] = [
   spec('nginx'),
   spec('rtorrent'),
   spec('rutorrent', ['nginx', 'rtorrent']),
-  spec('pgl'),
   spec('fail2ban', ['sshd']),
   spec('openvpn'),
   spec('postfix'),
+  // cron entries call the kobox CLI which the core component laid down
+  spec('scheduler', ['kobox-core']),
 ];

@@ -178,7 +178,6 @@ describe.skipIf(!onDebianAsRoot)('E2E: fresh Debian 12 -> bootstrap -> full stac
       );
 
       expect(stdout).toContain('kobox-core: installed');
-      expect(stdout).toContain('pgl: skipped');
 
       const status = JSON.parse(kobox(['install-status'])) as {
         name: string;
@@ -188,13 +187,13 @@ describe.skipIf(!onDebianAsRoot)('E2E: fresh Debian 12 -> bootstrap -> full stac
       const byName = new Map(status.map((row) => [row.name, row]));
       for (const name of [
         'kobox-core', 'sshd', 'tweaks', 'quota', 'nginx', 'rtorrent', 'rutorrent',
-        'bind', 'fail2ban', 'openvpn', 'postfix',
+        'bind', 'fail2ban', 'openvpn', 'postfix', 'scheduler',
       ]) {
         expect(byName.get(name)?.state, name).toBe('installed');
       }
-      // the two Debian 12 packaging realities, honestly recorded
-      expect(byName.get('pgl')?.state).toBe('skipped');
-      expect(byName.get('pgl')?.reason).toContain('not packaged');
+      // pgl is retired (Phase 5): no registry row at all
+      expect(byName.has('pgl')).toBe(false);
+      // the Debian 12 packaging reality, honestly recorded
       expect(byName.get('dnscrypt')?.state).toBe('skipped');
       expect(byName.get('dnscrypt')?.reason).toContain('not packaged');
       expect(byName.get('apt-sources')?.state).toBe('skipped'); // flag not passed
@@ -297,9 +296,9 @@ describe.skipIf(!onDebianAsRoot)('E2E: fresh Debian 12 -> bootstrap -> full stac
         alreadyInstalled: string[];
       };
       expect(report.installed).toEqual([]);
-      // the whole catalog minus the three Debian 12 skips (pgl, dnscrypt,
+      // the whole catalog minus the two Debian 12 skips (dnscrypt,
       // apt-sources)
-      expect(report.alreadyInstalled.length).toBe(11);
+      expect(report.alreadyInstalled.length).toBe(12);
     },
     INSTALL_TIMEOUT_MS,
   );
@@ -318,7 +317,7 @@ describe.skipIf(!onDebianAsRoot)('E2E: fresh Debian 12 -> bootstrap -> full stac
     sh('sshd', ['-t']); // stock sshd config still valid after drop-in removal
 
     const status = JSON.parse(kobox(['install-status'])) as { name: string; state: string }[];
-    const skippedOnDebian12 = ['pgl', 'dnscrypt', 'apt-sources'];
+    const skippedOnDebian12 = ['dnscrypt', 'apt-sources'];
     for (const row of status) {
       if (!skippedOnDebian12.includes(row.name)) {
         expect(row.state, row.name).toBe('to_install');

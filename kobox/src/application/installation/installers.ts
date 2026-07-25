@@ -21,6 +21,7 @@ import {
   renderWorkerEnv,
   renderWorkerUnit,
 } from '../../domain/installation/rendering.js';
+import { renderCronFile } from '../../domain/maintenance/rendering.js';
 import type { VpnPkiPort, VpnPkiProvisionPort } from '../../domain/security/ports.js';
 import { VPN_VARIANTS, renderOpenVpnServer } from '../../domain/security/vpn.js';
 import type { ManagedFilesPort, RenderedFile } from '../../domain/shared/files.js';
@@ -29,6 +30,7 @@ import type { SecuritySettings } from '../security/settings.js';
 export interface InstallSettings {
   readonly nodeBin: string;
   readonly workerMain: string;
+  readonly koboxBin: string;
   readonly manageAptSources: boolean;
   // release pin for the vendored ruTorrent archive (env-driven: shipping a
   // baked sha for a moving upstream would be a lie) — unset = honest skip
@@ -125,6 +127,7 @@ const RUTORRENT_DIR = '/var/www/rutorrent';
 const RUTORRENT_MARKER = `${RUTORRENT_DIR}/.kobox-artifact-sha256`;
 const RUTORRENT_ARCHIVE = '/var/tmp/kobox/rutorrent.tar.gz';
 const ZONES_SEED = '/etc/bind/kobox.zones.blacklists';
+const CRON_FILE = '/etc/cron.d/kobox';
 const BLOCKED_NAMES_SEED = '/etc/dnscrypt-proxy/blocked-names.txt';
 
 function installed(version?: string, detail?: string): InstallOutcome {
@@ -434,30 +437,23 @@ class DnscryptInstaller implements ComponentInstaller {
   }
 }
 
-class PglInstaller implements ComponentInstaller {
-  readonly name = 'pgl';
+class SchedulerInstaller implements ComponentInstaller {
+  readonly name = 'scheduler';
 
   constructor(private readonly ctx: InstallerContext) {}
 
   async install(): Promise<InstallOutcome> {
-    if (!(await this.ctx.packages.isAvailable('pgld'))) {
-      // the legacy shipped vendored Qt4-era debs; Debian 12 has neither —
-      // rtorrent-side enforcement (per-user ipv4_filter) keeps working
-      return {
-        state: 'skipped',
-        reason:
-          'pgl is not packaged for Debian 12 (legacy used vendored Qt4 debs); ipset-based replacement deferred to Phase 5',
-      };
-    }
-    await this.ctx.packages.ensureInstalled(['pgld', 'pglcmd']);
-    await this.ctx.systemd.enable('pgl', { now: true });
-    return installed(await this.ctx.packages.installedVersion('pgld'));
+    const { packages, files, systemd, install } = this.ctx;
+    // cron ships active on Debian 12; ensureInstalled is a fast no-op then
+    await packages.ensureInstalled(['cron']);
+    await files.apply([renderCronFile({ koboxBin: install.koboxBin })]);
+    await systemd.enable('cron', { now: true });
+    return installed(await packages.installedVersion('cron'));
   }
 
   async uninstall(): Promise<void> {
-    if (await this.ctx.systemd.isActive('pgl')) {
-      await this.ctx.systemd.disable('pgl', { now: true });
-    }
+    // cron itself is a stock Debian service, not ours — only the file goes
+    await this.ctx.host.removeFile(CRON_FILE);
   }
 }
 
@@ -561,7 +557,7 @@ export function buildInstallers(ctx: InstallerContext): ReadonlyMap<string, Comp
     new RutorrentInstaller(ctx),
     new BindInstaller(ctx),
     new DnscryptInstaller(ctx),
-    new PglInstaller(ctx),
+    new SchedulerInstaller(ctx),
     new Fail2banInstaller(ctx),
     new OpenVpnInstaller(ctx),
     new PostfixInstaller(ctx),

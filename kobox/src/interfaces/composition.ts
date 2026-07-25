@@ -210,6 +210,7 @@ export async function buildInstallation(
     install: {
       nodeBin: process.execPath,
       workerMain: fileURLToPath(new URL('./worker/main.js', import.meta.url)),
+      koboxBin: process.env.KOBOX_BIN ?? DEFAULT_KOBOX_BIN,
       manageAptSources: flags.manageAptSources,
       ...(rutorrentUrl !== undefined && rutorrentUrl !== '' && { rutorrentUrl }),
       ...(rutorrentSha256 !== undefined &&
