@@ -32,7 +32,7 @@ describe('installation rendering', () => {
   it('should_render_the_worker_unit_golden', () => {
     const file = renderWorkerUnit({
       nodeBin: '/usr/bin/node',
-      workerMain: '/opt/kobox/dist/interfaces/worker/main.js',
+      workerMain: '/opt/kobox/current/dist/interfaces/worker/main.js',
     });
     expect(file.path).toBe('/etc/systemd/system/kobox-worker.service');
     expect(file.mode).toBe('0644');

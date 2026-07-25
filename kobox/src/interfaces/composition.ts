@@ -160,6 +160,8 @@ export function securitySettings(): SecuritySettings {
 
 export const DEFAULT_DB_PATH = '/var/lib/kobox/kobox.db';
 export const DEFAULT_KOBOX_BIN = '/usr/local/bin/kobox';
+export const DEFAULT_CURRENT_LINK = '/opt/kobox/current';
+export const DEFAULT_RELEASES_DIR = '/opt/kobox/releases';
 
 export function backupSettings(): BackupSettings {
   return {
@@ -220,7 +222,9 @@ export async function buildInstallation(
     security: securitySettings(),
     install: {
       nodeBin: process.execPath,
-      workerMain: fileURLToPath(new URL('./worker/main.js', import.meta.url)),
+      // the package root of the RUNNING build (contains dist/, node_modules)
+      sourceDir: fileURLToPath(new URL('../..', import.meta.url)).replace(/\/$/, ''),
+      currentLink: process.env.KOBOX_CURRENT_LINK ?? DEFAULT_CURRENT_LINK,
       koboxBin: process.env.KOBOX_BIN ?? DEFAULT_KOBOX_BIN,
       manageAptSources: flags.manageAptSources,
       ...(rutorrentUrl !== undefined && rutorrentUrl !== '' && { rutorrentUrl }),

@@ -67,7 +67,8 @@ function buildWorld(overrides?: {
     },
     install: {
       nodeBin: '/usr/bin/node',
-      workerMain: '/opt/kobox/dist/interfaces/worker/main.js',
+      sourceDir: '/opt/kobox-src',
+      currentLink: '/opt/kobox/current',
       koboxBin: '/usr/local/bin/kobox',
       manageAptSources: overrides?.manageAptSources ?? false,
       ...(overrides?.rutorrentPin !== 'none' && {
@@ -103,9 +104,12 @@ describe('kobox-core installer', () => {
     expect(world.host.dirs.get('/etc/kobox')).toBe('0755');
     expect(world.host.dirs.get('/var/lib/kobox')).toBe('0700');
     expect(world.host.dirs.get('/var/spool/kobox/events')).toBe('1733');
+    // the unit executes THROUGH the current symlink: upgrades flip the link,
+    // never the unit (§5.6 versioned releases)
     expect(world.host.contentAt('/etc/systemd/system/kobox-worker.service')).toContain(
-      'ExecStart=/usr/bin/node /opt/kobox/dist/interfaces/worker/main.js',
+      'ExecStart=/usr/bin/node /opt/kobox/current/dist/interfaces/worker/main.js',
     );
+    expect(world.host.symlinks.get('/opt/kobox/current')).toBe('/opt/kobox-src');
     expect(world.host.contentAt('/etc/kobox/worker.env')).toContain(
       'KOBOX_DB=/var/lib/kobox/kobox.db',
     );

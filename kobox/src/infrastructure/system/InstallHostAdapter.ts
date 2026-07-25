@@ -1,6 +1,6 @@
 import { hostname } from 'node:os';
 import { existsSync } from 'node:fs';
-import { mkdir, chmod, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, chmod, lstat, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import type { InstallHostPort } from '../../domain/installation/ports.js';
 import type { RenderedFile } from '../../domain/shared/files.js';
 import { runOrThrow, type CommandRunner } from './CommandRunner.js';
@@ -35,6 +35,20 @@ export class InstallHostAdapter implements InstallHostPort {
   async ensureDir(path: string, mode: string): Promise<void> {
     await mkdir(path, { recursive: true });
     await chmod(path, parseInt(mode, 8));
+  }
+
+  async ensureSymlink(linkPath: string, target: string): Promise<boolean> {
+    // lstat, not exists: a dangling link counts as present (upgrade owns it)
+    const present = await lstat(linkPath).then(
+      () => true,
+      () => false,
+    );
+    if (present) {
+      return false;
+    }
+    await mkdir(linkPath.slice(0, linkPath.lastIndexOf('/')), { recursive: true });
+    await symlink(target, linkPath);
+    return true;
   }
 
   async ensureFile(file: RenderedFile): Promise<boolean> {

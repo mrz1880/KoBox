@@ -52,6 +52,8 @@ export interface InstallHostPort {
   ensureDir(path: string, mode: string): Promise<void>;
   // creates the file only when absent; returns true when it was created
   ensureFile(file: RenderedFile): Promise<boolean>;
+  // creates the symlink only when absent; returns true when it was created
+  ensureSymlink(linkPath: string, target: string): Promise<boolean>;
   extractTarGz(archive: string, destDir: string): Promise<void>;
   applySysctl(): Promise<void>;
   postconf(settings: Readonly<Record<string, string>>): Promise<void>;

@@ -13,6 +13,7 @@ export class FakeInstallHost implements ManagedFilesPort, InstallHostPort, Artif
   readonly preseeded: string[] = [];
   readonly postconfSettings: Record<string, string> = {};
   readonly postmapped: string[] = [];
+  readonly symlinks = new Map<string, string>();
   readonly quotaActivated: string[] = [];
   readonly fetched: [string, string][] = [];
   readonly extracted: [string, string][] = [];
@@ -65,6 +66,14 @@ export class FakeInstallHost implements ManagedFilesPort, InstallHostPort, Artif
       return Promise.resolve(false);
     }
     this.files.set(file.path, file);
+    return Promise.resolve(true);
+  }
+
+  ensureSymlink(linkPath: string, target: string): Promise<boolean> {
+    if (this.symlinks.has(linkPath)) {
+      return Promise.resolve(false);
+    }
+    this.symlinks.set(linkPath, target);
     return Promise.resolve(true);
   }
 

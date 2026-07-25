@@ -29,7 +29,10 @@ import type { SecuritySettings } from '../security/settings.js';
 
 export interface InstallSettings {
   readonly nodeBin: string;
-  readonly workerMain: string;
+  // the running source tree (linked as `current` on first install) and the
+  // symlink the worker unit executes through — upgrades flip the link only
+  readonly sourceDir: string;
+  readonly currentLink: string;
   readonly koboxBin: string;
   readonly manageAptSources: boolean;
   // release pin for the vendored ruTorrent archive (env-driven: shipping a
@@ -148,9 +151,15 @@ class KoboxCoreInstaller implements ComponentInstaller {
     await host.ensureDir('/etc/kobox', '0755');
     await host.ensureDir('/var/lib/kobox', '0700');
     await host.ensureDir('/var/spool/kobox/events', '1733');
+    // first install: current -> the tree the installer runs from; upgrades
+    // own the link afterwards (ensureSymlink never overwrites an existing one)
+    await host.ensureSymlink(install.currentLink, install.sourceDir);
     await files.apply([
       renderWorkerEnv(install.workerEnv),
-      renderWorkerUnit({ nodeBin: install.nodeBin, workerMain: install.workerMain }),
+      renderWorkerUnit({
+        nodeBin: install.nodeBin,
+        workerMain: `${install.currentLink}/dist/interfaces/worker/main.js`,
+      }),
       renderFirewallBootUnit(),
     ]);
     await systemd.daemonReload();
