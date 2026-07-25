@@ -47,3 +47,11 @@ export interface LoginAttemptsPort {
   save(attempt: LoginAttempt): Promise<void>;
   clear(username: Username): Promise<void>;
 }
+
+// Token material: generation needs a CSPRNG and hashing needs sha256, both
+// infrastructure concerns behind this port. The raw token goes to the cookie;
+// only its hash is ever stored or looked up.
+export interface SessionTokenPort {
+  generate(): string;
+  hashToken(token: string): string;
+}
