@@ -111,12 +111,12 @@ export class InstallHostAdapter implements InstallHostPort {
   }
 
   private async chownIfPossible(file: RenderedFile): Promise<void> {
-    // non-root test environments have no business chowning; the E2E install
-    // path always runs as root
+    // non-root test environments have no business chowning; the real install
+    // path always runs as root — and there a failed chown is a real failure
     if (process.geteuid?.() !== 0) {
       return;
     }
-    await this.runner.run({
+    await runOrThrow(this.runner, {
       command: 'chown',
       args: [`${file.owner}:${file.group}`, file.path],
       timeoutMs: 10_000,

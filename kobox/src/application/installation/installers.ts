@@ -83,10 +83,27 @@ async function guardedApply(
     priors.set(file.path, await ctx.host.readFile(file.path));
   }
   const changed = await ctx.files.apply(rendered);
-  const result = await check();
+  // a checker that DIES (spawn failure, timeout) rolls back exactly like a
+  // checker that says no — an unvalidated render never stays on disk
+  let result: ConfigCheckResult;
+  try {
+    result = await check();
+  } catch (error) {
+    await restorePriors(ctx, rendered, priors);
+    throw error;
+  }
   if (result.ok) {
     return changed;
   }
+  await restorePriors(ctx, rendered, priors);
+  throw new InstallGuardError(component, result.detail);
+}
+
+async function restorePriors(
+  ctx: InstallerContext,
+  rendered: readonly RenderedFile[],
+  priors: ReadonlyMap<string, string | undefined>,
+): Promise<void> {
   for (const file of rendered) {
     const prior = priors.get(file.path);
     if (prior === undefined) {
@@ -95,7 +112,6 @@ async function guardedApply(
       await ctx.files.apply([{ ...file, content: prior }]);
     }
   }
-  throw new InstallGuardError(component, result.detail);
 }
 
 const WORKER_UNIT = '/etc/systemd/system/kobox-worker.service';

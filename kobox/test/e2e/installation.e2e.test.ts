@@ -255,7 +255,7 @@ describe.skipIf(!onDebianAsRoot)('E2E: fresh Debian 12 -> bootstrap -> full stac
     240_000,
   );
 
-  it('should_restore_the_firewall_at_boot_via_the_oneshot_unit', () => {
+  it('should_restore_the_firewall_at_boot_via_the_oneshot_unit', async () => {
     sh('iptables', ['-F', 'INPUT']);
     expect(sh('iptables-save', [])).not.toContain('--dport 22');
 
@@ -264,6 +264,25 @@ describe.skipIf(!onDebianAsRoot)('E2E: fresh Debian 12 -> bootstrap -> full stac
     const restored = sh('iptables-save', []);
     expect(restored).toContain(':kobox-meter-out');
     expect(restored).toContain(`kobox-u-${USER}`);
+
+    // the masquerade lives in the SHARED nat table (never restored
+    // wholesale): the worker service reconverges it on startup — the other
+    // half of boot survival
+    const masqueradeArgs = [
+      '-t', 'nat', '-C', 'POSTROUTING',
+      '-s', '10.0.0.0/24', '!', '-d', '10.0.0.0/24', '-j', 'MASQUERADE',
+    ];
+    sh('iptables', ['-t', 'nat', '-D', 'POSTROUTING',
+      '-s', '10.0.0.0/24', '!', '-d', '10.0.0.0/24', '-j', 'MASQUERADE']);
+    sh('systemctl', ['restart', 'kobox-worker']);
+    await waitFor('masquerade reconvergence', () => {
+      try {
+        sh('iptables', masqueradeArgs, { stdio: 'pipe' });
+        return true;
+      } catch {
+        return false;
+      }
+    }, 60_000);
   });
 
   it(

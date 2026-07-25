@@ -1,9 +1,11 @@
 import { DomainError } from '../shared/DomainError.js';
 
 // to_install: never attempted (or reset by uninstall); failed: attempted and
-// broken — BOTH are pending so a failed component re-runs without redoing the
-// installed ones (anti-#122). skipped: deliberately not installable here
-// (e.g. pgl on Debian 12) — excluded from the plan but honestly recorded.
+// broken; skipped: deliberately not installable here (pgl on Debian 12, no
+// ruTorrent pin). Everything but installed stays pending: failures re-run
+// without redoing the rest (anti-#122), and skips are re-evaluated every run
+// (cheap, idempotent) so a fixed cause recovers by plain re-run — never DB
+// surgery.
 export const INSTALL_STATES = ['to_install', 'installed', 'failed', 'skipped'] as const;
 
 export type InstallStateValue = (typeof INSTALL_STATES)[number];
@@ -25,7 +27,7 @@ export class InstallState {
   }
 
   isPending(): boolean {
-    return this.value === 'to_install' || this.value === 'failed';
+    return this.value !== 'installed';
   }
 
   equals(other: InstallState): boolean {

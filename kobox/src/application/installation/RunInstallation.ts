@@ -83,7 +83,10 @@ export class RunInstallation {
       .map((spec) => spec.name.value)
       .filter((name) => states.get(name)?.value === 'installed');
 
-    await deps.packages.refresh();
+    // a fully converged box pays no apt-get update
+    if (plan.length > 0) {
+      await deps.packages.refresh();
+    }
 
     const installed: string[] = [];
     const skipped: string[] = [];

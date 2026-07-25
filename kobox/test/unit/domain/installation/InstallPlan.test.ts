@@ -59,9 +59,9 @@ describe('planInstallation', () => {
     expect(names(resumed)).toEqual(fullOrder.slice(bindIndex));
   });
 
-  it('should_exclude_skipped_components_from_the_plan', () => {
+  it('should_re_evaluate_skipped_components_so_a_fixed_cause_recovers_by_re_run', () => {
     const plan = planInstallation(COMPONENT_CATALOG, states({ pgl: 'skipped' }));
-    expect(names(plan)).not.toContain('pgl');
+    expect(names(plan)).toContain('pgl');
   });
 
   it('should_return_an_empty_plan_when_everything_is_installed', () => {

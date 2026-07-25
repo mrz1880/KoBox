@@ -162,15 +162,24 @@ describe('RunInstallation', () => {
     expect(world.installers.get('kobox-core')?.installCalls).toBe(1); // never redone
   });
 
-  it('should_record_skips_and_keep_them_out_of_later_plans', async () => {
-    stub('bind', () => ({ state: 'skipped', reason: 'not packaged here' }));
+  it('should_record_skips_and_re_evaluate_them_on_every_run', async () => {
+    let bindAvailable = false;
+    stub('bind', () =>
+      bindAvailable ? { state: 'installed' } : { state: 'skipped', reason: 'not packaged here' },
+    );
 
     const first = await runner().execute({ allowNonExt4: false });
     expect(first.skipped).toEqual(['bind']);
 
+    // the cause persists: re-skip, cheap and idempotent
     const second = await runner().execute({ allowNonExt4: false });
+    expect(second.skipped).toEqual(['bind']);
     expect(second.alreadyInstalled).toEqual(['kobox-core', 'sshd', 'fail2ban']);
-    expect(world.installers.get('bind')?.installCalls).toBe(1);
+
+    // the cause is fixed (pin set, package packaged): a plain re-run recovers
+    bindAvailable = true;
+    const third = await runner().execute({ allowNonExt4: false });
+    expect(third.installed).toEqual(['bind']);
   });
 
   it('should_be_idempotent_and_still_reconverge_on_re_run', async () => {
@@ -184,6 +193,8 @@ describe('RunInstallation', () => {
     for (const installer of world.installers.values()) {
       expect(installer.installCalls).toBe(1);
     }
+    // fully converged: no plan, no apt-get update either
+    expect(world.packages.refreshCount).toBe(1);
     // convergence is cheap and idempotent by Phase 1-3 design: always re-run
     expect(world.enqueued).toEqual([
       'apply-firewall',

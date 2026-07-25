@@ -62,28 +62,39 @@ export class EvaluateFairUse {
         continue;
       }
       evaluated += 1;
-      const { decision, budget } = await this.evaluateOne(
-        user,
-        counters.get(user.username.value),
-        now,
-      );
-      breaches += decision.events.some(
-        (event) => event.type === 'FairUseBreached' || event.type === 'AbnormalAuthRate',
-      )
-        ? 1
-        : 0;
-      throttled += decision.actions.includes('throttle') ? 1 : 0;
+      // one broken user (dead journal, uid beyond the classid space) must
+      // not blind the evaluator for everyone else — record and move on
+      try {
+        const { decision, budget } = await this.evaluateOne(
+          user,
+          counters.get(user.username.value),
+          now,
+        );
+        breaches += decision.events.some(
+          (event) => event.type === 'FairUseBreached' || event.type === 'AbnormalAuthRate',
+        )
+          ? 1
+          : 0;
+        throttled += decision.actions.includes('throttle') ? 1 : 0;
 
-      for (const action of decision.actions) {
-        if (action === 'throttle') {
-          await this.deps.shaping.throttle(user.username, uid, budget.throttleTo);
-        } else {
-          await this.deps.shaping.unthrottle(user.username, uid);
+        for (const action of decision.actions) {
+          if (action === 'throttle') {
+            await this.deps.shaping.throttle(user.username, uid, budget.throttleTo);
+          } else {
+            await this.deps.shaping.unthrottle(user.username, uid);
+          }
         }
-      }
-      for (const event of decision.events) {
-        await fairUse.appendEvent(user.username, event.type, JSON.stringify(event), now);
-        await this.deps.notifications.notify(event);
+        for (const event of decision.events) {
+          await fairUse.appendEvent(user.username, event.type, JSON.stringify(event), now);
+          await this.deps.notifications.notify(event);
+        }
+      } catch (error) {
+        await fairUse.appendEvent(
+          user.username,
+          'FairUseEvaluationError',
+          JSON.stringify({ message: error instanceof Error ? error.message : String(error) }),
+          now,
+        );
       }
     }
     return { evaluated, breaches, throttled };

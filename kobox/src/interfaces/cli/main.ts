@@ -529,16 +529,19 @@ program
   .description('print the component registry as JSON')
   .action(async () => {
     const c = container();
-    const wiring = await buildInstallation(c, { allowNonExt4: false, manageAptSources: false });
-    const rows = (await wiring.registry.list()).map((record) => ({
-      name: record.name.value,
-      state: record.state.value,
-      version: record.version?.value ?? null,
-      reason: record.reason ?? null,
-      installedAt: record.installedAt ?? null,
-    }));
-    process.stdout.write(`${JSON.stringify(rows, null, 2)}\n`);
-    c.db.close();
+    try {
+      const wiring = await buildInstallation(c, { allowNonExt4: false, manageAptSources: false });
+      const rows = (await wiring.registry.list()).map((record) => ({
+        name: record.name.value,
+        state: record.state.value,
+        version: record.version?.value ?? null,
+        reason: record.reason ?? null,
+        installedAt: record.installedAt ?? null,
+      }));
+      process.stdout.write(`${JSON.stringify(rows, null, 2)}\n`);
+    } finally {
+      c.db.close();
+    }
   });
 
 program

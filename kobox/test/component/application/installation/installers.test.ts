@@ -147,6 +147,15 @@ describe('sshd installer (the never-break-SSH guard)', () => {
     expect(world.systemd.log).not.toContain('reload-or-restart ssh');
   });
 
+  it('should_roll_back_even_when_the_checker_itself_dies', async () => {
+    // a checker spawn failure/timeout must not leave an unvalidated render
+    world.checks.throwSshd(new Error('sshd binary vanished'));
+
+    await expect(installer(world, 'sshd').install()).rejects.toThrow('sshd binary vanished');
+
+    expect(world.host.contentAt('/etc/ssh/sshd_config.d/90-kobox.conf')).toBeUndefined();
+  });
+
   it('should_not_reload_sshd_when_nothing_changed_on_re_run', async () => {
     await installer(world, 'sshd').install();
     world.systemd.log.length = 0;

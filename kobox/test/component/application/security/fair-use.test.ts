@@ -166,6 +166,33 @@ describe('EvaluateFairUse — the user-h scenario end-to-end', () => {
     expect(notifications.published).toEqual([]);
   });
 
+  it('should_isolate_a_per_user_failure_and_keep_evaluating_the_rest', async () => {
+    // one broken user (e.g. uid beyond the tc classid space) must not blind
+    // the evaluator for everyone else
+    await users.save(aUser().withUsername('bob').withScgiPort(51102).withRtorrentPort(45001).build());
+    identity.setUid('bob', 1002);
+    authLog.setCount('bob', 82); // bob breaches
+    const failingAuthLog = {
+      countAcceptedPublickey: (username: Username): Promise<number> => {
+        if (username.value === 'alice') {
+          return Promise.reject(new Error('journal exploded for alice'));
+        }
+        return authLog.countAcceptedPublickey(username, 60);
+      },
+    };
+    const isolated = new EvaluateFairUse({
+      users, fairUse, meter, authLog: failingAuthLog, identity, shaping, health,
+      notifications, policy,
+    });
+
+    const report = await isolated.execute({ now: '2026-07-24 10:00:00' });
+
+    expect(report.evaluated).toBe(2);
+    expect((await fairUse.getState(Username.parse('bob'))).level).toBe('alerted');
+    const aliceAudit = await fairUse.listEvents(alice);
+    expect(aliceAudit.some((e) => e.eventType === 'FairUseEvaluationError')).toBe(true);
+  });
+
   it('should_release_the_tc_class_of_a_suspended_user_once', async () => {
     // Phase 3 review debt: a user throttled then manually suspended kept an
     // inert tc class — release it and reset the graduated level

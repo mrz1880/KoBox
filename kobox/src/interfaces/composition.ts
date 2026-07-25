@@ -185,14 +185,15 @@ export async function buildInstallation(
   const rutorrentUrl = process.env.KOBOX_RUTORRENT_URL;
   const rutorrentSha256 = process.env.KOBOX_RUTORRENT_SHA256;
   const quotaFs = process.env.KOBOX_QUOTA_FS;
+  const installPki = new EasyRsaPkiAdapter(runner, process.env.KOBOX_VPN_PKI ?? DEFAULT_PKI_DIR);
   const ctx: InstallerContext = {
     packages: new AptPackageAdapter(runner),
     files: new RtorrentConfigAdapter(runner),
     systemd: new SystemdAdapter(runner),
     checks: new ConfigCheckAdapter(runner),
     host: new InstallHostAdapter(runner),
-    pki: new EasyRsaPkiAdapter(runner, process.env.KOBOX_VPN_PKI ?? DEFAULT_PKI_DIR),
-    pkiProvision: new EasyRsaPkiAdapter(runner, process.env.KOBOX_VPN_PKI ?? DEFAULT_PKI_DIR),
+    pki: installPki,
+    pkiProvision: installPki,
     artifacts: new ArtifactFetchAdapter(defaultBodyFetcher()),
     facts,
     security: securitySettings(),

@@ -43,8 +43,8 @@ function topologicalOrder(catalog: readonly ComponentSpec[]): readonly Component
   return ordered;
 }
 
-// The resumable plan: pending components (never attempted, or failed — they
-// re-run, anti-#122) in dependency order. installed and skipped are excluded.
+// The resumable plan: every non-installed component in dependency order —
+// failed re-runs (anti-#122), skipped re-evaluates (recoverable by re-run).
 export function planInstallation(
   catalog: readonly ComponentSpec[],
   states: ReadonlyMap<string, InstallState>,

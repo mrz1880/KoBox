@@ -64,12 +64,15 @@ describe('InstallState', () => {
     expect(() => InstallState.parse('is_installed')).toThrow(InvalidInstallStateError);
   });
 
-  it('should_mark_to_install_and_failed_as_pending_so_a_failed_component_re_runs', () => {
-    // anti-#122: a failed component re-enters the plan without redoing the rest
+  it('should_mark_everything_but_installed_as_pending', () => {
+    // anti-#122: a failed component re-enters the plan without redoing the
+    // rest; skipped re-enters too — skip checks are cheap and idempotent,
+    // and a skip whose cause was fixed (env pin set, package packaged)
+    // must be recoverable by plain re-run, never by DB surgery
     expect(InstallState.parse('to_install').isPending()).toBe(true);
     expect(InstallState.parse('failed').isPending()).toBe(true);
+    expect(InstallState.parse('skipped').isPending()).toBe(true);
     expect(InstallState.parse('installed').isPending()).toBe(false);
-    expect(InstallState.parse('skipped').isPending()).toBe(false);
   });
 });
 
