@@ -1,3 +1,4 @@
+import type { RenderedFile } from '../shared/files.js';
 import type { ComponentName } from './ComponentName.js';
 import type { InstallState } from './InstallState.js';
 import type { Version } from './Version.js';
@@ -17,6 +18,46 @@ export interface SystemFacts {
 
 export interface SystemFactsPort {
   gather(): Promise<SystemFacts>;
+}
+
+// Unit lifecycle for installers. Distinct from the per-user ServiceControlPort
+// (user domain): here units are named directly and enable/disable matters.
+export interface SystemdPort {
+  daemonReload(): Promise<void>;
+  enable(unit: string, opts?: { readonly now?: boolean }): Promise<void>;
+  disable(unit: string, opts?: { readonly now?: boolean }): Promise<void>;
+  start(unit: string): Promise<void>;
+  reloadOrRestart(unit: string): Promise<void>;
+  isActive(unit: string): Promise<boolean>;
+}
+
+export type ConfigCheckResult = { readonly ok: true } | { readonly ok: false; readonly detail: string };
+
+// The anti-brick validators: a rendered config is only kept when the
+// service's own checker accepts it (sshd -t, nginx -t, named-checkconf).
+export interface ConfigCheckPort {
+  sshd(): Promise<ConfigCheckResult>;
+  nginx(): Promise<ConfigCheckResult>;
+  bind(): Promise<ConfigCheckResult>;
+}
+
+// Small host mutations installers need beyond packages/files/units. The one
+// anti-corruption seam to Debian for installation; every op stays argv-only
+// or plain fs in the adapter.
+export interface InstallHostPort {
+  hostname(): Promise<string>;
+  pathExists(path: string): Promise<boolean>;
+  readFile(path: string): Promise<string | undefined>;
+  removeFile(path: string): Promise<void>;
+  ensureDir(path: string, mode: string): Promise<void>;
+  // creates the file only when absent; returns true when it was created
+  ensureFile(file: RenderedFile): Promise<boolean>;
+  extractTarGz(archive: string, destDir: string): Promise<void>;
+  applySysctl(): Promise<void>;
+  postconf(settings: Readonly<Record<string, string>>): Promise<void>;
+  preseedDebconf(selections: readonly string[]): Promise<void>;
+  mountOptions(mountPoint: string): Promise<readonly string[]>;
+  activateQuota(mountPoint: string): Promise<void>;
 }
 
 // apt behind a port: installers declare desired packages, the adapter keeps
