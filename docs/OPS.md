@@ -136,6 +136,23 @@ kobox install        # re-vendors when the sha differs from the installed marker
 Upgrading ruTorrent later = the same three lines with the new tag inside a
 `kobox upgrade`d release, or standalone via `kobox install`.
 
+## Pinning NanoMon (monitoring)
+
+The `nanomon` component is a lightweight host monitor (CPU/RAM/disk/network +
+systemd unit health), run non-root and bound to loopback; nginx proxies
+`/monitoring` to it behind the portal's **admin** session. Like ruTorrent it
+installs only from a pinned, verified binary — unset = honest skip. To pin:
+
+```
+# from a NanoMon release (x86_64 static musl binary + its published .sha256)
+export KOBOX_NANOMON_URL=https://<nanomon-release-host>/nanomon-x86_64-unknown-linux-musl
+export KOBOX_NANOMON_SHA256=<the sum>
+kobox install        # re-vendors when the sha differs from the installed marker
+```
+
+Admins reach the dashboard at `https://<host>:8189/monitoring`. NanoMon's own
+alerting (its `alerts.toml` → webhook) stays standalone for now.
+
 ## The portal & application auth (Phase 6)
 
 The SSR portal (`kobox-portal.service`) replaces the legacy Wolf CMS theme and

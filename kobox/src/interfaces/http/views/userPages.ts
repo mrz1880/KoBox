@@ -134,3 +134,12 @@ export function rutorrentPage(viewer: Viewer): string {
     viewer,
   );
 }
+
+export function monitoringPage(viewer: Viewer): string {
+  return page(
+    'Monitoring',
+    html`<h1>Monitoring</h1>
+<iframe class="app" src="/monitoring/" title="Monitoring"></iframe>`,
+    viewer,
+  );
+}
