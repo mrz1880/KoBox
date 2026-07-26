@@ -228,6 +228,8 @@ beforeEach(() => {
         import('../../../src/domain/user/Port.js').then((m) => m.RtorrentPort.parse(nextRtorrent++)),
       releaseScgiPort: () => Promise.resolve(),
       releaseRtorrentPort: () => Promise.resolve(),
+      claimScgiPort: () => Promise.resolve(),
+      claimRtorrentPort: () => Promise.resolve(),
     },
   });
   const instances = new InMemoryTorrentInstanceRepository();

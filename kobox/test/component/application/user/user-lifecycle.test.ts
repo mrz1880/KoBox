@@ -13,6 +13,7 @@ import { EmailAddress } from '../../../../src/domain/user/EmailAddress.js';
 import { HashedPassword } from '../../../../src/domain/user/HashedPassword.js';
 import { ProxyPort, RtorrentPort, ScgiPort } from '../../../../src/domain/user/Port.js';
 import type { PortAllocatorPort } from '../../../../src/domain/user/PortAllocatorPort.js';
+import { PortAlreadyClaimedError } from '../../../../src/domain/user/PortAllocatorPort.js';
 import { Quota } from '../../../../src/domain/user/Quota.js';
 import { Username } from '../../../../src/domain/user/Username.js';
 import { InMemoryPortalCredentialsRepository } from '../../../../src/infrastructure/persistence/InMemoryPortalCredentialsRepository.js';
@@ -29,22 +30,55 @@ class SequentialPortAllocator implements PortAllocatorPort {
   private nextRtorrent = 45000;
   private readonly freedScgi: number[] = [];
   private readonly freedRtorrent: number[] = [];
+  private readonly claimed = new Set<number>();
 
   allocateScgiPort(): Promise<ScgiPort> {
-    return Promise.resolve(ScgiPort.parse(this.freedScgi.shift() ?? this.nextScgi++));
+    const freed = this.freedScgi.shift();
+    if (freed !== undefined) {
+      return Promise.resolve(ScgiPort.parse(freed));
+    }
+    while (this.claimed.has(this.nextScgi)) {
+      this.nextScgi += 1;
+    }
+    return Promise.resolve(ScgiPort.parse(this.nextScgi++));
   }
 
   allocateRtorrentPort(): Promise<RtorrentPort> {
-    return Promise.resolve(RtorrentPort.parse(this.freedRtorrent.shift() ?? this.nextRtorrent++));
+    const freed = this.freedRtorrent.shift();
+    if (freed !== undefined) {
+      return Promise.resolve(RtorrentPort.parse(freed));
+    }
+    while (this.claimed.has(this.nextRtorrent)) {
+      this.nextRtorrent += 1;
+    }
+    return Promise.resolve(RtorrentPort.parse(this.nextRtorrent++));
   }
 
   releaseScgiPort(port: ScgiPort): Promise<void> {
+    this.claimed.delete(port.value);
     this.freedScgi.push(port.value);
     return Promise.resolve();
   }
 
   releaseRtorrentPort(port: RtorrentPort): Promise<void> {
+    this.claimed.delete(port.value);
     this.freedRtorrent.push(port.value);
+    return Promise.resolve();
+  }
+
+  claimScgiPort(port: ScgiPort): Promise<void> {
+    return this.claim(port.value);
+  }
+
+  claimRtorrentPort(port: RtorrentPort): Promise<void> {
+    return this.claim(port.value);
+  }
+
+  private claim(value: number): Promise<void> {
+    if (this.claimed.has(value)) {
+      return Promise.reject(new PortAlreadyClaimedError(value));
+    }
+    this.claimed.add(value);
     return Promise.resolve();
   }
 }
@@ -153,6 +187,41 @@ describe('CreateUser', () => {
     await expect(world.createUser.execute(createUserCommand())).rejects.toThrow(/exploded/);
 
     expect(await world.credentials.find(alice)).toBeUndefined();
+  });
+
+  it('should_preserve_explicit_ports_when_importing_a_legacy_user', async () => {
+    const user = await world.createUser.execute({
+      ...createUserCommand(),
+      ports: { scgi: ScgiPort.parse(51110), rtorrent: RtorrentPort.parse(45010) },
+    });
+
+    expect(user.scgiPort.value).toBe(51110);
+    expect(user.rtorrentPort.value).toBe(45010);
+    // the claimed ports are off the table for the next fresh allocation
+    const next = await world.createUser.execute({
+      ...createUserCommand(),
+      username: Username.parse('bob'),
+      email: EmailAddress.parse('bob@example.org'),
+    });
+    expect(next.scgiPort.value).not.toBe(51110);
+  });
+
+  it('should_reject_importing_a_user_onto_an_already_claimed_port', async () => {
+    await world.createUser.execute({
+      ...createUserCommand(),
+      ports: { scgi: ScgiPort.parse(51110), rtorrent: RtorrentPort.parse(45010) },
+    });
+
+    await expect(
+      world.createUser.execute({
+        ...createUserCommand(),
+        username: Username.parse('bob'),
+        email: EmailAddress.parse('bob@example.org'),
+        ports: { scgi: ScgiPort.parse(51110), rtorrent: RtorrentPort.parse(45011) },
+      }),
+    ).rejects.toThrow(PortAlreadyClaimedError);
+    // compensation: the collided import left no system account behind
+    expect(await world.accounts.accountExists(Username.parse('bob'))).toBe(false);
   });
 
   it('should_allocate_distinct_ports_for_successive_users', async () => {

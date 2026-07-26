@@ -3,7 +3,7 @@ import type { PortalCredentialsPort } from '../../domain/portal/ports.js';
 import type { AccountType } from '../../domain/user/AccountType.js';
 import type { EmailAddress } from '../../domain/user/EmailAddress.js';
 import type { HashedPassword } from '../../domain/user/HashedPassword.js';
-import type { ProxyPort } from '../../domain/user/Port.js';
+import type { ProxyPort, RtorrentPort, ScgiPort } from '../../domain/user/Port.js';
 import type { PortAllocatorPort } from '../../domain/user/PortAllocatorPort.js';
 import type { Quota } from '../../domain/user/Quota.js';
 import { SeedboxUser } from '../../domain/user/SeedboxUser.js';
@@ -25,6 +25,9 @@ export interface CreateUserCommand {
   readonly proxyPort: ProxyPort;
   readonly passwordHash: HashedPassword;
   readonly role: Role;
+  // Phase 7 import: preserve a legacy user's exact ports instead of allocating
+  // fresh ones (keeps their in-flight torrents on the same SCGI/rtorrent ports).
+  readonly ports?: { readonly scgi: ScgiPort; readonly rtorrent: RtorrentPort };
 }
 
 interface Deps {
@@ -49,13 +52,26 @@ export class CreateUser {
       throw new UserAlreadyExistsError(command.username.value);
     }
 
-    const scgiPort = await allocator.allocateScgiPort();
-    let rtorrentPort;
-    try {
-      rtorrentPort = await allocator.allocateRtorrentPort();
-    } catch (error) {
-      await allocator.releaseScgiPort(scgiPort);
-      throw error;
+    let scgiPort: ScgiPort;
+    let rtorrentPort: RtorrentPort;
+    if (command.ports) {
+      scgiPort = command.ports.scgi;
+      await allocator.claimScgiPort(scgiPort);
+      rtorrentPort = command.ports.rtorrent;
+      try {
+        await allocator.claimRtorrentPort(rtorrentPort);
+      } catch (error) {
+        await allocator.releaseScgiPort(scgiPort);
+        throw error;
+      }
+    } else {
+      scgiPort = await allocator.allocateScgiPort();
+      try {
+        rtorrentPort = await allocator.allocateRtorrentPort();
+      } catch (error) {
+        await allocator.releaseScgiPort(scgiPort);
+        throw error;
+      }
     }
     const { user, event } = SeedboxUser.create({
       username: command.username,
