@@ -35,9 +35,12 @@ pnpm exec stryker run --mutate "src/domain/user/**"   # un sous-arbre (itératio
 ```
 
 Rapport HTML : `reports/mutation/index.html`. Le **seuil de rupture** (`thresholds.break`,
-`stryker.conf.json`) fait échouer la commande sous 70 % — lance d'abord un baseline complet puis
-remonte `break` juste sous le score obtenu. C'est un outil **on-demand** (trop lourd pour la CI
-GitHub Free / le hook pre-push) : à jouer avant un refactor ou sur un module qu'on veut blinder.
+`stryker.conf.json`) fait échouer la commande sous ce score. **Baseline 2026-07-26 : 74,53 %**
+(4481 mutants, ~8 min) → `break` calé à **74**. Remonte-le au fur et à mesure que les tests
+s'améliorent. La plupart des survivants restants sont des mutants de **faible valeur** (littéraux
+de messages d'erreur, bornes de regex des VOs) — on peut soit blinder un fichier ciblé, soit
+désactiver le mutateur `StringLiteral` pour réduire le bruit. C'est un outil **on-demand** (trop
+lourd pour la CI GitHub Free / le hook pre-push) : à jouer avant un refactor ou pour blinder un module.
 
 ## Conteneur Debian 12 (adapters réels + E2E)
 
