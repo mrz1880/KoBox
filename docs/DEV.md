@@ -21,6 +21,24 @@ pnpm lint && pnpm typecheck
 Tout le domaine et l'application se testent avec des **fakes** — aucune commande système
 n'est exécutée par ces suites.
 
+## Mutation testing (Stryker)
+
+La couverture ligne (`pnpm coverage`, seuil 85 %) dit *ce qui est exécuté* ; le mutation
+testing dit *ce qui est réellement asserté*. Stryker mute `src/domain/**` + `src/application/**`
+et rejoue les suites unit/component/contract (`vitest.mutation.config.ts`) ; le checker
+TypeScript écarte les mutants qui ne compilent pas.
+
+```bash
+cd kobox
+pnpm mutation                                   # tout le domaine + application (lent, on-demand)
+pnpm exec stryker run --mutate "src/domain/user/**"   # un sous-arbre (itération rapide)
+```
+
+Rapport HTML : `reports/mutation/index.html`. Le **seuil de rupture** (`thresholds.break`,
+`stryker.conf.json`) fait échouer la commande sous 70 % — lance d'abord un baseline complet puis
+remonte `break` juste sous le score obtenu. C'est un outil **on-demand** (trop lourd pour la CI
+GitHub Free / le hook pre-push) : à jouer avant un refactor ou sur un module qu'on veut blinder.
+
 ## Conteneur Debian 12 (adapters réels + E2E)
 
 ```bash

@@ -30,7 +30,8 @@
     "test:int": "vitest run test/integration",
     "test:e2e": "vitest run --no-file-parallelism test/e2e",
     "coverage": "vitest run test/unit test/component test/contract --coverage",
-    "build": "tsc -p tsconfig.build.json"
+    "build": "tsc -p tsconfig.build.json",
+    "mutation": "stryker run"
   },
   "dependencies": {
     "@fastify/cookie": "^11.1.2",
@@ -43,6 +44,9 @@
     "zod": "^4.1.12"
   },
   "devDependencies": {
+    "@stryker-mutator/core": "^9.6.1",
+    "@stryker-mutator/typescript-checker": "^9.6.1",
+    "@stryker-mutator/vitest-runner": "^9.6.1",
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^24.10.1",
     "@vitest/coverage-v8": "^4.0.9",
