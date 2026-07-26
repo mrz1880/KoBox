@@ -11,7 +11,7 @@
   "reporters": ["html", "clear-text", "progress"],
   "htmlReporter": { "fileName": "reports/mutation/index.html" },
   "clearTextReporter": { "maxTestsToLog": 3 },
-  "thresholds": { "high": 90, "low": 75, "break": 70 },
+  "thresholds": { "high": 90, "low": 74, "break": 74 },
   "tempDirName": ".stryker-tmp",
   "concurrency": 4
 }
