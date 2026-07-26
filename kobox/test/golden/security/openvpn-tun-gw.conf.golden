@@ -7,6 +7,7 @@ server 10.0.0.0 255.255.255.0
 ca /etc/openvpn/kobox-pki/ca.crt
 cert /etc/openvpn/kobox-pki/issued/server.crt
 key /etc/openvpn/kobox-pki/private/server.key
+crl-verify /etc/openvpn/kobox-pki/crl.pem
 dh none
 data-ciphers AES-256-GCM:AES-128-GCM
 auth SHA256

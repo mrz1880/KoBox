@@ -1,4 +1,5 @@
 import type { NetworkServicePort } from '../../domain/security/ports.js';
+import { VPN_VARIANTS } from '../../domain/security/vpn.js';
 import type { NetworkServiceReloadPort } from '../../domain/tracker/ports.js';
 import type { Logger } from '../logging/logger.js';
 import { runOrThrow, type CommandRunner } from './CommandRunner.js';
@@ -50,6 +51,17 @@ export class NetworkServiceAdapter implements NetworkServicePort, NetworkService
   async reloadNfsExports(): Promise<void> {
     if (await this.unitExists('nfs-server')) {
       await this.run('exportfs', ['-ra']);
+    }
+  }
+
+  // The three servers are templated units (openvpn-server@kobox-<variant>);
+  // list-unit-files reports the template, and we reload-or-restart each instance
+  // so a fresh CRL directive (or republished crl.pem) takes effect.
+  async reloadOpenVpn(): Promise<void> {
+    if (await this.unitExists('openvpn-server@')) {
+      for (const variant of VPN_VARIANTS) {
+        await this.run('systemctl', ['reload-or-restart', `openvpn-server@kobox-${variant}`]);
+      }
     }
   }
 

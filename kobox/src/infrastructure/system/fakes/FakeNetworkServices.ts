@@ -24,6 +24,10 @@ export class FakeNetworkServices implements NetworkServicePort {
     return this.record('nfs');
   }
 
+  reloadOpenVpn(): Promise<void> {
+    return this.record('openvpn');
+  }
+
   private record(name: string): Promise<void> {
     if (this.failure) {
       return Promise.reject(this.failure);

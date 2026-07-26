@@ -228,6 +228,21 @@ describe('NetworkServiceAdapter', () => {
     await expect(adapter.reloadFail2ban()).rejects.toThrow('boom');
   });
 
+  it('should_reload_the_three_openvpn_server_instances_when_the_template_exists', async () => {
+    const runner = new PrefixRunner();
+    runner.on('systemctl list-unit-files openvpn-server@.service', {
+      stdout: 'openvpn-server@.service enabled\n',
+    });
+    const adapter = new NetworkServiceAdapter(runner, logger);
+
+    await adapter.reloadOpenVpn();
+
+    const lines = runner.commandLines();
+    expect(lines).toContain('systemctl reload-or-restart openvpn-server@kobox-tun-gw');
+    expect(lines).toContain('systemctl reload-or-restart openvpn-server@kobox-tun');
+    expect(lines).toContain('systemctl reload-or-restart openvpn-server@kobox-tap');
+  });
+
   it('should_skip_absent_units_explicitly_instead_of_failing', async () => {
     const runner = new PrefixRunner(); // no units listed at all
     const adapter = new NetworkServiceAdapter(runner, logger);
