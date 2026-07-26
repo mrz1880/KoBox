@@ -1,5 +1,7 @@
+import { randomBytes } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { parseJob } from '../application/jobs/contract.js';
+import { ImportFromMysb } from '../application/migration/ImportFromMysb.js';
 import { buildInstallers, type InstallerContext } from '../application/installation/installers.js';
 import { RunInstallation } from '../application/installation/RunInstallation.js';
 import { UninstallComponents } from '../application/installation/UninstallComponents.js';
@@ -28,6 +30,7 @@ import { MultiChannelNotifier } from '../infrastructure/notifications/MultiChann
 import { OutboxEmailChannel } from '../infrastructure/notifications/OutboxEmailChannel.js';
 import { SendmailTransport } from '../infrastructure/notifications/SendmailTransport.js';
 import { SqliteMailOutbox } from '../infrastructure/persistence/SqliteMailOutbox.js';
+import { SqliteMysbDumpSource } from '../infrastructure/persistence/SqliteMysbDumpSource.js';
 import { NtfyChannel } from '../infrastructure/notifications/NtfyChannel.js';
 import type { NotificationChannel } from '../infrastructure/notifications/formatEvent.js';
 import type { SecurityNotificationPort } from '../domain/security/ports.js';
@@ -62,6 +65,7 @@ import { IpsetAdapter } from '../infrastructure/system/IpsetAdapter.js';
 import { Cidr } from '../domain/security/Cidr.js';
 import { Bandwidth } from '../domain/security/Bandwidth.js';
 import { DynDnsHost } from '../domain/security/DynDnsHost.js';
+import { Password } from '../domain/user/Password.js';
 import { FairUsePolicy } from '../domain/security/FairUsePolicy.js';
 import { SqliteFairUseRepository } from '../infrastructure/persistence/SqliteFairUseRepository.js';
 import { DynDnsLookupAdapter } from '../infrastructure/system/DynDnsLookupAdapter.js';
@@ -310,6 +314,33 @@ export function buildUpgrade(c: Container): UpgradeRelease {
       currentLink: process.env.KOBOX_CURRENT_LINK ?? DEFAULT_CURRENT_LINK,
       packageSubdir: 'kobox',
     },
+  });
+}
+
+// Reads a frozen MySB dump and imports it via existing repos/use cases. Runs
+// DIRECT (like install/upgrade): it calls CreateUser and enqueues provisioning,
+// so the running root worker finishes the per-user system state. The temporary
+// password is a fresh CSPRNG string, hashed for the account and mailed once.
+export function buildMigrateFromMysb(
+  c: Container,
+  opts: { readonly dumpDir: string },
+): ImportFromMysb {
+  return new ImportFromMysb({
+    source: new SqliteMysbDumpSource(opts.dumpDir),
+    users: c.repo,
+    createUser: c.useCases.createUser,
+    suspendUser: c.useCases.suspendUser,
+    instances: new SqliteTorrentInstanceRepository(c.db),
+    trackers: c.trackerRepo,
+    blocklists: c.blocklistRepo,
+    torrents: new SqliteTorrentRepository(c.db),
+    addresses: c.addressRepo,
+    bindings: c.addressRepo,
+    hasher: c.hasher,
+    newTemporaryPassword: () => Password.parse(randomBytes(18).toString('base64url')),
+    outbox: c.outbox,
+    queue: c.queue,
+    clock: nowStamp,
   });
 }
 
