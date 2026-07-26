@@ -11,6 +11,7 @@ import {
   renderDnscryptConfig,
   renderFirewallBootUnit,
   renderNfsExports,
+  renderNanomonUnit,
   renderNginxVhost,
   renderPortalUnit,
   renderRutorrentConfig,
@@ -130,6 +131,9 @@ describe('installation rendering', () => {
     expect(file.content).toContain('fastcgi_param REMOTE_USER $kobox_user;');
     // per-user SCGI mounts are pulled from the rendered include dir
     expect(file.content).toContain('include /etc/nginx/kobox.d/*.conf;');
+    // NanoMon monitoring is admin-gated and proxied on loopback
+    expect(file.content).toContain('location /monitoring/ {');
+    expect(file.content).toContain('proxy_pass http://127.0.0.1:8191/;');
     // the ACME webroot is always served on :80 so certbot can validate
     // before any certificate exists
     expect(file.content).toContain('listen 80;');
@@ -229,6 +233,16 @@ describe('installation rendering', () => {
     expect(file.content).toContain('--localhost-only');
     expect(file.content).toContain('127.0.0.1');
     expectGolden('shellinabox.default.golden', file.content);
+  });
+
+  it('should_render_the_nanomon_unit_non_root_on_loopback_golden', () => {
+    const file = renderNanomonUnit();
+    expect(file.path).toBe('/etc/systemd/system/kobox-nanomon.service');
+    // non-root, read-only, loopback-bound
+    expect(file.content).toContain('User=nanomon');
+    expect(file.content).toContain('NANOMON_BIND=127.0.0.1');
+    expect(file.content).toContain('ProtectSystem=strict');
+    expectGolden('kobox-nanomon.service.golden', file.content);
   });
 
   it('should_render_bind_files_wired_to_the_phase2_blacklist_zones', () => {

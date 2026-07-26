@@ -27,6 +27,8 @@ export const COMPONENT_NAMES = [
   'nfs',
   'samba',
   'shellinabox',
+  // Phase 8 — lightweight host monitoring (vendored NanoMon binary)
+  'nanomon',
 ] as const;
 
 export type ComponentNameValue = (typeof COMPONENT_NAMES)[number];

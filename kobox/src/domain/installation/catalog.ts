@@ -40,4 +40,6 @@ export const COMPONENT_CATALOG: readonly ComponentSpec[] = [
   spec('nfs', ['kobox-core']),
   spec('samba', ['kobox-core']),
   spec('shellinabox', ['nginx']),
+  // Phase 8 — NanoMon monitoring, proxied by nginx behind the admin session
+  spec('nanomon', ['nginx']),
 ];

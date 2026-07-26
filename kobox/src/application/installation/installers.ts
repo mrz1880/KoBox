@@ -18,6 +18,7 @@ import {
   renderDnscryptConfig,
   renderFirewallBootUnit,
   renderNginxVhost,
+  renderNanomonUnit,
   renderPortalUnit,
   renderRutorrentConfig,
   renderShellinaboxDefault,
@@ -47,6 +48,10 @@ export interface InstallSettings {
   // baked sha for a moving upstream would be a lie) — unset = honest skip
   readonly rutorrentUrl?: string;
   readonly rutorrentSha256?: string;
+  // release pin for the vendored NanoMon binary (env-driven, same rationale as
+  // ruTorrent) — unset = honest skip
+  readonly nanomonUrl?: string;
+  readonly nanomonSha256?: string;
   readonly quotaFs?: string;
   // env-driven: KOBOX_LE_DOMAIN/KOBOX_LE_EMAIL (+ KOBOX_ACME_URL for the
   // pebble fixture); unset = honest skip, snakeoil stays
@@ -146,6 +151,9 @@ const HTPASSWD = '/etc/nginx/kobox.htpasswd';
 const RUTORRENT_DIR = '/var/www/rutorrent';
 const RUTORRENT_MARKER = `${RUTORRENT_DIR}/.kobox-artifact-sha256`;
 const RUTORRENT_ARCHIVE = '/var/tmp/kobox/rutorrent.tar.gz';
+const NANOMON_BIN = '/usr/local/bin/nanomon';
+const NANOMON_MARKER = '/etc/kobox/nanomon.sha256';
+const NANOMON_UNIT = '/etc/systemd/system/kobox-nanomon.service';
 const ZONES_SEED = '/etc/bind/kobox.zones.blacklists';
 const CRON_FILE = '/etc/cron.d/kobox';
 const BLOCKED_NAMES_SEED = '/etc/dnscrypt-proxy/blocked-names.txt';
@@ -770,6 +778,57 @@ class ShellinaboxInstaller implements ComponentInstaller {
   }
 }
 
+// Phase 8 — vendored NanoMon: a fetched, verified binary run non-root behind
+// the portal's admin-gated /monitoring proxy. Skips honestly when unpinned
+// (same env-driven rationale as ruTorrent).
+class NanomonInstaller implements ComponentInstaller {
+  readonly name = 'nanomon';
+
+  constructor(private readonly ctx: InstallerContext) {}
+
+  async install(): Promise<InstallOutcome> {
+    const { host, artifacts, files, systemd, install } = this.ctx;
+    if (install.nanomonUrl === undefined || install.nanomonSha256 === undefined) {
+      return {
+        state: 'skipped',
+        reason:
+          'no NanoMon release pinned — set KOBOX_NANOMON_URL and KOBOX_NANOMON_SHA256, then re-run kobox install',
+      };
+    }
+    await host.ensureServiceAccount('nanomon');
+    const marker = await host.readFile(NANOMON_MARKER);
+    const binaryChanged = marker?.trim() !== install.nanomonSha256;
+    if (binaryChanged) {
+      await artifacts.fetchVerified(install.nanomonUrl, install.nanomonSha256, NANOMON_BIN);
+      await host.setOwnership(NANOMON_BIN, 'root', 'root', '0755');
+      await files.apply([
+        {
+          path: NANOMON_MARKER,
+          content: `${install.nanomonSha256}\n`,
+          mode: '0644',
+          owner: 'root',
+          group: 'root',
+        },
+      ]);
+    }
+    const unitChanged = await files.apply([renderNanomonUnit()]);
+    await systemd.daemonReload();
+    await systemd.enable('kobox-nanomon', { now: true });
+    if (binaryChanged || unitChanged.length > 0) {
+      await systemd.reloadOrRestart('kobox-nanomon');
+    }
+    return installed();
+  }
+
+  async uninstall(): Promise<void> {
+    const { host, systemd } = this.ctx;
+    await systemd.disable('kobox-nanomon', { now: true });
+    await host.removeFile(NANOMON_UNIT);
+    await host.removeFile(NANOMON_BIN);
+    await systemd.daemonReload();
+  }
+}
+
 export function buildInstallers(ctx: InstallerContext): ReadonlyMap<string, ComponentInstaller> {
   const list: readonly ComponentInstaller[] = [
     new KoboxCoreInstaller(ctx),
@@ -792,6 +851,7 @@ export function buildInstallers(ctx: InstallerContext): ReadonlyMap<string, Comp
     new NfsInstaller(ctx),
     new SambaInstaller(ctx),
     new ShellinaboxInstaller(ctx),
+    new NanomonInstaller(ctx),
   ];
   return new Map(list.map((entry) => [entry.name, entry]));
 }

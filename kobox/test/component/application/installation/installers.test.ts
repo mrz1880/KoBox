@@ -63,6 +63,7 @@ function buildWorld(overrides?: {
   manageAptSources?: boolean;
   quotaFs?: string;
   rutorrentPin?: 'none';
+  nanomonPin?: 'none';
   letsencrypt?: { domain: string; email: string; acmeUrl?: string };
 }): World {
   const packages = new FakePackages();
@@ -105,6 +106,10 @@ function buildWorld(overrides?: {
       ...(overrides?.rutorrentPin !== 'none' && {
         rutorrentUrl: 'https://releases.example.net/rutorrent-4.3.9.tar.gz',
         rutorrentSha256: 'a'.repeat(64),
+      }),
+      ...(overrides?.nanomonPin !== 'none' && {
+        nanomonUrl: 'https://releases.example.net/nanomon-x86_64',
+        nanomonSha256: 'b'.repeat(64),
       }),
       ...(overrides?.quotaFs !== undefined && { quotaFs: overrides.quotaFs }),
       ...(overrides?.letsencrypt !== undefined && { letsencrypt: overrides.letsencrypt }),
@@ -613,6 +618,45 @@ describe('rutorrent installer', () => {
     await installer(world, 'rutorrent').install();
 
     expect(world.host.fetched).toHaveLength(1); // marker matched, no re-download
+  });
+});
+
+describe('nanomon installer', () => {
+  it('should_skip_with_guidance_when_no_release_pin_is_configured', async () => {
+    const unpinned = buildWorld({ nanomonPin: 'none' });
+
+    const outcome = await installer(unpinned, 'nanomon').install();
+
+    expect(outcome).toMatchObject({ state: 'skipped' });
+    expect(outcome.state === 'skipped' && outcome.reason).toContain('KOBOX_NANOMON_URL');
+    expect(unpinned.host.fetched).toHaveLength(0);
+  });
+
+  it('should_fetch_the_binary_create_the_account_and_enable_the_unit', async () => {
+    const outcome = await installer(world, 'nanomon').install();
+
+    expect(outcome.state).toBe('installed');
+    expect(world.host.fetched).toEqual([
+      ['https://releases.example.net/nanomon-x86_64', 'b'.repeat(64)],
+    ]);
+    expect(world.host.serviceAccounts.has('nanomon')).toBe(true);
+    expect(world.host.contentAt('/etc/systemd/system/kobox-nanomon.service')).toContain(
+      'User=nanomon',
+    );
+    expect(world.systemd.log).toContain('enable-now kobox-nanomon');
+
+    await installer(world, 'nanomon').install();
+
+    expect(world.host.fetched).toHaveLength(1); // marker matched, no re-download
+  });
+
+  it('should_remove_the_unit_and_binary_on_uninstall', async () => {
+    await installer(world, 'nanomon').install();
+
+    await installer(world, 'nanomon').uninstall();
+
+    expect(world.systemd.log).toContain('disable-now kobox-nanomon');
+    expect(world.host.contentAt('/usr/local/bin/nanomon')).toBeUndefined();
   });
 });
 
