@@ -5,3 +5,7 @@ coverage/
 *.db-journal
 *.db-wal
 *.db-shm
+
+# mutation testing (Stryker)
+.stryker-tmp/
+reports/
