@@ -5,6 +5,7 @@ import type { ComponentRegistry } from '../../../domain/installation/ports.js';
 import type { HealthCheckResult, HealthProbePort, UserRepository } from '../../../domain/user/ports.js';
 import { flashOf, viewerOf, type Guards } from '../guards.js';
 import { adminHealthPage, adminMailsPage } from '../views/adminOpsPage.js';
+import { monitoringPage } from '../views/userPages.js';
 
 export interface AdminOpsDeps {
   readonly users: UserRepository;
@@ -19,6 +20,16 @@ export function registerAdminOpsRoutes(
   deps: AdminOpsDeps,
   guards: Guards,
 ): void {
+  // Admin-only frame around the NanoMon dashboard; nginx separately gates the
+  // /monitoring/ proxy on the same admin auth_request.
+  server.get('/monitoring', async (request, reply) => {
+    const session = await guards.requireAdmin(request, reply);
+    if (session === undefined) {
+      return;
+    }
+    return reply.type('text/html').send(monitoringPage(viewerOf(session)));
+  });
+
   server.get('/admin/health', async (request, reply) => {
     const session = await guards.requireAdmin(request, reply);
     if (session === undefined) {

@@ -79,6 +79,7 @@ const ADMIN_NAV: readonly (readonly [string, string])[] = [
   ['/admin/fair-use', 'Fair use'],
   ['/admin/health', 'Health'],
   ['/admin/mails', 'Mails'],
+  ['/monitoring', 'Monitoring'],
   ['/rutorrent', 'ruTorrent'],
 ];
 

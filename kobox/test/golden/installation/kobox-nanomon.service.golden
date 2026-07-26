@@ -1,0 +1,24 @@
+# KoBox-managed — DO NOT EDIT (rendered declaratively).
+[Unit]
+Description=KoBox host monitoring (NanoMon)
+After=network.target
+
+[Service]
+Type=simple
+User=nanomon
+Group=nanomon
+ExecStart=/usr/local/bin/nanomon
+Environment=NANOMON_BIND=127.0.0.1
+Environment=NANOMON_PORT=8191
+Environment=NANOMON_ENABLE_SYSTEMD=true
+Environment=NANOMON_SERVICE_FILTER=rtorrent-*,kobox-*,nginx
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+SyslogIdentifier=kobox-nanomon
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

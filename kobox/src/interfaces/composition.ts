@@ -220,6 +220,8 @@ export async function buildInstallation(
   const facts = await new SystemFactsAdapter(runner).gather();
   const rutorrentUrl = process.env.KOBOX_RUTORRENT_URL;
   const rutorrentSha256 = process.env.KOBOX_RUTORRENT_SHA256;
+  const nanomonUrl = process.env.KOBOX_NANOMON_URL;
+  const nanomonSha256 = process.env.KOBOX_NANOMON_SHA256;
   const quotaFs = process.env.KOBOX_QUOTA_FS;
   const leDomain = process.env.KOBOX_LE_DOMAIN;
   const leEmail = process.env.KOBOX_LE_EMAIL;
@@ -248,6 +250,8 @@ export async function buildInstallation(
       ...(rutorrentUrl !== undefined && rutorrentUrl !== '' && { rutorrentUrl }),
       ...(rutorrentSha256 !== undefined &&
         rutorrentSha256 !== '' && { rutorrentSha256 }),
+      ...(nanomonUrl !== undefined && nanomonUrl !== '' && { nanomonUrl }),
+      ...(nanomonSha256 !== undefined && nanomonSha256 !== '' && { nanomonSha256 }),
       ...(quotaFs !== undefined && quotaFs !== '' && { quotaFs }),
       ...(leDomain !== undefined &&
         leDomain !== '' &&

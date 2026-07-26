@@ -86,6 +86,47 @@ export function renderPortalUnit(settings: PortalUnitSettings): RenderedFile {
   };
 }
 
+// Phase 8 — NanoMon monitoring. Runs NON-ROOT under a dedicated `nanomon`
+// account and read-only: it only reads /proc + /sys and queries systemd, keeps
+// its history in memory, and binds loopback (nginx gates /monitoring on the
+// admin session). Config is inline Environment= (no secrets).
+export function renderNanomonUnit(): RenderedFile {
+  return {
+    path: '/etc/systemd/system/kobox-nanomon.service',
+    content: [
+      MANAGED_HEADER,
+      '[Unit]',
+      'Description=KoBox host monitoring (NanoMon)',
+      'After=network.target',
+      '',
+      '[Service]',
+      'Type=simple',
+      'User=nanomon',
+      'Group=nanomon',
+      'ExecStart=/usr/local/bin/nanomon',
+      'Environment=NANOMON_BIND=127.0.0.1',
+      `Environment=NANOMON_PORT=${String(NANOMON_PORT)}`,
+      'Environment=NANOMON_ENABLE_SYSTEMD=true',
+      'Environment=NANOMON_SERVICE_FILTER=rtorrent-*,kobox-*,nginx',
+      // a read-only monitor: no writable paths, no new privileges
+      'NoNewPrivileges=yes',
+      'ProtectSystem=strict',
+      'ProtectHome=yes',
+      'PrivateTmp=yes',
+      'SyslogIdentifier=kobox-nanomon',
+      'Restart=on-failure',
+      'RestartSec=2',
+      '',
+      '[Install]',
+      'WantedBy=multi-user.target',
+      '',
+    ].join('\n'),
+    mode: '0644',
+    owner: 'root',
+    group: 'root',
+  };
+}
+
 // Phase 3 debt #1: iptables tables are empty after a reboot; this oneshot
 // restores the last applied ruleset. The Condition keeps the very first boot
 // (no apply yet) clean instead of failing the unit.
@@ -230,6 +271,9 @@ export const ACME_WEBROOT = '/var/www/acme';
 // and delegates /ru + /RPC-* protection to it via auth_request.
 export const PORTAL_HTTP_PORT = 8190;
 
+// Phase 8 — NanoMon binds loopback here; nginx proxies /monitoring to it.
+export const NANOMON_PORT = 8191;
+
 // Phase 6: the shared Basic Auth is retired. The SSR portal owns auth; nginx
 // proxies it on / and gates ruTorrent (/ru) and the per-user SCGI mounts
 // (/RPC-<USER>, pulled from the rendered include dir) with auth_request
@@ -327,6 +371,13 @@ export function renderNginxVhost(settings: NginxVhostSettings): RenderedFile {
       '    location /shell/ {',
       '        auth_request /internal/auth/admin;',
       '        proxy_pass http://127.0.0.1:4200/;',
+      '        proxy_set_header Host $host;',
+      '    }',
+      '',
+      '    # NanoMon host monitoring (localhost), admin-only through the portal',
+      '    location /monitoring/ {',
+      '        auth_request /internal/auth/admin;',
+      `        proxy_pass http://127.0.0.1:${String(NANOMON_PORT)}/;`,
       '        proxy_set_header Host $host;',
       '    }',
       '}',
