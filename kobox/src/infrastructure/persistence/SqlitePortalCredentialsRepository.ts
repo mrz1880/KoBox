@@ -21,16 +21,19 @@ export class SqlitePortalCredentialsRepository implements PortalCredentialsPort 
       username: Username.parse(row.username),
       passwordHash: HashedPassword.parse(row.passwordHash),
       role: row.role,
+      mustChangePassword: row.mustChangePassword === 1,
     });
   }
 
   save(credentials: PortalCredentials, now: string): Promise<void> {
+    const mustChange = credentials.mustChangePassword === true ? 1 : 0;
     this.db.orm
       .insert(portalCredentials)
       .values({
         username: credentials.username.value,
         passwordHash: credentials.passwordHash.value,
         role: credentials.role,
+        mustChangePassword: mustChange,
         updatedAt: now,
       })
       .onConflictDoUpdate({
@@ -38,6 +41,7 @@ export class SqlitePortalCredentialsRepository implements PortalCredentialsPort 
         set: {
           passwordHash: credentials.passwordHash.value,
           role: credentials.role,
+          mustChangePassword: mustChange,
           updatedAt: now,
         },
       })

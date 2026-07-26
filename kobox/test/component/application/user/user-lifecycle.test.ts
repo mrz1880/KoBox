@@ -181,6 +181,18 @@ describe('CreateUser', () => {
     expect(credentials?.role).toBe('admin');
   });
 
+  it('should_flag_an_imported_user_for_a_forced_password_change', async () => {
+    await world.createUser.execute({ ...createUserCommand(), mustChangePassword: true });
+
+    expect((await world.credentials.find(alice))?.mustChangePassword).toBe(true);
+  });
+
+  it('should_not_flag_a_normal_user_for_a_forced_password_change', async () => {
+    await world.createUser.execute(createUserCommand());
+
+    expect((await world.credentials.find(alice))?.mustChangePassword).toBe(false);
+  });
+
   it('should_not_leave_portal_credentials_behind_after_a_compensated_failure', async () => {
     world.quota.failNextSetQuota('quota tooling exploded');
 
@@ -319,6 +331,14 @@ describe('ChangePassword', () => {
     await world.changePassword.execute({ username: alice, passwordHash: aHash });
 
     expect((await world.credentials.find(alice))?.role).toBe('user');
+  });
+
+  it('should_clear_the_must_change_flag_once_the_password_is_changed', async () => {
+    await world.createUser.execute({ ...createUserCommand(), mustChangePassword: true });
+
+    await world.changePassword.execute({ username: alice, passwordHash: aHash });
+
+    expect((await world.credentials.find(alice))?.mustChangePassword).toBe(false);
   });
 
   it('should_reject_unknown_users', async () => {

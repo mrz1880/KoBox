@@ -9,6 +9,9 @@ export interface PortalCredentials {
   readonly username: Username;
   readonly passwordHash: HashedPassword;
   readonly role: Role;
+  // Phase 7: set when a migrated user is given a temporary password — the
+  // portal forces a password change before granting access. Defaults to false.
+  readonly mustChangePassword?: boolean;
 }
 
 export interface PortalCredentialsPort {

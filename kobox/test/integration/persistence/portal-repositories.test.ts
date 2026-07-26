@@ -75,6 +75,30 @@ describe('SqlitePortalCredentialsRepository', () => {
 
     expect(await repo.find(ALICE)).toBeUndefined();
   });
+
+  it('should_persist_the_must_change_password_flag_and_let_a_later_save_clear_it', async () => {
+    const repo = new SqlitePortalCredentialsRepository(db);
+
+    await repo.save(
+      { username: ALICE, passwordHash: HASH, role: 'user', mustChangePassword: true },
+      '2026-07-25 10:00:00',
+    );
+    expect((await repo.find(ALICE))?.mustChangePassword).toBe(true);
+
+    await repo.save(
+      { username: ALICE, passwordHash: HASH, role: 'user', mustChangePassword: false },
+      '2026-07-25 11:00:00',
+    );
+    expect((await repo.find(ALICE))?.mustChangePassword).toBe(false);
+  });
+
+  it('should_default_the_must_change_flag_to_false_when_omitted', async () => {
+    const repo = new SqlitePortalCredentialsRepository(db);
+
+    await repo.save({ username: ALICE, passwordHash: HASH, role: 'user' }, '2026-07-25 10:00:00');
+
+    expect((await repo.find(ALICE))?.mustChangePassword).toBe(false);
+  });
 });
 
 describe('SqlitePortalSessionRepository', () => {

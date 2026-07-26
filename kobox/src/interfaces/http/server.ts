@@ -134,6 +134,9 @@ export function buildPortalServer(deps: PortalServerDeps): FastifyInstance {
     if (session === undefined) {
       return reply.code(401).send();
     }
+    if (session.mustChangePassword) {
+      return reply.code(403).send();
+    }
     return reply.header('x-kobox-user', session.username.value).code(204).send();
   });
 
@@ -141,6 +144,10 @@ export function buildPortalServer(deps: PortalServerDeps): FastifyInstance {
     const session = await guards.sessionOf(request);
     if (session === undefined) {
       return reply.code(401).send();
+    }
+    // ruTorrent/RPC stays closed until the forced password change is done
+    if (session.mustChangePassword) {
+      return reply.code(403).send();
     }
     const original = String(request.headers['x-original-uri'] ?? '');
     const match = /^\/RPC-([A-Za-z0-9]+)(?:[/?].*)?$/.exec(original);
@@ -158,6 +165,9 @@ export function buildPortalServer(deps: PortalServerDeps): FastifyInstance {
     const session = await guards.sessionOf(request);
     if (session === undefined) {
       return reply.code(401).send();
+    }
+    if (session.mustChangePassword) {
+      return reply.code(403).send();
     }
     if (session.role !== 'admin') {
       return reply.code(403).send();

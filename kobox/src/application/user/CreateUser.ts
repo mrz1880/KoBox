@@ -28,6 +28,9 @@ export interface CreateUserCommand {
   // Phase 7 import: preserve a legacy user's exact ports instead of allocating
   // fresh ones (keeps their in-flight torrents on the same SCGI/rtorrent ports).
   readonly ports?: { readonly scgi: ScgiPort; readonly rtorrent: RtorrentPort };
+  // Phase 7 import: a migrated user gets a temporary password and must set a
+  // new one at first login.
+  readonly mustChangePassword?: boolean;
 }
 
 interface Deps {
@@ -94,7 +97,12 @@ export class CreateUser {
       const saved = await repo.save(user);
       // portal login mirrors the system password (same crypt hash)
       await credentials.save(
-        { username: user.username, passwordHash: command.passwordHash, role: command.role },
+        {
+          username: user.username,
+          passwordHash: command.passwordHash,
+          role: command.role,
+          mustChangePassword: command.mustChangePassword === true,
+        },
         clock(),
       );
       await notifications.notify(event);

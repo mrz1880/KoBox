@@ -50,6 +50,13 @@
       "when": 1784997725146,
       "tag": "0006_phase6-portal-access",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1785046176491,
+      "tag": "0007_phase7-must-change-password",
+      "breakpoints": true
     }
   ]
 }

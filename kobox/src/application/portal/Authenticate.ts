@@ -11,6 +11,9 @@ export interface AuthenticatedSession {
   readonly username: Username;
   readonly role: Role;
   readonly csrfToken: string;
+  // Phase 7: a migrated user on a temporary password. The portal forces a
+  // password change before granting any other access while this is true.
+  readonly mustChangePassword: boolean;
 }
 
 interface Deps {
@@ -50,6 +53,11 @@ export class Authenticate {
       return undefined;
     }
 
-    return { username: session.username, role: stored.role, csrfToken: session.csrfToken };
+    return {
+      username: session.username,
+      role: stored.role,
+      csrfToken: session.csrfToken,
+      mustChangePassword: stored.mustChangePassword === true,
+    };
   }
 }
