@@ -170,6 +170,20 @@ describe('Authenticate', () => {
     expect(auth?.username.value).toBe('alice');
     expect(auth?.role).toBe('user');
     expect(auth?.csrfToken).toBe(login.csrfToken);
+    expect(auth?.mustChangePassword).toBe(false);
+  });
+
+  it('should_carry_the_must_change_password_flag', async () => {
+    await world.credentials.save(
+      { username: alice, passwordHash: GOOD_HASH, role: 'user', mustChangePassword: true },
+      NOW,
+    );
+    const login = await world.login.execute({ username: alice, password: goodPassword(), now: NOW });
+    if (!login.ok) throw new Error('login failed');
+
+    const auth = await world.authenticate.execute({ token: login.token, now: NOW });
+
+    expect(auth?.mustChangePassword).toBe(true);
   });
 
   it('should_reject_unknown_and_expired_tokens', async () => {

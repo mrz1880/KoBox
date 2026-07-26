@@ -1,4 +1,4 @@
-import type { VpnPkiPort } from '../../domain/security/ports.js';
+import type { NetworkServicePort, VpnPkiPort } from '../../domain/security/ports.js';
 import {
   VPN_VARIANTS,
   renderOpenVpnClientProfile,
@@ -18,8 +18,11 @@ interface Deps {
   readonly users: UserRepository;
   readonly pki: VpnPkiPort;
   readonly files: ManagedFilesPort;
+  readonly reload: NetworkServicePort;
   readonly settings: SecuritySettings;
 }
+
+const SERVER_CONF_PREFIX = '/etc/openvpn/server/';
 
 // Declarative render of the three server configs plus per-user client
 // profiles. PKI material is read, never generated (Phase 4 provisions it):
@@ -54,6 +57,12 @@ export class RenderOpenVpn {
     }
 
     const changedFiles = await files.apply(rendered);
+    // Reload only when a server config actually changed (e.g. the CRL directive
+    // was first added): a pure revocation republishes crl.pem, which each server
+    // re-reads per client connect — no tunnel-dropping restart needed.
+    if (changedFiles.some((path) => path.startsWith(SERVER_CONF_PREFIX))) {
+      await this.deps.reload.reloadOpenVpn();
+    }
     return { changedFiles, profilesRendered, skippedUsers };
   }
 }

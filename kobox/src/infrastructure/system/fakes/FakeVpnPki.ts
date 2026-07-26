@@ -39,6 +39,7 @@ export class FakeVpnPki implements VpnPkiPort, VpnPkiProvisionPort {
       caCrt: '/etc/openvpn/kobox-pki/ca.crt',
       serverCrt: '/etc/openvpn/kobox-pki/issued/server.crt',
       serverKey: '/etc/openvpn/kobox-pki/private/server.key',
+      crlPem: '/etc/openvpn/kobox-pki/crl.pem',
     };
   }
 

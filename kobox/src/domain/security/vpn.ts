@@ -24,6 +24,10 @@ export interface VpnServerPaths {
   readonly caCrt: string;
   readonly serverCrt: string;
   readonly serverKey: string;
+  // The easy-rsa CRL: crl-verify makes each server reject a revoked client on
+  // its next connection. The file must always exist (ensurePki gen-crl seeds an
+  // empty one) or OpenVPN refuses to start.
+  readonly crlPem: string;
 }
 
 export interface VpnClientMaterial {
@@ -86,6 +90,7 @@ export function renderOpenVpnServer(
       `ca ${pki.caCrt}`,
       `cert ${pki.serverCrt}`,
       `key ${pki.serverKey}`,
+      `crl-verify ${pki.crlPem}`,
       'dh none',
       ...COMMON_CRYPTO,
       'keepalive 10 120',

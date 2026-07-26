@@ -38,6 +38,8 @@ export class ChangePassword {
         username: user.username,
         passwordHash: command.passwordHash,
         role: existing?.role ?? 'user',
+        // a completed change clears any forced-reset requirement
+        mustChangePassword: false,
       },
       clock(),
     );

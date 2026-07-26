@@ -37,6 +37,7 @@ const pki: VpnServerPaths = {
   caCrt: '/etc/openvpn/kobox-pki/ca.crt',
   serverCrt: '/etc/openvpn/kobox-pki/issued/server.crt',
   serverKey: '/etc/openvpn/kobox-pki/private/server.key',
+  crlPem: '/etc/openvpn/kobox-pki/crl.pem',
 };
 
 const material: VpnClientMaterial = {
@@ -52,6 +53,13 @@ describe('renderOpenVpnServer', () => {
       expect(file.path).toBe(`/etc/openvpn/server/kobox-${variant}.conf`);
       expect(file.mode).toBe('0600');
       expectGolden(`openvpn-${variant}.conf.golden`, file.content);
+    }
+  });
+
+  it('should_verify_the_crl_on_every_variant', () => {
+    for (const variant of VPN_VARIANTS) {
+      const content = renderOpenVpnServer(variant, vpn, pki).content;
+      expect(content).toContain(`crl-verify ${pki.crlPem}`);
     }
   });
 

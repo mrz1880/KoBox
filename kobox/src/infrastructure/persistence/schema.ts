@@ -252,6 +252,9 @@ export const portalCredentials = sqliteTable('portal_credentials', {
   role: text('role', { enum: ['admin', 'user'] })
     .notNull()
     .default('user'),
+  // Phase 7: a migrated user starts with a temporary password and must set a
+  // new one at first login before the portal grants any other access.
+  mustChangePassword: integer('must_change_password').notNull().default(0),
   updatedAt: text('updated_at').notNull(),
 });
 

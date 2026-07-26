@@ -32,6 +32,7 @@ import { SqliteTrackerRepository } from '../../../src/infrastructure/persistence
 import { SqliteUserAddressRepository } from '../../../src/infrastructure/persistence/SqliteUserAddressRepository.js';
 import { SqliteJobQueue } from '../../../src/infrastructure/persistence/SqliteJobQueue.js';
 import { SqlitePortAllocator } from '../../../src/infrastructure/persistence/SqlitePortAllocator.js';
+import { PortAlreadyClaimedError } from '../../../src/domain/user/PortAllocatorPort.js';
 import { SqliteTorrentInstanceRepository } from '../../../src/infrastructure/persistence/SqliteTorrentInstanceRepository.js';
 import { SqliteTorrentRepository } from '../../../src/infrastructure/persistence/SqliteTorrentRepository.js';
 import { SqliteUserRepository } from '../../../src/infrastructure/persistence/SqliteUserRepository.js';
@@ -123,6 +124,26 @@ describe('SqlitePortAllocator', () => {
     await repo.delete(Username.parse('alice'));
 
     expect((await allocator.allocateScgiPort()).value).toBe(first.value);
+  });
+
+  it('should_claim_an_explicit_port_and_skip_it_on_the_next_allocation', async () => {
+    const allocator = new SqlitePortAllocator(db);
+
+    await allocator.claimScgiPort(ScgiPort.parse(51101));
+    await allocator.claimRtorrentPort(RtorrentPort.parse(45000));
+
+    // the migration preserves legacy ports; later allocations must step over them
+    expect((await allocator.allocateScgiPort()).value).toBe(51102);
+    expect((await allocator.allocateRtorrentPort()).value).toBe(45001);
+  });
+
+  it('should_reject_claiming_an_already_taken_port', async () => {
+    const allocator = new SqlitePortAllocator(db);
+    await allocator.allocateScgiPort(); // takes 51101
+
+    await expect(allocator.claimScgiPort(ScgiPort.parse(51101))).rejects.toThrow(
+      PortAlreadyClaimedError,
+    );
   });
 });
 

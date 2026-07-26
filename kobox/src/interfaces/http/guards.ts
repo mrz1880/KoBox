@@ -28,6 +28,13 @@ export interface Guards {
   ): Promise<AuthenticatedSession | undefined>;
 }
 
+// The two routes a forced-reset user may still reach: the change form and
+// logout. Everything else redirects them to /password.
+function isPasswordSelfService(url: string): boolean {
+  const path = url.split('?')[0] ?? url;
+  return path === '/password' || path === '/logout';
+}
+
 export function viewerOf(session: AuthenticatedSession): Viewer {
   return {
     username: session.username.value,
@@ -54,6 +61,12 @@ export function buildGuards(authenticate: Authenticate, now: () => string): Guar
     const session = await sessionOf(request);
     if (session === undefined) {
       await reply.code(303).header('location', '/login').send();
+      return undefined;
+    }
+    // A migrated user on a temporary password is funnelled to /password before
+    // any other page (the change form and logout stay reachable).
+    if (session.mustChangePassword && !isPasswordSelfService(request.url)) {
+      await reply.code(303).header('location', '/password').send();
       return undefined;
     }
     return session;

@@ -47,6 +47,11 @@ export class EasyRsaPkiAdapter implements VpnPkiPort, VpnPkiProvisionPort {
     if (!existsSync(join(this.baseDir, 'issued/server.crt'))) {
       await this.easyrsa(['build-server-full', 'server', 'nopass']);
     }
+    // crl-verify in every server config requires crl.pem to exist, or OpenVPN
+    // refuses to start — seed an (empty) CRL the first time.
+    if (!existsSync(join(this.baseDir, 'crl.pem'))) {
+      await this.easyrsa(['gen-crl']);
+    }
   }
 
   async ensureClientMaterial(username: Username): Promise<void> {
@@ -56,10 +61,16 @@ export class EasyRsaPkiAdapter implements VpnPkiPort, VpnPkiProvisionPort {
     await this.easyrsa(['build-client-full', username.value, 'nopass']);
   }
 
-  // Removal (not revocation — CRLs are Phase 5): the issued material AND the
-  // rendered .ovpn profiles go together — a profile embeds the private key
-  // and must not outlive the user.
+  // Revoke, then republish the CRL, then delete: a revoked client is refused by
+  // crl-verify on its next connection even after its material is gone locally.
+  // The rendered .ovpn profiles go with it — a profile embeds the private key
+  // and must not outlive the user. Revocation is skipped when the cert is
+  // already gone (idempotent re-run).
   async removeClientMaterial(username: Username): Promise<void> {
+    if (existsSync(join(this.baseDir, `issued/${username.value}.crt`))) {
+      await this.easyrsa(['revoke', username.value]);
+      await this.easyrsa(['gen-crl']);
+    }
     for (const file of [
       `issued/${username.value}.crt`,
       `private/${username.value}.key`,

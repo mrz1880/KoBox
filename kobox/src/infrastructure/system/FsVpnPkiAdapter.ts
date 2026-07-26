@@ -16,6 +16,7 @@ export class FsVpnPkiAdapter implements VpnPkiPort {
       caCrt: join(this.baseDir, 'ca.crt'),
       serverCrt: join(this.baseDir, 'issued/server.crt'),
       serverKey: join(this.baseDir, 'private/server.key'),
+      crlPem: join(this.baseDir, 'crl.pem'),
     };
   }
 

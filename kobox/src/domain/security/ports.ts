@@ -61,6 +61,8 @@ export interface NetworkServicePort {
   reloadDns(): Promise<void>;
   reloadNginx(): Promise<void>;
   reloadNfsExports(): Promise<void>;
+  // Reload the OpenVPN servers after a config change (e.g. the CRL directive).
+  reloadOpenVpn(): Promise<void>;
 }
 
 export interface DynDnsBinding {

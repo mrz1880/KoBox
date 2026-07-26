@@ -55,6 +55,8 @@ describe('EasyRsaPkiAdapter', () => {
       ['/usr/share/easy-rsa/easyrsa', 'init-pki'],
       ['/usr/share/easy-rsa/easyrsa', 'build-ca', 'nopass'],
       ['/usr/share/easy-rsa/easyrsa', 'build-server-full', 'server', 'nopass'],
+      // crl.pem must exist or crl-verify makes every server refuse to start
+      ['/usr/share/easy-rsa/easyrsa', 'gen-crl'],
     ]);
     for (const call of runner.calls) {
       expect(call.env).toMatchObject({
@@ -68,7 +70,7 @@ describe('EasyRsaPkiAdapter', () => {
 
   it('should_never_regenerate_existing_material_on_re_run', async () => {
     // re-running install must not invalidate distributed certificates
-    seedPki('ca.crt', 'issued/server.crt');
+    seedPki('ca.crt', 'issued/server.crt', 'crl.pem');
 
     await adapter.ensurePki();
 
@@ -82,6 +84,7 @@ describe('EasyRsaPkiAdapter', () => {
 
     expect(runner.argvs()).toEqual([
       ['/usr/share/easy-rsa/easyrsa', 'build-server-full', 'server', 'nopass'],
+      ['/usr/share/easy-rsa/easyrsa', 'gen-crl'],
     ]);
   });
 
@@ -108,6 +111,12 @@ describe('EasyRsaPkiAdapter', () => {
 
     await withProfiles.removeClientMaterial(alice);
 
+    // revoke the cert and republish the CRL before deleting the files, so a
+    // revoked client is refused even though its material is gone locally
+    expect(runner.argvs()).toEqual([
+      ['/usr/share/easy-rsa/easyrsa', 'revoke', 'alice'],
+      ['/usr/share/easy-rsa/easyrsa', 'gen-crl'],
+    ]);
     expect(existsSync(join(pkiDir, 'issued/alice.crt'))).toBe(false);
     expect(existsSync(join(pkiDir, 'private/alice.key'))).toBe(false);
     expect(existsSync(join(pkiDir, 'reqs/alice.req'))).toBe(false);

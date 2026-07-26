@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { RenderOpenVpn } from '../../../../src/application/security/RenderOpenVpn.js';
 import { DynDnsHost } from '../../../../src/domain/security/DynDnsHost.js';
 import { InMemoryUserRepository } from '../../../../src/infrastructure/persistence/InMemoryUserRepository.js';
+import { FakeNetworkServices } from '../../../../src/infrastructure/system/fakes/FakeNetworkServices.js';
 import { FakeRtorrentConfig } from '../../../../src/infrastructure/system/fakes/FakeRtorrentConfig.js';
 import { FakeVpnPki } from '../../../../src/infrastructure/system/fakes/FakeVpnPki.js';
 import { aUser } from '../../../builders/UserBuilder.js';
@@ -16,12 +17,14 @@ const material = {
 let users: InMemoryUserRepository;
 let pki: FakeVpnPki;
 let files: FakeRtorrentConfig;
+let reload: FakeNetworkServices;
 
 function useCase(withRemote: boolean): RenderOpenVpn {
   return new RenderOpenVpn({
     users,
     pki,
     files,
+    reload,
     settings: withRemote
       ? { ...testSettings, vpnRemote: DynDnsHost.parse('seedbox.example.org') }
       : testSettings,
@@ -32,6 +35,7 @@ beforeEach(() => {
   users = new InMemoryUserRepository();
   pki = new FakeVpnPki();
   files = new FakeRtorrentConfig();
+  reload = new FakeNetworkServices();
 });
 
 describe('RenderOpenVpn', () => {
@@ -58,6 +62,25 @@ describe('RenderOpenVpn', () => {
     expect(files.contentAt('/etc/kobox/vpn-profiles/alice/kobox-tap.ovpn')).toContain('dev tap');
     expect(files.contentAt('/etc/kobox/vpn-profiles/bob/kobox-tun-gw.ovpn')).toBeUndefined();
     expect(report.skippedUsers).toEqual(['bob']);
+  });
+
+  it('should_reload_openvpn_when_a_server_config_changed', async () => {
+    // a fresh render writes the three server configs (the CRL directive lands
+    // here) — the servers must reload to pick it up
+    await useCase(true).execute();
+
+    expect(reload.reloads).toContain('openvpn');
+  });
+
+  it('should_not_reload_openvpn_when_nothing_changed', async () => {
+    const uc = useCase(true);
+    await uc.execute();
+    reload.reloads.length = 0;
+
+    // a converged re-render changes no server config: no tunnel-dropping reload
+    await uc.execute();
+
+    expect(reload.reloads).not.toContain('openvpn');
   });
 
   it('should_skip_all_profiles_when_no_vpn_remote_is_configured', async () => {

@@ -20,6 +20,7 @@ import { TorrentEventSpoolWriter } from '../../infrastructure/spool/TorrentEvent
 import {
   buildContainer,
   buildInstallation,
+  buildMigrateFromMysb,
   buildUpgrade,
   spoolDir,
   DEFAULT_DB_PATH,
@@ -631,6 +632,23 @@ program
         convergenceJobs: report.drainedJobs,
       };
       process.stdout.write(`${JSON.stringify(summary, null, 2)}\n`);
+    } finally {
+      c.db.close();
+    }
+  });
+
+program
+  .command('migrate-from-mysb')
+  .requiredOption('--dump <dir>', 'directory holding the frozen MySB dump (mysb.sqlite + sync/)')
+  .option('--apply', 'write the import (default is a read-only dry-run)')
+  .option('--dry-run', 'preview only, writing nothing (the default)')
+  .description('import users and data from a frozen MySB dump (dry-run by default)')
+  .action(async (options: { dump: string; apply?: boolean; dryRun?: boolean }) => {
+    const c = container();
+    try {
+      const importer = buildMigrateFromMysb(c, { dumpDir: options.dump });
+      const report = await importer.execute({ apply: options.apply === true });
+      process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
     } finally {
       c.db.close();
     }
