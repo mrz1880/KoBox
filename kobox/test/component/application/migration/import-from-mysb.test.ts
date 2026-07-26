@@ -350,7 +350,7 @@ describe('ImportFromMysb', () => {
       expect(await world.users.findByUsername(alice)).toBeDefined();
     });
 
-    it('should_be_idempotent_creating_no_second_user_or_mail', async () => {
+    it('should_reprovision_but_never_recreate_or_remail_on_a_second_apply', async () => {
       world = buildWorld(new FakeMysbSource({ users: [aliceDto] }));
 
       await world.importer.execute({ apply: true });
@@ -363,8 +363,30 @@ describe('ImportFromMysb', () => {
 
       expect(report.users.created).toEqual([]);
       expect(report.users.alreadyImported).toEqual(['alice']);
-      expect(provisions()).toBe(firstProvisions);
+      // re-run repairs: idempotent provisioning is re-enqueued so a half-imported
+      // user converges — but the account and the temp-password mail happen once
+      expect(provisions()).toBeGreaterThan(firstProvisions);
       expect((await world.outbox.listRecent(50)).length).toBe(firstMails);
+    });
+
+    it('should_isolate_a_failing_user_and_still_import_the_rest', async () => {
+      world = buildWorld(
+        new FakeMysbSource({
+          users: [
+            aliceDto,
+            // bob collides on alice's SCGI port: his CreateUser throws mid-import
+            { ...aliceDto, username: 'bob', email: 'bob@example.org', rtorrentPort: 45001 },
+          ],
+        }),
+      );
+
+      const report = await world.importer.execute({ apply: true });
+
+      expect(report.users.created).toEqual(['alice']);
+      expect(report.users.conflicts.map((c) => c.key)).toContain('bob');
+      // the run completed and alice is fully imported despite bob failing
+      expect(await world.users.findByUsername(alice)).toBeDefined();
+      expect(await world.users.findByUsername(Username.parse('bob'))).toBeUndefined();
     });
   });
 });

@@ -99,12 +99,27 @@ export class ImportFromMysb {
       if (await this.deps.users.findByUsername(mapped.username)) {
         users.alreadyImported.push(mapped.username.value);
         knownUsers.add(mapped.username.value);
+        // Repair: re-run the idempotent provisioning so a user who was created
+        // but not fully provisioned (an interrupted earlier run) converges.
+        // The account, flags and temp-password mail are NOT redone (once-only).
+        if (apply) {
+          await this.enqueueProvisioning(mapped.username.value);
+        }
         continue;
       }
-      users.created.push(mapped.username.value);
-      knownUsers.add(mapped.username.value);
-      if (apply) {
+      if (!apply) {
+        users.created.push(mapped.username.value);
+        knownUsers.add(mapped.username.value);
+        continue;
+      }
+      // Per-user isolation: a failure (e.g. a colliding port) is recorded and
+      // the import moves on — one bad row must not abort the other users.
+      try {
         await this.importUser(mapped);
+        users.created.push(mapped.username.value);
+        knownUsers.add(mapped.username.value);
+      } catch (error) {
+        users.conflicts.push({ key: mapped.username.value, reason: messageOf(error) });
       }
     }
 
@@ -150,17 +165,12 @@ export class ImportFromMysb {
         syncDisabled: mapped.syncDisabled,
       }),
     );
-    const username = mapped.username.value;
-    // the same fan-out the worker's create-user chain does, minus its generic
-    // (passwordless) welcome mail — this import sends its own with the password.
-    await this.deps.queue.enqueue(parseJob('provision-rtorrent', { username }));
-    await this.deps.queue.enqueue(parseJob('provision-vpn-user', { username }));
-    await this.deps.queue.enqueue(parseJob('render-nfs-exports', {}));
+    await this.enqueueProvisioning(mapped.username.value);
     await this.deps.outbox.enqueue(
       {
         recipient: mapped.email.value,
         subject: 'Your KoBox seedbox is ready — set your password',
-        body: welcomeBody(username, tempPassword),
+        body: welcomeBody(mapped.username.value, tempPassword),
       },
       this.deps.clock(),
     );
@@ -168,6 +178,15 @@ export class ImportFromMysb {
       // CreateUser always starts active; restore the legacy suspended state.
       await this.deps.suspendUser.execute({ username: mapped.username });
     }
+  }
+
+  // The same provisioning fan-out the worker's create-user chain does, minus its
+  // generic (passwordless) welcome mail. Every job here is idempotent, so it is
+  // safe to re-enqueue on a repair re-run.
+  private async enqueueProvisioning(username: string): Promise<void> {
+    await this.deps.queue.enqueue(parseJob('provision-rtorrent', { username }));
+    await this.deps.queue.enqueue(parseJob('provision-vpn-user', { username }));
+    await this.deps.queue.enqueue(parseJob('render-nfs-exports', {}));
   }
 
   private async importTrackers(apply: boolean): Promise<CategoryReport> {

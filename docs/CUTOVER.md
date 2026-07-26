@@ -147,6 +147,13 @@ jobs DB), sets `must_change_password`, pre-writes the torrent instance with its
 `sync_disabled` flag, and enqueues provisioning. Catalogue data (trackers,
 blocklists, torrents, addresses) is upserted.
 
+Failures are **isolated per user**: a bad row (e.g. a colliding port) is recorded
+in the report's `conflicts` and the run continues for everyone else — check the
+report's `users.conflicts` is empty. If the run was interrupted, simply
+**re-run** `--apply`: already-created users are re-provisioned (idempotent) so a
+half-imported user converges, while the account and the temp-password mail are
+never redone.
+
 ---
 
 ## 6. Regenerate & smoke
