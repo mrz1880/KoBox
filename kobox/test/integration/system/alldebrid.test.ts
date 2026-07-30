@@ -108,6 +108,30 @@ describe('AllDebridAdapter', () => {
     expect(delayedIds).toHaveLength(4); // maxAttempts, then it gave up
   });
 
+  it('should_turn_a_known_error_code_into_something_the_user_can_act_on', async () => {
+    // proven against the live API: this is what a user meets the first time
+    // their key is used from a new server
+    unlockBody = {
+      status: 'error',
+      error: { code: 'AUTH_BLOCKED', message: 'This apikey is geo-blocked or ip-blocked' },
+    };
+    const adapter = new AllDebridAdapter(baseUrl);
+
+    await expect(adapter.unlock(link, KEY)).rejects.toThrow(/open the email it sent you/);
+    // the code survives for diagnosis
+    await expect(adapter.unlock(link, KEY)).rejects.toThrow(/AUTH_BLOCKED/);
+  });
+
+  it('should_pass_an_unknown_error_code_through_unchanged', async () => {
+    unlockBody = {
+      status: 'error',
+      error: { code: 'SOME_NEW_CODE', message: 'something we have never seen' },
+    };
+    const adapter = new AllDebridAdapter(baseUrl);
+
+    await expect(adapter.unlock(link, KEY)).rejects.toThrow(/something we have never seen/);
+  });
+
   it('should_raise_a_typed_error_on_a_debrid_error_response', async () => {
     unlockBody = {
       status: 'error',
