@@ -39,6 +39,9 @@ import {
   DEFAULT_DEBRID_PRIVATE_KEY,
 } from '../infrastructure/system/RsaDebridKeyCipher.js';
 import { FsDebridKeyPair } from '../infrastructure/system/FsDebridKeyPair.js';
+import { RequestDebridDownload } from '../application/ddl/RequestDebridDownload.js';
+import type { DebridKeyEncryptorPort } from '../domain/ddl/ports.js';
+import type { JobQueuePort } from '../application/jobs/JobQueuePort.js';
 import { StoredDebridCredentials } from '../infrastructure/system/StoredDebridCredentials.js';
 import { AllDebridAdapter } from '../infrastructure/system/AllDebridAdapter.js';
 import { Aria2Adapter } from '../infrastructure/system/Aria2Adapter.js';
@@ -403,6 +406,81 @@ export interface Container {
   readonly loginAttempts: SqliteLoginAttemptsRepository;
   readonly componentRegistry: SqliteComponentRegistry;
   readonly releaseRepo: SqliteReleaseRepository;
+}
+
+// ---------------------------------------------------------------------------
+// The portal's OWN wiring (Phase 8 §B.1).
+//
+// It builds the repositories it reads, the queue it enqueues into, and nothing
+// else: no JobWorker, no privileged adapter, no use case that mutates the host.
+// The non-root boundary stops being a promise about what the process *calls* and
+// becomes a fact about what it can even construct.
+//
+// Two deliberate details:
+//   - `debridEncryptor` is typed as the ENCRYPTOR port only, so this container
+//     cannot open a stored key even though one class implements both halves;
+//   - a CommandRunner is still created, but only for openssl (password verify)
+//     and the health probe — neither is privileged, and the process runs as
+//     kobox-portal regardless.
+export interface PortalContainer {
+  readonly db: KoboxDatabase;
+  readonly logger: Logger;
+  readonly queue: JobQueuePort;
+  readonly repo: SqliteUserRepository;
+  readonly credentials: SqlitePortalCredentialsRepository;
+  readonly sessions: SqlitePortalSessionRepository;
+  readonly loginAttempts: SqliteLoginAttemptsRepository;
+  readonly hasher: OpensslPasswordHasher;
+  readonly trackerRepo: SqliteTrackerRepository;
+  readonly blocklistRepo: SqliteBlocklistRepository;
+  readonly addressRepo: SqliteUserAddressRepository;
+  readonly fairUseRepo: SqliteFairUseRepository;
+  readonly healthProbe: ProcessSocketHealthProbe;
+  readonly componentRegistry: SqliteComponentRegistry;
+  readonly releaseRepo: SqliteReleaseRepository;
+  readonly outbox: SqliteMailOutbox;
+  readonly debridDownloadRepo: SqliteDebridDownloadRepository;
+  readonly debridAccountRepo: SqliteDebridAccountRepository;
+  readonly debridEncryptor: DebridKeyEncryptorPort;
+  readonly requestDownload: RequestDebridDownload;
+}
+
+export function buildPortalContainer(name: string): PortalContainer {
+  const logger = createLogger(name);
+  const db = KoboxDatabase.open(process.env.KOBOX_DB ?? DEFAULT_DB_PATH);
+  // openssl + health probe only; nothing here mutates the host
+  const runner = new ExecFileRunner();
+  const queue = new SqliteJobQueue(db);
+  const debridDownloadRepo = new SqliteDebridDownloadRepository(db);
+  return {
+    db,
+    logger,
+    queue,
+    repo: new SqliteUserRepository(db),
+    credentials: new SqlitePortalCredentialsRepository(db),
+    sessions: new SqlitePortalSessionRepository(db),
+    loginAttempts: new SqliteLoginAttemptsRepository(db),
+    hasher: new OpensslPasswordHasher(runner),
+    trackerRepo: new SqliteTrackerRepository(db),
+    blocklistRepo: new SqliteBlocklistRepository(db),
+    addressRepo: new SqliteUserAddressRepository(db),
+    fairUseRepo: new SqliteFairUseRepository(db),
+    healthProbe: new ProcessSocketHealthProbe(runner),
+    componentRegistry: new SqliteComponentRegistry(db),
+    releaseRepo: new SqliteReleaseRepository(db),
+    outbox: new SqliteMailOutbox(db),
+    debridDownloadRepo,
+    debridAccountRepo: new SqliteDebridAccountRepository(db),
+    debridEncryptor: new RsaDebridKeyCipher(
+      process.env.KOBOX_DEBRID_PUBLIC_KEY ?? DEFAULT_DEBRID_PUBLIC_KEY,
+      process.env.KOBOX_DEBRID_PRIVATE_KEY ?? DEFAULT_DEBRID_PRIVATE_KEY,
+    ),
+    requestDownload: new RequestDebridDownload({
+      repo: debridDownloadRepo,
+      queue,
+      clock: nowStamp,
+    }),
+  };
 }
 
 export function buildContainer(name: string): Container {

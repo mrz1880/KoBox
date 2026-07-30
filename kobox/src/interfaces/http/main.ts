@@ -4,7 +4,7 @@ import { Login } from '../../application/portal/Login.js';
 import { Logout } from '../../application/portal/Logout.js';
 import { CryptoSessionTokens } from '../../infrastructure/system/CryptoSessionTokens.js';
 import { FsVpnProfileStore } from '../../infrastructure/system/FsVpnProfileStore.js';
-import { buildContainer } from '../composition.js';
+import { buildPortalContainer } from '../composition.js';
 import { buildPortalServer } from './server.js';
 
 export const DEFAULT_PORTAL_HTTP_PORT = 8190;
@@ -16,7 +16,8 @@ function nowStamp(): string {
 // The portal process: non-root, no privileged adapters in reach — it reads
 // repositories and enqueues typed jobs, nothing else (AUDIT §3.5).
 async function main(): Promise<void> {
-  const container = buildContainer('kobox-portal');
+  // the portal's own wiring: no JobWorker, no privileged adapter is even built
+  const container = buildPortalContainer('kobox-portal');
   const tokens = new CryptoSessionTokens();
   const authDeps = {
     users: container.repo,
@@ -47,10 +48,10 @@ async function main(): Promise<void> {
     credentials: container.credentials,
     profiles: new FsVpnProfileStore(process.env.KOBOX_VPN_PROFILES_DIR),
     downloads: container.debridDownloadRepo,
-    requestDownload: container.ddlUseCases.requestDownload,
+    requestDownload: container.requestDownload,
     debridAccounts: container.debridAccountRepo,
     // public half only: this process can seal a key, never open one
-    debridEncryptor: container.debridCipher,
+    debridEncryptor: container.debridEncryptor,
   });
 
   const port = Number(process.env.KOBOX_PORTAL_HTTP_PORT ?? DEFAULT_PORTAL_HTTP_PORT);

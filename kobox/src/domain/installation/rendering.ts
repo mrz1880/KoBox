@@ -70,10 +70,14 @@ export function renderPortalUnit(settings: PortalUnitSettings): RenderedFile {
       // shares the DB with the root worker (kobox-portal group); 0007 keeps
       // new SQLite WAL/-shm files group-writable
       'UMask=0007',
-      // defense-in-depth for a process whose whole design is zero-privilege
-      // (PrivateTmp is deliberately omitted: it would hide a /tmp-based DB in
-      // tests, and the portal keeps no secrets in /tmp)
+      // defense-in-depth for a process whose whole design is zero-privilege:
+      // everything read-only except the shared database directory it must write
+      // (sessions, WAL/-shm). PrivateTmp stays off — the portal keeps nothing in
+      // /tmp, and a private one would only hide the shared DB during tests.
       'NoNewPrivileges=yes',
+      'ProtectSystem=strict',
+      'ProtectHome=yes',
+      'ReadWritePaths=/var/lib/kobox',
       'SyslogIdentifier=kobox-portal',
       'Restart=on-failure',
       'RestartSec=2',
