@@ -109,6 +109,7 @@ const USERNAME_JOB_BUILDERS = {
   'suspend-user': (input: { username: string }) => buildJob.suspendUser(input),
   'resume-user': (input: { username: string }) => buildJob.resumeUser(input),
   'provision-rtorrent': (input: { username: string }) => buildJob.provisionRtorrent(input),
+  'restart-rtorrent': (input: { username: string }) => buildJob.restartRtorrent(input),
   'render-rtorrent-config': (input: { username: string }) => buildJob.renderRtorrentConfig(input),
 } as const;
 
@@ -137,6 +138,9 @@ function usernameCommand(
 
 usernameCommand('delete-user', 'delete a seedbox user and its resources', (c, username) =>
   c.useCases.deleteUser.execute({ username }),
+);
+usernameCommand('restart-rtorrent', 'restart a user rtorrent instance', (c, username) =>
+  c.torrentUseCases.restart.execute({ username }),
 );
 usernameCommand('suspend-user', 'reversibly cut SSH/SFTP/rtorrent for a user', (c, username) =>
   c.useCases.suspendUser.execute({ username }),

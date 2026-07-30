@@ -5,6 +5,10 @@ import { DeleteUser } from '../../../../src/application/user/DeleteUser.js';
 import { ResumeUser } from '../../../../src/application/user/ResumeUser.js';
 import { SuspendUser } from '../../../../src/application/user/SuspendUser.js';
 import {
+  RestartRtorrentInstance,
+  SuspendedUserRestartError,
+} from '../../../../src/application/torrent/RestartRtorrentInstance.js';
+import {
   UserAlreadyExistsError,
   UserNotFoundError,
 } from '../../../../src/application/user/errors.js';
@@ -252,6 +256,32 @@ describe('CreateUser', () => {
 
     expect(second.scgiPort.equals(first.scgiPort)).toBe(false);
     expect(second.rtorrentPort.equals(first.rtorrentPort)).toBe(false);
+  });
+});
+
+describe('RestartRtorrentInstance', () => {
+  it('should_restart_the_instance_of_an_active_user', async () => {
+    await world.createUser.execute(createUserCommand());
+    const restart = new RestartRtorrentInstance({ users: world.repo, services: world.services });
+
+    await restart.execute({ username: alice });
+
+    expect(await world.services.isUserServiceRunning(alice)).toBe(true);
+  });
+
+  it('should_refuse_a_suspended_user_so_the_sanction_is_not_undone', async () => {
+    await world.createUser.execute(createUserCommand());
+    await world.suspendUser.execute({ username: alice });
+    const restart = new RestartRtorrentInstance({ users: world.repo, services: world.services });
+
+    await expect(restart.execute({ username: alice })).rejects.toThrow(SuspendedUserRestartError);
+    expect(await world.services.isUserServiceRunning(alice)).toBe(false);
+  });
+
+  it('should_reject_an_unknown_user', async () => {
+    const restart = new RestartRtorrentInstance({ users: world.repo, services: world.services });
+
+    await expect(restart.execute({ username: alice })).rejects.toThrow(UserNotFoundError);
   });
 });
 

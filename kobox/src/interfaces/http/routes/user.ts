@@ -251,6 +251,17 @@ export function registerUserRoutes(
     return redirectWithFlash(reply, '/downloads', 'download queued');
   });
 
+  server.post('/rutorrent/restart', async (request, reply) => {
+    const session = await guards.requireCsrf(request, reply);
+    if (session === undefined) {
+      return;
+    }
+    // the username comes from the session, never the body: a user can only
+    // restart their own instance
+    await deps.queue.enqueue(buildJob.restartRtorrent({ username: session.username.value }));
+    return redirectWithFlash(reply, '/rutorrent', 'rtorrent restart queued');
+  });
+
   server.get('/access', async (request, reply) => {
     const session = await guards.requireSession(request, reply);
     if (session === undefined) {
@@ -283,6 +294,6 @@ export function registerUserRoutes(
     if (session === undefined) {
       return;
     }
-    return reply.type('text/html').send(rutorrentPage(viewerOf(session)));
+    return reply.type('text/html').send(rutorrentPage(viewerOf(session), flashOf(request)));
   });
 }

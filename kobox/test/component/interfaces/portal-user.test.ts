@@ -370,6 +370,34 @@ describe('per-user debrid account', () => {
 });
 
 describe('ruTorrent iframe', () => {
+  it('should_offer_a_self_service_restart_that_enqueues_for_the_session_user', async () => {
+    const response = await world.server.inject({
+      method: 'POST',
+      url: '/rutorrent/restart',
+      headers: { cookie: user.cookie, 'content-type': 'application/x-www-form-urlencoded' },
+      payload: form({ _csrf: user.csrf }),
+    });
+
+    expect(response.statusCode).toBe(303);
+    // the username comes from the session — a user cannot restart someone else's
+    expect(world.queue.jobs[0]).toEqual({
+      type: 'restart-rtorrent',
+      payload: { username: 'alice' },
+    });
+  });
+
+  it('should_require_csrf_to_restart', async () => {
+    const response = await world.server.inject({
+      method: 'POST',
+      url: '/rutorrent/restart',
+      headers: { cookie: user.cookie, 'content-type': 'application/x-www-form-urlencoded' },
+      payload: form({}),
+    });
+
+    expect(response.statusCode).toBe(403);
+    expect(world.queue.jobs).toHaveLength(0);
+  });
+
   it('should_serve_a_page_that_frames_ru', async () => {
     const response = await world.server.inject({
       method: 'GET',

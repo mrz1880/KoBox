@@ -54,6 +54,9 @@ export const buildJob = {
     return parseJob('resume-user', { username: input.username });
   },
 
+  restartRtorrent(input: { username: string }): Job {
+    return parseJob('restart-rtorrent', input);
+  },
   provisionRtorrent(input: { username: string }): Job {
     return parseJob('provision-rtorrent', { username: input.username });
   },
