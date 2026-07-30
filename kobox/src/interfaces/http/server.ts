@@ -14,7 +14,11 @@ import type { ReleaseRepositoryPort } from '../../application/maintenance/Releas
 import type { VpnProfileStorePort } from '../../application/portal/ports.js';
 import type { PortalCredentialsPort } from '../../domain/portal/ports.js';
 import type { ComponentRegistry } from '../../domain/installation/ports.js';
-import type { DebridDownloadRepository } from '../../domain/ddl/ports.js';
+import type {
+  DebridAccountRepository,
+  DebridDownloadRepository,
+  DebridKeyEncryptorPort,
+} from '../../domain/ddl/ports.js';
 import type { DynDnsBindingRepository, FairUseRepository } from '../../domain/security/ports.js';
 import type {
   BlocklistRepository,
@@ -54,6 +58,8 @@ export interface PortalServerDeps {
   readonly profiles: VpnProfileStorePort;
   readonly downloads: DebridDownloadRepository;
   readonly requestDownload: RequestDebridDownload;
+  readonly debridAccounts: DebridAccountRepository;
+  readonly debridEncryptor: DebridKeyEncryptorPort;
   readonly logger?: Logger;
 }
 

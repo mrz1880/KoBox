@@ -174,4 +174,10 @@ export const buildJob = {
   pollDebridDownloads(): Job {
     return parseJob('poll-debrid-downloads', {});
   },
+  setDebridKey(input: { username: string; encryptedKey: string }): Job {
+    return parseJob('set-debrid-key', input);
+  },
+  clearDebridKey(input: { username: string }): Job {
+    return parseJob('clear-debrid-key', input);
+  },
 };

@@ -1,4 +1,5 @@
 import { alldebridDelayedSchema, alldebridUnlockSchema } from '../../application/ddl/debridSchemas.js';
+import type { DebridApiKey } from '../../domain/ddl/DebridApiKey.js';
 import { DirectUrl } from '../../domain/ddl/DirectUrl.js';
 import type { FilehosterLink } from '../../domain/ddl/FilehosterLink.js';
 import type { DebridPort, DebridResult } from '../../domain/ddl/ports.js';
@@ -29,7 +30,8 @@ export interface DelayedTuning {
   readonly maxAttempts?: number;
 }
 
-// Unlocks a filehoster link via AllDebrid v4. The api key travels in the
+// Unlocks a filehoster link via AllDebrid v4 with the KEY OF THE REQUESTING USER
+// (accounts are per-user), so the adapter is stateless. The api key travels in the
 // `Authorization: Bearer` header (the documented method), NOT the query string —
 // so it never lands in AllDebrid's or an intermediary proxy's access logs; a
 // network failure is re-thrown sanitized so it can't leak into the worker log
@@ -43,7 +45,6 @@ export class AllDebridAdapter implements DebridPort {
   private readonly maxDelayedAttempts: number;
 
   constructor(
-    private readonly apiKey: string,
     private readonly baseUrl: string = DEFAULT_BASE_URL,
     private readonly fetchFn: FetchFn = fetch,
     tuning: DelayedTuning = {},
@@ -53,12 +54,12 @@ export class AllDebridAdapter implements DebridPort {
     this.maxDelayedAttempts = tuning.maxAttempts ?? DEFAULT_MAX_DELAYED_ATTEMPTS;
   }
 
-  async unlock(link: FilehosterLink): Promise<DebridResult> {
+  async unlock(link: FilehosterLink, apiKey: DebridApiKey): Promise<DebridResult> {
     const url = new URL(`${this.baseUrl}/v4/link/unlock`);
     url.searchParams.set('agent', 'kobox');
     url.searchParams.set('link', link.value);
 
-    const parsed = alldebridUnlockSchema.parse(await this.getJson(url));
+    const parsed = alldebridUnlockSchema.parse(await this.getJson(url, apiKey));
     if (parsed.status === 'error') {
       throw new DebridError(parsed.error.code, parsed.error.message);
     }
@@ -66,19 +67,22 @@ export class AllDebridAdapter implements DebridPort {
       return this.result(parsed.data.link, parsed.data.filename);
     }
     if (parsed.data.delayed !== undefined) {
-      return this.result(await this.awaitDelayed(parsed.data.delayed), parsed.data.filename);
+      return this.result(
+        await this.awaitDelayed(parsed.data.delayed, apiKey),
+        parsed.data.filename,
+      );
     }
     throw new DebridError('unexpected', 'debrid returned neither a link nor a delayed id');
   }
 
   // Polls /v4/link/delayed until the link is generated (status 2), the host
   // gives up (status 3), or the budget runs out — whichever comes first.
-  private async awaitDelayed(id: number): Promise<string> {
+  private async awaitDelayed(id: number, apiKey: DebridApiKey): Promise<string> {
     const url = new URL(`${this.baseUrl}/v4/link/delayed`);
     url.searchParams.set('id', String(id));
     for (let attempt = 0; attempt < this.maxDelayedAttempts; attempt += 1) {
       await this.sleep(this.pollIntervalMs);
-      const parsed = alldebridDelayedSchema.parse(await this.getJson(url));
+      const parsed = alldebridDelayedSchema.parse(await this.getJson(url, apiKey));
       if (parsed.status === 'error') {
         throw new DebridError(parsed.error.code, parsed.error.message);
       }
@@ -100,10 +104,10 @@ export class AllDebridAdapter implements DebridPort {
     };
   }
 
-  private async getJson(url: URL): Promise<unknown> {
+  private async getJson(url: URL, apiKey: DebridApiKey): Promise<unknown> {
     try {
       const response = await this.fetchFn(url.toString(), {
-        headers: { authorization: `Bearer ${this.apiKey}` },
+        headers: { authorization: `Bearer ${apiKey.reveal()}` },
       });
       return await response.json();
     } catch {

@@ -8,6 +8,7 @@ import { DownloadGid } from '../../../src/domain/ddl/DownloadGid.js';
 import { FilehosterLink } from '../../../src/domain/ddl/FilehosterLink.js';
 import { Username } from '../../../src/domain/user/Username.js';
 import { KoboxDatabase } from '../../../src/infrastructure/persistence/db.js';
+import { SqliteDebridAccountRepository } from '../../../src/infrastructure/persistence/SqliteDebridAccountRepository.js';
 import { SqliteDebridDownloadRepository } from '../../../src/infrastructure/persistence/SqliteDebridDownloadRepository.js';
 
 let dir: string;
@@ -89,5 +90,45 @@ describe('SqliteDebridDownloadRepository', () => {
 
     expect(await repo.listForUser(alice)).toHaveLength(1);
     expect(await repo.listForUser(bob)).toHaveLength(1);
+  });
+});
+
+describe('SqliteDebridAccountRepository', () => {
+  const NOW = '2026-07-30 12:00:00';
+
+  it('should_store_and_read_back_a_sealed_key_per_user', async () => {
+    const repo = new SqliteDebridAccountRepository(db);
+
+    await repo.save(alice, 'sealed-alice', NOW);
+    await repo.save(bob, 'sealed-bob', NOW);
+
+    expect(await repo.findEncrypted(alice)).toBe('sealed-alice');
+    expect(await repo.findEncrypted(bob)).toBe('sealed-bob');
+    expect(await repo.has(alice)).toBe(true);
+  });
+
+  it('should_replace_the_previous_key_instead_of_accumulating_secrets', async () => {
+    const repo = new SqliteDebridAccountRepository(db);
+    await repo.save(alice, 'sealed-old', NOW);
+
+    await repo.save(alice, 'sealed-new', '2026-07-31 09:00:00');
+
+    expect(await repo.findEncrypted(alice)).toBe('sealed-new');
+  });
+
+  it('should_report_no_account_for_a_user_who_never_set_one', async () => {
+    const repo = new SqliteDebridAccountRepository(db);
+
+    expect(await repo.findEncrypted(alice)).toBeUndefined();
+    expect(await repo.has(alice)).toBe(false);
+  });
+
+  it('should_remove_a_key_on_request', async () => {
+    const repo = new SqliteDebridAccountRepository(db);
+    await repo.save(alice, 'sealed-alice', NOW);
+
+    await repo.remove(alice);
+
+    expect(await repo.has(alice)).toBe(false);
   });
 });

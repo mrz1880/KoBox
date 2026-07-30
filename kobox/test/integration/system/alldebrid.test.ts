@@ -1,5 +1,6 @@
 import { createServer, type Server } from 'node:http';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { DebridApiKey } from '../../../src/domain/ddl/DebridApiKey.js';
 import { FilehosterLink } from '../../../src/domain/ddl/FilehosterLink.js';
 import {
   AllDebridAdapter,
@@ -48,6 +49,7 @@ afterEach(async () => {
 });
 
 const link = FilehosterLink.parse('https://1fichier.example/abc');
+const KEY = DebridApiKey.parse('SECRETKEYSECRETKEY');
 // never actually wait in tests: no-op sleep, a tight poll budget
 const fast: DelayedTuning = { sleep: () => Promise.resolve(), pollIntervalMs: 0, maxAttempts: 4 };
 
@@ -57,15 +59,15 @@ describe('AllDebridAdapter', () => {
       status: 'success',
       data: { link: 'https://cdn.example/Movie.2026.mkv', filename: 'Movie.2026.mkv', filesize: 42 },
     };
-    const adapter = new AllDebridAdapter('SECRETKEY', baseUrl);
+    const adapter = new AllDebridAdapter(baseUrl);
 
-    const result = await adapter.unlock(link);
+    const result = await adapter.unlock(link, KEY);
 
     expect(result.direct.value).toBe('https://cdn.example/Movie.2026.mkv');
     expect(result.filename).toBe('Movie.2026.mkv');
     // the key rides in the Authorization header, never the URL (it would land
     // in AllDebrid's/proxy access logs otherwise); link + agent stay in the query
-    expect(lastAuth).toBe('Bearer SECRETKEY');
+    expect(lastAuth).toBe('Bearer SECRETKEYSECRETKEY');
     expect(lastQuery?.get('apikey')).toBeNull();
     expect(lastQuery?.get('link')).toBe('https://1fichier.example/abc');
     expect(lastQuery?.get('agent')).toBe('kobox');
@@ -78,31 +80,31 @@ describe('AllDebridAdapter', () => {
       { status: 'success', data: { status: 1 } },
       { status: 'success', data: { status: 2, link: 'https://cdn.example/Delayed.mkv' } },
     ];
-    const adapter = new AllDebridAdapter('SECRETKEY', baseUrl, fetch, fast);
+    const adapter = new AllDebridAdapter(baseUrl, fetch, fast);
 
-    const result = await adapter.unlock(link);
+    const result = await adapter.unlock(link, KEY);
 
     expect(result.direct.value).toBe('https://cdn.example/Delayed.mkv');
     expect(result.filename).toBe('Delayed.mkv');
     // it polled /link/delayed with the id from the unlock response, Bearer-authed
     expect(delayedIds).toEqual(['777', '777', '777']);
-    expect(lastAuth).toBe('Bearer SECRETKEY');
+    expect(lastAuth).toBe('Bearer SECRETKEYSECRETKEY');
   });
 
   it('should_fail_when_the_delayed_host_gives_up', async () => {
     unlockBody = { status: 'success', data: { delayed: 42 } };
     delayedQueue = [{ status: 'success', data: { status: 3 } }];
-    const adapter = new AllDebridAdapter('SECRETKEY', baseUrl, fetch, fast);
+    const adapter = new AllDebridAdapter(baseUrl, fetch, fast);
 
-    await expect(adapter.unlock(link)).rejects.toThrow(DebridError);
+    await expect(adapter.unlock(link, KEY)).rejects.toThrow(DebridError);
   });
 
   it('should_fail_when_the_delayed_link_never_becomes_ready', async () => {
     unlockBody = { status: 'success', data: { delayed: 42 } };
     // queue empty -> the stub keeps returning status 1; the budget runs out
-    const adapter = new AllDebridAdapter('SECRETKEY', baseUrl, fetch, fast);
+    const adapter = new AllDebridAdapter(baseUrl, fetch, fast);
 
-    await expect(adapter.unlock(link)).rejects.toThrow(/delayed-timeout/);
+    await expect(adapter.unlock(link, KEY)).rejects.toThrow(/delayed-timeout/);
     expect(delayedIds).toHaveLength(4); // maxAttempts, then it gave up
   });
 
@@ -111,23 +113,23 @@ describe('AllDebridAdapter', () => {
       status: 'error',
       error: { code: 'LINK_HOST_NOT_SUPPORTED', message: 'host unsupported' },
     };
-    const adapter = new AllDebridAdapter('SECRETKEY', baseUrl);
+    const adapter = new AllDebridAdapter(baseUrl);
 
-    await expect(adapter.unlock(link)).rejects.toThrow(DebridError);
+    await expect(adapter.unlock(link, KEY)).rejects.toThrow(DebridError);
   });
 
   it('should_not_leak_the_api_key_in_a_network_failure', async () => {
     await new Promise<void>((resolve) => server.close(() => { resolve(); })); // no server listening
-    const adapter = new AllDebridAdapter('SUPERSECRET', baseUrl);
+    const adapter = new AllDebridAdapter(baseUrl);
 
     let message = '';
     try {
-      await adapter.unlock(link);
+      await adapter.unlock(link, KEY);
       throw new Error('expected a rejection');
     } catch (error) {
       message = error instanceof Error ? error.message : String(error);
     }
-    expect(message).not.toContain('SUPERSECRET');
+    expect(message).not.toContain('SECRETKEYSECRETKEY');
     expect(message).not.toBe('expected a rejection');
   });
 });

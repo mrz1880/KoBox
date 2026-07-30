@@ -2,7 +2,15 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { Username } from '../../../src/domain/user/Username.js';
 import type { VpnVariant } from '../../../src/domain/security/vpn.js';
 import type { VpnProfileStorePort } from '../../../src/application/portal/ports.js';
-import { buildPortalWorld, form, loginAs, type AgentSession, type PortalWorld } from './portalWorld.js';
+import {
+  buildPortalWorld,
+  form,
+  loginAs,
+  NOW,
+  SEAL_PREFIX,
+  type AgentSession,
+  type PortalWorld,
+} from './portalWorld.js';
 
 // A fake profile store keyed by "user/variant".
 class FakeProfileStore implements VpnProfileStorePort {
@@ -263,6 +271,101 @@ describe('debrid downloads', () => {
 
     expect(bossView.statusCode).toBe(200);
     expect(bossView.body).toContain('No downloads yet.');
+  });
+});
+
+describe('per-user debrid account', () => {
+  const KEY = 'abcdef0123456789ABCDEF';
+
+  it('should_show_the_no_key_state_and_a_form', async () => {
+    const response = await world.server.inject({
+      method: 'GET',
+      url: '/downloads',
+      headers: { cookie: user.cookie },
+    });
+
+    expect(response.body).toContain('My AllDebrid account');
+    expect(response.body).toContain('no key');
+    expect(response.body).toContain('action="/downloads/debrid-key"');
+  });
+
+  it('should_seal_the_key_before_it_ever_leaves_the_portal', async () => {
+    const response = await world.server.inject({
+      method: 'POST',
+      url: '/downloads/debrid-key',
+      headers: { cookie: user.cookie, 'content-type': 'application/x-www-form-urlencoded' },
+      payload: form({ _csrf: user.csrf, apiKey: KEY }),
+    });
+
+    expect(response.statusCode).toBe(303);
+    const job = world.queue.jobs[0];
+    expect(job?.type).toBe('set-debrid-key');
+    if (job?.type === 'set-debrid-key') {
+      expect(job.payload.username).toBe('alice');
+      // the plaintext key must not appear anywhere in the job payload
+      expect(JSON.stringify(job.payload)).not.toContain(KEY);
+      // …but the sealed blob is the right one
+      expect(Buffer.from(job.payload.encryptedKey, 'base64').toString()).toBe(
+        `${SEAL_PREFIX}${KEY}`,
+      );
+    }
+  });
+
+  it('should_report_a_configured_key_without_ever_echoing_it', async () => {
+    await world.debridAccounts.save(Username.parse('alice'), 'sealed-blob', NOW);
+
+    const response = await world.server.inject({
+      method: 'GET',
+      url: '/downloads',
+      headers: { cookie: user.cookie },
+    });
+
+    expect(response.body).toContain('key configured');
+    // neither the key nor its ciphertext is ever rendered back
+    expect(response.body).not.toContain('sealed-blob');
+    expect(response.body).toContain('Remove my key');
+  });
+
+  it('should_reject_a_malformed_key_without_enqueueing', async () => {
+    const response = await world.server.inject({
+      method: 'POST',
+      url: '/downloads/debrid-key',
+      headers: { cookie: user.cookie, 'content-type': 'application/x-www-form-urlencoded' },
+      payload: form({ _csrf: user.csrf, apiKey: 'https://alldebrid.com/apikeys' }),
+    });
+
+    expect(response.statusCode).toBe(200);
+    // the apostrophe is html-escaped in the rendered page
+    expect(response.body).toContain('look like an AllDebrid API key');
+    expect(world.queue.jobs).toHaveLength(0);
+  });
+
+  it('should_enqueue_a_clear_for_the_session_user_only', async () => {
+    const response = await world.server.inject({
+      method: 'POST',
+      url: '/downloads/debrid-key/clear',
+      headers: { cookie: user.cookie, 'content-type': 'application/x-www-form-urlencoded' },
+      payload: form({ _csrf: user.csrf }),
+    });
+
+    expect(response.statusCode).toBe(303);
+    // the username comes from the session, never from the request body
+    expect(world.queue.jobs[0]).toEqual({
+      type: 'clear-debrid-key',
+      payload: { username: 'alice' },
+    });
+  });
+
+  it('should_require_csrf_to_set_a_key', async () => {
+    const response = await world.server.inject({
+      method: 'POST',
+      url: '/downloads/debrid-key',
+      headers: { cookie: user.cookie, 'content-type': 'application/x-www-form-urlencoded' },
+      payload: form({ apiKey: KEY }),
+    });
+
+    expect(response.statusCode).toBe(403);
+    expect(world.queue.jobs).toHaveLength(0);
   });
 });
 

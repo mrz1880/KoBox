@@ -5,7 +5,12 @@ import type { JobQueuePort } from '../../../application/jobs/JobQueuePort.js';
 import type { VpnProfileStorePort } from '../../../application/portal/ports.js';
 import { DownloadCategory } from '../../../domain/ddl/DownloadCategory.js';
 import { FilehosterLink } from '../../../domain/ddl/FilehosterLink.js';
-import type { DebridDownloadRepository } from '../../../domain/ddl/ports.js';
+import { DebridApiKey } from '../../../domain/ddl/DebridApiKey.js';
+import type {
+  DebridAccountRepository,
+  DebridDownloadRepository,
+  DebridKeyEncryptorPort,
+} from '../../../domain/ddl/ports.js';
 import type { PortalCredentialsPort } from '../../../domain/portal/ports.js';
 import { DomainError } from '../../../domain/shared/DomainError.js';
 import type { FairUseRepository } from '../../../domain/security/ports.js';
@@ -34,6 +39,8 @@ const downloadSchema = z.object({
   category: z.enum(['films', 'series']),
 });
 
+const debridKeySchema = z.object({ apiKey: z.string().min(1).max(256) });
+
 function isVpnVariant(raw: string): raw is VpnVariant {
   return (VPN_VARIANTS as readonly string[]).includes(raw);
 }
@@ -54,6 +61,21 @@ function parseLink(raw: string | undefined): FilehosterLink | undefined {
   }
 }
 
+// A mistyped key is a form error, not a 500 — same contract as parseLink.
+function parseDebridKey(raw: string | undefined): DebridApiKey | undefined {
+  if (raw === undefined) {
+    return undefined;
+  }
+  try {
+    return DebridApiKey.parse(raw);
+  } catch (error) {
+    if (error instanceof DomainError) {
+      return undefined;
+    }
+    throw error;
+  }
+}
+
 export interface UserRoutesDeps {
   readonly users: UserRepository;
   readonly fairUse: FairUseRepository;
@@ -63,6 +85,9 @@ export interface UserRoutesDeps {
   readonly profiles: VpnProfileStorePort;
   readonly downloads: DebridDownloadRepository;
   readonly requestDownload: RequestDebridDownload;
+  readonly debridAccounts: DebridAccountRepository;
+  // the portal holds the PUBLIC half only — it can seal a key, never open one
+  readonly debridEncryptor: DebridKeyEncryptorPort;
 }
 
 export function registerUserRoutes(
@@ -148,9 +173,51 @@ export function registerUserRoutes(
       return;
     }
     const rows = await deps.downloads.listForUser(session.username);
+    const hasKey = await deps.debridAccounts.has(session.username);
     return reply
       .type('text/html')
-      .send(downloadsPage(viewerOf(session), rows, flashOf(request)));
+      .send(downloadsPage(viewerOf(session), rows, hasKey, flashOf(request)));
+  });
+
+  server.post('/downloads/debrid-key', async (request, reply) => {
+    const session = await guards.requireCsrf(request, reply);
+    if (session === undefined) {
+      return;
+    }
+    const parsed = debridKeySchema.safeParse(request.body);
+    const key = parseDebridKey(parsed.success ? parsed.data.apiKey : undefined);
+    if (key === undefined) {
+      const rows = await deps.downloads.listForUser(session.username);
+      const hasKey = await deps.debridAccounts.has(session.username);
+      return reply
+        .code(200)
+        .type('text/html')
+        .send(
+          downloadsPage(
+            viewerOf(session),
+            rows,
+            hasKey,
+            undefined,
+            "That doesn't look like an AllDebrid API key.",
+          ),
+        );
+    }
+    // sealed HERE with the public half: the plaintext key never reaches the job
+    // payload, the database, or a log line
+    const encryptedKey = await deps.debridEncryptor.encrypt(key);
+    await deps.queue.enqueue(
+      buildJob.setDebridKey({ username: session.username.value, encryptedKey }),
+    );
+    return redirectWithFlash(reply, '/downloads', 'debrid key saved');
+  });
+
+  server.post('/downloads/debrid-key/clear', async (request, reply) => {
+    const session = await guards.requireCsrf(request, reply);
+    if (session === undefined) {
+      return;
+    }
+    await deps.queue.enqueue(buildJob.clearDebridKey({ username: session.username.value }));
+    return redirectWithFlash(reply, '/downloads', 'debrid key removed');
   });
 
   server.post('/downloads', async (request, reply) => {
@@ -162,6 +229,7 @@ export function registerUserRoutes(
     const link = parseLink(parsed.success ? parsed.data.link : undefined);
     if (!parsed.success || link === undefined) {
       const rows = await deps.downloads.listForUser(session.username);
+      const hasKey = await deps.debridAccounts.has(session.username);
       return reply
         .code(200)
         .type('text/html')
@@ -169,6 +237,7 @@ export function registerUserRoutes(
           downloadsPage(
             viewerOf(session),
             rows,
+            hasKey,
             undefined,
             'Please provide a valid http(s) link and a category.',
           ),

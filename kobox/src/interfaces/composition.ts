@@ -31,7 +31,15 @@ import { OutboxEmailChannel } from '../infrastructure/notifications/OutboxEmailC
 import { SendmailTransport } from '../infrastructure/notifications/SendmailTransport.js';
 import { SqliteMailOutbox } from '../infrastructure/persistence/SqliteMailOutbox.js';
 import { SqliteMysbDumpSource } from '../infrastructure/persistence/SqliteMysbDumpSource.js';
+import { SqliteDebridAccountRepository } from '../infrastructure/persistence/SqliteDebridAccountRepository.js';
 import { SqliteDebridDownloadRepository } from '../infrastructure/persistence/SqliteDebridDownloadRepository.js';
+import {
+  RsaDebridKeyCipher,
+  DEFAULT_DEBRID_PUBLIC_KEY,
+  DEFAULT_DEBRID_PRIVATE_KEY,
+} from '../infrastructure/system/RsaDebridKeyCipher.js';
+import { FsDebridKeyPair } from '../infrastructure/system/FsDebridKeyPair.js';
+import { StoredDebridCredentials } from '../infrastructure/system/StoredDebridCredentials.js';
 import { AllDebridAdapter } from '../infrastructure/system/AllDebridAdapter.js';
 import { Aria2Adapter } from '../infrastructure/system/Aria2Adapter.js';
 import { DdlPlacementAdapter } from '../infrastructure/system/DdlPlacementAdapter.js';
@@ -246,6 +254,10 @@ export async function buildInstallation(
     checks: new ConfigCheckAdapter(runner),
     host: new InstallHostAdapter(runner),
     ipset: new IpsetAdapter(runner),
+    debridKeys: new FsDebridKeyPair(
+      process.env.KOBOX_DEBRID_PUBLIC_KEY ?? DEFAULT_DEBRID_PUBLIC_KEY,
+      process.env.KOBOX_DEBRID_PRIVATE_KEY ?? DEFAULT_DEBRID_PRIVATE_KEY,
+    ),
     certbot: new CertbotAdapter(runner, process.env.KOBOX_ACME_CA_BUNDLE),
     pki: installPki,
     pkiProvision: installPki,
@@ -373,6 +385,8 @@ export interface Container {
   readonly outbox: SqliteMailOutbox;
   readonly ddlUseCases: DdlUseCases;
   readonly debridDownloadRepo: SqliteDebridDownloadRepository;
+  readonly debridAccountRepo: SqliteDebridAccountRepository;
+  readonly debridCipher: RsaDebridKeyCipher;
   readonly queue: SqliteJobQueue;
   readonly worker: JobWorker;
   readonly hasher: OpensslPasswordHasher;
@@ -409,6 +423,7 @@ export function buildContainer(name: string): Container {
   const credentials = new SqlitePortalCredentialsRepository(db);
   const sessions = new SqlitePortalSessionRepository(db);
   const loginAttempts = new SqliteLoginAttemptsRepository(db);
+  const debridAccountRepo = new SqliteDebridAccountRepository(db);
   const useCases = buildUseCases({
     repo,
     accounts: new SystemAccountAdapter(runner),
@@ -419,6 +434,7 @@ export function buildContainer(name: string): Container {
     allocator: new SqlitePortAllocator(db),
     credentials,
     sessions,
+    debridAccounts: debridAccountRepo,
     clock: nowStamp,
   });
   const queue = new SqliteJobQueue(db);
@@ -505,16 +521,21 @@ export function buildContainer(name: string): Container {
     backupHost: new BackupHostAdapter(runner, db),
     backupSettings: backupSettings(),
   });
-  // DDL/debrid: the debrid key + aria2 secret live only here (worker env),
-  // never in the DB or a job payload. Unset key = feature inert (unlock fails,
-  // rows are marked failed, nothing else downloads).
+  // DDL/debrid: debrid accounts are PER-USER — each key is stored sealed and is
+  // only opened here, worker-side, by the root-only private PEM. No user key,
+  // no download for that user; everything else is unaffected.
   const debridDownloadRepo = new SqliteDebridDownloadRepository(db);
+  const debridCipher = new RsaDebridKeyCipher(
+    process.env.KOBOX_DEBRID_PUBLIC_KEY ?? DEFAULT_DEBRID_PUBLIC_KEY,
+    process.env.KOBOX_DEBRID_PRIVATE_KEY ?? DEFAULT_DEBRID_PRIVATE_KEY,
+  );
   const ddlUseCases = buildDdlUseCases({
     repo: debridDownloadRepo,
+    accounts: debridAccountRepo,
     debrid: new AllDebridAdapter(
-      process.env.KOBOX_ALLDEBRID_APIKEY ?? '',
       process.env.KOBOX_ALLDEBRID_BASE_URL ?? DEFAULT_ALLDEBRID_BASE_URL,
     ),
+    credentials: new StoredDebridCredentials(debridAccountRepo, debridCipher),
     downloader: new Aria2Adapter(
       process.env.KOBOX_ARIA2_RPC_URL ?? DEFAULT_ARIA2_RPC_URL,
       process.env.KOBOX_ARIA2_RPC_SECRET ?? '',
@@ -546,6 +567,8 @@ export function buildContainer(name: string): Container {
     ),
     ddlUseCases,
     debridDownloadRepo,
+    debridAccountRepo,
+    debridCipher,
     hasher: new OpensslPasswordHasher(runner),
     repo,
     trackerRepo,

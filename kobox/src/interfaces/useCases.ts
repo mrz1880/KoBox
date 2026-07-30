@@ -1,7 +1,10 @@
 import { PollDebridDownloads } from '../application/ddl/PollDebridDownloads.js';
 import { RequestDebridDownload } from '../application/ddl/RequestDebridDownload.js';
 import { StartDebridDownload } from '../application/ddl/StartDebridDownload.js';
+import { ClearDebridKey, StoreDebridKey } from '../application/ddl/StoreDebridKey.js';
 import type {
+  DebridAccountRepository,
+  DebridCredentialsPort,
   DebridDownloadRepository,
   DebridPort,
   DownloaderPort,
@@ -110,6 +113,8 @@ export interface UseCaseDeps {
   readonly allocator: PortAllocatorPort;
   readonly credentials: PortalCredentialsPort;
   readonly sessions: SessionStorePort;
+  // delete-user must not leave the user's sealed debrid key behind
+  readonly debridAccounts: DebridAccountRepository;
   readonly clock: () => string;
 }
 
@@ -296,7 +301,9 @@ export function buildTorrentUseCases(deps: TorrentUseCaseDeps): TorrentUseCases 
 
 export interface DdlUseCaseDeps {
   readonly repo: DebridDownloadRepository;
+  readonly accounts: DebridAccountRepository;
   readonly debrid: DebridPort;
+  readonly credentials: DebridCredentialsPort;
   readonly downloader: DownloaderPort;
   readonly placement: DownloadPlacementPort;
   readonly queue: JobQueuePort;
@@ -308,6 +315,8 @@ export interface DdlUseCases {
   readonly requestDownload: RequestDebridDownload;
   readonly startDownload: StartDebridDownload;
   readonly pollDownloads: PollDebridDownloads;
+  readonly storeDebridKey: StoreDebridKey;
+  readonly clearDebridKey: ClearDebridKey;
 }
 
 export function buildDdlUseCases(deps: DdlUseCaseDeps): DdlUseCases {
@@ -320,6 +329,7 @@ export function buildDdlUseCases(deps: DdlUseCaseDeps): DdlUseCases {
     startDownload: new StartDebridDownload({
       repo: deps.repo,
       debrid: deps.debrid,
+      credentials: deps.credentials,
       downloader: deps.downloader,
       stagingBase: deps.stagingBase,
     }),
@@ -328,5 +338,7 @@ export function buildDdlUseCases(deps: DdlUseCaseDeps): DdlUseCases {
       downloader: deps.downloader,
       placement: deps.placement,
     }),
+    storeDebridKey: new StoreDebridKey({ accounts: deps.accounts, clock: deps.clock }),
+    clearDebridKey: new ClearDebridKey({ accounts: deps.accounts }),
   };
 }
