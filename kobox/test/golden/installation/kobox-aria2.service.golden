@@ -1,0 +1,19 @@
+# KoBox-managed — DO NOT EDIT (rendered declaratively).
+[Unit]
+Description=KoBox aria2 download engine (debrid downloads)
+After=network.target
+
+[Service]
+Type=simple
+User=kobox-aria2
+Group=kobox-aria2
+ExecStart=/usr/bin/aria2c --conf-path=/etc/kobox/aria2.conf
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/var/lib/kobox/ddl-staging
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

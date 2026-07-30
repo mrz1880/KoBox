@@ -348,7 +348,16 @@ describe.skipIf(!onDebianAsRoot)('E2E: fresh Debian 12 -> bootstrap -> full stac
     // nanomon is unpinned in this suite (no KOBOX_NANOMON_URL) so it honestly
     // skips; its real install/uninstall is component-tested and its runtime is
     // covered by nanomon.e2e.
-    const skippedOnDebian12 = ['dnscrypt', 'apt-sources', 'ipset', 'letsencrypt', 'nanomon'];
+    // aria2 is likewise unpinned here (no KOBOX_ARIA2_RPC_SECRET) so it skips;
+    // its install is component-tested.
+    const skippedOnDebian12 = [
+      'dnscrypt',
+      'apt-sources',
+      'ipset',
+      'letsencrypt',
+      'nanomon',
+      'aria2',
+    ];
     for (const row of status) {
       if (!skippedOnDebian12.includes(row.name)) {
         expect(row.state, row.name).toBe('to_install');

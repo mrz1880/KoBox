@@ -64,6 +64,7 @@ function buildWorld(overrides?: {
   quotaFs?: string;
   rutorrentPin?: 'none';
   nanomonPin?: 'none';
+  aria2Pin?: 'none';
   letsencrypt?: { domain: string; email: string; acmeUrl?: string };
 }): World {
   const packages = new FakePackages();
@@ -110,6 +111,10 @@ function buildWorld(overrides?: {
       ...(overrides?.nanomonPin !== 'none' && {
         nanomonUrl: 'https://releases.example.net/nanomon-x86_64',
         nanomonSha256: 'b'.repeat(64),
+      }),
+      ...(overrides?.aria2Pin !== 'none' && {
+        aria2RpcSecret: 'test-rpc-secret',
+        ddlStagingDir: '/var/lib/kobox/ddl-staging',
       }),
       ...(overrides?.quotaFs !== undefined && { quotaFs: overrides.quotaFs }),
       ...(overrides?.letsencrypt !== undefined && { letsencrypt: overrides.letsencrypt }),
@@ -657,6 +662,33 @@ describe('nanomon installer', () => {
 
     expect(world.systemd.log).toContain('disable-now kobox-nanomon');
     expect(world.host.contentAt('/usr/local/bin/nanomon')).toBeUndefined();
+  });
+});
+
+describe('aria2 installer', () => {
+  it('should_skip_when_no_rpc_secret_is_configured', async () => {
+    const unpinned = buildWorld({ aria2Pin: 'none' });
+
+    const outcome = await installer(unpinned, 'aria2').install();
+
+    expect(outcome).toMatchObject({ state: 'skipped' });
+    expect(outcome.state === 'skipped' && outcome.reason).toContain('KOBOX_ARIA2_RPC_SECRET');
+  });
+
+  it('should_install_aria2_non_root_with_a_config_backed_secret', async () => {
+    const outcome = await installer(world, 'aria2').install();
+
+    expect(outcome.state).toBe('installed');
+    expect(world.packages.installed).toContain('aria2');
+    expect(world.host.serviceAccounts.has('kobox-aria2')).toBe(true);
+    // the secret lives in the config (0640), not on the command line
+    const conf = world.host.fileAt('/etc/kobox/aria2.conf');
+    expect(conf?.content).toContain('rpc-secret=test-rpc-secret');
+    expect(conf?.mode).toBe('0640');
+    expect(world.host.contentAt('/etc/systemd/system/kobox-aria2.service')).toContain(
+      'User=kobox-aria2',
+    );
+    expect(world.systemd.log).toContain('enable-now kobox-aria2');
   });
 });
 

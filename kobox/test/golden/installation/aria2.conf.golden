@@ -1,0 +1,9 @@
+# KoBox-managed — DO NOT EDIT (rendered declaratively).
+enable-rpc=true
+rpc-listen-all=false
+rpc-listen-port=6800
+rpc-secret=test-rpc-secret
+dir=/var/lib/kobox/ddl-staging
+continue=true
+max-connection-per-server=8
+allow-overwrite=true

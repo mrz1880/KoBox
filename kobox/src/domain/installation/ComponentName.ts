@@ -29,6 +29,8 @@ export const COMPONENT_NAMES = [
   'shellinabox',
   // Phase 8 — lightweight host monitoring (vendored NanoMon binary)
   'nanomon',
+  // Phase 9 — DDL/debrid download engine (aria2 daemon, localhost RPC)
+  'aria2',
 ] as const;
 
 export type ComponentNameValue = (typeof COMPONENT_NAMES)[number];

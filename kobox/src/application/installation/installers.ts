@@ -18,6 +18,8 @@ import {
   renderDnscryptConfig,
   renderFirewallBootUnit,
   renderNginxVhost,
+  renderAria2Conf,
+  renderAria2Unit,
   renderNanomonUnit,
   renderPortalUnit,
   renderRutorrentConfig,
@@ -52,6 +54,10 @@ export interface InstallSettings {
   // ruTorrent) — unset = honest skip
   readonly nanomonUrl?: string;
   readonly nanomonSha256?: string;
+  // DDL/debrid: the aria2 RPC secret (shared with the worker's Aria2Adapter);
+  // unset = the download engine honestly skips. Staging dir aria2 writes into.
+  readonly aria2RpcSecret?: string;
+  readonly ddlStagingDir?: string;
   readonly quotaFs?: string;
   // env-driven: KOBOX_LE_DOMAIN/KOBOX_LE_EMAIL (+ KOBOX_ACME_URL for the
   // pebble fixture); unset = honest skip, snakeoil stays
@@ -829,6 +835,50 @@ class NanomonInstaller implements ComponentInstaller {
   }
 }
 
+const DEFAULT_DDL_STAGING_DIR = '/var/lib/kobox/ddl-staging';
+
+// Phase 9 — aria2 download engine for debrid downloads. apt-installed, run
+// non-root on a localhost-only RPC (secret from the config file, not argv).
+// Skips honestly when no RPC secret is pinned.
+class Aria2Installer implements ComponentInstaller {
+  readonly name = 'aria2';
+
+  constructor(private readonly ctx: InstallerContext) {}
+
+  async install(): Promise<InstallOutcome> {
+    const { packages, host, files, systemd, install } = this.ctx;
+    if (install.aria2RpcSecret === undefined || install.aria2RpcSecret === '') {
+      return {
+        state: 'skipped',
+        reason: 'no aria2 RPC secret — set KOBOX_ARIA2_RPC_SECRET, then re-run kobox install',
+      };
+    }
+    const stagingDir = install.ddlStagingDir ?? DEFAULT_DDL_STAGING_DIR;
+    await packages.ensureInstalled(['aria2']);
+    await host.ensureServiceAccount('kobox-aria2');
+    await host.ensureDir(stagingDir, '0750');
+    await host.setOwnership(stagingDir, 'kobox-aria2', 'kobox-aria2', '0750');
+    const changed = await files.apply([
+      renderAria2Conf(install.aria2RpcSecret, stagingDir),
+      renderAria2Unit(stagingDir),
+    ]);
+    await systemd.daemonReload();
+    await systemd.enable('kobox-aria2', { now: true });
+    if (changed.length > 0) {
+      await systemd.reloadOrRestart('kobox-aria2');
+    }
+    return installed(await packages.installedVersion('aria2'));
+  }
+
+  async uninstall(): Promise<void> {
+    const { host, systemd } = this.ctx;
+    await systemd.disable('kobox-aria2', { now: true });
+    await host.removeFile('/etc/systemd/system/kobox-aria2.service');
+    await host.removeFile('/etc/kobox/aria2.conf');
+    await systemd.daemonReload();
+  }
+}
+
 export function buildInstallers(ctx: InstallerContext): ReadonlyMap<string, ComponentInstaller> {
   const list: readonly ComponentInstaller[] = [
     new KoboxCoreInstaller(ctx),
@@ -852,6 +902,7 @@ export function buildInstallers(ctx: InstallerContext): ReadonlyMap<string, Comp
     new SambaInstaller(ctx),
     new ShellinaboxInstaller(ctx),
     new NanomonInstaller(ctx),
+    new Aria2Installer(ctx),
   ];
   return new Map(list.map((entry) => [entry.name, entry]));
 }
