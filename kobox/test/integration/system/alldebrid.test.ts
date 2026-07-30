@@ -6,12 +6,14 @@ import { AllDebridAdapter, DebridError } from '../../../src/infrastructure/syste
 let server: Server;
 let baseUrl: string;
 let lastQuery: URLSearchParams | undefined;
+let lastAuth: string | undefined;
 let response: { status: number; body: unknown } = { status: 200, body: {} };
 
 beforeEach(async () => {
   await new Promise<void>((resolve) => {
     server = createServer((req, res) => {
       lastQuery = new URL(req.url ?? '', 'http://x').searchParams;
+      lastAuth = req.headers.authorization;
       res.writeHead(response.status, { 'content-type': 'application/json' });
       res.end(JSON.stringify(response.body));
     });
@@ -44,8 +46,10 @@ describe('AllDebridAdapter', () => {
 
     expect(result.direct.value).toBe('https://cdn.example/Movie.2026.mkv');
     expect(result.filename).toBe('Movie.2026.mkv');
-    // the key + link are passed as query params (agent identifies the app)
-    expect(lastQuery?.get('apikey')).toBe('SECRETKEY');
+    // the key rides in the Authorization header, never the URL (it would land
+    // in AllDebrid's/proxy access logs otherwise); link + agent stay in the query
+    expect(lastAuth).toBe('Bearer SECRETKEY');
+    expect(lastQuery?.get('apikey')).toBeNull();
     expect(lastQuery?.get('link')).toBe('https://1fichier.example/abc');
     expect(lastQuery?.get('agent')).toBe('kobox');
   });

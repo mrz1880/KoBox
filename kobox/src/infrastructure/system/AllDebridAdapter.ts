@@ -10,14 +10,18 @@ export class DebridError extends Error {
   }
 }
 
-type FetchFn = (url: string) => Promise<{ json(): Promise<unknown> }>;
+interface FetchInit {
+  readonly headers?: Record<string, string>;
+}
+type FetchFn = (url: string, init?: FetchInit) => Promise<{ json(): Promise<unknown> }>;
 
 const DEFAULT_BASE_URL = 'https://api.alldebrid.com';
 
-// Unlocks a filehoster link via AllDebrid v4. The api key is passed as a query
-// param; the request URL therefore CARRIES A SECRET and must never be logged —
-// a network failure is re-thrown sanitized so the key can't leak into the
-// worker's job-error log.
+// Unlocks a filehoster link via AllDebrid v4. The api key travels in the
+// `Authorization: Bearer` header (the method AllDebrid documents), NOT in the
+// query string — so it never lands in AllDebrid's or an intermediary proxy's
+// access logs. A network failure is still re-thrown sanitized so the key can't
+// leak into the worker's job-error log either.
 export class AllDebridAdapter implements DebridPort {
   constructor(
     private readonly apiKey: string,
@@ -28,12 +32,13 @@ export class AllDebridAdapter implements DebridPort {
   async unlock(link: FilehosterLink): Promise<DebridResult> {
     const url = new URL(`${this.baseUrl}/v4/link/unlock`);
     url.searchParams.set('agent', 'kobox');
-    url.searchParams.set('apikey', this.apiKey);
     url.searchParams.set('link', link.value);
 
     let body: unknown;
     try {
-      const response = await this.fetchFn(url.toString());
+      const response = await this.fetchFn(url.toString(), {
+        headers: { authorization: `Bearer ${this.apiKey}` },
+      });
       body = await response.json();
     } catch {
       throw new DebridError('network', 'debrid request failed');
