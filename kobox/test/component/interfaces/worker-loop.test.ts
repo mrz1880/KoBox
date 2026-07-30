@@ -65,6 +65,7 @@ import {
   buildTrackerUseCases,
   buildUseCases,
 } from '../../../src/interfaces/useCases.js';
+import { InMemoryDebridAccountRepository } from '../../../src/infrastructure/persistence/InMemoryDebridAccountRepository.js';
 import { InMemoryDebridDownloadRepository } from '../../../src/infrastructure/persistence/InMemoryDebridDownloadRepository.js';
 
 class InMemoryJobQueue implements JobQueuePort {
@@ -213,6 +214,7 @@ beforeEach(() => {
   let nextRtorrent = 45000;
   const credentials = new InMemoryPortalCredentialsRepository();
   const sessions = new InMemoryPortalSessionRepository();
+  const debridAccounts = new InMemoryDebridAccountRepository();
   const useCases = buildUseCases({
     repo,
     accounts,
@@ -222,6 +224,7 @@ beforeEach(() => {
     notifications,
     credentials,
     sessions,
+    debridAccounts,
     clock: () => '2026-07-25 10:00:00',
     allocator: {
       allocateScgiPort: () =>
@@ -337,7 +340,9 @@ beforeEach(() => {
   });
   const ddlUseCases = buildDdlUseCases({
     repo: new InMemoryDebridDownloadRepository(),
+    accounts: debridAccounts,
     debrid: { unlock: () => Promise.reject(new Error('no debrid in this suite')) },
+    credentials: { forUser: () => Promise.resolve(undefined) },
     downloader: {
       addUri: () => Promise.reject(new Error('no aria2 in this suite')),
       status: () => Promise.reject(new Error('no aria2 in this suite')),

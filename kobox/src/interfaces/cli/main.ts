@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
+import { DebridApiKey } from '../../domain/ddl/DebridApiKey.js';
 import { DownloadCategory } from '../../domain/ddl/DownloadCategory.js';
 import { FilehosterLink } from '../../domain/ddl/FilehosterLink.js';
 import { EventHook } from '../../domain/torrent/EventHook.js';
@@ -510,6 +511,34 @@ program
       link: FilehosterLink.parse(link),
     });
     await done(c, `download ${String(id)} requested for ${username}`);
+  });
+
+program
+  .command('set-debrid-key')
+  .argument('<username>')
+  .description('set a user AllDebrid key (read from stdin; sealed before it enters the queue)')
+  .action(async (username: string) => {
+    const raw = await readStdin();
+    const c = container();
+    // sealed here, exactly like the portal does: the plaintext never enters the
+    // job payload, the database or a log line
+    const encryptedKey = await c.debridCipher.encrypt(DebridApiKey.parse(raw));
+    const id = await c.queue.enqueue(
+      buildJob.setDebridKey({ username: Username.parse(username).value, encryptedKey }),
+    );
+    await done(c, `job ${String(id)} enqueued: set-debrid-key ${username}`);
+  });
+
+program
+  .command('clear-debrid-key')
+  .argument('<username>')
+  .description('remove a user stored AllDebrid key')
+  .action(async (username: string) => {
+    const c = container();
+    const id = await c.queue.enqueue(
+      buildJob.clearDebridKey({ username: Username.parse(username).value }),
+    );
+    await done(c, `job ${String(id)} enqueued: clear-debrid-key ${username}`);
   });
 
 program

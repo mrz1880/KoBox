@@ -48,6 +48,9 @@ async function main(): Promise<void> {
     profiles: new FsVpnProfileStore(process.env.KOBOX_VPN_PROFILES_DIR),
     downloads: container.debridDownloadRepo,
     requestDownload: container.ddlUseCases.requestDownload,
+    debridAccounts: container.debridAccountRepo,
+    // public half only: this process can seal a key, never open one
+    debridEncryptor: container.debridCipher,
   });
 
   const port = Number(process.env.KOBOX_PORTAL_HTTP_PORT ?? DEFAULT_PORTAL_HTTP_PORT);

@@ -284,6 +284,15 @@ export const loginAttempts = sqliteTable('login_attempts', {
 // unrestricts it (debrid) and downloads it with aria2 into their home. The
 // source link is content, never a secret (the debrid key lives in the worker
 // env only). Status drives the poll loop; the gid is aria2's handle.
+// One AllDebrid key per user, stored ENCRYPTED (RSA-OAEP, base64): the portal
+// shares this database and must not be able to use what it can read. username as
+// primary key means setting a key replaces the old one — no stale secrets pile up.
+export const debridAccounts = sqliteTable('debrid_accounts', {
+  username: text('username').primaryKey(),
+  encryptedKey: text('encrypted_key').notNull(),
+  updatedAt: text('updated_at').notNull(),
+});
+
 export const debridDownloads = sqliteTable(
   'debrid_downloads',
   {

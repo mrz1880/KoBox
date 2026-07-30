@@ -140,9 +140,35 @@ function downloadStatusChip(status: DebridDownload['status']): RawHtml {
   }
 }
 
+// The per-user debrid account panel. It never echoes the key back — not even
+// sealed: the only states shown are "configured" and "not configured".
+function debridAccountCard(viewer: Viewer, hasKey: boolean): RawHtml {
+  return html`<div class="card">
+  <h2>My AllDebrid account</h2>
+  <p>Status: ${hasKey
+    ? html`<span class="chip ok">key configured</span>`
+    : html`<span class="chip warn">no key</span>`}<br>
+  <span class="muted">Your key is stored encrypted and is only used for your own
+  downloads. Without one, downloads stay unavailable for you — nothing else changes.</span></p>
+  <form method="post" action="/downloads/debrid-key">
+    <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
+    <label for="apiKey">${hasKey ? 'Replace my key' : 'My AllDebrid API key'}</label>
+    <input id="apiKey" name="apiKey" type="password" autocomplete="off" required>
+    <button type="submit">Save</button>
+  </form>
+  ${hasKey
+    ? html`<form class="inline" method="post" action="/downloads/debrid-key/clear">
+    <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
+    <button class="ghost" type="submit">Remove my key</button>
+  </form>`
+    : undefined}
+</div>`;
+}
+
 export function downloadsPage(
   viewer: Viewer,
   downloads: readonly DebridDownload[],
+  hasKey: boolean,
   message?: string,
   error?: string,
 ): string {
@@ -162,6 +188,7 @@ export function downloadsPage(
     html`<h1>Downloads</h1>
 ${flash(message)}
 ${flash(error, 'error')}
+${debridAccountCard(viewer, hasKey)}
 <form class="card" method="post" action="/downloads">
   <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
   <label for="link">Filehoster link</label>

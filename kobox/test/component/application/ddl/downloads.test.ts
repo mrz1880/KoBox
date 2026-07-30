@@ -3,12 +3,17 @@ import type { Job } from '../../../../src/application/jobs/contract.js';
 import type { ClaimedJob, JobQueuePort } from '../../../../src/application/jobs/JobQueuePort.js';
 import { PollDebridDownloads } from '../../../../src/application/ddl/PollDebridDownloads.js';
 import { RequestDebridDownload } from '../../../../src/application/ddl/RequestDebridDownload.js';
-import { StartDebridDownload } from '../../../../src/application/ddl/StartDebridDownload.js';
+import {
+  NO_DEBRID_ACCOUNT,
+  StartDebridDownload,
+} from '../../../../src/application/ddl/StartDebridDownload.js';
 import { DirectUrl } from '../../../../src/domain/ddl/DirectUrl.js';
 import { DownloadCategory } from '../../../../src/domain/ddl/DownloadCategory.js';
 import { DownloadGid } from '../../../../src/domain/ddl/DownloadGid.js';
 import { FilehosterLink } from '../../../../src/domain/ddl/FilehosterLink.js';
+import { DebridApiKey } from '../../../../src/domain/ddl/DebridApiKey.js';
 import type {
+  DebridCredentialsPort,
   DebridPort,
   DebridResult,
   DownloaderPort,
@@ -24,8 +29,21 @@ const GID = DownloadGid.parse('2089b05ecca3d829');
 class FakeDebrid implements DebridPort {
   result: DebridResult = { direct: DirectUrl.parse('https://cdn.example/f.mkv'), filename: 'f.mkv' };
   failWith: Error | undefined;
-  unlock(): Promise<DebridResult> {
+  readonly usedKeys: string[] = [];
+  unlock(_link: FilehosterLink, apiKey: DebridApiKey): Promise<DebridResult> {
+    this.usedKeys.push(apiKey.reveal());
     return this.failWith ? Promise.reject(this.failWith) : Promise.resolve(this.result);
+  }
+}
+
+// each user brings their own key; undefined = no account configured
+class FakeCredentials implements DebridCredentialsPort {
+  private readonly keys = new Map<string, DebridApiKey>();
+  set(username: string, key: string): void {
+    this.keys.set(username, DebridApiKey.parse(key));
+  }
+  forUser(username: Username): Promise<DebridApiKey | undefined> {
+    return Promise.resolve(this.keys.get(username.value));
   }
 }
 
@@ -84,6 +102,7 @@ let repo: InMemoryDebridDownloadRepository;
 let debrid: FakeDebrid;
 let downloader: FakeDownloader;
 let placement: FakePlacement;
+let credentials: FakeCredentials;
 let queue: RecordingQueue;
 
 beforeEach(() => {
@@ -91,6 +110,9 @@ beforeEach(() => {
   debrid = new FakeDebrid();
   downloader = new FakeDownloader();
   placement = new FakePlacement();
+  credentials = new FakeCredentials();
+  credentials.set('alice', 'ALICEKEYALICEKEY');
+  credentials.set('bob', 'BOBKEYBOBKEYBOBKEY');
   queue = new RecordingQueue();
 });
 
@@ -109,7 +131,7 @@ describe('RequestDebridDownload', () => {
 
 describe('StartDebridDownload', () => {
   function start() {
-    return new StartDebridDownload({ repo, debrid, downloader, stagingBase: '/var/lib/kobox-aria2' });
+    return new StartDebridDownload({ repo, debrid, credentials, downloader, stagingBase: '/var/lib/kobox-aria2' });
   }
 
   it('should_unlock_add_to_aria2_and_record_the_gid', async () => {
@@ -145,6 +167,38 @@ describe('StartDebridDownload', () => {
     expect(saved?.error).toContain('host not supported');
   });
 
+  it('should_unlock_with_the_requesting_users_own_key', async () => {
+    const bob = Username.parse('bob');
+    const id = await new RequestDebridDownload({ repo, queue, clock: now }).execute({
+      username: bob,
+      category: DownloadCategory.films,
+      link,
+    });
+
+    await start().execute({ downloadId: id });
+
+    // bob's key, not alice's and not a shared instance one
+    expect(debrid.usedKeys).toEqual(['BOBKEYBOBKEYBOBKEY']);
+  });
+
+  it('should_fail_the_row_actionably_when_the_user_has_no_debrid_account', async () => {
+    const stranger = Username.parse('nokey');
+    const id = await new RequestDebridDownload({ repo, queue, clock: now }).execute({
+      username: stranger,
+      category: DownloadCategory.films,
+      link,
+    });
+
+    await start().execute({ downloadId: id });
+
+    const saved = await repo.findById(id);
+    expect(saved?.status).toBe('failed');
+    expect(saved?.error).toBe(NO_DEBRID_ACCOUNT);
+    // no account is never fatal: the API was never called, nothing threw
+    expect(debrid.usedKeys).toHaveLength(0);
+    expect(downloader.added).toHaveLength(0);
+  });
+
   it('should_be_idempotent_and_skip_a_non_pending_row', async () => {
     const id = await new RequestDebridDownload({ repo, queue, clock: now }).execute({
       username: alice,
@@ -169,6 +223,7 @@ describe('PollDebridDownloads', () => {
     await new StartDebridDownload({
       repo,
       debrid,
+      credentials,
       downloader,
       stagingBase: '/var/lib/kobox-aria2',
     }).execute({ downloadId: id });
@@ -224,6 +279,7 @@ describe('PollDebridDownloads', () => {
     await new StartDebridDownload({
       repo,
       debrid,
+      credentials,
       downloader,
       stagingBase: '/var/lib/kobox-aria2',
     }).execute({ downloadId: bobId });

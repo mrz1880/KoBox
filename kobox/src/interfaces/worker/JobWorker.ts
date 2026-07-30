@@ -353,6 +353,17 @@ export class JobWorker {
       case 'poll-debrid-downloads':
         await this.ddl.pollDownloads.execute();
         return;
+      case 'set-debrid-key':
+        await this.ddl.storeDebridKey.execute({
+          username: Username.parse(job.payload.username),
+          encryptedKey: job.payload.encryptedKey,
+        });
+        return;
+      case 'clear-debrid-key':
+        await this.ddl.clearDebridKey.execute({
+          username: Username.parse(job.payload.username),
+        });
+        return;
       case 'add-user-address':
       case 'remove-user-address': {
         const report = await this.trackers.manageUserAddress.execute({

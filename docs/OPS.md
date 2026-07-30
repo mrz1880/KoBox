@@ -177,11 +177,9 @@ account with RPC on loopback only; the RPC secret lives in
 `/etc/kobox/aria2.conf` (mode 0640), never on the command line. Like ruTorrent
 and NanoMon it is **skip-when-unpinned** — no secret configured, no component.
 
-Two secrets, both **worker-env only** — never in the DB, a job payload, or a log
-(the adapters sanitize network errors so the key can't leak):
+Only one server-wide secret is needed — the aria2 RPC secret:
 
 ```
-export KOBOX_ALLDEBRID_APIKEY=<your AllDebrid API key>   # instance-wide
 export KOBOX_ARIA2_RPC_SECRET=$(openssl rand -hex 24)
 kobox install        # brings up kobox-aria2.service
 ```
@@ -189,8 +187,34 @@ kobox install        # brings up kobox-aria2.service
 Optional: `KOBOX_DDL_STAGING` (default `/var/lib/kobox-aria2`, deliberately
 outside the portal-locked `/var/lib/kobox` which `kobox-aria2` cannot traverse)
 for the aria2 scratch dir; `KOBOX_ALLDEBRID_BASE_URL` overrides the API endpoint
-(used by the E2E to point at a local stub). Unset `KOBOX_ALLDEBRID_APIKEY` = the
-feature is inert: unlock fails and rows are marked failed, nothing downloads.
+(used by the E2E to point at a local stub).
+
+### Debrid accounts are per-user
+
+**Each user brings their own AllDebrid account** — there is no shared server key.
+A user pastes their key on `/downloads`; it is encrypted in the browser round
+trip's server leg with a public key and stored as ciphertext, and only the root
+worker can open it. Admins can also set one for a user without seeing it stored
+in the clear:
+
+```
+printf '%s' 'the-alldebrid-key' | kobox set-debrid-key alice
+kobox clear-debrid-key alice     # drop a stored key
+```
+
+`kobox install` provisions the sealing pair, idempotently:
+
+- `/etc/kobox/debrid-pub.pem` — `0644`, the portal seals with it
+- `/etc/kobox/debrid-key.pem` — `0600 root:root`, only the worker opens with it
+
+An existing private key is **never** regenerated (that would orphan every stored
+key), and a missing public half is re-derived from it. Back up
+`debrid-key.pem` with the database: restoring one without the other leaves the
+stored keys undecryptable and users simply re-enter them.
+
+Having an account is **never a prerequisite**: a user without a key just has no
+DDL. Their download rows fail with "no AllDebrid account configured — add your
+key in Downloads", and nothing else in KoBox is affected.
 
 Users submit from the portal **Downloads** page (per-user, CSRF-guarded, lists
 their own requests + live status) or an admin can queue one with

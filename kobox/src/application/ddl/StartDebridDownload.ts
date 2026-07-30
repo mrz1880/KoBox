@@ -1,6 +1,14 @@
 import { join } from 'node:path';
-import type { DebridDownloadRepository, DebridPort, DownloaderPort } from '../../domain/ddl/ports.js';
+import type {
+  DebridCredentialsPort,
+  DebridDownloadRepository,
+  DebridPort,
+  DownloaderPort,
+} from '../../domain/ddl/ports.js';
 import { DebridDownloadNotFoundError } from './errors.js';
+
+export const NO_DEBRID_ACCOUNT =
+  'no AllDebrid account configured — add your key in Downloads';
 
 export interface StartDebridDownloadCommand {
   readonly downloadId: number;
@@ -9,6 +17,7 @@ export interface StartDebridDownloadCommand {
 interface Deps {
   readonly repo: DebridDownloadRepository;
   readonly debrid: DebridPort;
+  readonly credentials: DebridCredentialsPort;
   readonly downloader: DownloaderPort;
   readonly stagingBase: string;
 }
@@ -33,7 +42,14 @@ export class StartDebridDownload {
       return;
     }
     try {
-      const { direct } = await this.deps.debrid.unlock(download.sourceLink);
+      // no personal account is a normal state, never fatal: only this download
+      // is unavailable, and the message tells the user how to fix it
+      const apiKey = await this.deps.credentials.forUser(download.username);
+      if (apiKey === undefined) {
+        await this.deps.repo.save(download.failed(NO_DEBRID_ACCOUNT));
+        return;
+      }
+      const { direct } = await this.deps.debrid.unlock(download.sourceLink, apiKey);
       const dir = join(this.deps.stagingBase, download.username.value);
       const gid = await this.deps.downloader.addUri(direct, dir);
       await this.deps.repo.save(download.startedWith(gid));

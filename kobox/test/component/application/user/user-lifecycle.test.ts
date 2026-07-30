@@ -17,6 +17,7 @@ import { PortAlreadyClaimedError } from '../../../../src/domain/user/PortAllocat
 import { Quota } from '../../../../src/domain/user/Quota.js';
 import { Username } from '../../../../src/domain/user/Username.js';
 import { InMemoryPortalCredentialsRepository } from '../../../../src/infrastructure/persistence/InMemoryPortalCredentialsRepository.js';
+import { InMemoryDebridAccountRepository } from '../../../../src/infrastructure/persistence/InMemoryDebridAccountRepository.js';
 import { InMemoryPortalSessionRepository } from '../../../../src/infrastructure/persistence/InMemoryPortalSessionRepository.js';
 import { InMemoryUserRepository } from '../../../../src/infrastructure/persistence/InMemoryUserRepository.js';
 import { FakeNotifications } from '../../../../src/infrastructure/system/fakes/FakeNotifications.js';
@@ -107,6 +108,7 @@ interface World {
   notifications: FakeNotifications;
   credentials: InMemoryPortalCredentialsRepository;
   sessions: InMemoryPortalSessionRepository;
+  debridAccounts: InMemoryDebridAccountRepository;
   createUser: CreateUser;
   deleteUser: DeleteUser;
   changePassword: ChangePassword;
@@ -125,9 +127,13 @@ beforeEach(() => {
   const notifications = new FakeNotifications();
   const credentials = new InMemoryPortalCredentialsRepository();
   const sessions = new InMemoryPortalSessionRepository();
+  const debridAccounts = new InMemoryDebridAccountRepository();
   const allocator = new SequentialPortAllocator();
   const clock = (): string => '2026-07-25 10:00:00';
-  const deps = { repo, accounts, quota, sftp, services, notifications, credentials, sessions, clock };
+  const deps = {
+    repo, accounts, quota, sftp, services, notifications, credentials, sessions,
+    debridAccounts, clock,
+  };
   world = {
     ...deps,
     createUser: new CreateUser({ ...deps, allocator }),
@@ -279,6 +285,15 @@ describe('DeleteUser', () => {
 
     expect(await world.credentials.find(alice)).toBeUndefined();
     expect(await world.sessions.find('a'.repeat(64))).toBeUndefined();
+  });
+
+  it('should_not_let_a_stored_debrid_key_outlive_the_account', async () => {
+    await world.createUser.execute(createUserCommand());
+    await world.debridAccounts.save(alice, 'sealed-blob', '2026-07-30 12:00:00');
+
+    await world.deleteUser.execute({ username: alice });
+
+    expect(await world.debridAccounts.has(alice)).toBe(false);
   });
 
   it('should_reject_deleting_an_unknown_user', async () => {

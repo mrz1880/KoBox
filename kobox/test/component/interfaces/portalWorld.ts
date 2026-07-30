@@ -5,6 +5,8 @@ import type { ClaimedJob, JobQueuePort } from '../../../src/application/jobs/Job
 import { Authenticate } from '../../../src/application/portal/Authenticate.js';
 import { Login } from '../../../src/application/portal/Login.js';
 import { Logout } from '../../../src/application/portal/Logout.js';
+import type { DebridApiKey } from '../../../src/domain/ddl/DebridApiKey.js';
+import type { DebridKeyEncryptorPort } from '../../../src/domain/ddl/ports.js';
 import { HashedPassword } from '../../../src/domain/user/HashedPassword.js';
 import type { Password } from '../../../src/domain/user/Password.js';
 import { Username } from '../../../src/domain/user/Username.js';
@@ -13,6 +15,7 @@ import type { HealthCheckResult, HealthProbePort, PasswordHasherPort } from '../
 import { InMemoryBlocklistRepository } from '../../../src/infrastructure/persistence/InMemoryBlocklistRepository.js';
 import { InMemoryFairUseRepository } from '../../../src/infrastructure/persistence/InMemoryFairUseRepository.js';
 import { InMemoryComponentRegistry } from '../../../src/infrastructure/persistence/InMemoryComponentRegistry.js';
+import { InMemoryDebridAccountRepository } from '../../../src/infrastructure/persistence/InMemoryDebridAccountRepository.js';
 import { InMemoryDebridDownloadRepository } from '../../../src/infrastructure/persistence/InMemoryDebridDownloadRepository.js';
 import { InMemoryLoginAttemptsRepository } from '../../../src/infrastructure/persistence/InMemoryLoginAttemptsRepository.js';
 import { InMemoryMailOutbox } from '../../../src/infrastructure/persistence/InMemoryMailOutbox.js';
@@ -94,6 +97,16 @@ export class RecordingQueue implements JobQueuePort {
   }
 }
 
+// Stands in for RSA sealing: reversible marker, so a test can assert the portal
+// never emits the PLAINTEXT key while still proving it sealed the right one.
+export const SEAL_PREFIX = 'sealed:';
+
+class FakeDebridEncryptor implements DebridKeyEncryptorPort {
+  encrypt(key: DebridApiKey): Promise<string> {
+    return Promise.resolve(Buffer.from(`${SEAL_PREFIX}${key.reveal()}`).toString('base64'));
+  }
+}
+
 export interface PortalWorld {
   readonly server: FastifyInstance;
   readonly users: InMemoryUserRepository;
@@ -102,6 +115,7 @@ export interface PortalWorld {
   readonly queue: RecordingQueue;
   readonly outbox: InMemoryMailOutbox;
   readonly downloads: InMemoryDebridDownloadRepository;
+  readonly debridAccounts: InMemoryDebridAccountRepository;
 }
 
 // Builds a portal server over in-memory fakes with two accounts:
@@ -118,6 +132,9 @@ export async function buildPortalWorld(
   const queue = new RecordingQueue();
   const outbox = new InMemoryMailOutbox();
   const downloads = new InMemoryDebridDownloadRepository();
+  const debridAccounts = new InMemoryDebridAccountRepository();
+  // the portal seals with the public half only; this fake makes that visible
+  const debridEncryptor = new FakeDebridEncryptor();
   const authDeps = { users, credentials, sessions, attempts, tokens, hasher };
   const server = buildPortalServer({
     login: new Login(authDeps),
@@ -140,6 +157,8 @@ export async function buildPortalWorld(
     profiles: new NoProfiles(),
     downloads,
     requestDownload: new RequestDebridDownload({ repo: downloads, queue, clock: () => NOW }),
+    debridAccounts,
+    debridEncryptor,
     ...extra,
   });
   await users.save(new UserBuilder().build());
@@ -159,7 +178,7 @@ export async function buildPortalWorld(
     { username: Username.parse('boss'), passwordHash: GOOD_HASH, role: 'admin' },
     NOW,
   );
-  return { server, users, credentials, sessions, queue, outbox, downloads };
+  return { server, users, credentials, sessions, queue, outbox, downloads, debridAccounts };
 }
 
 export interface AgentSession {

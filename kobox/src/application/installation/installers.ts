@@ -33,6 +33,7 @@ import {
   type NginxVhostSettings,
 } from '../../domain/installation/rendering.js';
 import { renderCronFile } from '../../domain/maintenance/rendering.js';
+import type { DebridKeyPairPort } from '../../domain/ddl/ports.js';
 import type { IpsetPort } from '../../domain/tracker/ports.js';
 import type { VpnPkiPort, VpnPkiProvisionPort } from '../../domain/security/ports.js';
 import { PORTAL_GROUP, VPN_VARIANTS, renderOpenVpnServer } from '../../domain/security/vpn.js';
@@ -77,6 +78,7 @@ export interface InstallerContext {
   readonly checks: ConfigCheckPort;
   readonly host: InstallHostPort;
   readonly ipset: IpsetPort;
+  readonly debridKeys: DebridKeyPairPort;
   readonly certbot: CertbotPort;
   readonly pki: VpnPkiPort;
   readonly pkiProvision: VpnPkiProvisionPort;
@@ -193,6 +195,9 @@ class KoboxCoreInstaller implements ComponentInstaller {
     // first install: current -> the tree the installer runs from; upgrades
     // own the link afterwards (ensureSymlink never overwrites an existing one)
     await host.ensureSymlink(install.currentLink, install.sourceDir);
+    // the pair that seals per-user debrid keys; idempotent, so re-installs and
+    // upgrades never orphan a stored key
+    await this.ctx.debridKeys.ensurePair();
     await files.apply([
       renderWorkerEnv(install.workerEnv),
       renderWorkerUnit({

@@ -56,6 +56,7 @@ button.danger { background: var(--danger); border-color: var(--danger); }
 form.inline { display: inline; } form.inline button { margin: 0; padding: 0.2rem 0.7rem; font-size: 0.85rem; }
 .flash { border-left: 3px solid var(--green); background: var(--panel); padding: 0.6rem 1rem; margin: 1rem 0; }
 .error { border-left-color: var(--danger); }
+.muted { color: var(--muted); font-size: 0.85rem; }
 .chip { display: inline-block; padding: 0.05rem 0.5rem; border-radius: 999px; font-size: 0.78rem; border: 1px solid var(--line); }
 .chip.ok { color: var(--green); border-color: var(--green); }
 .chip.warn { color: var(--amber); border-color: var(--amber); }

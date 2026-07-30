@@ -6,6 +6,7 @@ import { setTimeout as sleep } from 'node:timers/promises';
 import Database from 'better-sqlite3';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { renderAria2Conf, renderAria2Unit } from '../../src/domain/installation/rendering.js';
+import { FsDebridKeyPair } from '../../src/infrastructure/system/FsDebridKeyPair.js';
 
 // Full DDL/debrid E2E on a fresh Debian 12 with a REAL aria2c daemon started
 // from the REAL rendered unit + config (the kobox-aria2 non-root account, RPC
@@ -23,12 +24,14 @@ import { renderAria2Conf, renderAria2Unit } from '../../src/domain/installation/
 const onDebianAsRoot = process.platform === 'linux' && process.getuid?.() === 0;
 const USER = 'e2eddl';
 const HOME = `/home/${USER}`;
+const NOKEY_USER = 'e2enokey';
 const CLI = 'dist/interfaces/cli/main.js';
 const WORKER = 'dist/interfaces/worker/main.js';
 const CONF = '/etc/kobox/aria2.conf';
 const UNIT = '/etc/systemd/system/kobox-aria2.service';
 const STAGING = '/var/lib/kobox-aria2';
 const RPC_SECRET = 'e2e-aria2-rpc-secret';
+const DEBRID_KEY = 'e2edebridkey0123456789';
 const STUB_PORT = 8799;
 const STUB_BASE = `http://127.0.0.1:${String(STUB_PORT)}`;
 const PAYLOAD = 'kobox-ddl-e2e-payload\n';
@@ -105,8 +108,9 @@ describe.skipIf(!onDebianAsRoot)('E2E: debrid link -> aria2 -> user home', () =>
       KOBOX_DB: dbPath,
       KOBOX_SPOOL: join(dir, 'events'),
       KOBOX_BIN: `/usr/bin/env node ${process.cwd()}/${CLI}`,
-      KOBOX_ALLDEBRID_APIKEY: 'e2e-key',
       KOBOX_ALLDEBRID_BASE_URL: STUB_BASE,
+      KOBOX_DEBRID_PUBLIC_KEY: join(dir, 'debrid-pub.pem'),
+      KOBOX_DEBRID_PRIVATE_KEY: join(dir, 'debrid-key.pem'),
       KOBOX_ARIA2_RPC_URL: 'http://127.0.0.1:6800/jsonrpc',
       KOBOX_ARIA2_RPC_SECRET: RPC_SECRET,
       KOBOX_DDL_STAGING: STAGING,
@@ -155,6 +159,15 @@ describe.skipIf(!onDebianAsRoot)('E2E: debrid link -> aria2 -> user home', () =>
     // user-lifecycle's job), so we skip the real rtorrent instance rather than
     // contend for its SCGI port with the other suites
     execFileSync('useradd', ['--create-home', USER]);
+
+    // the sealing pair `kobox install` would provision, then the user's OWN key
+    // through the real CLI path (seal -> job -> worker -> stored ciphertext)
+    await new FsDebridKeyPair(
+      env.KOBOX_DEBRID_PUBLIC_KEY ?? '',
+      env.KOBOX_DEBRID_PRIVATE_KEY ?? '',
+    ).ensurePair();
+    kobox(['set-debrid-key', USER], `${DEBRID_KEY}\n`);
+    drainQueue();
   });
 
   afterAll(() => {
@@ -223,6 +236,31 @@ describe.skipIf(!onDebianAsRoot)('E2E: debrid link -> aria2 -> user home', () =>
     );
     expect(row?.status).toBe('failed');
     // the sanitized adapter message, never the key
-    expect(String(row?.error)).not.toContain('e2e-key');
+    expect(String(row?.error)).not.toContain(DEBRID_KEY);
+  });
+
+  it('should_store_the_users_key_sealed_and_never_in_the_clear', () => {
+    const row = dbRow('SELECT encrypted_key FROM debrid_accounts WHERE username = ?', USER);
+    const sealed = String(row?.encrypted_key);
+
+    expect(sealed).not.toContain(DEBRID_KEY); // ciphertext, inert to the portal
+    expect(sealed).toMatch(/^[A-Za-z0-9+/=]+$/);
+    // and it is not sitting in a job payload either
+    const job = dbRow("SELECT payload_json FROM jobs WHERE type = 'set-debrid-key'");
+    expect(String(job?.payload_json)).not.toContain(DEBRID_KEY);
+  });
+
+  it('should_fail_actionably_for_a_user_with_no_debrid_account', () => {
+    execFileSync('useradd', ['--create-home', NOKEY_USER]);
+    try {
+      kobox(['request-download', NOKEY_USER, 'https://1fichier.example/x', '--category', 'films']);
+      drainQueue();
+
+      const row = dbRow('SELECT status, error FROM debrid_downloads WHERE username = ?', NOKEY_USER);
+      expect(row?.status).toBe('failed');
+      expect(String(row?.error)).toContain('no AllDebrid account');
+    } finally {
+      execFileSync('userdel', ['-r', NOKEY_USER], { stdio: 'ignore' });
+    }
   });
 });

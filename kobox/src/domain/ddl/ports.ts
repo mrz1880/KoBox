@@ -1,4 +1,5 @@
 import type { Username } from '../user/Username.js';
+import type { DebridApiKey } from './DebridApiKey.js';
 import type { DebridDownload } from './DebridDownload.js';
 import type { DownloadCategory } from './DownloadCategory.js';
 import type { DirectUrl } from './DirectUrl.js';
@@ -32,10 +33,43 @@ export interface DownloadPlacementPort {
   place(stagedPath: string, username: Username, category: DownloadCategory): Promise<string>;
 }
 
-// Resolves a filehoster link to an unrestricted direct URL. The API key it
-// needs lives in the adapter (worker env) — never in the domain or the DB.
+// Resolves a filehoster link to an unrestricted direct URL, using the key of the
+// user who asked — accounts are per-user, so the key is a per-call parameter.
 export interface DebridPort {
-  unlock(link: FilehosterLink): Promise<DebridResult>;
+  unlock(link: FilehosterLink, apiKey: DebridApiKey): Promise<DebridResult>;
+}
+
+// The user's own AllDebrid key, ready to use: the adapter reads the stored
+// ciphertext and decrypts it. undefined = this user has no account configured,
+// which is never fatal — only their downloads are unavailable.
+export interface DebridCredentialsPort {
+  forUser(username: Username): Promise<DebridApiKey | undefined>;
+}
+
+// Sealing (portal side) and opening (worker side) are SEPARATE interfaces so the
+// type system shows the non-root portal can never reach the private half.
+export interface DebridKeyEncryptorPort {
+  encrypt(key: DebridApiKey): Promise<string>;
+}
+
+export interface DebridKeyDecryptorPort {
+  decrypt(sealed: string): Promise<DebridApiKey>;
+}
+
+// Provisions the RSA pair that seals per-user debrid keys, at install time.
+// MUST be idempotent: regenerating an existing private half would silently
+// orphan every stored key. A missing public half is re-derived, never a pretext
+// to make a new pair.
+export interface DebridKeyPairPort {
+  ensurePair(): Promise<void>;
+}
+
+export interface DebridAccountRepository {
+  // upsert: one key per user, replacing any previous one
+  save(username: Username, encryptedKey: string, now: string): Promise<void>;
+  findEncrypted(username: Username): Promise<string | undefined>;
+  remove(username: Username): Promise<void>;
+  has(username: Username): Promise<boolean>;
 }
 
 export interface DebridDownloadRepository {

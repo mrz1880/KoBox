@@ -6,6 +6,7 @@ import {
   type InstallerContext,
 } from '../../../../src/application/installation/installers.js';
 import type { CertbotRequest } from '../../../../src/application/maintenance/CertbotPort.js';
+import type { DebridKeyPairPort } from '../../../../src/domain/ddl/ports.js';
 import type { SystemFacts } from '../../../../src/domain/installation/ports.js';
 import { Cidr } from '../../../../src/domain/security/Cidr.js';
 import { FakeConfigChecks } from '../../../../src/infrastructure/system/fakes/FakeConfigChecks.js';
@@ -32,6 +33,7 @@ interface World {
   readonly checks: FakeConfigChecks;
   readonly pki: FakeVpnPki;
   readonly ipset: FakeIpset;
+  readonly debridKeys: FakeDebridKeyPair;
   readonly certbot: FakeCertbot;
   readonly installers: ReadonlyMap<string, ComponentInstaller>;
 }
@@ -58,6 +60,16 @@ class FakeCertbot {
   }
 }
 
+// Records that the sealing pair was provisioned; the real generation is
+// integration-tested (it must never regenerate over an existing private key).
+class FakeDebridKeyPair implements DebridKeyPairPort {
+  calls = 0;
+  ensurePair(): Promise<void> {
+    this.calls += 1;
+    return Promise.resolve();
+  }
+}
+
 function buildWorld(overrides?: {
   facts?: Partial<SystemFacts>;
   manageAptSources?: boolean;
@@ -73,6 +85,7 @@ function buildWorld(overrides?: {
   const checks = new FakeConfigChecks();
   const pki = new FakeVpnPki();
   const ipset = new FakeIpset();
+  const debridKeys = new FakeDebridKeyPair();
   const certbot = new FakeCertbot(host);
   const ctx: InstallerContext = {
     packages,
@@ -81,6 +94,7 @@ function buildWorld(overrides?: {
     checks,
     host,
     ipset,
+    debridKeys,
     certbot,
     pki,
     pkiProvision: pki,
@@ -125,7 +139,10 @@ function buildWorld(overrides?: {
       ]),
     },
   };
-  return { packages, host, systemd, checks, pki, ipset, certbot, installers: buildInstallers(ctx) };
+  return {
+    packages, host, systemd, checks, pki, ipset, debridKeys, certbot,
+    installers: buildInstallers(ctx),
+  };
 }
 
 function installer(world: World, name: string): ComponentInstaller {
@@ -174,6 +191,14 @@ describe('kobox-core installer', () => {
     expect(world.systemd.log).toContain('enable-now kobox-worker');
     // boot oneshot is enabled but NOT started: no rules file exists yet
     expect(world.systemd.log).toContain('enable kobox-firewall');
+  });
+
+  it('should_provision_the_debrid_sealing_pair', async () => {
+    await installer(world, 'kobox-core').install();
+
+    // per-user debrid keys are useless without it; the adapter itself guarantees
+    // an existing private half is never regenerated
+    expect(world.debridKeys.calls).toBe(1);
   });
 
   it('should_uninstall_units_but_never_touch_the_database_dir', async () => {

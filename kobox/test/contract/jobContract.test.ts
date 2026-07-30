@@ -46,6 +46,8 @@ describe('job contract', () => {
       'render-nfs-exports',
       'debrid-download',
       'poll-debrid-downloads',
+    'set-debrid-key',
+    'clear-debrid-key',
     ]);
   });
 
