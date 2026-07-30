@@ -128,13 +128,6 @@ describe.skipIf(!onDebianAsRoot)('E2E: debrid link -> aria2 -> user home', () =>
     }
 
     sh('bash', ['docker/e2e-setup.sh']);
-    // a stale rtorrent-<user> from a prior run holds SCGI port 51101; free it so
-    // this (and later suites reusing that port) can bind
-    try {
-      execFileSync('systemctl', ['disable', '--now', `rtorrent-${USER}`], { stdio: 'ignore' });
-    } catch {
-      /* unit may not exist yet */
-    }
     try {
       execFileSync('userdel', ['-r', USER], { stdio: 'ignore' });
     } catch {
@@ -157,9 +150,11 @@ describe.skipIf(!onDebianAsRoot)('E2E: debrid link -> aria2 -> user home', () =>
       await sleep(200);
     }
 
-    // a real seedbox user so placement has a home to land in
-    kobox(['create-user', USER, '--email', 'e2eddl@example.org', '--quota-gib', '5'], 'pw123456\n');
-    drainQueue();
+    // a plain unix user with a home for placement to land in — this test proves
+    // the debrid→aria2→placement plumbing, not user provisioning (that's
+    // user-lifecycle's job), so we skip the real rtorrent instance rather than
+    // contend for its SCGI port with the other suites
+    execFileSync('useradd', ['--create-home', USER]);
   });
 
   afterAll(() => {
@@ -168,13 +163,6 @@ describe.skipIf(!onDebianAsRoot)('E2E: debrid link -> aria2 -> user home', () =>
       execFileSync('systemctl', ['disable', '--now', 'kobox-aria2'], { stdio: 'ignore' });
     } catch {
       /* not started */
-    }
-    // create-user provisioned a real rtorrent-<user> on SCGI 51101 — stop it so
-    // it doesn't collide with the next suite's rtorrent on the same port
-    try {
-      execFileSync('systemctl', ['disable', '--now', `rtorrent-${USER}`], { stdio: 'ignore' });
-    } catch {
-      /* not provisioned */
     }
     try {
       execFileSync('userdel', ['-r', USER], { stdio: 'ignore' });
