@@ -43,8 +43,12 @@ class FakeDownloader implements DownloaderPort {
 
 class FakePlacement implements DownloadPlacementPort {
   readonly placed: { staged: string; username: string }[] = [];
+  rejectFor: string | undefined;
   place(staged: string, username: Username, category: Cat): Promise<string> {
     this.placed.push({ staged, username: username.value });
+    if (this.rejectFor === username.value) {
+      return Promise.reject(new Error('ENOENT: staged file already gone'));
+    }
     return Promise.resolve(`/home/${username.value}/rtorrent/complete/${category.subdir}/Movie.mkv`);
   }
 }
@@ -204,5 +208,34 @@ describe('PollDebridDownloads', () => {
     await poll().execute();
 
     expect((await repo.findById(id))?.status).toBe('downloading');
+  });
+
+  it('should_isolate_a_failing_row_and_still_advance_the_rest_of_the_batch', async () => {
+    // two finished downloads; placement wedges on the first (its staged file is
+    // gone after a mid-run crash). The failure must fail just that row, not
+    // abort the loop and starve the second.
+    const bob = Username.parse('bob');
+    const aliceId = await anActiveDownload();
+    const bobId = await new RequestDebridDownload({ repo, queue, clock: now }).execute({
+      username: bob,
+      category: DownloadCategory.series,
+      link,
+    });
+    await new StartDebridDownload({
+      repo,
+      debrid,
+      downloader,
+      stagingBase: '/var/lib/kobox/ddl-staging',
+    }).execute({ downloadId: bobId });
+    downloader.state = { state: 'complete', filePath: '/var/lib/kobox/ddl-staging/x/Movie.mkv' };
+    placement.rejectFor = 'alice';
+
+    await poll().execute();
+
+    expect((await repo.findById(aliceId))?.status).toBe('failed');
+    expect((await repo.findById(bobId))?.status).toBe('done'); // not starved
+    expect(placement.placed.map((p) => p.username)).toEqual(
+      expect.arrayContaining(['alice', 'bob']),
+    );
   });
 });
