@@ -279,3 +279,28 @@ export const loginAttempts = sqliteTable('login_attempts', {
   failures: integer('failures').notNull().default(0),
   lockedUntil: text('locked_until'),
 });
+
+// Phase 9 — DDL/debrid downloads: a user submits a filehoster link, KoBox
+// unrestricts it (debrid) and downloads it with aria2 into their home. The
+// source link is content, never a secret (the debrid key lives in the worker
+// env only). Status drives the poll loop; the gid is aria2's handle.
+export const debridDownloads = sqliteTable(
+  'debrid_downloads',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    username: text('username').notNull(),
+    category: text('category', { enum: ['films', 'series'] }).notNull(),
+    sourceLink: text('source_link').notNull(),
+    status: text('status', { enum: ['pending', 'downloading', 'done', 'failed'] })
+      .notNull()
+      .default('pending'),
+    gid: text('gid'),
+    filename: text('filename'),
+    error: text('error'),
+    createdAt: text('created_at').notNull(),
+  },
+  (table) => [
+    index('debrid_downloads_status_idx').on(table.status),
+    index('debrid_downloads_username_idx').on(table.username),
+  ],
+);
