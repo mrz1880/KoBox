@@ -238,7 +238,7 @@ describe('installation rendering', () => {
   });
 
   it('should_render_the_aria2_config_and_unit_golden', () => {
-    const conf = renderAria2Conf('test-rpc-secret', '/var/lib/kobox/ddl-staging');
+    const conf = renderAria2Conf('test-rpc-secret', '/var/lib/kobox-aria2');
     expect(conf.path).toBe('/etc/kobox/aria2.conf');
     // secret-bearing config is not world-readable and RPC stays on loopback
     expect(conf.mode).toBe('0640');
@@ -246,9 +246,9 @@ describe('installation rendering', () => {
     expect(conf.content).toContain('rpc-listen-all=false');
     expectGolden('aria2.conf.golden', conf.content);
 
-    const unit = renderAria2Unit('/var/lib/kobox/ddl-staging');
+    const unit = renderAria2Unit('/var/lib/kobox-aria2');
     expect(unit.content).toContain('User=kobox-aria2');
-    expect(unit.content).toContain('ReadWritePaths=/var/lib/kobox/ddl-staging');
+    expect(unit.content).toContain('ReadWritePaths=/var/lib/kobox-aria2');
     expectGolden('kobox-aria2.service.golden', unit.content);
   });
 

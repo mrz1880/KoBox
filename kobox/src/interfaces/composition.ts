@@ -179,7 +179,8 @@ export function securitySettings(): SecuritySettings {
 
 export const DEFAULT_DB_PATH = '/var/lib/kobox/kobox.db';
 const DEFAULT_ARIA2_RPC_URL = 'http://127.0.0.1:6800/jsonrpc';
-const DEFAULT_DDL_STAGING = '/var/lib/kobox/ddl-staging';
+// outside /var/lib/kobox (2770 root:kobox-portal, untraversable by kobox-aria2)
+const DEFAULT_DDL_STAGING = '/var/lib/kobox-aria2';
 const DEFAULT_ALLDEBRID_BASE_URL = 'https://api.alldebrid.com';
 export const DEFAULT_KOBOX_BIN = '/usr/local/bin/kobox';
 export const DEFAULT_CURRENT_LINK = '/opt/kobox/current';
