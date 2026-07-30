@@ -2,6 +2,7 @@ import fastifyCookie from '@fastify/cookie';
 import fastifyFormbody from '@fastify/formbody';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { z } from 'zod';
+import type { RequestDebridDownload } from '../../application/ddl/RequestDebridDownload.js';
 import type { JobQueuePort } from '../../application/jobs/JobQueuePort.js';
 import type { Authenticate } from '../../application/portal/Authenticate.js';
 import type { Login } from '../../application/portal/Login.js';
@@ -13,6 +14,7 @@ import type { ReleaseRepositoryPort } from '../../application/maintenance/Releas
 import type { VpnProfileStorePort } from '../../application/portal/ports.js';
 import type { PortalCredentialsPort } from '../../domain/portal/ports.js';
 import type { ComponentRegistry } from '../../domain/installation/ports.js';
+import type { DebridDownloadRepository } from '../../domain/ddl/ports.js';
 import type { DynDnsBindingRepository, FairUseRepository } from '../../domain/security/ports.js';
 import type {
   BlocklistRepository,
@@ -50,6 +52,8 @@ export interface PortalServerDeps {
   readonly outbox: MailOutboxPort;
   readonly credentials: PortalCredentialsPort;
   readonly profiles: VpnProfileStorePort;
+  readonly downloads: DebridDownloadRepository;
+  readonly requestDownload: RequestDebridDownload;
   readonly logger?: Logger;
 }
 

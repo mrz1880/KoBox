@@ -85,6 +85,7 @@ const ADMIN_NAV: readonly (readonly [string, string])[] = [
 
 const USER_NAV: readonly (readonly [string, string])[] = [
   ['/', 'Home'],
+  ['/downloads', 'Downloads'],
   ['/access', 'My access'],
   ['/password', 'Password'],
   ['/rutorrent', 'ruTorrent'],

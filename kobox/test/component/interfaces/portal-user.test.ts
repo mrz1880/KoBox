@@ -178,6 +178,94 @@ describe('my access', () => {
   });
 });
 
+describe('debrid downloads', () => {
+  it('should_show_the_submit_form_and_an_empty_list', async () => {
+    const response = await world.server.inject({
+      method: 'GET',
+      url: '/downloads',
+      headers: { cookie: user.cookie },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.body).toContain('action="/downloads"');
+    expect(response.body).toContain('No downloads yet.');
+  });
+
+  it('should_persist_a_pending_row_and_enqueue_the_typed_job', async () => {
+    const response = await world.server.inject({
+      method: 'POST',
+      url: '/downloads',
+      headers: { cookie: user.cookie, 'content-type': 'application/x-www-form-urlencoded' },
+      payload: form({
+        _csrf: user.csrf,
+        link: 'https://1fichier.example/abc',
+        category: 'films',
+      }),
+    });
+
+    expect(response.statusCode).toBe(303);
+    const stored = await world.downloads.listForUser(Username.parse('alice'));
+    expect(stored).toHaveLength(1);
+    expect(stored[0]?.status).toBe('pending');
+    expect(stored[0]?.category.value).toBe('films');
+    const job = world.queue.jobs[0];
+    expect(job?.type).toBe('debrid-download');
+    // the portal enqueues an id, never the link — resolution is the worker's job
+    if (job?.type === 'debrid-download') {
+      expect(job.payload.downloadId).toBe(stored[0]?.id);
+      expect(JSON.stringify(job.payload)).not.toContain('1fichier');
+    }
+  });
+
+  it('should_reject_a_non_http_link_without_enqueueing', async () => {
+    const response = await world.server.inject({
+      method: 'POST',
+      url: '/downloads',
+      headers: { cookie: user.cookie, 'content-type': 'application/x-www-form-urlencoded' },
+      payload: form({ _csrf: user.csrf, link: 'ftp://nope/x', category: 'films' }),
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.body).toContain('valid http(s) link');
+    expect(world.queue.jobs).toHaveLength(0);
+    expect(await world.downloads.listForUser(Username.parse('alice'))).toHaveLength(0);
+  });
+
+  it('should_require_csrf', async () => {
+    const response = await world.server.inject({
+      method: 'POST',
+      url: '/downloads',
+      headers: { cookie: user.cookie, 'content-type': 'application/x-www-form-urlencoded' },
+      payload: form({ link: 'https://1fichier.example/abc', category: 'films' }),
+    });
+
+    expect(response.statusCode).toBe(403);
+    expect(world.queue.jobs).toHaveLength(0);
+  });
+
+  it('should_never_list_another_users_downloads', async () => {
+    await world.server.inject({
+      method: 'POST',
+      url: '/downloads',
+      headers: { cookie: user.cookie, 'content-type': 'application/x-www-form-urlencoded' },
+      payload: form({
+        _csrf: user.csrf,
+        link: 'https://1fichier.example/alice-only',
+        category: 'series',
+      }),
+    });
+
+    const bossView = await world.server.inject({
+      method: 'GET',
+      url: '/downloads',
+      headers: { cookie: admin.cookie },
+    });
+
+    expect(bossView.statusCode).toBe(200);
+    expect(bossView.body).toContain('No downloads yet.');
+  });
+});
+
 describe('ruTorrent iframe', () => {
   it('should_serve_a_page_that_frames_ru', async () => {
     const response = await world.server.inject({

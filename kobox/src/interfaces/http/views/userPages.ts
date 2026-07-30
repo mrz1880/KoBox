@@ -1,3 +1,4 @@
+import type { DebridDownload } from '../../../domain/ddl/DebridDownload.js';
 import { VPN_VARIANTS } from '../../../domain/security/vpn.js';
 import type { FairUseState } from '../../../domain/security/ports.js';
 import type { SeedboxUser } from '../../../domain/user/SeedboxUser.js';
@@ -120,6 +121,60 @@ export function accessPage(viewer: Viewer): string {
 <h2>OpenVPN profiles</h2>
 <table>
   <thead><tr><th>Profile</th><th>Download</th></tr></thead>
+  <tbody>${rows}</tbody>
+</table>`,
+    viewer,
+  );
+}
+
+function downloadStatusChip(status: DebridDownload['status']): RawHtml {
+  switch (status) {
+    case 'done':
+      return html`<span class="chip ok">done</span>`;
+    case 'failed':
+      return html`<span class="chip bad">failed</span>`;
+    case 'downloading':
+      return html`<span class="chip warn">downloading</span>`;
+    default:
+      return html`<span class="chip">pending</span>`;
+  }
+}
+
+export function downloadsPage(
+  viewer: Viewer,
+  downloads: readonly DebridDownload[],
+  message?: string,
+  error?: string,
+): string {
+  const rows =
+    downloads.length === 0
+      ? html`<tr><td colspan="4">No downloads yet.</td></tr>`
+      : downloads.map(
+          (download) => html`<tr>
+  <td>${download.category.value}</td>
+  <td>${downloadStatusChip(download.status)}</td>
+  <td class="mono">${download.filename ?? download.error ?? download.sourceLink.value}</td>
+  <td class="mono">${download.createdAt}</td>
+</tr>`,
+        );
+  return page(
+    'Downloads',
+    html`<h1>Downloads</h1>
+${flash(message)}
+${flash(error, 'error')}
+<form class="card" method="post" action="/downloads">
+  <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
+  <label for="link">Filehoster link</label>
+  <input id="link" name="link" type="url" inputmode="url" placeholder="https://…" required>
+  <label for="category">Category</label>
+  <select id="category" name="category">
+    <option value="films">Films</option>
+    <option value="series">Series</option>
+  </select>
+  <button type="submit">Download (queued)</button>
+</form>
+<table>
+  <thead><tr><th>Category</th><th>Status</th><th>Detail</th><th>Requested</th></tr></thead>
   <tbody>${rows}</tbody>
 </table>`,
     viewer,

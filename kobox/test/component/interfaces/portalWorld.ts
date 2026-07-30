@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify';
+import { RequestDebridDownload } from '../../../src/application/ddl/RequestDebridDownload.js';
 import type { Job } from '../../../src/application/jobs/contract.js';
 import type { ClaimedJob, JobQueuePort } from '../../../src/application/jobs/JobQueuePort.js';
 import { Authenticate } from '../../../src/application/portal/Authenticate.js';
@@ -12,6 +13,7 @@ import type { HealthCheckResult, HealthProbePort, PasswordHasherPort } from '../
 import { InMemoryBlocklistRepository } from '../../../src/infrastructure/persistence/InMemoryBlocklistRepository.js';
 import { InMemoryFairUseRepository } from '../../../src/infrastructure/persistence/InMemoryFairUseRepository.js';
 import { InMemoryComponentRegistry } from '../../../src/infrastructure/persistence/InMemoryComponentRegistry.js';
+import { InMemoryDebridDownloadRepository } from '../../../src/infrastructure/persistence/InMemoryDebridDownloadRepository.js';
 import { InMemoryLoginAttemptsRepository } from '../../../src/infrastructure/persistence/InMemoryLoginAttemptsRepository.js';
 import { InMemoryMailOutbox } from '../../../src/infrastructure/persistence/InMemoryMailOutbox.js';
 import { InMemoryReleaseRepository } from '../../../src/infrastructure/persistence/InMemoryReleaseRepository.js';
@@ -99,6 +101,7 @@ export interface PortalWorld {
   readonly sessions: InMemoryPortalSessionRepository;
   readonly queue: RecordingQueue;
   readonly outbox: InMemoryMailOutbox;
+  readonly downloads: InMemoryDebridDownloadRepository;
 }
 
 // Builds a portal server over in-memory fakes with two accounts:
@@ -114,6 +117,7 @@ export async function buildPortalWorld(
   const hasher = new FakeHasher();
   const queue = new RecordingQueue();
   const outbox = new InMemoryMailOutbox();
+  const downloads = new InMemoryDebridDownloadRepository();
   const authDeps = { users, credentials, sessions, attempts, tokens, hasher };
   const server = buildPortalServer({
     login: new Login(authDeps),
@@ -134,6 +138,8 @@ export async function buildPortalWorld(
     outbox,
     credentials,
     profiles: new NoProfiles(),
+    downloads,
+    requestDownload: new RequestDebridDownload({ repo: downloads, queue, clock: () => NOW }),
     ...extra,
   });
   await users.save(new UserBuilder().build());
@@ -153,7 +159,7 @@ export async function buildPortalWorld(
     { username: Username.parse('boss'), passwordHash: GOOD_HASH, role: 'admin' },
     NOW,
   );
-  return { server, users, credentials, sessions, queue, outbox };
+  return { server, users, credentials, sessions, queue, outbox, downloads };
 }
 
 export interface AgentSession {
