@@ -1,7 +1,5 @@
-import { execFileSync, type ExecFileSyncOptions } from 'node:child_process';
+import { execFileSync, spawn, type ChildProcess, type ExecFileSyncOptions } from 'node:child_process';
 import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
-import { createServer, type Server } from 'node:http';
-import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
@@ -17,6 +15,10 @@ import { renderAria2Conf, renderAria2Unit } from '../../src/domain/installation/
 //   -> scheduled poll -> root worker places the file in ~user/rtorrent/complete
 // and hands it to the user — exactly the plumbing the real box runs, minus the
 // real debrid call (which the integration test covers against a stub).
+//
+// The stub runs in its OWN process on a fixed loopback port: this test drives
+// kobox through blocking execFileSync calls, which would freeze an in-process
+// HTTP server's event loop and starve aria2's fetch.
 
 const onDebianAsRoot = process.platform === 'linux' && process.getuid?.() === 0;
 const USER = 'e2eddl';
@@ -27,11 +29,34 @@ const CONF = '/etc/kobox/aria2.conf';
 const UNIT = '/etc/systemd/system/kobox-aria2.service';
 const STAGING = '/var/lib/kobox/ddl-staging';
 const RPC_SECRET = 'e2e-aria2-rpc-secret';
+const STUB_PORT = 8799;
+const STUB_BASE = `http://127.0.0.1:${String(STUB_PORT)}`;
 const PAYLOAD = 'kobox-ddl-e2e-payload\n';
+
+// A standalone stub for both AllDebrid and the filehoster: /v4/link/unlock hands
+// back a direct link to /file on this same server; /file streams the payload.
+const STUB_SRC = `const http = require('http');
+const port = Number(process.argv[2]);
+const payload = process.argv[3];
+http.createServer((req, res) => {
+  if (req.url.startsWith('/v4/link/unlock')) {
+    res.writeHead(200, { 'content-type': 'application/json' });
+    res.end(JSON.stringify({ status: 'success', data: { link: 'http://127.0.0.1:' + port + '/file/movie.mkv', filename: 'movie.mkv' } }));
+    return;
+  }
+  if (req.url.startsWith('/file/')) {
+    res.writeHead(200, { 'content-type': 'application/octet-stream' });
+    res.end(payload);
+    return;
+  }
+  res.writeHead(404);
+  res.end();
+}).listen(port, '127.0.0.1');
+`;
 
 let env: NodeJS.ProcessEnv;
 let dbPath: string;
-let stub: Server;
+let stubProc: ChildProcess;
 
 function sh(command: string, args: string[], options: ExecFileSyncOptions = {}): string {
   return execFileSync(command, args, { encoding: 'utf8', env, ...options }) as string;
@@ -71,52 +96,37 @@ function ensureAccount(): void {
   }
 }
 
-// A single stub for both AllDebrid and the filehoster: /v4/link/unlock returns a
-// direct link back to /file on this same server; /file streams the payload.
-function startStub(): Promise<number> {
-  return new Promise((resolve) => {
-    stub = createServer((req, res) => {
-      const { port } = stub.address() as AddressInfo;
-      if (req.url?.startsWith('/v4/link/unlock')) {
-        res.writeHead(200, { 'content-type': 'application/json' });
-        res.end(
-          JSON.stringify({
-            status: 'success',
-            data: { link: `http://127.0.0.1:${String(port)}/file/movie.mkv`, filename: 'movie.mkv' },
-          }),
-        );
-        return;
-      }
-      if (req.url?.startsWith('/file/')) {
-        res.writeHead(200, { 'content-type': 'application/octet-stream' });
-        res.end(PAYLOAD);
-        return;
-      }
-      res.writeHead(404);
-      res.end();
-    });
-    stub.listen(0, '127.0.0.1', () => {
-      resolve((stub.address() as AddressInfo).port);
-    });
-  });
-}
-
 describe.skipIf(!onDebianAsRoot)('E2E: debrid link -> aria2 -> user home', () => {
   beforeAll(async () => {
     const dir = mkdtempSync(join(tmpdir(), 'kobox-ddl-e2e-'));
     dbPath = join(dir, 'kobox.db');
-    const stubPort = await startStub();
     env = {
       ...process.env,
       KOBOX_DB: dbPath,
       KOBOX_SPOOL: join(dir, 'events'),
       KOBOX_BIN: `/usr/bin/env node ${process.cwd()}/${CLI}`,
       KOBOX_ALLDEBRID_APIKEY: 'e2e-key',
-      KOBOX_ALLDEBRID_BASE_URL: `http://127.0.0.1:${String(stubPort)}`,
+      KOBOX_ALLDEBRID_BASE_URL: STUB_BASE,
       KOBOX_ARIA2_RPC_URL: 'http://127.0.0.1:6800/jsonrpc',
       KOBOX_ARIA2_RPC_SECRET: RPC_SECRET,
       KOBOX_DDL_STAGING: STAGING,
     };
+
+    // the debrid/filehoster stub, in its own process so blocking kobox calls
+    // can't freeze its event loop
+    const stubFile = join(dir, 'debrid-stub.cjs');
+    writeFileSync(stubFile, STUB_SRC);
+    stubProc = spawn('node', [stubFile, String(STUB_PORT), PAYLOAD], { stdio: 'ignore' });
+    stubProc.unref();
+    for (let i = 0; i < 25; i += 1) {
+      try {
+        execFileSync('curl', ['-fsS', `${STUB_BASE}/file/movie.mkv`], { stdio: 'ignore' });
+        break;
+      } catch {
+        await sleep(200);
+      }
+    }
+
     sh('bash', ['docker/e2e-setup.sh']);
     try {
       execFileSync('userdel', ['-r', USER], { stdio: 'ignore' });
@@ -146,7 +156,7 @@ describe.skipIf(!onDebianAsRoot)('E2E: debrid link -> aria2 -> user home', () =>
   });
 
   afterAll(() => {
-    stub.close();
+    stubProc.kill();
     try {
       execFileSync('systemctl', ['disable', '--now', 'kobox-aria2'], { stdio: 'ignore' });
     } catch {
@@ -170,32 +180,24 @@ describe.skipIf(!onDebianAsRoot)('E2E: debrid link -> aria2 -> user home', () =>
   });
 
   it('should_carry_a_link_through_debrid_and_aria2_into_the_user_home', async () => {
-    kobox([
-      'request-download',
-      USER,
-      'https://1fichier.example/abc',
-      '--category',
-      'films',
-    ]);
+    kobox(['request-download', USER, 'https://1fichier.example/abc', '--category', 'films']);
     drainQueue(); // StartDebridDownload: unlock(stub) + aria2 addUri
 
     let status = '';
-    for (let i = 0; i < 40 && status !== 'done'; i += 1) {
+    for (let i = 0; i < 20 && status !== 'done' && status !== 'failed'; i += 1) {
       kobox(['poll-debrid-downloads']);
       drainQueue(); // PollDebridDownloads: place on complete
       const current = dbRow('SELECT status FROM debrid_downloads WHERE username = ?', USER)?.status;
       status = typeof current === 'string' ? current : '';
-      if (status === 'failed') {
-        break;
-      }
-      await sleep(250);
+      await sleep(300);
     }
 
     const row = dbRow(
-      'SELECT status, filename FROM debrid_downloads WHERE username = ?',
+      'SELECT status, filename, error FROM debrid_downloads WHERE username = ?',
       USER,
     );
-    expect(row?.status).toBe('done');
+    // surface the row (incl. any error) so a CI failure is self-explaining
+    expect(row?.status, `download not done: ${JSON.stringify(row)}`).toBe('done');
     expect(row?.filename).toBe('movie.mkv');
 
     const placed = join(HOME, 'rtorrent/complete/films/movie.mkv');
