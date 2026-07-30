@@ -46,6 +46,8 @@ async function main(): Promise<void> {
     outbox: container.outbox,
     credentials: container.credentials,
     profiles: new FsVpnProfileStore(process.env.KOBOX_VPN_PROFILES_DIR),
+    downloads: container.debridDownloadRepo,
+    requestDownload: container.ddlUseCases.requestDownload,
   });
 
   const port = Number(process.env.KOBOX_PORTAL_HTTP_PORT ?? DEFAULT_PORTAL_HTTP_PORT);

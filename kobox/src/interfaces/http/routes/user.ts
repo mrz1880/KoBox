@@ -1,8 +1,13 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
+import type { RequestDebridDownload } from '../../../application/ddl/RequestDebridDownload.js';
 import type { JobQueuePort } from '../../../application/jobs/JobQueuePort.js';
 import type { VpnProfileStorePort } from '../../../application/portal/ports.js';
+import { DownloadCategory } from '../../../domain/ddl/DownloadCategory.js';
+import { FilehosterLink } from '../../../domain/ddl/FilehosterLink.js';
+import type { DebridDownloadRepository } from '../../../domain/ddl/ports.js';
 import type { PortalCredentialsPort } from '../../../domain/portal/ports.js';
+import { DomainError } from '../../../domain/shared/DomainError.js';
 import type { FairUseRepository } from '../../../domain/security/ports.js';
 import { VPN_VARIANTS, type VpnVariant } from '../../../domain/security/vpn.js';
 import { Password } from '../../../domain/user/Password.js';
@@ -12,6 +17,7 @@ import { flashOf, redirectWithFlash, viewerOf, type Guards } from '../guards.js'
 import {
   accessPage,
   adminHomePage,
+  downloadsPage,
   passwordPage,
   rutorrentPage,
   userHomePage,
@@ -23,8 +29,29 @@ const passwordSchema = z.object({
   next: z.string().min(8).max(256),
 });
 
+const downloadSchema = z.object({
+  link: z.string().min(1).max(2048),
+  category: z.enum(['films', 'series']),
+});
+
 function isVpnVariant(raw: string): raw is VpnVariant {
   return (VPN_VARIANTS as readonly string[]).includes(raw);
+}
+
+// A malformed link is a form error, not a 500: parse it here and let the caller
+// re-render the page. Only a domain rejection is swallowed — anything else throws.
+function parseLink(raw: string | undefined): FilehosterLink | undefined {
+  if (raw === undefined) {
+    return undefined;
+  }
+  try {
+    return FilehosterLink.parse(raw);
+  } catch (error) {
+    if (error instanceof DomainError) {
+      return undefined;
+    }
+    throw error;
+  }
 }
 
 export interface UserRoutesDeps {
@@ -34,6 +61,8 @@ export interface UserRoutesDeps {
   readonly hasher: PasswordHasherPort;
   readonly credentials: PortalCredentialsPort;
   readonly profiles: VpnProfileStorePort;
+  readonly downloads: DebridDownloadRepository;
+  readonly requestDownload: RequestDebridDownload;
 }
 
 export function registerUserRoutes(
@@ -111,6 +140,46 @@ export function registerUserRoutes(
     );
     await deps.queue.enqueue(job);
     return redirectWithFlash(reply, '/password', 'password change queued');
+  });
+
+  server.get('/downloads', async (request, reply) => {
+    const session = await guards.requireSession(request, reply);
+    if (session === undefined) {
+      return;
+    }
+    const rows = await deps.downloads.listForUser(session.username);
+    return reply
+      .type('text/html')
+      .send(downloadsPage(viewerOf(session), rows, flashOf(request)));
+  });
+
+  server.post('/downloads', async (request, reply) => {
+    const session = await guards.requireCsrf(request, reply);
+    if (session === undefined) {
+      return;
+    }
+    const parsed = downloadSchema.safeParse(request.body);
+    const link = parseLink(parsed.success ? parsed.data.link : undefined);
+    if (!parsed.success || link === undefined) {
+      const rows = await deps.downloads.listForUser(session.username);
+      return reply
+        .code(200)
+        .type('text/html')
+        .send(
+          downloadsPage(
+            viewerOf(session),
+            rows,
+            undefined,
+            'Please provide a valid http(s) link and a category.',
+          ),
+        );
+    }
+    await deps.requestDownload.execute({
+      username: session.username,
+      category: DownloadCategory.parse(parsed.data.category),
+      link,
+    });
+    return redirectWithFlash(reply, '/downloads', 'download queued');
   });
 
   server.get('/access', async (request, reply) => {
