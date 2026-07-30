@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
+import { DownloadCategory } from '../../domain/ddl/DownloadCategory.js';
+import { FilehosterLink } from '../../domain/ddl/FilehosterLink.js';
 import { EventHook } from '../../domain/torrent/EventHook.js';
 import { InfoHash } from '../../domain/torrent/InfoHash.js';
 import { LABEL_PATTERN, Label } from '../../domain/torrent/Label.js';
@@ -492,6 +494,22 @@ program
         ? 'poll-debrid-downloads already pending'
         : `job ${String(id)} enqueued: poll-debrid-downloads`,
     );
+  });
+
+program
+  .command('request-download')
+  .argument('<username>')
+  .argument('<link>')
+  .option('--category <films|series>', 'target complete/ subdir', 'films')
+  .description('queue a filehoster link for debrid unlock + download (unprivileged entry point)')
+  .action(async (username: string, link: string, options: Record<string, string>) => {
+    const c = container();
+    const id = await c.ddlUseCases.requestDownload.execute({
+      username: Username.parse(username),
+      category: DownloadCategory.parse(options.category ?? 'films'),
+      link: FilehosterLink.parse(link),
+    });
+    await done(c, `download ${String(id)} requested for ${username}`);
   });
 
 program
