@@ -15,6 +15,8 @@ import {
   renderAria2Unit,
   renderNanomonUnit,
   renderNginxVhost,
+  isWorkerOnlyEnv,
+  renderPortalEnv,
   renderPortalUnit,
   renderRutorrentConfig,
   renderShellinaboxDefault,
@@ -63,7 +65,9 @@ describe('installation rendering', () => {
     expect(file.content).toContain('Group=kobox-portal');
     // journald identifier the fail2ban portal jail keys on
     expect(file.content).toContain('SyslogIdentifier=kobox-portal');
-    expect(file.content).toContain('EnvironmentFile=-/etc/kobox/worker.env');
+    // its OWN env file — never the worker's, which holds the secrets
+    expect(file.content).toContain('EnvironmentFile=-/etc/kobox/portal.env');
+    expect(file.content).not.toContain('worker.env');
     expect(file.content).toContain(
       'ExecStart=/usr/bin/node /opt/kobox/current/kobox/dist/interfaces/http/main.js',
     );
@@ -93,6 +97,72 @@ describe('installation rendering', () => {
 
     expect(() => renderWorkerEnv(new Map([['bad-key', 'x']]))).toThrow(InvalidWorkerEnvError);
     expect(() => renderWorkerEnv(new Map([['KOBOX_X', 'a\nb']]))).toThrow(InvalidWorkerEnvError);
+  });
+
+  it('should_render_portal_env_without_any_worker_only_secret_golden', () => {
+    const snapshot = new Map([
+      ['KOBOX_DB', '/var/lib/kobox/kobox.db'],
+      ['KOBOX_PORTAL_HTTP_PORT', '8190'],
+      // every secret the root worker alone acts on
+      ['KOBOX_ALLDEBRID_APIKEY', 'the-debrid-key'],
+      ['KOBOX_ARIA2_RPC_SECRET', 'the-rpc-secret'],
+      ['KOBOX_IBLOCKLIST_USER', 'the-list-user'],
+      ['KOBOX_IBLOCKLIST_PIN', 'the-list-pin'],
+      ['KOBOX_NTFY_URL', 'https://ntfy.example.net/secret-topic'],
+      ['KOBOX_DISCORD_WEBHOOK', 'https://discord.example/api/webhooks/xyz'],
+      // convention-matched: a secret added later is withheld by default
+      ['KOBOX_FUTURE_TOKEN', 'not-yet-invented'],
+    ]);
+
+    const file = renderPortalEnv(snapshot);
+
+    expect(file.path).toBe('/etc/kobox/portal.env');
+    // readable by the non-root portal identity, nobody else
+    expect(file.mode).toBe('0640');
+    expect(file.owner).toBe('root');
+    expect(file.group).toBe('kobox-portal');
+    // the plain config it needs survives
+    expect(file.content).toContain('KOBOX_DB=/var/lib/kobox/kobox.db');
+    expect(file.content).toContain('KOBOX_PORTAL_HTTP_PORT=8190');
+    // not one secret VALUE reaches the file
+    for (const secret of [
+      'the-debrid-key',
+      'the-rpc-secret',
+      'the-list-user',
+      'the-list-pin',
+      'secret-topic',
+      'webhooks/xyz',
+      'not-yet-invented',
+    ]) {
+      expect(file.content, secret).not.toContain(secret);
+    }
+    expectGolden('portal.env.golden', file.content);
+
+    // the worker still gets everything — the split withholds, it never drops
+    expect(renderWorkerEnv(snapshot).content).toContain('KOBOX_ALLDEBRID_APIKEY=the-debrid-key');
+  });
+
+  it('should_classify_worker_only_env_keys_by_name_and_convention', () => {
+    for (const key of [
+      'KOBOX_ALLDEBRID_APIKEY',
+      'KOBOX_ARIA2_RPC_SECRET',
+      'KOBOX_IBLOCKLIST_PIN',
+      'KOBOX_NTFY_URL',
+      'KOBOX_SOMETHING_TOKEN',
+      'KOBOX_SOMETHING_PASSWORD',
+    ]) {
+      expect(isWorkerOnlyEnv(key), key).toBe(true);
+    }
+    // plain config the portal legitimately needs must NOT be filtered
+    for (const key of [
+      'KOBOX_DB',
+      'KOBOX_PORTAL_HTTP_PORT',
+      'KOBOX_ARIA2_RPC_URL',
+      'KOBOX_VPN_PROFILES_DIR',
+      'KOBOX_NANOMON_SHA256',
+    ]) {
+      expect(isWorkerOnlyEnv(key), key).toBe(false);
+    }
   });
 
   it('should_render_the_sshd_dropin_without_a_port_line_on_the_default_port', () => {

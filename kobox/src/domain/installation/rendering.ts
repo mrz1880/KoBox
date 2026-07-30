@@ -64,7 +64,9 @@ export function renderPortalUnit(settings: PortalUnitSettings): RenderedFile {
       'User=kobox-portal',
       'Group=kobox-portal',
       `ExecStart=${settings.nodeBin} ${settings.portalMain}`,
-      'EnvironmentFile=-/etc/kobox/worker.env',
+      // its OWN env file, not the worker's: same config minus every secret the
+      // portal never uses (debrid key, aria2 RPC secret, webhooks…)
+      'EnvironmentFile=-/etc/kobox/portal.env',
       // shares the DB with the root worker (kobox-portal group); 0007 keeps
       // new SQLite WAL/-shm files group-writable
       'UMask=0007',
@@ -232,9 +234,28 @@ export class InvalidWorkerEnvError extends DomainError {
 
 const ENV_KEY_PATTERN = /^[A-Z][A-Z0-9_]*$/;
 
-// Snapshot of the relevant KOBOX_* env at install time, so the systemd worker
-// runs with the same configuration the installer saw. Sorted for determinism.
-export function renderWorkerEnv(vars: ReadonlyMap<string, string>): RenderedFile {
+// Env entries only the ROOT worker may hold: credentials and capability URLs it
+// alone acts on (debrid key, aria2 RPC secret, blocklist subscription
+// credentials, notification webhooks). The non-root portal never calls those
+// paths — it reads repositories and enqueues jobs — so it must not receive them.
+const WORKER_ONLY_ENV_NAMES: readonly string[] = [
+  'KOBOX_ALLDEBRID_APIKEY',
+  'KOBOX_ARIA2_RPC_SECRET',
+  'KOBOX_IBLOCKLIST_USER',
+  'KOBOX_IBLOCKLIST_PIN',
+  'KOBOX_NTFY_URL',
+  'KOBOX_DISCORD_WEBHOOK',
+];
+
+// Also matched by naming convention, so a secret added later is withheld from
+// the portal BY DEFAULT instead of leaking until someone updates the list above.
+const WORKER_ONLY_ENV_SUFFIX = /_(?:APIKEY|API_KEY|SECRET|TOKEN|PASSWORD|WEBHOOK|PIN)$/;
+
+export function isWorkerOnlyEnv(key: string): boolean {
+  return WORKER_ONLY_ENV_NAMES.includes(key) || WORKER_ONLY_ENV_SUFFIX.test(key);
+}
+
+function envLines(vars: ReadonlyMap<string, string>, keep: (key: string) => boolean): string[] {
   const lines: string[] = [];
   for (const [key, value] of [...vars.entries()].sort(([a], [b]) => a.localeCompare(b))) {
     if (!ENV_KEY_PATTERN.test(key)) {
@@ -243,14 +264,36 @@ export function renderWorkerEnv(vars: ReadonlyMap<string, string>): RenderedFile
     if (value.includes('\n')) {
       throw new InvalidWorkerEnvError(`value of ${key} contains a newline`);
     }
-    lines.push(`${key}=${value}`);
+    if (keep(key)) {
+      lines.push(`${key}=${value}`);
+    }
   }
+  return lines;
+}
+
+// Snapshot of the relevant KOBOX_* env at install time, so the systemd worker
+// runs with the same configuration the installer saw. Sorted for determinism.
+// Root-only (0600): this is the file that holds every secret.
+export function renderWorkerEnv(vars: ReadonlyMap<string, string>): RenderedFile {
   return {
     path: '/etc/kobox/worker.env',
-    content: [MANAGED_HEADER, ...lines, ''].join('\n'),
+    content: [MANAGED_HEADER, ...envLines(vars, () => true), ''].join('\n'),
     mode: '0600',
     owner: 'root',
     group: 'root',
+  };
+}
+
+// The same snapshot MINUS every worker-only secret, for the non-root portal
+// (least privilege: /proc/<portal-pid>/environ is readable by its own uid, so a
+// secret it never uses must not be there at all). 0640 root:kobox-portal.
+export function renderPortalEnv(vars: ReadonlyMap<string, string>): RenderedFile {
+  return {
+    path: '/etc/kobox/portal.env',
+    content: [MANAGED_HEADER, ...envLines(vars, (key) => !isWorkerOnlyEnv(key)), ''].join('\n'),
+    mode: '0640',
+    owner: 'root',
+    group: 'kobox-portal',
   };
 }
 

@@ -21,6 +21,7 @@ import {
   renderAria2Conf,
   renderAria2Unit,
   renderNanomonUnit,
+  renderPortalEnv,
   renderPortalUnit,
   renderRutorrentConfig,
   renderShellinaboxDefault,
@@ -150,6 +151,7 @@ async function restorePriors(
 const WORKER_UNIT = '/etc/systemd/system/kobox-worker.service';
 const FIREWALL_UNIT = '/etc/systemd/system/kobox-firewall.service';
 const WORKER_ENV = '/etc/kobox/worker.env';
+const PORTAL_ENV = '/etc/kobox/portal.env';
 const SSHD_DROPIN = '/etc/ssh/sshd_config.d/90-kobox.conf';
 const SYSCTL_DROPIN = '/etc/sysctl.d/90-kobox.conf';
 const NGINX_VHOST = '/etc/nginx/conf.d/kobox.conf';
@@ -627,7 +629,10 @@ class PortalInstaller implements ComponentInstaller {
 
   async install(): Promise<InstallOutcome> {
     const { files, systemd, install } = this.ctx;
-    await files.apply([
+    const changed = await files.apply([
+      // the portal's own env: the install snapshot minus every worker-only
+      // secret, so the non-root process never holds one it cannot use
+      renderPortalEnv(install.workerEnv),
       renderPortalUnit({
         nodeBin: install.nodeBin,
         portalMain: `${install.currentLink}/dist/interfaces/http/main.js`,
@@ -635,6 +640,11 @@ class PortalInstaller implements ComponentInstaller {
     ]);
     await systemd.daemonReload();
     await systemd.enable('kobox-portal', { now: true });
+    // enable --now leaves an ALREADY-running portal untouched: restart it so a
+    // changed env (a secret withdrawn, a port moved) actually takes effect
+    if (changed.length > 0) {
+      await systemd.reloadOrRestart('kobox-portal');
+    }
     return installed();
   }
 
@@ -642,6 +652,7 @@ class PortalInstaller implements ComponentInstaller {
     const { host, systemd } = this.ctx;
     await systemd.disable('kobox-portal', { now: true });
     await host.removeFile('/etc/systemd/system/kobox-portal.service');
+    await host.removeFile(PORTAL_ENV);
     await systemd.daemonReload();
   }
 }

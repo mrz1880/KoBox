@@ -23,6 +23,8 @@ const FIXTURE_IP = '127.0.0.2';
 const ARTIFACT_HOST = 'lists.example.net';
 const ARTIFACT_PORT = 8446;
 const INSTALL_TIMEOUT_MS = 900_000;
+// marker secret: must reach the root worker's env and NEVER the portal's
+const PORTAL_FORBIDDEN_SECRET = 'worker-only-secret-marker';
 
 let env: NodeJS.ProcessEnv;
 let fixtureDir: string;
@@ -122,6 +124,8 @@ describe.skipIf(!onDebianAsRoot)('E2E: fresh Debian 12 -> bootstrap -> full stac
       KOBOX_VPN_REMOTE: 'seedbox.example.org',
       KOBOX_RUTORRENT_URL: `https://${ARTIFACT_HOST}:${String(ARTIFACT_PORT)}/rutorrent.tar.gz`,
       KOBOX_RUTORRENT_SHA256: artifactSha,
+      // a worker-only secret, to prove the non-root portal never receives it
+      KOBOX_ALLDEBRID_APIKEY: PORTAL_FORBIDDEN_SECRET,
       NODE_EXTRA_CA_CERTS: tls.pemPath,
     };
 
@@ -239,6 +243,17 @@ describe.skipIf(!onDebianAsRoot)('E2E: fresh Debian 12 -> bootstrap -> full stac
     }
     // /ru is now gated by the portal session (auth_request), not Basic Auth
     expect(code).toBe('401');
+
+    // least privilege, proven on the RUNNING process: the root worker holds the
+    // secret, the non-root portal's own env file and /proc/<pid>/environ do not
+    expect(readFileSync('/etc/kobox/worker.env', 'utf8')).toContain(PORTAL_FORBIDDEN_SECRET);
+    expect(readFileSync('/etc/kobox/portal.env', 'utf8')).not.toContain(PORTAL_FORBIDDEN_SECRET);
+    const portalPid = sh('systemctl', ['show', '-p', 'MainPID', '--value', 'kobox-portal']).trim();
+    expect(Number(portalPid)).toBeGreaterThan(0);
+    const portalEnviron = readFileSync(`/proc/${portalPid}/environ`, 'utf8');
+    expect(portalEnviron).not.toContain(PORTAL_FORBIDDEN_SECRET);
+    // …while still getting the plain config it needs to run
+    expect(portalEnviron).toContain('KOBOX_DB=');
     // vendored app landed from the verified fixture artifact
     expect(readFileSync('/var/www/rutorrent/index.html', 'utf8')).toContain('ruTorrent fixture');
   });
