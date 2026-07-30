@@ -1,5 +1,6 @@
 import type { Username } from '../user/Username.js';
 import type { DebridDownload } from './DebridDownload.js';
+import type { DownloadCategory } from './DownloadCategory.js';
 import type { DirectUrl } from './DirectUrl.js';
 import type { DownloadGid } from './DownloadGid.js';
 import type { FilehosterLink } from './FilehosterLink.js';
@@ -22,6 +23,13 @@ export interface DownloadState {
 export interface DownloaderPort {
   addUri(url: DirectUrl, dir: string): Promise<DownloadGid>;
   status(gid: DownloadGid): Promise<DownloadState>;
+}
+
+// Moves a finished download from the aria2 staging dir into the user's
+// ~/rtorrent/complete/<category>/ (the layout Radarr/Sonarr import from) and
+// hands ownership to the user. Root-only (the worker). Returns the final path.
+export interface DownloadPlacementPort {
+  place(stagedPath: string, username: Username, category: DownloadCategory): Promise<string>;
 }
 
 // Resolves a filehoster link to an unrestricted direct URL. The API key it
