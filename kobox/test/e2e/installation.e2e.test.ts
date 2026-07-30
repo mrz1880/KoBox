@@ -97,7 +97,12 @@ function buildArtifactTarball(): Buffer {
 
 describe.skipIf(!onDebianAsRoot)('E2E: fresh Debian 12 -> bootstrap -> full stack', () => {
   beforeAll(async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'kobox-install-e2e-'));
+    // NOT under /tmp: the portal unit runs ProtectSystem=strict, whose only
+    // writable path is /var/lib/kobox. A unique subdir of it keeps this suite
+    // isolated from the others (a shared /var/lib/kobox/kobox.db would carry
+    // another suite's state in here) while staying writable for the portal.
+    mkdirSync('/var/lib/kobox', { recursive: true });
+    const dir = mkdtempSync('/var/lib/kobox/e2e-install-');
     fixtureDir = mkdtempSync(join(tmpdir(), 'kobox-install-fixtures-'));
     execFileSync('bash', ['docker/e2e-setup.sh']);
 
