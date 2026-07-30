@@ -26,8 +26,13 @@ describe('DirectUrl', () => {
     expect(DirectUrl.parse('https://cdn.example/file.mkv').value).toBe('https://cdn.example/file.mkv');
   });
 
-  it('should_reject_a_plain_http_url', () => {
-    expect(() => DirectUrl.parse('http://cdn.example/file.mkv')).toThrow();
+  it('should_accept_a_plain_http_url', () => {
+    // AllDebrid's docs show http direct links; rejecting them would fail real unlocks
+    expect(DirectUrl.parse('http://cdn.example/file.mkv').value).toBe('http://cdn.example/file.mkv');
+  });
+
+  it('should_reject_a_non_http_scheme', () => {
+    expect(() => DirectUrl.parse('ftp://cdn.example/file.mkv')).toThrow();
   });
 });
 
