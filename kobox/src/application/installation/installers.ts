@@ -875,8 +875,14 @@ class Aria2Installer implements ComponentInstaller {
 
   async uninstall(): Promise<void> {
     const { host, systemd } = this.ctx;
+    const unitPath = '/etc/systemd/system/kobox-aria2.service';
+    // skip-when-unpinned: if aria2 was never installed there's nothing to tear
+    // down — and no reason to pay a systemctl disable + daemon-reload for it
+    if ((await host.readFile(unitPath)) === undefined) {
+      return;
+    }
     await systemd.disable('kobox-aria2', { now: true });
-    await host.removeFile('/etc/systemd/system/kobox-aria2.service');
+    await host.removeFile(unitPath);
     await host.removeFile('/etc/kobox/aria2.conf');
     await systemd.daemonReload();
   }

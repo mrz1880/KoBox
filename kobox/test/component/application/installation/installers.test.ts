@@ -690,6 +690,25 @@ describe('aria2 installer', () => {
     );
     expect(world.systemd.log).toContain('enable-now kobox-aria2');
   });
+
+  it('should_disable_and_remove_the_unit_on_uninstall', async () => {
+    await installer(world, 'aria2').install();
+
+    await installer(world, 'aria2').uninstall();
+
+    expect(world.systemd.log).toContain('disable-now kobox-aria2');
+    expect(world.host.contentAt('/etc/systemd/system/kobox-aria2.service')).toBeUndefined();
+    expect(world.host.contentAt('/etc/kobox/aria2.conf')).toBeUndefined();
+  });
+
+  it('should_be_a_no_op_uninstall_when_never_installed', async () => {
+    const unpinned = buildWorld({ aria2Pin: 'none' });
+
+    await installer(unpinned, 'aria2').uninstall();
+
+    // no systemctl disable / daemon-reload paid for a component that was skipped
+    expect(unpinned.systemd.log).not.toContain('kobox-aria2');
+  });
 });
 
 describe('fail2ban installer', () => {
