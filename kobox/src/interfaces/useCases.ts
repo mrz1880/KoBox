@@ -1,3 +1,13 @@
+import { PollDebridDownloads } from '../application/ddl/PollDebridDownloads.js';
+import { RequestDebridDownload } from '../application/ddl/RequestDebridDownload.js';
+import { StartDebridDownload } from '../application/ddl/StartDebridDownload.js';
+import type {
+  DebridDownloadRepository,
+  DebridPort,
+  DownloaderPort,
+  DownloadPlacementPort,
+} from '../domain/ddl/ports.js';
+import type { JobQueuePort } from '../application/jobs/JobQueuePort.js';
 import { DiscoverTrackerFromTorrent } from '../application/tracker/DiscoverTrackerFromTorrent.js';
 import { FetchTrackerCert } from '../application/tracker/FetchTrackerCert.js';
 import { ImportBlocklistCatalog } from '../application/tracker/ImportBlocklistCatalog.js';
@@ -280,6 +290,43 @@ export function buildTorrentUseCases(deps: TorrentUseCaseDeps): TorrentUseCases 
       users: deps.users,
       files: deps.config,
       reload: deps.nginx,
+    }),
+  };
+}
+
+export interface DdlUseCaseDeps {
+  readonly repo: DebridDownloadRepository;
+  readonly debrid: DebridPort;
+  readonly downloader: DownloaderPort;
+  readonly placement: DownloadPlacementPort;
+  readonly queue: JobQueuePort;
+  readonly clock: () => string;
+  readonly stagingBase: string;
+}
+
+export interface DdlUseCases {
+  readonly requestDownload: RequestDebridDownload;
+  readonly startDownload: StartDebridDownload;
+  readonly pollDownloads: PollDebridDownloads;
+}
+
+export function buildDdlUseCases(deps: DdlUseCaseDeps): DdlUseCases {
+  return {
+    requestDownload: new RequestDebridDownload({
+      repo: deps.repo,
+      queue: deps.queue,
+      clock: deps.clock,
+    }),
+    startDownload: new StartDebridDownload({
+      repo: deps.repo,
+      debrid: deps.debrid,
+      downloader: deps.downloader,
+      stagingBase: deps.stagingBase,
+    }),
+    pollDownloads: new PollDebridDownloads({
+      repo: deps.repo,
+      downloader: deps.downloader,
+      placement: deps.placement,
     }),
   };
 }

@@ -481,6 +481,20 @@ program
   });
 
 program
+  .command('poll-debrid-downloads')
+  .description('advance in-flight debrid downloads (cron entry point)')
+  .action(async () => {
+    const c = container();
+    const id = await c.queue.enqueueUnique(buildJob.pollDebridDownloads());
+    await done(
+      c,
+      id === undefined
+        ? 'poll-debrid-downloads already pending'
+        : `job ${String(id)} enqueued: poll-debrid-downloads`,
+    );
+  });
+
+program
   .command('run-backup')
   .description('dump the database and KoBox configs into a TTL-rotated backup (cron entry point)')
   .action(async () => {

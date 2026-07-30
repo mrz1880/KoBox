@@ -58,12 +58,14 @@ import { FakeVpnPki } from '../../../src/infrastructure/system/fakes/FakeVpnPki.
 import { buildJob } from '../../../src/interfaces/cli/buildJob.js';
 import { JobWorker } from '../../../src/interfaces/worker/JobWorker.js';
 import {
+  buildDdlUseCases,
   buildMaintenanceUseCases,
   buildSecurityUseCases,
   buildTorrentUseCases,
   buildTrackerUseCases,
   buildUseCases,
 } from '../../../src/interfaces/useCases.js';
+import { InMemoryDebridDownloadRepository } from '../../../src/infrastructure/persistence/InMemoryDebridDownloadRepository.js';
 
 class InMemoryJobQueue implements JobQueuePort {
   private readonly rows: { id: number; job: Job; status: string; error?: string }[] = [];
@@ -333,6 +335,18 @@ beforeEach(() => {
     backupHost: new NoopBackupHost(),
     backupSettings: { root: '/var/backups/kobox', ttlDays: 7, keepMin: 3, configDirs: [] },
   });
+  const ddlUseCases = buildDdlUseCases({
+    repo: new InMemoryDebridDownloadRepository(),
+    debrid: { unlock: () => Promise.reject(new Error('no debrid in this suite')) },
+    downloader: {
+      addUri: () => Promise.reject(new Error('no aria2 in this suite')),
+      status: () => Promise.reject(new Error('no aria2 in this suite')),
+    },
+    placement: { place: () => Promise.reject(new Error('no placement in this suite')) },
+    queue,
+    clock: () => '2026-07-25 10:00:00',
+    stagingBase: '/tmp/kobox-ddl-staging',
+  });
   world = {
     queue,
     accounts,
@@ -365,6 +379,7 @@ beforeEach(() => {
       securityUseCases,
       maintenanceUseCases,
       outbox,
+      ddlUseCases,
     ),
   };
 });

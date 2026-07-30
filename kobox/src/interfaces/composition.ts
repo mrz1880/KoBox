@@ -31,6 +31,10 @@ import { OutboxEmailChannel } from '../infrastructure/notifications/OutboxEmailC
 import { SendmailTransport } from '../infrastructure/notifications/SendmailTransport.js';
 import { SqliteMailOutbox } from '../infrastructure/persistence/SqliteMailOutbox.js';
 import { SqliteMysbDumpSource } from '../infrastructure/persistence/SqliteMysbDumpSource.js';
+import { SqliteDebridDownloadRepository } from '../infrastructure/persistence/SqliteDebridDownloadRepository.js';
+import { AllDebridAdapter } from '../infrastructure/system/AllDebridAdapter.js';
+import { Aria2Adapter } from '../infrastructure/system/Aria2Adapter.js';
+import { DdlPlacementAdapter } from '../infrastructure/system/DdlPlacementAdapter.js';
 import { NtfyChannel } from '../infrastructure/notifications/NtfyChannel.js';
 import type { NotificationChannel } from '../infrastructure/notifications/formatEvent.js';
 import type { SecurityNotificationPort } from '../domain/security/ports.js';
@@ -91,11 +95,13 @@ import { WatchDirAdapter } from '../infrastructure/system/WatchDirAdapter.js';
 import { loadRtorrentTemplates } from '../infrastructure/templates/TemplateProvider.js';
 import { JobWorker } from './worker/JobWorker.js';
 import {
+  buildDdlUseCases,
   buildMaintenanceUseCases,
   buildSecurityUseCases,
   buildTorrentUseCases,
   buildTrackerUseCases,
   buildUseCases,
+  type DdlUseCases,
   type MaintenanceUseCases,
   type SecurityUseCases,
   type TorrentUseCases,
@@ -172,6 +178,8 @@ export function securitySettings(): SecuritySettings {
 }
 
 export const DEFAULT_DB_PATH = '/var/lib/kobox/kobox.db';
+const DEFAULT_ARIA2_RPC_URL = 'http://127.0.0.1:6800/jsonrpc';
+const DEFAULT_DDL_STAGING = '/var/lib/kobox/ddl-staging';
 export const DEFAULT_KOBOX_BIN = '/usr/local/bin/kobox';
 export const DEFAULT_CURRENT_LINK = '/opt/kobox/current';
 export const DEFAULT_RELEASES_DIR = '/opt/kobox/releases';
@@ -357,6 +365,8 @@ export interface Container {
   readonly securityUseCases: SecurityUseCases;
   readonly maintenanceUseCases: MaintenanceUseCases;
   readonly outbox: SqliteMailOutbox;
+  readonly ddlUseCases: DdlUseCases;
+  readonly debridDownloadRepo: SqliteDebridDownloadRepository;
   readonly queue: SqliteJobQueue;
   readonly worker: JobWorker;
   readonly hasher: OpensslPasswordHasher;
@@ -489,6 +499,22 @@ export function buildContainer(name: string): Container {
     backupHost: new BackupHostAdapter(runner, db),
     backupSettings: backupSettings(),
   });
+  // DDL/debrid: the debrid key + aria2 secret live only here (worker env),
+  // never in the DB or a job payload. Unset key = feature inert (unlock fails,
+  // rows are marked failed, nothing else downloads).
+  const debridDownloadRepo = new SqliteDebridDownloadRepository(db);
+  const ddlUseCases = buildDdlUseCases({
+    repo: debridDownloadRepo,
+    debrid: new AllDebridAdapter(process.env.KOBOX_ALLDEBRID_APIKEY ?? ''),
+    downloader: new Aria2Adapter(
+      process.env.KOBOX_ARIA2_RPC_URL ?? DEFAULT_ARIA2_RPC_URL,
+      process.env.KOBOX_ARIA2_RPC_SECRET ?? '',
+    ),
+    placement: new DdlPlacementAdapter(runner),
+    queue,
+    clock: nowStamp,
+    stagingBase: process.env.KOBOX_DDL_STAGING ?? DEFAULT_DDL_STAGING,
+  });
   return {
     db,
     logger,
@@ -507,7 +533,10 @@ export function buildContainer(name: string): Container {
       securityUseCases,
       maintenanceUseCases,
       outbox,
+      ddlUseCases,
     ),
+    ddlUseCases,
+    debridDownloadRepo,
     hasher: new OpensslPasswordHasher(runner),
     repo,
     trackerRepo,
