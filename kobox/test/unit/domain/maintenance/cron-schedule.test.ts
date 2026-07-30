@@ -70,7 +70,8 @@ describe('SCHEDULED_JOBS', () => {
     expect(bySubcommand.get('update-blocklists')?.schedule.value).toBe('0 */6 * * *');
     expect(bySubcommand.get('renew-tracker-certs')?.schedule.value).toBe('10 0 * * *');
     expect(bySubcommand.get('run-backup')?.schedule.value).toBe('30 5 * * *');
-    expect(SCHEDULED_JOBS).toHaveLength(6);
+    expect(bySubcommand.get('poll-debrid-downloads')?.schedule.value).toBe('*/2 * * * *');
+    expect(SCHEDULED_JOBS).toHaveLength(7);
   });
 
   it('should_only_reference_shell_safe_kobox_subcommands', () => {

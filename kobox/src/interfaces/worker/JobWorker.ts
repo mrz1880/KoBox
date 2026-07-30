@@ -15,6 +15,7 @@ import { ProxyPort } from '../../domain/user/Port.js';
 import { Quota } from '../../domain/user/Quota.js';
 import { Username } from '../../domain/user/Username.js';
 import type {
+  DdlUseCases,
   MaintenanceUseCases,
   SecurityUseCases,
   TorrentUseCases,
@@ -49,6 +50,7 @@ export class JobWorker {
     private readonly security: SecurityUseCases,
     private readonly maintenance: MaintenanceUseCases,
     private readonly outbox: MailOutboxPort,
+    private readonly ddl: DdlUseCases,
   ) {}
 
   async processNext(): Promise<boolean> {
@@ -344,6 +346,12 @@ export class JobWorker {
         return;
       case 'render-nfs-exports':
         await this.security.renderNfsExports.execute();
+        return;
+      case 'debrid-download':
+        await this.ddl.startDownload.execute({ downloadId: job.payload.downloadId });
+        return;
+      case 'poll-debrid-downloads':
+        await this.ddl.pollDownloads.execute();
         return;
       case 'add-user-address':
       case 'remove-user-address': {

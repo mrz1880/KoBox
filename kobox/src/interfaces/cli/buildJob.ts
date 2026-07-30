@@ -170,4 +170,8 @@ export const buildJob = {
   renderNfsExports(): Job {
     return parseJob('render-nfs-exports', {});
   },
+
+  pollDebridDownloads(): Job {
+    return parseJob('poll-debrid-downloads', {});
+  },
 };
