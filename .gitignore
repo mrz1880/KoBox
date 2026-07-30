@@ -9,7 +9,3 @@ TODO.md
 .pnpm-store/
 HANDOFF.md
 
-# local secrets handed over for manual testing — never commit
-.tempenv
-*.tempenv
-.secrets
