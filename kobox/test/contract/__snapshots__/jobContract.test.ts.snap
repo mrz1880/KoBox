@@ -146,6 +146,21 @@ exports[`job contract > should_keep_the_wire_contract_stable 1`] = `
     ],
     "type": "object",
   },
+  "debrid-download": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "downloadId": {
+        "exclusiveMinimum": 0,
+        "maximum": 9007199254740991,
+        "type": "integer",
+      },
+    },
+    "required": [
+      "downloadId",
+    ],
+    "type": "object",
+  },
   "delete-user": {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "additionalProperties": false,
@@ -251,6 +266,12 @@ exports[`job contract > should_keep_the_wire_contract_stable 1`] = `
     "required": [
       "host",
     ],
+    "type": "object",
+  },
+  "poll-debrid-downloads": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {},
     "type": "object",
   },
   "provision-rtorrent": {

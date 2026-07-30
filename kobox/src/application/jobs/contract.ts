@@ -48,6 +48,8 @@ export const JOB_TYPES = [
   'set-fair-use-override',
   'render-rutorrent-users',
   'render-nfs-exports',
+  'debrid-download',
+  'poll-debrid-downloads',
 ] as const;
 
 export type JobType = (typeof JOB_TYPES)[number];
@@ -167,6 +169,9 @@ export const jobPayloadSchemas = {
   }),
   'render-rutorrent-users': z.strictObject({}),
   'render-nfs-exports': z.strictObject({}),
+  // DDL: resolve+download a submitted link; the poll advances active downloads
+  'debrid-download': z.strictObject({ downloadId: z.number().int().positive() }),
+  'poll-debrid-downloads': z.strictObject({}),
 } satisfies Record<JobType, z.ZodType>;
 
 export type JobPayload<T extends JobType> = z.infer<(typeof jobPayloadSchemas)[T]>;

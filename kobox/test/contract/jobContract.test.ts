@@ -44,6 +44,8 @@ describe('job contract', () => {
       'set-fair-use-override',
       'render-rutorrent-users',
       'render-nfs-exports',
+      'debrid-download',
+      'poll-debrid-downloads',
     ]);
   });
 
