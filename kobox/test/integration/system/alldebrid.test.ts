@@ -1,21 +1,39 @@
 import { createServer, type Server } from 'node:http';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { FilehosterLink } from '../../../src/domain/ddl/FilehosterLink.js';
-import { AllDebridAdapter, DebridError } from '../../../src/infrastructure/system/AllDebridAdapter.js';
+import {
+  AllDebridAdapter,
+  DebridError,
+  type DelayedTuning,
+} from '../../../src/infrastructure/system/AllDebridAdapter.js';
 
 let server: Server;
 let baseUrl: string;
 let lastQuery: URLSearchParams | undefined;
 let lastAuth: string | undefined;
-let response: { status: number; body: unknown } = { status: 200, body: {} };
+let delayedIds: string[] = [];
+// per-path response bodies; /link/delayed pulls the next queued body each call
+let unlockBody: unknown = {};
+let delayedQueue: unknown[] = [];
 
 beforeEach(async () => {
+  lastQuery = undefined;
+  lastAuth = undefined;
+  delayedIds = [];
+  unlockBody = {};
+  delayedQueue = [];
   await new Promise<void>((resolve) => {
     server = createServer((req, res) => {
-      lastQuery = new URL(req.url ?? '', 'http://x').searchParams;
+      const url = new URL(req.url ?? '', 'http://x');
+      lastQuery = url.searchParams;
       lastAuth = req.headers.authorization;
-      res.writeHead(response.status, { 'content-type': 'application/json' });
-      res.end(JSON.stringify(response.body));
+      res.writeHead(200, { 'content-type': 'application/json' });
+      if (url.pathname === '/v4/link/delayed') {
+        delayedIds.push(url.searchParams.get('id') ?? '');
+        res.end(JSON.stringify(delayedQueue.shift() ?? { status: 'success', data: { status: 1 } }));
+        return;
+      }
+      res.end(JSON.stringify(unlockBody));
     });
     server.listen(0, '127.0.0.1', () => {
       const addr = server.address();
@@ -30,15 +48,14 @@ afterEach(async () => {
 });
 
 const link = FilehosterLink.parse('https://1fichier.example/abc');
+// never actually wait in tests: no-op sleep, a tight poll budget
+const fast: DelayedTuning = { sleep: () => Promise.resolve(), pollIntervalMs: 0, maxAttempts: 4 };
 
 describe('AllDebridAdapter', () => {
   it('should_unlock_a_link_into_a_direct_url_and_filename', async () => {
-    response = {
-      status: 200,
-      body: {
-        status: 'success',
-        data: { link: 'https://cdn.example/Movie.2026.mkv', filename: 'Movie.2026.mkv', filesize: 42 },
-      },
+    unlockBody = {
+      status: 'success',
+      data: { link: 'https://cdn.example/Movie.2026.mkv', filename: 'Movie.2026.mkv', filesize: 42 },
     };
     const adapter = new AllDebridAdapter('SECRETKEY', baseUrl);
 
@@ -54,10 +71,45 @@ describe('AllDebridAdapter', () => {
     expect(lastQuery?.get('agent')).toBe('kobox');
   });
 
+  it('should_poll_a_delayed_link_until_it_is_ready', async () => {
+    unlockBody = { status: 'success', data: { delayed: 777, filename: 'Delayed.mkv' } };
+    delayedQueue = [
+      { status: 'success', data: { status: 1 } }, // still processing
+      { status: 'success', data: { status: 1 } },
+      { status: 'success', data: { status: 2, link: 'https://cdn.example/Delayed.mkv' } },
+    ];
+    const adapter = new AllDebridAdapter('SECRETKEY', baseUrl, fetch, fast);
+
+    const result = await adapter.unlock(link);
+
+    expect(result.direct.value).toBe('https://cdn.example/Delayed.mkv');
+    expect(result.filename).toBe('Delayed.mkv');
+    // it polled /link/delayed with the id from the unlock response, Bearer-authed
+    expect(delayedIds).toEqual(['777', '777', '777']);
+    expect(lastAuth).toBe('Bearer SECRETKEY');
+  });
+
+  it('should_fail_when_the_delayed_host_gives_up', async () => {
+    unlockBody = { status: 'success', data: { delayed: 42 } };
+    delayedQueue = [{ status: 'success', data: { status: 3 } }];
+    const adapter = new AllDebridAdapter('SECRETKEY', baseUrl, fetch, fast);
+
+    await expect(adapter.unlock(link)).rejects.toThrow(DebridError);
+  });
+
+  it('should_fail_when_the_delayed_link_never_becomes_ready', async () => {
+    unlockBody = { status: 'success', data: { delayed: 42 } };
+    // queue empty -> the stub keeps returning status 1; the budget runs out
+    const adapter = new AllDebridAdapter('SECRETKEY', baseUrl, fetch, fast);
+
+    await expect(adapter.unlock(link)).rejects.toThrow(/delayed-timeout/);
+    expect(delayedIds).toHaveLength(4); // maxAttempts, then it gave up
+  });
+
   it('should_raise_a_typed_error_on_a_debrid_error_response', async () => {
-    response = {
-      status: 200,
-      body: { status: 'error', error: { code: 'LINK_HOST_NOT_SUPPORTED', message: 'host unsupported' } },
+    unlockBody = {
+      status: 'error',
+      error: { code: 'LINK_HOST_NOT_SUPPORTED', message: 'host unsupported' },
     };
     const adapter = new AllDebridAdapter('SECRETKEY', baseUrl);
 
