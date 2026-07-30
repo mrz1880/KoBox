@@ -6,6 +6,7 @@ ENV container=docker
 RUN apt-get update && apt-get install -y --no-install-recommends \
     systemd \
     systemd-sysv \
+    aria2 \
     dbus \
     bind9utils \
     easy-rsa \

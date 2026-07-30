@@ -180,6 +180,7 @@ export function securitySettings(): SecuritySettings {
 export const DEFAULT_DB_PATH = '/var/lib/kobox/kobox.db';
 const DEFAULT_ARIA2_RPC_URL = 'http://127.0.0.1:6800/jsonrpc';
 const DEFAULT_DDL_STAGING = '/var/lib/kobox/ddl-staging';
+const DEFAULT_ALLDEBRID_BASE_URL = 'https://api.alldebrid.com';
 export const DEFAULT_KOBOX_BIN = '/usr/local/bin/kobox';
 export const DEFAULT_CURRENT_LINK = '/opt/kobox/current';
 export const DEFAULT_RELEASES_DIR = '/opt/kobox/releases';
@@ -509,7 +510,10 @@ export function buildContainer(name: string): Container {
   const debridDownloadRepo = new SqliteDebridDownloadRepository(db);
   const ddlUseCases = buildDdlUseCases({
     repo: debridDownloadRepo,
-    debrid: new AllDebridAdapter(process.env.KOBOX_ALLDEBRID_APIKEY ?? ''),
+    debrid: new AllDebridAdapter(
+      process.env.KOBOX_ALLDEBRID_APIKEY ?? '',
+      process.env.KOBOX_ALLDEBRID_BASE_URL ?? DEFAULT_ALLDEBRID_BASE_URL,
+    ),
     downloader: new Aria2Adapter(
       process.env.KOBOX_ARIA2_RPC_URL ?? DEFAULT_ARIA2_RPC_URL,
       process.env.KOBOX_ARIA2_RPC_SECRET ?? '',

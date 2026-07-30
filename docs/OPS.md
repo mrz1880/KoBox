@@ -153,6 +153,49 @@ kobox install        # re-vendors when the sha differs from the installed marker
 Admins reach the dashboard at `https://<host>:8189/monitoring`. NanoMon's own
 alerting (its `alerts.toml` → webhook) stays standalone for now.
 
+## DDL & debrid downloads (aria2 + AllDebrid)
+
+KoBox can turn a filehoster link (1fichier, …) into a finished file in the
+user's library, the same folder Radarr/Sonarr already import from. KoBox is
+**source-agnostic**: it receives a link the user already has, unlocks it through
+a debrid service, downloads it, and drops it in place. It never scrapes a
+source — where the links come from is the user's business.
+
+The flow, all job-driven so the portal stays unprivileged:
+
+```
+portal /downloads  (or)  kobox request-download <user> <link> --category films|series
+      → pending row + `debrid-download` job
+      → worker: AllDebrid unlock → aria2 fetches the direct URL into staging
+      → cron `poll-debrid-downloads` (every 2 min): on complete, the root
+        worker moves the file to ~<user>/rtorrent/complete/<category>/ and
+        chowns it to the user; on error, the row is marked failed
+```
+
+The `aria2` component installs the engine as a **non-root** `kobox-aria2`
+account with RPC on loopback only; the RPC secret lives in
+`/etc/kobox/aria2.conf` (mode 0640), never on the command line. Like ruTorrent
+and NanoMon it is **skip-when-unpinned** — no secret configured, no component.
+
+Two secrets, both **worker-env only** — never in the DB, a job payload, or a log
+(the adapters sanitize network errors so the key can't leak):
+
+```
+export KOBOX_ALLDEBRID_APIKEY=<your AllDebrid API key>   # instance-wide
+export KOBOX_ARIA2_RPC_SECRET=$(openssl rand -hex 24)
+kobox install        # brings up kobox-aria2.service
+```
+
+Optional: `KOBOX_DDL_STAGING` (default `/var/lib/kobox/ddl-staging`) for the
+aria2 scratch dir; `KOBOX_ALLDEBRID_BASE_URL` overrides the API endpoint (used
+by the E2E to point at a local stub). Unset `KOBOX_ALLDEBRID_APIKEY` = the
+feature is inert: unlock fails and rows are marked failed, nothing downloads.
+
+Users submit from the portal **Downloads** page (per-user, CSRF-guarded, lists
+their own requests + live status) or an admin can queue one with
+`kobox request-download`. Categories are the closed set `films|series`, which
+picks the `complete/<category>/` subdir.
+
 ## The portal & application auth (Phase 6)
 
 The SSR portal (`kobox-portal.service`) replaces the legacy Wolf CMS theme and
