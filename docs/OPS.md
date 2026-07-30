@@ -186,9 +186,10 @@ export KOBOX_ARIA2_RPC_SECRET=$(openssl rand -hex 24)
 kobox install        # brings up kobox-aria2.service
 ```
 
-Optional: `KOBOX_DDL_STAGING` (default `/var/lib/kobox/ddl-staging`) for the
-aria2 scratch dir; `KOBOX_ALLDEBRID_BASE_URL` overrides the API endpoint (used
-by the E2E to point at a local stub). Unset `KOBOX_ALLDEBRID_APIKEY` = the
+Optional: `KOBOX_DDL_STAGING` (default `/var/lib/kobox-aria2`, deliberately
+outside the portal-locked `/var/lib/kobox` which `kobox-aria2` cannot traverse)
+for the aria2 scratch dir; `KOBOX_ALLDEBRID_BASE_URL` overrides the API endpoint
+(used by the E2E to point at a local stub). Unset `KOBOX_ALLDEBRID_APIKEY` = the
 feature is inert: unlock fails and rows are marked failed, nothing downloads.
 
 Users submit from the portal **Downloads** page (per-user, CSRF-guarded, lists
@@ -220,6 +221,19 @@ mutation enqueues a typed job the root worker executes.
   worker. `/var/lib/kobox` is `2770 root:kobox-portal` (setgid) and both units
   run `UMask=0007`, so SQLite's WAL/-shm files stay group-writable. If the portal
   logs `unable to open database file`, check those perms first.
+- **Split environments (least privilege)**: the two units do NOT share an env
+  file. `/etc/kobox/worker.env` (`0600 root:root`) holds the full install
+  snapshot including every secret; `/etc/kobox/portal.env`
+  (`0640 root:kobox-portal`) is the same snapshot **minus** the worker-only
+  secrets — the debrid key, the aria2 RPC secret, the iblocklist credentials and
+  the ntfy/Discord webhooks. The portal never calls those paths (it reads
+  repositories and enqueues jobs), so it must not carry the secrets in its
+  memory or in `/proc/<pid>/environ`, which its own uid can read. Both files are
+  rendered by `kobox install`; a key is withheld from the portal when its name is
+  on the explicit list **or** ends in `_SECRET`/`_TOKEN`/`_APIKEY`/`_PASSWORD`/
+  `_WEBHOOK`/`_PIN` — so a secret added later is withheld by default. Adding a
+  var the portal genuinely needs: just make sure it does not match that
+  convention.
 - **Per-user ruTorrent**: each active user gets an nginx `/RPC-<UPPERCASE>` SCGI
   mount (rendered into `/etc/nginx/kobox.d/rutorrent-users.conf`) and a matching
   `conf/users/<user>/config.php`; the render is chained after

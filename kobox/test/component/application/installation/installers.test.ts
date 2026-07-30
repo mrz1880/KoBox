@@ -118,7 +118,11 @@ function buildWorld(overrides?: {
       }),
       ...(overrides?.quotaFs !== undefined && { quotaFs: overrides.quotaFs }),
       ...(overrides?.letsencrypt !== undefined && { letsencrypt: overrides.letsencrypt }),
-      workerEnv: new Map([['KOBOX_DB', '/var/lib/kobox/kobox.db']]),
+      workerEnv: new Map([
+        ['KOBOX_DB', '/var/lib/kobox/kobox.db'],
+        // a worker-only secret: the root worker gets it, the portal must not
+        ['KOBOX_ALLDEBRID_APIKEY', 'the-debrid-key'],
+      ]),
     },
   };
   return { packages, host, systemd, checks, pki, ipset, certbot, installers: buildInstallers(ctx) };
@@ -161,6 +165,10 @@ describe('kobox-core installer', () => {
     expect(world.host.symlinks.get('/opt/kobox/current')).toBe('/opt/kobox-src');
     expect(world.host.contentAt('/etc/kobox/worker.env')).toContain(
       'KOBOX_DB=/var/lib/kobox/kobox.db',
+    );
+    // the root worker is the one process that DOES hold the secrets
+    expect(world.host.contentAt('/etc/kobox/worker.env')).toContain(
+      'KOBOX_ALLDEBRID_APIKEY=the-debrid-key',
     );
     expect(world.systemd.log).toContain('daemon-reload');
     expect(world.systemd.log).toContain('enable-now kobox-worker');
@@ -291,6 +299,21 @@ describe('portal installer', () => {
     expect(world.systemd.log).toContain('enable-now kobox-portal');
   });
 
+  it('should_give_the_portal_its_own_env_without_the_worker_secrets', async () => {
+    await installer(world, 'portal').install();
+
+    const env = world.host.fileAt('/etc/kobox/portal.env');
+    // the config it needs, none of the secrets it never uses
+    expect(env?.content).toContain('KOBOX_DB=/var/lib/kobox/kobox.db');
+    expect(env?.content).not.toContain('the-debrid-key');
+    // readable by the portal identity only
+    expect(env?.mode).toBe('0640');
+    expect(env?.group).toBe('kobox-portal');
+    expect(world.host.contentAt('/etc/systemd/system/kobox-portal.service')).toContain(
+      'EnvironmentFile=-/etc/kobox/portal.env',
+    );
+  });
+
   it('should_disable_and_remove_the_unit_on_uninstall', async () => {
     await installer(world, 'portal').install();
 
@@ -298,6 +321,7 @@ describe('portal installer', () => {
 
     expect(world.systemd.log).toContain('disable-now kobox-portal');
     expect(world.host.contentAt('/etc/systemd/system/kobox-portal.service')).toBeUndefined();
+    expect(world.host.contentAt('/etc/kobox/portal.env')).toBeUndefined();
   });
 });
 
