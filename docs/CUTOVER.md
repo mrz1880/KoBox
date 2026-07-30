@@ -183,6 +183,17 @@ Smoke checks (per a sample user):
 > `send-mails` immediately after `--apply`, and note that `must_change_password`
 > forces rotation on first login regardless — the temp password is single-use.
 
+> **Debrid accounts must be re-authorised from THIS server.** Debrid accounts are
+> per-user: each user pastes their own AllDebrid key on `/downloads` (or an admin
+> runs `printf '%s' '<key>' | kobox set-debrid-key <user>`). The **first** unlock
+> attempted from a new IP fails with `AUTH_BLOCKED` — AllDebrid emails the account
+> owner to authorise the new location, and only then do downloads work. This is
+> **per IP and does not carry over**: a key validated from a laptop while testing
+> is still blocked here. Expect one failed download per user at cutover, with the
+> row reading "AllDebrid blocked this new location — open the email it sent you…".
+> Have each user clear that email before declaring DDL green. (Verified against
+> the live AllDebrid API on 2026-07-30.)
+
 ---
 
 ## 7. Atomic switch to `:8189`
