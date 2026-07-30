@@ -230,6 +230,8 @@ export async function buildInstallation(
   const rutorrentSha256 = process.env.KOBOX_RUTORRENT_SHA256;
   const nanomonUrl = process.env.KOBOX_NANOMON_URL;
   const nanomonSha256 = process.env.KOBOX_NANOMON_SHA256;
+  const aria2RpcSecret = process.env.KOBOX_ARIA2_RPC_SECRET;
+  const ddlStagingDir = process.env.KOBOX_DDL_STAGING;
   const quotaFs = process.env.KOBOX_QUOTA_FS;
   const leDomain = process.env.KOBOX_LE_DOMAIN;
   const leEmail = process.env.KOBOX_LE_EMAIL;
@@ -260,6 +262,8 @@ export async function buildInstallation(
         rutorrentSha256 !== '' && { rutorrentSha256 }),
       ...(nanomonUrl !== undefined && nanomonUrl !== '' && { nanomonUrl }),
       ...(nanomonSha256 !== undefined && nanomonSha256 !== '' && { nanomonSha256 }),
+      ...(aria2RpcSecret !== undefined && aria2RpcSecret !== '' && { aria2RpcSecret }),
+      ...(ddlStagingDir !== undefined && ddlStagingDir !== '' && { ddlStagingDir }),
       ...(quotaFs !== undefined && quotaFs !== '' && { quotaFs }),
       ...(leDomain !== undefined &&
         leDomain !== '' &&

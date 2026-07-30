@@ -11,6 +11,8 @@ import {
   renderDnscryptConfig,
   renderFirewallBootUnit,
   renderNfsExports,
+  renderAria2Conf,
+  renderAria2Unit,
   renderNanomonUnit,
   renderNginxVhost,
   renderPortalUnit,
@@ -233,6 +235,21 @@ describe('installation rendering', () => {
     expect(file.content).toContain('--localhost-only');
     expect(file.content).toContain('127.0.0.1');
     expectGolden('shellinabox.default.golden', file.content);
+  });
+
+  it('should_render_the_aria2_config_and_unit_golden', () => {
+    const conf = renderAria2Conf('test-rpc-secret', '/var/lib/kobox/ddl-staging');
+    expect(conf.path).toBe('/etc/kobox/aria2.conf');
+    // secret-bearing config is not world-readable and RPC stays on loopback
+    expect(conf.mode).toBe('0640');
+    expect(conf.content).toContain('rpc-secret=test-rpc-secret');
+    expect(conf.content).toContain('rpc-listen-all=false');
+    expectGolden('aria2.conf.golden', conf.content);
+
+    const unit = renderAria2Unit('/var/lib/kobox/ddl-staging');
+    expect(unit.content).toContain('User=kobox-aria2');
+    expect(unit.content).toContain('ReadWritePaths=/var/lib/kobox/ddl-staging');
+    expectGolden('kobox-aria2.service.golden', unit.content);
   });
 
   it('should_render_the_nanomon_unit_non_root_on_loopback_golden', () => {

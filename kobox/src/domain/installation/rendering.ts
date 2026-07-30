@@ -127,6 +127,67 @@ export function renderNanomonUnit(): RenderedFile {
   };
 }
 
+// Phase 9 — aria2 RPC port (localhost only). The worker's Aria2Adapter talks
+// to it here; it is never exposed off-box.
+export const ARIA2_RPC_PORT = 6800;
+
+// The aria2 config carries the RPC secret, so it is 0640 root:kobox-aria2 (not
+// world-readable) and the secret is read from the file — never passed on the
+// command line where /proc/<pid>/cmdline would leak it.
+export function renderAria2Conf(secret: string, stagingDir: string): RenderedFile {
+  return {
+    path: '/etc/kobox/aria2.conf',
+    content: [
+      MANAGED_HEADER,
+      'enable-rpc=true',
+      'rpc-listen-all=false',
+      `rpc-listen-port=${String(ARIA2_RPC_PORT)}`,
+      `rpc-secret=${secret}`,
+      `dir=${stagingDir}`,
+      'continue=true',
+      'max-connection-per-server=8',
+      'allow-overwrite=true',
+      '',
+    ].join('\n'),
+    mode: '0640',
+    owner: 'root',
+    group: 'kobox-aria2',
+  };
+}
+
+// aria2 runs NON-ROOT (kobox-aria2), read-only except the staging dir it writes
+// downloads into; the root worker moves finished files into the user home.
+export function renderAria2Unit(stagingDir: string): RenderedFile {
+  return {
+    path: '/etc/systemd/system/kobox-aria2.service',
+    content: [
+      MANAGED_HEADER,
+      '[Unit]',
+      'Description=KoBox aria2 download engine (debrid downloads)',
+      'After=network.target',
+      '',
+      '[Service]',
+      'Type=simple',
+      'User=kobox-aria2',
+      'Group=kobox-aria2',
+      'ExecStart=/usr/bin/aria2c --conf-path=/etc/kobox/aria2.conf',
+      'NoNewPrivileges=yes',
+      'ProtectSystem=strict',
+      'ProtectHome=yes',
+      `ReadWritePaths=${stagingDir}`,
+      'Restart=on-failure',
+      'RestartSec=2',
+      '',
+      '[Install]',
+      'WantedBy=multi-user.target',
+      '',
+    ].join('\n'),
+    mode: '0644',
+    owner: 'root',
+    group: 'root',
+  };
+}
+
 // Phase 3 debt #1: iptables tables are empty after a reboot; this oneshot
 // restores the last applied ruleset. The Condition keeps the very first boot
 // (no apply yet) clean instead of failing the unit.

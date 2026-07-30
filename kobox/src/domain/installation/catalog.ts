@@ -42,4 +42,6 @@ export const COMPONENT_CATALOG: readonly ComponentSpec[] = [
   spec('shellinabox', ['nginx']),
   // Phase 8 — NanoMon monitoring, proxied by nginx behind the admin session
   spec('nanomon', ['nginx']),
+  // Phase 9 — aria2 download engine for debrid downloads (localhost RPC)
+  spec('aria2', ['kobox-core']),
 ];
