@@ -363,5 +363,5 @@ describe.skipIf(!onDebianAsRoot)('E2E: fresh Debian 12 -> bootstrap -> full stac
         expect(row.state, row.name).toBe('to_install');
       }
     }
-  });
+  }, 60_000); // two full-stack CLI spawns (uninstall + install-status): the 5s default is too tight
 });
