@@ -4,9 +4,26 @@ import { DirectUrl } from '../../domain/ddl/DirectUrl.js';
 import type { FilehosterLink } from '../../domain/ddl/FilehosterLink.js';
 import type { DebridPort, DebridResult } from '../../domain/ddl/ports.js';
 
+// AllDebrid's own wording is written for API integrators, not for the person
+// staring at a failed download. These are the codes a KoBox user actually hits,
+// rewritten as something they can act on. AUTH_BLOCKED is the common one: an
+// account meets a brand-new IP the first time its key is used on a new seedbox.
+const ACTIONABLE_MESSAGES: Readonly<Record<string, string>> = {
+  AUTH_BLOCKED:
+    'AllDebrid blocked this new location — open the email it sent you to authorise this server, then request the download again',
+  AUTH_BAD_APIKEY: 'AllDebrid rejected your key — check it in Downloads',
+  AUTH_MISSING_APIKEY: 'no AllDebrid key was sent — set yours in Downloads',
+  AUTH_USER_BANNED: 'this AllDebrid account is banned',
+  LINK_HOST_NOT_SUPPORTED: 'AllDebrid does not support this filehoster',
+  LINK_HOST_UNAVAILABLE: 'this filehoster is unavailable at AllDebrid right now — try again later',
+  LINK_DOWN: 'this file is no longer available at the filehoster',
+  MUST_BE_PREMIUM: 'this filehoster requires an active AllDebrid premium subscription',
+};
+
 export class DebridError extends Error {
   constructor(code: string, message: string) {
-    super(`debrid error ${code}: ${message}`);
+    // keep the code for diagnosis, lead with the actionable wording when known
+    super(`debrid error ${code}: ${ACTIONABLE_MESSAGES[code] ?? message}`);
     this.name = 'DebridError';
   }
 }
