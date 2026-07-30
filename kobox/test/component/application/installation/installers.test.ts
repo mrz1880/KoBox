@@ -114,7 +114,7 @@ function buildWorld(overrides?: {
       }),
       ...(overrides?.aria2Pin !== 'none' && {
         aria2RpcSecret: 'test-rpc-secret',
-        ddlStagingDir: '/var/lib/kobox/ddl-staging',
+        ddlStagingDir: '/var/lib/kobox-aria2',
       }),
       ...(overrides?.quotaFs !== undefined && { quotaFs: overrides.quotaFs }),
       ...(overrides?.letsencrypt !== undefined && { letsencrypt: overrides.letsencrypt }),

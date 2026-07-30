@@ -835,7 +835,10 @@ class NanomonInstaller implements ComponentInstaller {
   }
 }
 
-const DEFAULT_DDL_STAGING_DIR = '/var/lib/kobox/ddl-staging';
+// aria2's own scratch dir, deliberately OUTSIDE /var/lib/kobox: that tree is
+// 2770 root:kobox-portal, which the non-root kobox-aria2 account can't even
+// traverse — so staging lives under its own top-level dir it fully owns.
+const DEFAULT_DDL_STAGING_DIR = '/var/lib/kobox-aria2';
 
 // Phase 9 — aria2 download engine for debrid downloads. apt-installed, run
 // non-root on a localhost-only RPC (secret from the config file, not argv).

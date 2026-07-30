@@ -109,7 +109,7 @@ describe('RequestDebridDownload', () => {
 
 describe('StartDebridDownload', () => {
   function start() {
-    return new StartDebridDownload({ repo, debrid, downloader, stagingBase: '/var/lib/kobox/ddl-staging' });
+    return new StartDebridDownload({ repo, debrid, downloader, stagingBase: '/var/lib/kobox-aria2' });
   }
 
   it('should_unlock_add_to_aria2_and_record_the_gid', async () => {
@@ -126,7 +126,7 @@ describe('StartDebridDownload', () => {
     expect(saved?.gid?.value).toBe('2089b05ecca3d829');
     // per-user staging dir, direct URL from the debrid unlock
     expect(downloader.added).toEqual([
-      { url: 'https://cdn.example/f.mkv', dir: '/var/lib/kobox/ddl-staging/alice' },
+      { url: 'https://cdn.example/f.mkv', dir: '/var/lib/kobox-aria2/alice' },
     ]);
   });
 
@@ -170,7 +170,7 @@ describe('PollDebridDownloads', () => {
       repo,
       debrid,
       downloader,
-      stagingBase: '/var/lib/kobox/ddl-staging',
+      stagingBase: '/var/lib/kobox-aria2',
     }).execute({ downloadId: id });
     return id;
   }
@@ -181,11 +181,11 @@ describe('PollDebridDownloads', () => {
 
   it('should_place_the_file_and_complete_on_a_finished_download', async () => {
     const id = await anActiveDownload();
-    downloader.state = { state: 'complete', filePath: '/var/lib/kobox/ddl-staging/alice/Movie.mkv' };
+    downloader.state = { state: 'complete', filePath: '/var/lib/kobox-aria2/alice/Movie.mkv' };
 
     await poll().execute();
 
-    expect(placement.placed).toEqual([{ staged: '/var/lib/kobox/ddl-staging/alice/Movie.mkv', username: 'alice' }]);
+    expect(placement.placed).toEqual([{ staged: '/var/lib/kobox-aria2/alice/Movie.mkv', username: 'alice' }]);
     const saved = await repo.findById(id);
     expect(saved?.status).toBe('done');
     expect(saved?.filename).toBe('Movie.mkv');
@@ -225,9 +225,9 @@ describe('PollDebridDownloads', () => {
       repo,
       debrid,
       downloader,
-      stagingBase: '/var/lib/kobox/ddl-staging',
+      stagingBase: '/var/lib/kobox-aria2',
     }).execute({ downloadId: bobId });
-    downloader.state = { state: 'complete', filePath: '/var/lib/kobox/ddl-staging/x/Movie.mkv' };
+    downloader.state = { state: 'complete', filePath: '/var/lib/kobox-aria2/x/Movie.mkv' };
     placement.rejectFor = 'alice';
 
     await poll().execute();
