@@ -192,6 +192,9 @@ export class JobWorker {
           username: Username.parse(job.payload.username),
         });
         return;
+      case 'restart-rtorrent':
+        await this.torrents.restart.execute({ username: Username.parse(job.payload.username) });
+        return;
       case 'provision-rtorrent':
         await this.torrents.provision.execute({ username: Username.parse(job.payload.username) });
         return;

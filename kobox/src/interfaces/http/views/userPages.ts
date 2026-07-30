@@ -208,10 +208,16 @@ ${debridAccountCard(viewer, hasKey)}
   );
 }
 
-export function rutorrentPage(viewer: Viewer): string {
+export function rutorrentPage(viewer: Viewer, message?: string): string {
   return page(
     'ruTorrent',
     html`<h1>ruTorrent</h1>
+${flash(message)}
+<form class="inline" method="post" action="/rutorrent/restart">
+  <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
+  <button class="ghost" type="submit">Restart my rtorrent</button>
+  <span class="muted">Use this if the interface stops responding.</span>
+</form>
 <iframe class="app" src="/ru/" title="ruTorrent"></iframe>`,
     viewer,
   );

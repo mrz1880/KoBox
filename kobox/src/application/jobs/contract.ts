@@ -17,6 +17,7 @@ export const JOB_TYPES = [
   'suspend-user',
   'resume-user',
   'provision-rtorrent',
+  'restart-rtorrent',
   'deprovision-rtorrent',
   'render-rtorrent-config',
   'add-watch-dir',
@@ -169,6 +170,8 @@ export const jobPayloadSchemas = {
     authRatePerHour: z.number().int().positive().nullable().optional(),
     throttleToBps: z.number().int().positive().nullable().optional(),
   }),
+  // self-service restart (replaces the legacy setuid helper)
+  'restart-rtorrent': usernameOnly,
   'render-rutorrent-users': z.strictObject({}),
   'render-nfs-exports': z.strictObject({}),
   // DDL: resolve+download a submitted link; the poll advances active downloads

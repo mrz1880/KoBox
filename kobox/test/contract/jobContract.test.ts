@@ -13,6 +13,7 @@ describe('job contract', () => {
       'suspend-user',
       'resume-user',
       'provision-rtorrent',
+    'restart-rtorrent',
       'deprovision-rtorrent',
       'render-rtorrent-config',
       'add-watch-dir',

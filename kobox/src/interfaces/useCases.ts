@@ -24,6 +24,7 @@ import { UpdateBlocklists, type IblocklistCredentials } from '../application/tra
 import { AddWatchDir } from '../application/torrent/AddWatchDir.js';
 import { DeprovisionRtorrentInstance } from '../application/torrent/DeprovisionRtorrentInstance.js';
 import { HandleTorrentEvent } from '../application/torrent/HandleTorrentEvent.js';
+import { RestartRtorrentInstance } from '../application/torrent/RestartRtorrentInstance.js';
 import { ProvisionRtorrentInstance } from '../application/torrent/ProvisionRtorrentInstance.js';
 import { RenderRtorrentConfig } from '../application/torrent/RenderRtorrentConfig.js';
 import { RenderRutorrentUsers } from '../application/torrent/RenderRutorrentUsers.js';
@@ -181,6 +182,7 @@ export interface TorrentUseCases {
   readonly setAllowPublicTracker: SetAllowPublicTracker;
   readonly handleEvent: HandleTorrentEvent;
   readonly renderRutorrentUsers: RenderRutorrentUsers;
+  readonly restart: RestartRtorrentInstance;
 }
 
 export interface TrackerUseCaseDeps {
@@ -296,6 +298,7 @@ export function buildTorrentUseCases(deps: TorrentUseCaseDeps): TorrentUseCases 
       files: deps.config,
       reload: deps.nginx,
     }),
+    restart: new RestartRtorrentInstance({ users: deps.users, services: deps.services }),
   };
 }
 
