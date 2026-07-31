@@ -55,7 +55,7 @@ ignores, the tracker whitelist and the NFS exports.</p>
   <input id="add-username" name="username" required pattern="[a-z][a-z0-9]{0,31}">
   <label for="add-ipv4">IPv4</label>
   <input id="add-ipv4" name="ipv4" required>
-  <button type="submit">Add address (queued)</button>
+  <button type="submit">Add address</button>
 </form>
 
 <h2>DynDNS hostnames</h2>
@@ -69,7 +69,7 @@ ignores, the tracker whitelist and the NFS exports.</p>
   <input id="host-username" name="username" required pattern="[a-z][a-z0-9]{0,31}">
   <label for="host-hostname">Hostname</label>
   <input id="host-hostname" name="hostname" required>
-  <button type="submit">Add hostname (queued)</button>
+  <button type="submit">Add hostname</button>
 </form>`,
     viewer,
   );
@@ -152,7 +152,7 @@ ${flash(message)}
   <input id="ov-auth" name="authRatePerHour">
   <label for="ov-throttle">Throttle target (Mbit/s, empty = keep, "clear" = default)</label>
   <input id="ov-throttle" name="throttleToMbit">
-  <button type="submit">Apply override (queued, audited)</button>
+  <button type="submit">Apply override</button>
 </form>
 
 <h2>Recent events</h2>

@@ -107,7 +107,7 @@ export function registerAdminNetworkRoutes(
         return reply.code(400).send();
       }
       await deps.queue.enqueue(build(parsed.data));
-      return redirectWithFlash(reply, '/admin/addresses', `${action} address queued`);
+      return redirectWithFlash(reply, '/admin/addresses', `${action === 'add' ? 'Adding' : 'Removing'} the address.`);
     });
   }
 
@@ -130,7 +130,7 @@ export function registerAdminNetworkRoutes(
         return reply.code(400).send();
       }
       await deps.queue.enqueue(build(parsed.data));
-      return redirectWithFlash(reply, '/admin/addresses', `${action} queued`);
+      return redirectWithFlash(reply, '/admin/addresses', `${action === 'add-hostname' ? 'Adding' : 'Removing'} the hostname.`);
     });
   }
 
@@ -177,6 +177,6 @@ export function registerAdminNetworkRoutes(
         ...(throttleToBps !== undefined && { throttleToBps }),
       }),
     );
-    return redirectWithFlash(reply, '/admin/fair-use', 'override queued');
+    return redirectWithFlash(reply, '/admin/fair-use', 'Override applied.');
   });
 }

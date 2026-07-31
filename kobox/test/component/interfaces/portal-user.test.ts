@@ -196,7 +196,7 @@ describe('debrid downloads', () => {
 
     expect(response.statusCode).toBe(200);
     expect(response.body).toContain('action="/downloads"');
-    expect(response.body).toContain('No downloads yet.');
+    expect(response.body).toContain('Nothing here yet');
   });
 
   it('should_persist_a_pending_row_and_enqueue_the_typed_job', async () => {
@@ -270,7 +270,7 @@ describe('debrid downloads', () => {
     });
 
     expect(bossView.statusCode).toBe(200);
-    expect(bossView.body).toContain('No downloads yet.');
+    expect(bossView.body).toContain('Nothing here yet');
   });
 });
 

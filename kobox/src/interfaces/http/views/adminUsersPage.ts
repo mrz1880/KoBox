@@ -55,7 +55,7 @@ ${flash(message)}
     <option value="user">user</option>
     <option value="admin">admin</option>
   </select>
-  <button type="submit">Create (queued)</button>
+  <button type="submit">Create user</button>
 </form>`,
     viewer,
   );
@@ -98,7 +98,7 @@ ${flash(message)}
   <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
   <label for="password">New password</label>
   <input id="password" name="password" type="password" required minlength="8">
-  <button type="submit">Reset (queued)</button>
+  <button type="submit">Reset password</button>
 </form>`,
     viewer,
   );
