@@ -30,6 +30,14 @@ export interface AdminUsersDeps {
 
 // Every mutation is an enqueue of the same typed jobs the CLI produces; the
 // portal holds no privileged port (AUDIT §3.5).
+// What each action is called from the operator's side, rather than the job type
+// name that happens to implement it.
+const ACTION_WORDS: Readonly<Record<string, string>> = {
+  delete: 'Deleting',
+  suspend: 'Suspending',
+  resume: 'Restoring',
+};
+
 export function registerAdminUserRoutes(
   server: FastifyInstance,
   deps: AdminUsersDeps,
@@ -70,7 +78,7 @@ export function registerAdminUserRoutes(
       deps.hasher,
     );
     await deps.queue.enqueue(job);
-    return redirectWithFlash(reply, '/admin/users', `create-user ${parsed.data.username} queued`);
+    return redirectWithFlash(reply, '/admin/users', `Creating ${parsed.data.username}.`);
   });
 
   server.get('/admin/users/:name', async (request, reply) => {
@@ -108,7 +116,7 @@ export function registerAdminUserRoutes(
       }
       await deps.queue.enqueue(build(params.data.name));
       const target = action === 'delete' ? '/admin/users' : `/admin/users/${params.data.name}`;
-      return redirectWithFlash(reply, target, `${action} ${params.data.name} queued`);
+      return redirectWithFlash(reply, target, `${ACTION_WORDS[action]} ${params.data.name}.`);
     });
   }
 
@@ -131,7 +139,7 @@ export function registerAdminUserRoutes(
     return redirectWithFlash(
       reply,
       `/admin/users/${params.data.name}`,
-      'password change queued',
+      'Password change under way — it takes a few seconds.',
     );
   });
 }

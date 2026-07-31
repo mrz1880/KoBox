@@ -35,9 +35,25 @@ header form { margin-left: auto; }
 main { max-width: 72rem; margin: 0 auto; padding: 1.25rem; }
 h1 { font-size: 1.3rem; } h2 { font-size: 1.05rem; margin-top: 2rem; }
 table { border-collapse: collapse; width: 100%; background: var(--panel); }
-th, td { text-align: left; padding: 0.4rem 0.6rem; border-bottom: 1px solid var(--line); }
+th, td {
+  text-align: left; padding: 0.55rem 0.7rem; border-bottom: 1px solid var(--line);
+  /* top-aligned: a wrapped cell must not float its neighbours to the middle */
+  vertical-align: top;
+}
 th { color: var(--muted); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.06em; }
 td.num, td.mono { font-family: ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+/* timestamps claim the width they need instead of breaking mid-value */
+td.when {
+  white-space: nowrap; width: 1%; font-family: ui-monospace, monospace;
+  font-variant-numeric: tabular-nums; font-size: 0.8rem; color: var(--muted);
+}
+/* file names and links are data — read as mono; a failure is prose — read as text */
+.path { font-family: ui-monospace, monospace; font-size: 0.85rem; overflow-wrap: anywhere; }
+.reason { color: var(--muted); }
+.reason code {
+  font-family: ui-monospace, monospace; font-size: 0.78rem; color: var(--danger);
+  border: 1px solid var(--line); border-radius: 3px; padding: 0 0.3rem; margin-right: 0.35rem;
+}
 form.card, div.card {
   background: var(--panel); border: 1px solid var(--line); border-radius: 6px;
   padding: 1rem 1.25rem; margin: 1rem 0; max-width: 34rem;
@@ -57,6 +73,89 @@ form.inline { display: inline; } form.inline button { margin: 0; padding: 0.2rem
 .flash { border-left: 3px solid var(--green); background: var(--panel); padding: 0.6rem 1rem; margin: 1rem 0; }
 .error { border-left-color: var(--danger); }
 .muted { color: var(--muted); font-size: 0.85rem; }
+.links { margin-top: 1.5rem; }
+
+/* A choice, presented as a choice: cards side by side, each carrying the one
+   sentence that tells you whether it is the one you want. */
+.choices { display: grid; gap: 0.75rem; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); margin: 1rem 0; }
+.choice {
+  display: flex; flex-direction: column; gap: 0.5rem;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 1rem;
+}
+.choice.pick { border-color: var(--teal); }
+.choice h3 { margin: 0; font-size: 0.95rem; }
+.choice p { margin: 0; color: var(--muted); font-size: 0.85rem; flex: 1; }
+.choice .tag {
+  align-self: flex-start; font-size: 0.66rem; letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--teal); font-weight: 700;
+}
+.choice a.action {
+  align-self: flex-start; text-decoration: none; font-weight: 600; font-size: 0.88rem;
+  border: 1px solid var(--teal); color: var(--teal); border-radius: 4px; padding: 0.35rem 0.8rem;
+}
+.choice a.action:hover, .choice a.action:focus { background: var(--teal); color: var(--bg); }
+.facts { display: grid; gap: 0.35rem 1.5rem; grid-template-columns: auto 1fr; margin: 0.5rem 0 0; }
+.facts dt { color: var(--muted); font-size: 0.8rem; }
+.facts dd {
+  margin: 0; font-family: ui-monospace, monospace; font-variant-numeric: tabular-nums;
+  font-size: 0.85rem; overflow-wrap: anywhere;
+}
+
+/* --- Signal strip: the console signature (UI-AUDIT §2) -------------------
+   Each user reads as a mixing-desk channel: a state LED, a segmented VU of
+   egress against their fair-use budget, then the numbers. Segments (not a
+   smooth bar) are the deliberate cue — a bar that runs into the peak zone is
+   how an abuser becomes obvious at a glance instead of days later. */
+.eyebrow {
+  font-size: 0.68rem; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--muted); font-weight: 600;
+}
+.strip {
+  display: grid; gap: 0.25rem 1rem; align-items: center;
+  grid-template-columns: auto minmax(6rem, 10rem) 1fr auto;
+  padding: 0.7rem 1rem; border: 1px solid var(--line); border-radius: 6px;
+  background: var(--panel); margin: 0.4rem 0;
+}
+.strip + .strip { margin-top: 0.4rem; }
+.strip .led {
+  width: 0.6rem; height: 0.6rem; border-radius: 50%; background: var(--green);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--green) 22%, transparent);
+}
+.strip .led.warn { background: var(--amber); box-shadow: 0 0 0 3px color-mix(in srgb, var(--amber) 22%, transparent); }
+.strip .led.bad { background: var(--danger); box-shadow: 0 0 0 3px color-mix(in srgb, var(--danger) 22%, transparent); }
+.strip .led.off { background: var(--muted); box-shadow: none; }
+.strip .who { display: flex; flex-direction: column; gap: 0.1rem; min-width: 0; }
+.strip .who a, .strip .who .name { font-weight: 700; text-decoration: none; color: var(--ink); }
+.strip .who .name { overflow-wrap: anywhere; }
+.strip .figures {
+  font-family: ui-monospace, monospace; font-variant-numeric: tabular-nums;
+  font-size: 0.8rem; color: var(--muted); text-align: right; white-space: nowrap;
+}
+.strip .figures b { color: var(--ink); font-weight: 600; }
+.vu { display: flex; gap: 2px; align-items: flex-end; height: 1.1rem; }
+.vu i { flex: 1 1 0; height: 100%; background: var(--line); border-radius: 1px; }
+.vu i.on { background: var(--teal); }
+.vu i.on.warn { background: var(--amber); }
+.vu i.on.peak { background: var(--danger); }
+/* the peak zone stays tinted even unlit, so the scale is readable at rest */
+.vu i.zone { background: color-mix(in srgb, var(--danger) 18%, var(--line)); }
+.ribbon {
+  display: flex; flex-wrap: wrap; gap: 0.6rem 2rem; align-items: baseline;
+  padding: 0.9rem 1.25rem; border: 1px solid var(--line); border-radius: 6px;
+  background: var(--panel);
+}
+.ribbon .metric { display: flex; flex-direction: column; gap: 0.15rem; }
+.ribbon .metric .val {
+  font-family: ui-monospace, monospace; font-variant-numeric: tabular-nums;
+  font-size: 1.35rem; font-weight: 600;
+}
+.ribbon .metric .val.alert { color: var(--amber); }
+.ribbon .metric .val.bad { color: var(--danger); }
+@media (max-width: 40rem) {
+  .strip { grid-template-columns: auto 1fr; }
+  .strip .figures { grid-column: 1 / -1; text-align: left; }
+  .strip .vu { grid-column: 1 / -1; }
+}
 .chip { display: inline-block; padding: 0.05rem 0.5rem; border-radius: 999px; font-size: 0.78rem; border: 1px solid var(--line); }
 .chip.ok { color: var(--green); border-color: var(--green); }
 .chip.warn { color: var(--amber); border-color: var(--amber); }

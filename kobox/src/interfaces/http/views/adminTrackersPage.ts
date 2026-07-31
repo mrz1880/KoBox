@@ -46,7 +46,7 @@ export function adminTrackersPage(
 ${flash(message)}
 <form class="inline" method="post" action="/admin/trackers/renew-certs">
   <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
-  <button type="submit">Renew due certificates (queued)</button>
+  <button type="submit">Renew certificates</button>
 </form>
 <table>
   <thead>
@@ -82,11 +82,11 @@ export function adminBlocklistsPage(
 ${flash(message)}
 <form class="inline" method="post" action="/admin/blocklists/update">
   <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
-  <button type="submit">Update now (queued)</button>
+  <button type="submit">Update now</button>
 </form>
 <form class="inline" method="post" action="/admin/blocklists/import-catalog">
   <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
-  <button type="submit" class="ghost">Import iblocklist catalog (queued)</button>
+  <button type="submit" class="ghost">Import catalog</button>
 </form>
 <table>
   <thead>

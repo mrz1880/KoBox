@@ -61,7 +61,7 @@ export function registerAdminTrackerRoutes(
         return reply.code(400).send();
       }
       await deps.queue.enqueue(build(parsed.data.host));
-      return redirectWithFlash(reply, '/admin/trackers', `${action} ${parsed.data.host} queued`);
+      return redirectWithFlash(reply, '/admin/trackers', `Updating ${parsed.data.host}.`);
     });
   }
 
@@ -72,7 +72,7 @@ export function registerAdminTrackerRoutes(
     }
     const today = deps.now().slice(0, 10);
     await deps.queue.enqueue(buildJob.renewTrackerCerts({ today }));
-    return redirectWithFlash(reply, '/admin/trackers', 'certificate renewal queued');
+    return redirectWithFlash(reply, '/admin/trackers', 'Renewing certificates.');
   });
 
   server.get('/admin/blocklists', async (request, reply) => {
@@ -92,7 +92,7 @@ export function registerAdminTrackerRoutes(
       return;
     }
     await deps.queue.enqueue(buildJob.updateBlocklists());
-    return redirectWithFlash(reply, '/admin/blocklists', 'blocklist update queued');
+    return redirectWithFlash(reply, '/admin/blocklists', 'Updating blocklists.');
   });
 
   server.post('/admin/blocklists/import-catalog', async (request, reply) => {
@@ -101,6 +101,6 @@ export function registerAdminTrackerRoutes(
       return;
     }
     await deps.queue.enqueue(buildJob.importBlocklistCatalog());
-    return redirectWithFlash(reply, '/admin/blocklists', 'catalog import queued');
+    return redirectWithFlash(reply, '/admin/blocklists', 'Importing the catalog.');
   });
 }

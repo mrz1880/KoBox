@@ -17,6 +17,7 @@ import type { FairUseRepository } from '../../../domain/security/ports.js';
 import { VPN_VARIANTS, type VpnVariant } from '../../../domain/security/vpn.js';
 import { Password } from '../../../domain/user/Password.js';
 import type { PasswordHasherPort, UserRepository } from '../../../domain/user/ports.js';
+import type { SeedboxUser } from '../../../domain/user/SeedboxUser.js';
 import { buildJob } from '../../cli/buildJob.js';
 import { flashOf, redirectWithFlash, viewerOf, type Guards } from '../guards.js';
 import {
@@ -27,6 +28,7 @@ import {
   rutorrentPage,
   userHomePage,
   type FleetRow,
+  type SignalRow,
 } from '../views/userPages.js';
 
 const passwordSchema = z.object({
@@ -90,6 +92,24 @@ export interface UserRoutesDeps {
   readonly debridEncryptor: DebridKeyEncryptorPort;
 }
 
+// One channel of the console, assembled from what the portal can read in the
+// database alone: the fair-use verdict and the last usage sample.
+async function signalRowFor(
+  deps: Pick<UserRoutesDeps, 'fairUse'>,
+  user: SeedboxUser,
+): Promise<SignalRow> {
+  const state = await deps.fairUse.getState(user.username);
+  const sample = await deps.fairUse.lastSample(user.username);
+  return {
+    username: user.username.value,
+    suspended: user.status.isSuspended(),
+    healthy: state.healthState === 'healthy',
+    level: state.level,
+    egressBytes: sample?.egressBytes ?? 0,
+    quotaGib: user.quota.toGib(),
+  };
+}
+
 export function registerUserRoutes(
   server: FastifyInstance,
   deps: UserRoutesDeps,
@@ -104,12 +124,7 @@ export function registerUserRoutes(
     if (session.role === 'admin') {
       const rows: FleetRow[] = [];
       for (const user of await deps.users.listAll()) {
-        const state = await deps.fairUse.getState(user.username);
-        rows.push({
-          username: user.username.value,
-          status: user.status.isSuspended() ? 'suspended' : 'active',
-          level: state.level,
-        });
+        rows.push(await signalRowFor(deps, user));
       }
       return reply
         .type('text/html')
@@ -119,10 +134,11 @@ export function registerUserRoutes(
     if (user === undefined) {
       return reply.code(303).header('location', '/login').send();
     }
-    const state = await deps.fairUse.getState(session.username);
     return reply
       .type('text/html')
-      .send(userHomePage(user, state, viewerOf(session), flashOf(request)));
+      .send(
+        userHomePage(user, viewerOf(session), await signalRowFor(deps, user), flashOf(request)),
+      );
   });
 
   server.get('/password', async (request, reply) => {
@@ -164,7 +180,7 @@ export function registerUserRoutes(
       deps.hasher,
     );
     await deps.queue.enqueue(job);
-    return redirectWithFlash(reply, '/password', 'password change queued');
+    return redirectWithFlash(reply, '/password', 'Password change under way — it takes a few seconds.');
   });
 
   server.get('/downloads', async (request, reply) => {
@@ -208,7 +224,7 @@ export function registerUserRoutes(
     await deps.queue.enqueue(
       buildJob.setDebridKey({ username: session.username.value, encryptedKey }),
     );
-    return redirectWithFlash(reply, '/downloads', 'debrid key saved');
+    return redirectWithFlash(reply, '/downloads', 'Key saved.');
   });
 
   server.post('/downloads/debrid-key/clear', async (request, reply) => {
@@ -217,7 +233,7 @@ export function registerUserRoutes(
       return;
     }
     await deps.queue.enqueue(buildJob.clearDebridKey({ username: session.username.value }));
-    return redirectWithFlash(reply, '/downloads', 'debrid key removed');
+    return redirectWithFlash(reply, '/downloads', 'Key removed.');
   });
 
   server.post('/downloads', async (request, reply) => {
@@ -248,7 +264,7 @@ export function registerUserRoutes(
       category: DownloadCategory.parse(parsed.data.category),
       link,
     });
-    return redirectWithFlash(reply, '/downloads', 'download queued');
+    return redirectWithFlash(reply, '/downloads', 'Download started. It will appear in the list below.');
   });
 
   server.post('/rutorrent/restart', async (request, reply) => {
@@ -259,7 +275,7 @@ export function registerUserRoutes(
     // the username comes from the session, never the body: a user can only
     // restart their own instance
     await deps.queue.enqueue(buildJob.restartRtorrent({ username: session.username.value }));
-    return redirectWithFlash(reply, '/rutorrent', 'rtorrent restart queued');
+    return redirectWithFlash(reply, '/rutorrent', 'Restarting your rtorrent.');
   });
 
   server.get('/access', async (request, reply) => {
@@ -267,7 +283,19 @@ export function registerUserRoutes(
     if (session === undefined) {
       return;
     }
-    return reply.type('text/html').send(accessPage(viewerOf(session)));
+    const user = await deps.users.findByUsername(session.username);
+    if (user === undefined) {
+      return reply.code(303).header('location', '/login').send();
+    }
+    const sftpHost = process.env.KOBOX_VPN_REMOTE;
+    return reply.type('text/html').send(
+      accessPage(viewerOf(session), {
+        username: user.username.value,
+        // only shown when the operator configured a reachable name for the box
+        ...(sftpHost !== undefined && sftpHost !== '' && { sftpHost }),
+        rtorrentPort: user.rtorrentPort.value,
+      }),
+    );
   });
 
   server.get('/access/ovpn/:variant', async (request, reply) => {
