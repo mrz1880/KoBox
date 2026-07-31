@@ -3,7 +3,7 @@
   "version": "0.0.1",
   "private": true,
   "packageManager": "pnpm@10.31.0",
-  "description": "KoBox — multi-user seedbox manager (Phase 0: User Management)",
+  "description": "KoBox \u2014 multi-user seedbox manager (Phase 0: User Management)",
   "type": "module",
   "bin": {
     "kobox": "dist/interfaces/cli/main.js",
@@ -17,7 +17,11 @@
     "onlyBuiltDependencies": [
       "better-sqlite3",
       "esbuild"
-    ]
+    ],
+    "overrides": {
+      "qs@<6.15.2": ">=6.15.2",
+      "esbuild@<0.25.0": ">=0.25.0"
+    }
   },
   "scripts": {
     "prepare": "git config --local core.hooksPath kobox/.githooks || true",
