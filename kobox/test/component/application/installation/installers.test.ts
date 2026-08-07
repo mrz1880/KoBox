@@ -779,7 +779,11 @@ describe('speedtest installer', () => {
     const outcome = await installer(world, 'speedtest').install();
 
     expect(outcome.state).toBe('installed');
-    expect(world.host.contentAt('/usr/local/bin/librespeed-cli')).toBeDefined();
+    // the tarball is fetched then extracted; the binary lives in its own dir
+    expect(world.host.extracted).toContainEqual([
+      '/var/tmp/kobox/librespeed-cli.tar.gz',
+      '/usr/local/lib/kobox-speedtest',
+    ]);
     expect(world.host.contentAt('/etc/kobox/speedtest.sha256')).toContain('c'.repeat(64));
   });
 
@@ -797,7 +801,7 @@ describe('speedtest installer', () => {
 
     await installer(world, 'speedtest').uninstall();
 
-    expect(world.host.contentAt('/usr/local/bin/librespeed-cli')).toBeUndefined();
+    expect(world.host.contentAt('/usr/local/lib/kobox-speedtest/librespeed-cli')).toBeUndefined();
   });
 });
 

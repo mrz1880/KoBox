@@ -168,7 +168,11 @@ const RUTORRENT_ARCHIVE = '/var/tmp/kobox/rutorrent.tar.gz';
 const NANOMON_BIN = '/usr/local/bin/nanomon';
 const NANOMON_MARKER = '/etc/kobox/nanomon.sha256';
 const NANOMON_UNIT = '/etc/systemd/system/kobox-nanomon.service';
-const SPEEDTEST_BIN = '/usr/local/bin/librespeed-cli';
+// the release ships a tar.gz (binary + LICENSE at the root), so it is extracted
+// into its own directory and run from there — no copy step, nothing to keep in sync
+const SPEEDTEST_DIR = '/usr/local/lib/kobox-speedtest';
+const SPEEDTEST_BIN = `${SPEEDTEST_DIR}/librespeed-cli`;
+const SPEEDTEST_ARCHIVE = '/var/tmp/kobox/librespeed-cli.tar.gz';
 const SPEEDTEST_MARKER = '/etc/kobox/speedtest.sha256';
 const ZONES_SEED = '/etc/bind/kobox.zones.blacklists';
 const CRON_FILE = '/etc/cron.d/kobox';
@@ -884,7 +888,13 @@ class SpeedtestInstaller implements ComponentInstaller {
     if (marker?.trim() === install.speedtestSha256) {
       return installed(install.speedtestSha256.slice(0, 12));
     }
-    await artifacts.fetchVerified(install.speedtestUrl, install.speedtestSha256, SPEEDTEST_BIN);
+    await artifacts.fetchVerified(
+      install.speedtestUrl,
+      install.speedtestSha256,
+      SPEEDTEST_ARCHIVE,
+    );
+    await host.ensureDir(SPEEDTEST_DIR, '0755');
+    await host.extractTarGz(SPEEDTEST_ARCHIVE, SPEEDTEST_DIR);
     await host.setOwnership(SPEEDTEST_BIN, 'root', 'root', '0755');
     await host.ensureFile({
       path: SPEEDTEST_MARKER,
@@ -899,6 +909,7 @@ class SpeedtestInstaller implements ComponentInstaller {
   async uninstall(): Promise<void> {
     const { host } = this.ctx;
     await host.removeFile(SPEEDTEST_BIN);
+    await host.removeFile(SPEEDTEST_ARCHIVE);
     await host.removeFile(SPEEDTEST_MARKER);
   }
 }

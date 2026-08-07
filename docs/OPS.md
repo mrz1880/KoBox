@@ -138,15 +138,20 @@ Upgrading ruTorrent later = the same three lines with the new tag inside a
 
 ## Measuring the link (speedtest)
 
-The `speedtest` component vendors `librespeed-cli` — open source, one static
-binary, pinned and checksum-verified like ruTorrent and NanoMon. Unset = honest
-skip, and the admin screen says what to set:
+The `speedtest` component vendors `librespeed-cli` — open source, pinned and
+checksum-verified like ruTorrent and NanoMon. The upstream release is a tarball
+(binary + LICENSE), extracted into `/usr/local/lib/kobox-speedtest/`. Unset =
+honest skip, and the admin screen says what to set:
 
 ```
-export KOBOX_SPEEDTEST_URL=https://<release-host>/librespeed-cli
-export KOBOX_SPEEDTEST_SHA256=<the sum>
+# v1.0.13, linux amd64 — verified 2026-07-31
+export KOBOX_SPEEDTEST_URL=https://github.com/librespeed/speedtest-cli/releases/download/v1.0.13/librespeed-cli_1.0.13_linux_amd64.tar.gz
+export KOBOX_SPEEDTEST_SHA256=33f2278a6ae16e83dc80f38a16aa8689b0b315530ce30ccb6de7968a2bf7527a
 kobox install
 ```
+
+Re-pinning later = the same two lines with the new tag and its sum; the
+component re-vendors when the sum differs from the installed marker.
 
 Admins measure from **Health → Link speed**, or with `kobox run-speedtest`.
 Results are kept as a series: a single figure says little, a drift over weeks
