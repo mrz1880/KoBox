@@ -56,6 +56,10 @@ export interface InstallSettings {
   // ruTorrent) — unset = honest skip
   readonly nanomonUrl?: string;
   readonly nanomonSha256?: string;
+  // link measurement binary, pinned like the other vendored artifacts —
+  // unset = the component honestly skips and the admin screen says so
+  readonly speedtestUrl?: string;
+  readonly speedtestSha256?: string;
   // DDL/debrid: the aria2 RPC secret (shared with the worker's Aria2Adapter);
   // unset = the download engine honestly skips. Staging dir aria2 writes into.
   readonly aria2RpcSecret?: string;
@@ -164,6 +168,8 @@ const RUTORRENT_ARCHIVE = '/var/tmp/kobox/rutorrent.tar.gz';
 const NANOMON_BIN = '/usr/local/bin/nanomon';
 const NANOMON_MARKER = '/etc/kobox/nanomon.sha256';
 const NANOMON_UNIT = '/etc/systemd/system/kobox-nanomon.service';
+const SPEEDTEST_BIN = '/usr/local/bin/librespeed-cli';
+const SPEEDTEST_MARKER = '/etc/kobox/speedtest.sha256';
 const ZONES_SEED = '/etc/bind/kobox.zones.blacklists';
 const CRON_FILE = '/etc/cron.d/kobox';
 const BLOCKED_NAMES_SEED = '/etc/dnscrypt-proxy/blocked-names.txt';
@@ -859,6 +865,44 @@ const DEFAULT_DDL_STAGING_DIR = '/var/lib/kobox-aria2';
 // Phase 9 — aria2 download engine for debrid downloads. apt-installed, run
 // non-root on a localhost-only RPC (secret from the config file, not argv).
 // Skips honestly when no RPC secret is pinned.
+// Link measurement. No unit and no schedule: it saturates the connection, so it
+// only ever runs from an explicit admin request.
+class SpeedtestInstaller implements ComponentInstaller {
+  readonly name = 'speedtest';
+
+  constructor(private readonly ctx: InstallerContext) {}
+
+  async install(): Promise<InstallOutcome> {
+    const { host, artifacts, install } = this.ctx;
+    if (install.speedtestUrl === undefined || install.speedtestSha256 === undefined) {
+      return {
+        state: 'skipped',
+        reason: 'no speedtest binary pinned — set KOBOX_SPEEDTEST_URL and KOBOX_SPEEDTEST_SHA256',
+      };
+    }
+    const marker = await host.readFile(SPEEDTEST_MARKER);
+    if (marker?.trim() === install.speedtestSha256) {
+      return installed(install.speedtestSha256.slice(0, 12));
+    }
+    await artifacts.fetchVerified(install.speedtestUrl, install.speedtestSha256, SPEEDTEST_BIN);
+    await host.setOwnership(SPEEDTEST_BIN, 'root', 'root', '0755');
+    await host.ensureFile({
+      path: SPEEDTEST_MARKER,
+      content: `${install.speedtestSha256}\n`,
+      mode: '0644',
+      owner: 'root',
+      group: 'root',
+    });
+    return installed(install.speedtestSha256.slice(0, 12));
+  }
+
+  async uninstall(): Promise<void> {
+    const { host } = this.ctx;
+    await host.removeFile(SPEEDTEST_BIN);
+    await host.removeFile(SPEEDTEST_MARKER);
+  }
+}
+
 class Aria2Installer implements ComponentInstaller {
   readonly name = 'aria2';
 
@@ -928,6 +972,7 @@ export function buildInstallers(ctx: InstallerContext): ReadonlyMap<string, Comp
     new ShellinaboxInstaller(ctx),
     new NanomonInstaller(ctx),
     new Aria2Installer(ctx),
+    new SpeedtestInstaller(ctx),
   ];
   return new Map(list.map((entry) => [entry.name, entry]));
 }

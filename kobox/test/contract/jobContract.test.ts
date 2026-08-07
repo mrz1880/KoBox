@@ -41,6 +41,7 @@ describe('job contract', () => {
       'evaluate-fair-use',
       'send-mails',
       'run-backup',
+    'run-speedtest',
       'apply-ipset',
       'set-fair-use-override',
       'render-rutorrent-users',

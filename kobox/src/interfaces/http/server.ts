@@ -14,6 +14,7 @@ import type { ReleaseRepositoryPort } from '../../application/maintenance/Releas
 import type { VpnProfileStorePort } from '../../application/portal/ports.js';
 import type { PortalCredentialsPort } from '../../domain/portal/ports.js';
 import type { ComponentRegistry } from '../../domain/installation/ports.js';
+import type { SpeedtestRepositoryPort } from '../../application/maintenance/SpeedtestPort.js';
 import type {
   DebridAccountRepository,
   DebridDownloadRepository,
@@ -52,6 +53,7 @@ export interface PortalServerDeps {
   readonly fairUse: FairUseRepository;
   readonly health: HealthProbePort;
   readonly components: ComponentRegistry;
+  readonly speedtests: SpeedtestRepositoryPort;
   readonly releases: ReleaseRepositoryPort;
   readonly outbox: MailOutboxPort;
   readonly credentials: PortalCredentialsPort;

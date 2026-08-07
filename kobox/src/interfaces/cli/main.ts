@@ -546,6 +546,20 @@ program
   });
 
 program
+  .command('run-speedtest')
+  .description('measure what the link can carry (saturates it — admin action, never scheduled)')
+  .action(async () => {
+    const c = container();
+    const id = await c.queue.enqueueUnique(buildJob.runSpeedtest());
+    await done(
+      c,
+      id === undefined
+        ? 'a measurement is already running'
+        : `job ${String(id)} enqueued: run-speedtest`,
+    );
+  });
+
+program
   .command('run-backup')
   .description('dump the database and KoBox configs into a TTL-rotated backup (cron entry point)')
   .action(async () => {

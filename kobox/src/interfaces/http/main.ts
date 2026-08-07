@@ -43,6 +43,7 @@ async function main(): Promise<void> {
     fairUse: container.fairUseRepo,
     health: container.healthProbe,
     components: container.componentRegistry,
+    speedtests: container.speedtests,
     releases: container.releaseRepo,
     outbox: container.outbox,
     credentials: container.credentials,
