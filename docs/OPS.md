@@ -136,6 +136,32 @@ kobox install        # re-vendors when the sha differs from the installed marker
 Upgrading ruTorrent later = the same three lines with the new tag inside a
 `kobox upgrade`d release, or standalone via `kobox install`.
 
+## Measuring the link (speedtest)
+
+The `speedtest` component vendors `librespeed-cli` — open source, one static
+binary, pinned and checksum-verified like ruTorrent and NanoMon. Unset = honest
+skip, and the admin screen says what to set:
+
+```
+export KOBOX_SPEEDTEST_URL=https://<release-host>/librespeed-cli
+export KOBOX_SPEEDTEST_SHA256=<the sum>
+kobox install
+```
+
+Admins measure from **Health → Link speed**, or with `kobox run-speedtest`.
+Results are kept as a series: a single figure says little, a drift over weeks
+says the connection is degrading.
+
+> **It saturates the link on purpose.** For its ten seconds, users' downloads
+> slow down — and a measurement taken while the box is busy reads low, because
+> it only sees what is left. Nothing schedules it: it runs on an explicit admin
+> request, and a second click while one is running is refused rather than
+> stacked. Each run also spends a few hundred MB of your provider's transfer
+> allowance.
+
+This answers "what can the link do", which is a different question from "what is
+it doing" — the per-user counters and NanoMon answer that one.
+
 ## Pinning NanoMon (monitoring)
 
 The `nanomon` component is a lightweight host monitor (CPU/RAM/disk/network +

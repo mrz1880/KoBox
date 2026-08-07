@@ -45,6 +45,7 @@ export const JOB_TYPES = [
   'evaluate-fair-use',
   'send-mails',
   'run-backup',
+  'run-speedtest',
   'apply-ipset',
   'set-fair-use-override',
   'render-rutorrent-users',
@@ -161,6 +162,8 @@ export const jobPayloadSchemas = {
   'evaluate-fair-use': z.strictObject({}),
   'send-mails': z.strictObject({}),
   'run-backup': z.strictObject({}),
+  // operator-triggered only: it saturates the link, so nothing schedules it
+  'run-speedtest': z.strictObject({}),
   'apply-ipset': z.strictObject({}),
   // per-user fair-use budget override: absent = untouched, null = clear,
   // number = set (bits/s for the bandwidth fields)

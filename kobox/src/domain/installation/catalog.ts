@@ -44,4 +44,5 @@ export const COMPONENT_CATALOG: readonly ComponentSpec[] = [
   spec('nanomon', ['nginx']),
   // Phase 9 — aria2 download engine for debrid downloads (localhost RPC)
   spec('aria2', ['kobox-core']),
+  spec('speedtest', ['kobox-core']),
 ];

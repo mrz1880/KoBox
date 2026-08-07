@@ -32,6 +32,7 @@ import { SendmailTransport } from '../infrastructure/notifications/SendmailTrans
 import { SqliteMailOutbox } from '../infrastructure/persistence/SqliteMailOutbox.js';
 import { SqliteMysbDumpSource } from '../infrastructure/persistence/SqliteMysbDumpSource.js';
 import { SqliteDebridAccountRepository } from '../infrastructure/persistence/SqliteDebridAccountRepository.js';
+import { SqliteSpeedtestRepository } from '../infrastructure/persistence/SqliteSpeedtestRepository.js';
 import { SqliteDebridDownloadRepository } from '../infrastructure/persistence/SqliteDebridDownloadRepository.js';
 import {
   RsaDebridKeyCipher,
@@ -43,6 +44,7 @@ import { RequestDebridDownload } from '../application/ddl/RequestDebridDownload.
 import type { DebridKeyEncryptorPort } from '../domain/ddl/ports.js';
 import type { JobQueuePort } from '../application/jobs/JobQueuePort.js';
 import { StoredDebridCredentials } from '../infrastructure/system/StoredDebridCredentials.js';
+import { LibrespeedAdapter } from '../infrastructure/system/LibrespeedAdapter.js';
 import { AllDebridAdapter } from '../infrastructure/system/AllDebridAdapter.js';
 import { Aria2Adapter } from '../infrastructure/system/Aria2Adapter.js';
 import { DdlPlacementAdapter } from '../infrastructure/system/DdlPlacementAdapter.js';
@@ -243,6 +245,8 @@ export async function buildInstallation(
   const rutorrentSha256 = process.env.KOBOX_RUTORRENT_SHA256;
   const nanomonUrl = process.env.KOBOX_NANOMON_URL;
   const nanomonSha256 = process.env.KOBOX_NANOMON_SHA256;
+  const speedtestUrl = process.env.KOBOX_SPEEDTEST_URL;
+  const speedtestSha256 = process.env.KOBOX_SPEEDTEST_SHA256;
   const aria2RpcSecret = process.env.KOBOX_ARIA2_RPC_SECRET;
   const ddlStagingDir = process.env.KOBOX_DDL_STAGING;
   const quotaFs = process.env.KOBOX_QUOTA_FS;
@@ -279,6 +283,8 @@ export async function buildInstallation(
         rutorrentSha256 !== '' && { rutorrentSha256 }),
       ...(nanomonUrl !== undefined && nanomonUrl !== '' && { nanomonUrl }),
       ...(nanomonSha256 !== undefined && nanomonSha256 !== '' && { nanomonSha256 }),
+      ...(speedtestUrl !== undefined && speedtestUrl !== '' && { speedtestUrl }),
+      ...(speedtestSha256 !== undefined && speedtestSha256 !== '' && { speedtestSha256 }),
       ...(aria2RpcSecret !== undefined && aria2RpcSecret !== '' && { aria2RpcSecret }),
       ...(ddlStagingDir !== undefined && ddlStagingDir !== '' && { ddlStagingDir }),
       ...(quotaFs !== undefined && quotaFs !== '' && { quotaFs }),
@@ -387,6 +393,7 @@ export interface Container {
   readonly maintenanceUseCases: MaintenanceUseCases;
   readonly outbox: SqliteMailOutbox;
   readonly ddlUseCases: DdlUseCases;
+  readonly speedtestRepo: SqliteSpeedtestRepository;
   readonly debridDownloadRepo: SqliteDebridDownloadRepository;
   readonly debridAccountRepo: SqliteDebridAccountRepository;
   readonly debridCipher: RsaDebridKeyCipher;
@@ -438,6 +445,7 @@ export interface PortalContainer {
   readonly healthProbe: ProcessSocketHealthProbe;
   readonly componentRegistry: SqliteComponentRegistry;
   readonly releaseRepo: SqliteReleaseRepository;
+  readonly speedtests: SqliteSpeedtestRepository;
   readonly outbox: SqliteMailOutbox;
   readonly debridDownloadRepo: SqliteDebridDownloadRepository;
   readonly debridAccountRepo: SqliteDebridAccountRepository;
@@ -468,6 +476,7 @@ export function buildPortalContainer(name: string): PortalContainer {
     healthProbe: new ProcessSocketHealthProbe(runner),
     componentRegistry: new SqliteComponentRegistry(db),
     releaseRepo: new SqliteReleaseRepository(db),
+    speedtests: new SqliteSpeedtestRepository(db),
     outbox: new SqliteMailOutbox(db),
     debridDownloadRepo,
     debridAccountRepo: new SqliteDebridAccountRepository(db),
@@ -593,11 +602,15 @@ export function buildContainer(name: string): Container {
     notifications,
     settings,
   });
+  const speedtestRepo = new SqliteSpeedtestRepository(db);
   const maintenanceUseCases = buildMaintenanceUseCases({
     outbox,
     transport: new SendmailTransport(runner),
     backupHost: new BackupHostAdapter(runner, db),
     backupSettings: backupSettings(),
+    speedtest: new LibrespeedAdapter(runner, process.env.KOBOX_SPEEDTEST_BIN),
+    speedtests: speedtestRepo,
+    clock: nowStamp,
   });
   // DDL/debrid: debrid accounts are PER-USER — each key is stored sealed and is
   // only opened here, worker-side, by the root-only private PEM. No user key,
@@ -644,6 +657,7 @@ export function buildContainer(name: string): Container {
       ddlUseCases,
     ),
     ddlUseCases,
+    speedtestRepo,
     debridDownloadRepo,
     debridAccountRepo,
     debridCipher,

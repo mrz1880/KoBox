@@ -34,6 +34,11 @@ import type { BackupHostPort } from '../application/maintenance/BackupHostPort.j
 import type { MailOutboxPort } from '../application/maintenance/MailOutboxPort.js';
 import type { MailTransportPort } from '../application/maintenance/MailTransportPort.js';
 import { RunBackup, type BackupSettings } from '../application/maintenance/RunBackup.js';
+import { RunSpeedtest } from '../application/maintenance/RunSpeedtest.js';
+import type {
+  SpeedtestPort,
+  SpeedtestRepositoryPort,
+} from '../application/maintenance/SpeedtestPort.js';
 import { SendMails } from '../application/maintenance/SendMails.js';
 import { ApplyFirewall } from '../application/security/ApplyFirewall.js';
 import { DeprovisionVpnUser } from '../application/security/DeprovisionVpnUser.js';
@@ -142,17 +147,26 @@ export interface MaintenanceUseCaseDeps {
   readonly transport: MailTransportPort;
   readonly backupHost: BackupHostPort;
   readonly backupSettings: BackupSettings;
+  readonly speedtest: SpeedtestPort;
+  readonly speedtests: SpeedtestRepositoryPort;
+  readonly clock: () => string;
 }
 
 export interface MaintenanceUseCases {
   readonly sendMails: SendMails;
   readonly runBackup: RunBackup;
+  readonly runSpeedtest: RunSpeedtest;
 }
 
 export function buildMaintenanceUseCases(deps: MaintenanceUseCaseDeps): MaintenanceUseCases {
   return {
     sendMails: new SendMails(deps),
     runBackup: new RunBackup({ backupHost: deps.backupHost, settings: deps.backupSettings }),
+    runSpeedtest: new RunSpeedtest({
+      speedtest: deps.speedtest,
+      repo: deps.speedtests,
+      clock: deps.clock,
+    }),
   };
 }
 

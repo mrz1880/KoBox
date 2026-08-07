@@ -377,6 +377,7 @@ describe.skipIf(!onDebianAsRoot)('E2E: fresh Debian 12 -> bootstrap -> full stac
       'letsencrypt',
       'nanomon',
       'aria2',
+      'speedtest',
     ];
     for (const row of status) {
       if (!skippedOnDebian12.includes(row.name)) {

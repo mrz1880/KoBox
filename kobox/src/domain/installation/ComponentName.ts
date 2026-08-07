@@ -31,6 +31,7 @@ export const COMPONENT_NAMES = [
   'nanomon',
   // Phase 9 — DDL/debrid download engine (aria2 daemon, localhost RPC)
   'aria2',
+  'speedtest',
 ] as const;
 
 export type ComponentNameValue = (typeof COMPONENT_NAMES)[number];

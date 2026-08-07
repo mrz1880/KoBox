@@ -338,6 +338,9 @@ export class JobWorker {
       case 'send-mails':
         await this.maintenance.sendMails.execute({ now: nowStamp() });
         return;
+      case 'run-speedtest':
+        await this.maintenance.runSpeedtest.execute();
+        return;
       case 'run-backup':
         await this.maintenance.runBackup.execute({ now: nowStamp() });
         return;

@@ -284,6 +284,17 @@ export const loginAttempts = sqliteTable('login_attempts', {
 // unrestricts it (debrid) and downloads it with aria2 into their home. The
 // source link is content, never a secret (the debrid key lives in the worker
 // env only). Status drives the poll loop; the gid is aria2's handle.
+// Link measurements, kept as a series: one figure says little, a drift over
+// weeks says the connection is degrading.
+export const speedtests = sqliteTable('speedtests', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  downloadBps: integer('download_bps').notNull(),
+  uploadBps: integer('upload_bps').notNull(),
+  latencyMs: integer('latency_ms').notNull(),
+  server: text('server').notNull(),
+  measuredAt: text('measured_at').notNull(),
+});
+
 // One AllDebrid key per user, stored ENCRYPTED (RSA-OAEP, base64): the portal
 // shares this database and must not be able to use what it can read. username as
 // primary key means setting a key replaces the old one — no stale secrets pile up.

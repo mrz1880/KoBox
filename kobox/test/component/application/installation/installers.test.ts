@@ -77,6 +77,7 @@ function buildWorld(overrides?: {
   rutorrentPin?: 'none';
   nanomonPin?: 'none';
   aria2Pin?: 'none';
+  speedtestPin?: 'none';
   letsencrypt?: { domain: string; email: string; acmeUrl?: string };
 }): World {
   const packages = new FakePackages();
@@ -125,6 +126,10 @@ function buildWorld(overrides?: {
       ...(overrides?.nanomonPin !== 'none' && {
         nanomonUrl: 'https://releases.example.net/nanomon-x86_64',
         nanomonSha256: 'b'.repeat(64),
+      }),
+      ...(overrides?.speedtestPin !== 'none' && {
+        speedtestUrl: 'https://releases.example.net/librespeed-cli',
+        speedtestSha256: 'c'.repeat(64),
       }),
       ...(overrides?.aria2Pin !== 'none' && {
         aria2RpcSecret: 'test-rpc-secret',
@@ -757,6 +762,42 @@ describe('aria2 installer', () => {
 
     // no systemctl disable / daemon-reload paid for a component that was skipped
     expect(unpinned.systemd.log).not.toContain('kobox-aria2');
+  });
+});
+
+describe('speedtest installer', () => {
+  it('should_skip_when_no_binary_is_pinned', async () => {
+    const unpinned = buildWorld({ speedtestPin: 'none' });
+
+    const outcome = await installer(unpinned, 'speedtest').install();
+
+    expect(outcome).toMatchObject({ state: 'skipped' });
+    expect(outcome.state === 'skipped' && outcome.reason).toContain('KOBOX_SPEEDTEST_URL');
+  });
+
+  it('should_vendor_the_verified_binary_and_remember_its_sum', async () => {
+    const outcome = await installer(world, 'speedtest').install();
+
+    expect(outcome.state).toBe('installed');
+    expect(world.host.contentAt('/usr/local/bin/librespeed-cli')).toBeDefined();
+    expect(world.host.contentAt('/etc/kobox/speedtest.sha256')).toContain('c'.repeat(64));
+  });
+
+  it('should_not_refetch_when_the_pinned_sum_already_matches', async () => {
+    await installer(world, 'speedtest').install();
+    const fetchedOnce = world.host.fetched.length;
+
+    await installer(world, 'speedtest').install();
+
+    expect(world.host.fetched).toHaveLength(fetchedOnce);
+  });
+
+  it('should_remove_the_binary_on_uninstall', async () => {
+    await installer(world, 'speedtest').install();
+
+    await installer(world, 'speedtest').uninstall();
+
+    expect(world.host.contentAt('/usr/local/bin/librespeed-cli')).toBeUndefined();
   });
 });
 

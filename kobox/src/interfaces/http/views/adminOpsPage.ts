@@ -1,6 +1,7 @@
 import type { ReleaseRecord } from '../../../application/maintenance/ReleaseRepositoryPort.js';
 import type { OutboxMail } from '../../../application/maintenance/MailOutboxPort.js';
 import type { ComponentRecord } from '../../../domain/installation/ports.js';
+import type { Speedtest } from '../../../domain/maintenance/speedtest.js';
 import type { HealthCheckResult } from '../../../domain/user/ports.js';
 import { html, type RawHtml } from '../html.js';
 import { flash, page, type Viewer } from './layout.js';
@@ -24,11 +25,56 @@ function componentChip(state: string): RawHtml {
   return html`<span class="chip">${state}</span>`;
 }
 
+// Rates read best as round Mbit/s: the exact bit count is noise here.
+function toMbit(bps: number): string {
+  return `${(bps / 1_000_000).toFixed(1)} Mbit/s`;
+}
+
+// A single figure says little; the series is what tells you the link is drifting.
+// The measurement saturates the connection, so the cost is stated next to the
+// button rather than discovered afterwards.
+function linkSpeedSection(
+  viewer: Viewer,
+  measurements: readonly Speedtest[],
+  available: boolean,
+): RawHtml {
+  const rows = measurements.map(
+    (measurement) => html`<tr>
+  <td class="num">${toMbit(measurement.download.bps)}</td>
+  <td class="num">${toMbit(measurement.upload.bps)}</td>
+  <td class="num">${measurement.latencyMs} ms</td>
+  <td>${measurement.server}</td>
+  <td class="when">${measurement.measuredAt}</td>
+</tr>`,
+  );
+  return html`<h2>Link speed</h2>
+${available
+    ? html`<form class="inline" method="post" action="/admin/speedtest">
+  <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
+  <button type="submit">Measure now</button>
+</form>
+<p class="muted">Saturates the connection for about ten seconds, so downloads
+slow down while it runs — and a measurement taken while the box is busy reads
+low. Nothing schedules it.</p>`
+    : html`<p class="muted">No measurement binary pinned. Set
+<span class="mono">KOBOX_SPEEDTEST_URL</span> and
+<span class="mono">KOBOX_SPEEDTEST_SHA256</span>, then run
+<span class="mono">kobox install</span>.</p>`}
+${measurements.length === 0
+    ? html`<p class="muted">No measurement yet.</p>`
+    : html`<table>
+  <thead><tr><th>Down</th><th>Up</th><th>Latency</th><th>Server</th><th>Measured</th></tr></thead>
+  <tbody>${rows}</tbody>
+</table>`}`;
+}
+
 export function adminHealthPage(
   probes: readonly HealthCheckResult[],
   components: readonly ComponentRecord[],
   releases: readonly ReleaseRecord[],
   viewer: Viewer,
+  measurements: readonly Speedtest[] = [],
+  speedtestAvailable = false,
   message?: string,
 ): string {
   const probeRows = probes.map(
@@ -63,6 +109,8 @@ ${flash(message)}
   <thead><tr><th>Probe</th><th>State</th><th>Detail</th></tr></thead>
   <tbody>${probeRows}</tbody>
 </table>
+
+${linkSpeedSection(viewer, measurements, speedtestAvailable)}
 
 <h2>Components</h2>
 <table>

@@ -149,6 +149,9 @@ export const buildJob = {
     return parseJob('send-mails', {});
   },
 
+  runSpeedtest(): Job {
+    return parseJob('run-speedtest', {});
+  },
   runBackup(): Job {
     return parseJob('run-backup', {});
   },
