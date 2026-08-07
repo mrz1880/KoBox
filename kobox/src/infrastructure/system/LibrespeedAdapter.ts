@@ -4,7 +4,7 @@ import { Speedtest } from '../../domain/maintenance/speedtest.js';
 import { Bandwidth } from '../../domain/security/Bandwidth.js';
 import { runOrThrow, type CommandRunner } from './CommandRunner.js';
 
-export const DEFAULT_LIBRESPEED_BIN = '/usr/local/bin/librespeed-cli';
+export const DEFAULT_LIBRESPEED_BIN = '/usr/local/lib/kobox-speedtest/librespeed-cli';
 
 export class SpeedtestUnavailableError extends Error {
   constructor(detail: string) {
