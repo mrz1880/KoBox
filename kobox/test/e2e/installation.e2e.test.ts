@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { promisify } from 'node:util';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { ConfigDocument } from '../../src/domain/installation/ConfigDocument.js';
 
 // The Phase 4 product: a fresh Debian 12 container becomes a full KoBox box
 // through bootstrap/install.sh alone, then `create user -> everything works`
@@ -297,6 +298,36 @@ describe.skipIf(!onDebianAsRoot)('E2E: fresh Debian 12 -> bootstrap -> full stac
     },
     240_000,
   );
+
+  it('should_let_the_unprivileged_portal_read_every_catalogued_config_it_wrote', () => {
+    // The config screen reads these files directly as kobox-portal — no job, no
+    // root. That only holds if every catalogued file is world-readable, which
+    // is a property of the INSTALLER's chmod, not of the reader. A file that
+    // installs 0640 would show as "not on this box" and quietly lie.
+    for (const document of ConfigDocument.all()) {
+      if (!existsSync(document.path)) {
+        continue; // component not installed in this suite: an honest skip
+      }
+      expect(() =>
+        sh('runuser', ['-u', 'kobox-portal', '--', 'cat', document.path], { stdio: 'pipe' }),
+        document.path,
+      ).not.toThrow();
+    }
+  });
+
+  it('should_keep_the_secret_bearing_files_out_of_reach_of_that_same_portal', () => {
+    // the other half of the argument: the files deliberately absent from the
+    // catalog are also unreadable to the process that renders it
+    for (const secret of ['/etc/kobox/worker.env', '/etc/kobox/aria2.conf']) {
+      if (!existsSync(secret)) {
+        continue;
+      }
+      expect(
+        () => sh('runuser', ['-u', 'kobox-portal', '--', 'cat', secret], { stdio: 'pipe' }),
+        secret,
+      ).toThrow();
+    }
+  });
 
   it('should_restore_the_firewall_at_boot_via_the_oneshot_unit', async () => {
     sh('iptables', ['-F', 'INPUT']);

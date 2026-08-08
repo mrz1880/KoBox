@@ -11,6 +11,11 @@ import { HashedPassword } from '../../../src/domain/user/HashedPassword.js';
 import type { Password } from '../../../src/domain/user/Password.js';
 import { Username } from '../../../src/domain/user/Username.js';
 import type { VpnProfileStorePort } from '../../../src/application/portal/ports.js';
+import type {
+  ConfigFileContent,
+  ConfigFileReaderPort,
+} from '../../../src/application/installation/ConfigFileReaderPort.js';
+import type { ConfigDocument } from '../../../src/domain/installation/ConfigDocument.js';
 import type { HealthCheckResult, HealthProbePort, PasswordHasherPort } from '../../../src/domain/user/ports.js';
 import { InMemoryBlocklistRepository } from '../../../src/infrastructure/persistence/InMemoryBlocklistRepository.js';
 import { InMemoryFairUseRepository } from '../../../src/infrastructure/persistence/InMemoryFairUseRepository.js';
@@ -47,6 +52,18 @@ class AllHealthyProbe implements HealthProbePort {
     return Promise.resolve({ name: `${host}:${port}`, state: 'healthy' });
   }
 }
+// Only the scheduler exists on this fake box; every other catalogued file is
+// absent, which is exactly the "component not installed" case.
+class OneFileOnDisk implements ConfigFileReaderPort {
+  read(document: ConfigDocument): Promise<ConfigFileContent | undefined> {
+    return Promise.resolve(
+      document.id === 'scheduler'
+        ? { content: '*/5 * * * * root /usr/local/bin/kobox send-mails\n', truncated: false }
+        : undefined,
+    );
+  }
+}
+
 // A profile store that has no files unless a test swaps its own in.
 class NoProfiles implements VpnProfileStorePort {
   read(): Promise<string | undefined> {
@@ -162,6 +179,7 @@ export async function buildPortalWorld(
     components: new InMemoryComponentRegistry(),
     speedtests: new InMemorySpeedtestRepository(),
     diagnostics,
+    configFiles: new OneFileOnDisk(),
     releases: new InMemoryReleaseRepository(),
     outbox,
     credentials,

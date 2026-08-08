@@ -45,6 +45,7 @@ async function main(): Promise<void> {
     components: container.componentRegistry,
     speedtests: container.speedtests,
     diagnostics: container.diagnostics,
+    configFiles: container.configFiles,
     releases: container.releaseRepo,
     outbox: container.outbox,
     credentials: container.credentials,

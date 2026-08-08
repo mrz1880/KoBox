@@ -43,6 +43,7 @@ th, td {
 th { color: var(--muted); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.06em; }
 td.num, td.mono { font-family: ui-monospace, monospace; font-variant-numeric: tabular-nums; }
 .mono { font-family: ui-monospace, monospace; }
+tr.current td { background: var(--panel); font-weight: 600; }
 /* Diagnostics: a captured excerpt and the panel that frames it. The excerpt
    scrolls inside its own box — a 200-line journal must not stretch the page. */
 .panel {
@@ -194,6 +195,7 @@ const ADMIN_NAV: readonly (readonly [string, string])[] = [
   ['/admin/health', 'Health'],
   ['/admin/logs', 'Logs'],
   ['/admin/packages', 'Updates'],
+  ['/admin/config', 'Config'],
   ['/admin/mails', 'Mails'],
   ['/monitoring', 'Monitoring'],
   ['/rutorrent', 'ruTorrent'],
