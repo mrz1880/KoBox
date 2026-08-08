@@ -95,22 +95,76 @@ export function signalStrip(row: SignalRow): RawHtml {
 </div>`;
 }
 
+// What the person needs to know before anything else, said plainly. A VU meter
+// belongs on the operator's console; someone who just wants their files needs a
+// sentence telling them whether things are working and what to do if not.
+function plainStatus(row: SignalRow): RawHtml {
+  if (row.suspended) {
+    return html`<p class="flash error">Your account is suspended. Contact the
+    administrator to have it restored.</p>`;
+  }
+  if (!row.healthy) {
+    return html`<p class="flash error">Your torrent client is not running.
+    <a href="/rutorrent">Restart it from the ruTorrent page</a>.</p>`;
+  }
+  if (row.level === 'throttled') {
+    return html`<p class="flash error">Your connection is temporarily slowed
+    because of heavy use. It lifts on its own once traffic settles.</p>`;
+  }
+  if (row.level === 'alerted') {
+    return html`<p class="flash">You are using a lot of bandwidth right now.
+    Nothing is limited yet.</p>`;
+  }
+  return html`<p class="muted">Everything is running.</p>`;
+}
+
+interface HomeAction {
+  readonly href: string;
+  readonly title: string;
+  readonly blurb: string;
+}
+
+// The three things people actually do here. ruTorrent comes first because that
+// is where most of them spend their time — the portal is the place you visit to
+// set something up or check on it, not where you live.
+const HOME_ACTIONS: readonly HomeAction[] = [
+  {
+    href: '/rutorrent',
+    title: 'Torrents',
+    blurb: 'Add a torrent and follow it. This is the main tool.',
+  },
+  {
+    href: '/media',
+    title: 'My media',
+    blurb: 'Watch or download what has finished.',
+  },
+  {
+    href: '/downloads',
+    title: 'Download a link',
+    blurb: 'Paste a link from a file host and let the server fetch it.',
+  },
+];
+
 export function userHomePage(
   user: SeedboxUser,
   viewer: Viewer,
   row: SignalRow,
   message?: string,
 ): string {
+  const actions = HOME_ACTIONS.map(
+    (action) => html`<div class="choice">
+  <h3>${action.title}</h3>
+  <p>${action.blurb}</p>
+  <a class="action" href="${action.href}">Open</a>
+</div>`,
+  );
   return page(
     'Home',
     html`<h1>Hello ${user.username.value}</h1>
 ${flash(message)}
-${signalStrip({ ...row, label: 'Your channel' })}
-<p class="muted">SCGI port <span class="mono">${user.scgiPort.value}</span></p>
-<p class="links"><a href="/downloads">Downloads</a> ·
-<a href="/access">My access &amp; VPN profiles</a> ·
-<a href="/rutorrent">Open ruTorrent</a> ·
-<a href="/password">Change password</a></p>`,
+${plainStatus(row)}
+<div class="choices">${actions}</div>
+<p class="links"><a href="/access">My account and connection details</a></p>`,
     viewer,
   );
 }

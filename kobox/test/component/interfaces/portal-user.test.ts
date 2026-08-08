@@ -48,8 +48,31 @@ describe('role-routed home', () => {
 
     expect(response.statusCode).toBe(200);
     expect(response.body).toContain('alice');
-    expect(response.body).toContain('412'); // quota GiB
-    expect(response.body).toContain('/access');
+    // the home answers "what do I want to do", not "here is your telemetry":
+    // the three real actions, and no bandwidth figure or port number
+    expect(response.body).toContain('/rutorrent');
+    expect(response.body).toContain('/media');
+    expect(response.body).toContain('/downloads');
+    expect(response.body).toContain('Everything is running');
+    expect(response.body).not.toContain('412');
+  });
+
+  it('should_tell_a_user_plainly_when_their_client_is_down', async () => {
+    await world.fairUse.saveState(
+      Username.parse('alice'),
+      { level: 'none', healthState: 'unhealthy' },
+      NOW,
+    );
+
+    const response = await world.server.inject({
+      method: 'GET',
+      url: '/',
+      headers: { cookie: user.cookie },
+    });
+
+    // a sentence and a way out, not a red LED they cannot interpret
+    expect(response.body).toContain('torrent client is not running');
+    expect(response.body).toContain('/rutorrent');
   });
 
   it('should_show_a_fleet_summary_to_an_admin', async () => {

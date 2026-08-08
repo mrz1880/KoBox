@@ -183,13 +183,15 @@ const ADMIN_NAV: readonly (readonly [string, string])[] = [
   ['/rutorrent', 'ruTorrent'],
 ];
 
+// Ordered by how often a person needs it, not by how the system is organised.
+// VPN profiles, ports and the password live behind "Account": needed rarely,
+// and putting them in the main bar made the technical look mandatory.
 const USER_NAV: readonly (readonly [string, string])[] = [
   ['/', 'Home'],
-  ['/downloads', 'Downloads'],
+  ['/rutorrent', 'Torrents'],
   ['/media', 'My media'],
-  ['/access', 'My access'],
-  ['/password', 'Password'],
-  ['/rutorrent', 'ruTorrent'],
+  ['/downloads', 'Download a link'],
+  ['/access', 'Account'],
 ];
 
 export function page(title: string, body: RawHtml, viewer?: Viewer): string {
