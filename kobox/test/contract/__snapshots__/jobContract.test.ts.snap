@@ -450,6 +450,21 @@ exports[`job contract > should_keep_the_wire_contract_stable 1`] = `
     ],
     "type": "object",
   },
+  "restart-service": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "service": {
+        "maxLength": 64,
+        "minLength": 1,
+        "type": "string",
+      },
+    },
+    "required": [
+      "service",
+    ],
+    "type": "object",
+  },
   "resume-user": {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "additionalProperties": false,

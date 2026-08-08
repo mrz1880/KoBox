@@ -5,6 +5,9 @@ import type { ComponentRegistry, ComponentRecord } from '../../../domain/install
 import type { SpeedtestRepositoryPort } from '../../../application/maintenance/SpeedtestPort.js';
 import type { JobQueuePort } from '../../../application/jobs/JobQueuePort.js';
 import type { HealthCheckResult, HealthProbePort, UserRepository } from '../../../domain/user/ports.js';
+import { z } from 'zod';
+import { ManagedService } from '../../../domain/maintenance/ManagedService.js';
+import { DomainError } from '../../../domain/shared/DomainError.js';
 import { buildJob } from '../../cli/buildJob.js';
 import { flashOf, redirectWithFlash, viewerOf, type Guards } from '../guards.js';
 import { adminHealthPage, adminMailsPage } from '../views/adminOpsPage.js';
@@ -19,6 +22,8 @@ export interface AdminOpsDeps {
   readonly releases: ReleaseRepositoryPort;
   readonly outbox: MailOutboxPort;
 }
+
+const restartServiceSchema = z.object({ service: z.string().min(1).max(64) });
 
 export function registerAdminOpsRoutes(
   server: FastifyInstance,
@@ -71,6 +76,29 @@ export function registerAdminOpsRoutes(
           flashOf(request),
         ),
       );
+  });
+
+  server.post('/admin/services/restart', async (request, reply) => {
+    const session = await guards.requireAdminCsrf(request, reply);
+    if (session === undefined) {
+      return;
+    }
+    const parsed = restartServiceSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.code(400).send();
+    }
+    // parsed against the closed set here too: an unknown unit never becomes a job
+    let service: ManagedService;
+    try {
+      service = ManagedService.parse(parsed.data.service);
+    } catch (error) {
+      if (error instanceof DomainError) {
+        return reply.code(400).send();
+      }
+      throw error;
+    }
+    await deps.queue.enqueue(buildJob.restartService({ service: service.value }));
+    return redirectWithFlash(reply, '/admin/health', `Restarting ${service.value}.`);
   });
 
   server.post('/admin/speedtest', async (request, reply) => {

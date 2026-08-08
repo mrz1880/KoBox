@@ -4,7 +4,7 @@ import { ComponentName } from '../../../src/domain/installation/ComponentName.js
 import { Version } from '../../../src/domain/installation/Version.js';
 import { InMemoryComponentRegistry } from '../../../src/infrastructure/persistence/InMemoryComponentRegistry.js';
 import { InMemoryReleaseRepository } from '../../../src/infrastructure/persistence/InMemoryReleaseRepository.js';
-import { buildPortalWorld, loginAs, type AgentSession, type PortalWorld } from './portalWorld.js';
+import { buildPortalWorld, form, loginAs, type AgentSession, type PortalWorld } from './portalWorld.js';
 
 // Fake probe: healthy unless a name/port is registered as down.
 class FakeHealthProbe implements HealthProbePort {
@@ -135,5 +135,49 @@ describe('admin mails screen', () => {
     });
 
     expect(response.statusCode).toBe(403);
+  });
+});
+
+describe('managed services', () => {
+  it('should_enqueue_a_restart_for_a_unit_kobox_manages', async () => {
+    const response = await world.server.inject({
+      method: 'POST',
+      url: '/admin/services/restart',
+      headers: { cookie: admin.cookie, 'content-type': 'application/x-www-form-urlencoded' },
+      payload: form({ _csrf: admin.csrf, service: 'nginx' }),
+    });
+
+    expect(response.statusCode).toBe(303);
+    expect(world.queue.jobs[0]).toEqual({
+      type: 'restart-service',
+      payload: { service: 'nginx' },
+    });
+  });
+
+  it('should_refuse_a_unit_outside_the_closed_set', async () => {
+    const response = await world.server.inject({
+      method: 'POST',
+      url: '/admin/services/restart',
+      headers: { cookie: admin.cookie, 'content-type': 'application/x-www-form-urlencoded' },
+      payload: form({ _csrf: admin.csrf, service: 'sshd' }),
+    });
+
+    // rejected before it can become a job — an arbitrary unit never reaches systemctl
+    expect(response.statusCode).toBe(400);
+    expect(world.queue.jobs).toHaveLength(0);
+  });
+
+  it('should_refuse_a_non_admin', async () => {
+    const user = await loginAs(world, 'alice');
+
+    const response = await world.server.inject({
+      method: 'POST',
+      url: '/admin/services/restart',
+      headers: { cookie: user.cookie, 'content-type': 'application/x-www-form-urlencoded' },
+      payload: form({ _csrf: user.csrf, service: 'nginx' }),
+    });
+
+    expect(response.statusCode).toBe(403);
+    expect(world.queue.jobs).toHaveLength(0);
   });
 });
