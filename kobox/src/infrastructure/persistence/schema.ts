@@ -284,6 +284,20 @@ export const loginAttempts = sqliteTable('login_attempts', {
 // unrestricts it (debrid) and downloads it with aria2 into their home. The
 // source link is content, never a secret (the debrid key lives in the worker
 // env only). Status drives the poll loop; the gid is aria2's handle.
+// What the worker last saw in each user's completed downloads. The portal reads
+// this instead of the filesystem, which is what lets it keep ProtectHome=yes.
+export const mediaFiles = sqliteTable(
+  'media_files',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    username: text('username').notNull(),
+    path: text('path').notNull(),
+    sizeBytes: integer('size_bytes').notNull(),
+    indexedAt: text('indexed_at').notNull(),
+  },
+  (table) => [unique().on(table.username, table.path)],
+);
+
 // Link measurements, kept as a series: one figure says little, a drift over
 // weeks says the connection is degrading.
 export const speedtests = sqliteTable('speedtests', {

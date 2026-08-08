@@ -136,6 +136,34 @@ kobox install        # re-vendors when the sha differs from the installed marker
 Upgrading ruTorrent later = the same three lines with the new tag inside a
 `kobox upgrade`d release, or standalone via `kobox install`.
 
+## My media (the Cakebox successor)
+
+Users see what landed in their completed downloads at **/media**, play what a
+browser can play, and download the rest. Cakebox-light did this until upstream
+archived it in 2018; this replaces it with something that has a session, CSRF
+and per-user scoping, which it never had.
+
+Three roles, deliberately separate:
+
+- the **root worker** indexes `~user/rtorrent/complete/` into the database —
+  chained after a finished torrent or a placed debrid download, plus a sweep
+  every 15 min because files also leave over SFTP;
+- the **portal** lists from those rows, so it keeps `ProtectHome=yes` and no
+  disk access at all;
+- **nginx** streams the bytes through an `internal` location, reachable only via
+  a redirect the portal emits after checking the session and that the file
+  belongs to that user. nginx handles range requests, so seeking works.
+
+> **One permission is widened for this.** User homes are set to `0711` at
+> creation: traversable so nginx can reach an authorised file, **not listable**,
+> so nothing can enumerate a home. The completed-downloads directory itself is
+> already `0755` (rtorrent needs it). Existing accounts created before this keep
+> their old mode — `chmod 0711 /home/<user>` to bring them in line.
+
+Browsers play mp4/webm/ogg; an mkv or an H.265 file is offered as a download
+instead of a player that would show a black rectangle. Transcoding is out of
+scope — it would be a different, far heavier project.
+
 ## Measuring the link (speedtest)
 
 The `speedtest` component vendors `librespeed-cli` — open source, pinned and

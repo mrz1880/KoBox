@@ -230,7 +230,7 @@ describe.skipIf(!onDebianAsRoot)('E2E: maintenance keeps the installed box alive
         .split('\n')
         .filter((line) => line !== '' && !line.startsWith('#') && !/^[A-Z]+=/.test(line))
         .map((line) => line.split(' ').slice(6)); // five schedule fields + 'root'
-      expect(entries).toHaveLength(7);
+      expect(entries).toHaveLength(8);
 
       // a real tick: run the exact command cron would run — twice
       for (const round of [1, 2]) {
@@ -248,6 +248,7 @@ describe.skipIf(!onDebianAsRoot)('E2E: maintenance keeps the installed box alive
         'resolve-dyndns', 'send-mails', 'evaluate-fair-use',
         'update-blocklists', 'renew-tracker-certs', 'run-backup',
         'poll-debrid-downloads',
+        'index-media',
       ]) {
         expect(counts.get(type)?.pending, type).toBe(1);
       }

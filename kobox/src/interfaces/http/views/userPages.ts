@@ -1,4 +1,5 @@
 import type { DebridDownload } from '../../../domain/ddl/DebridDownload.js';
+import type { MediaFile } from '../../../domain/media/MediaFile.js';
 import type { SeedboxUser } from '../../../domain/user/SeedboxUser.js';
 import { html, type RawHtml } from '../html.js';
 import { flash, page, type Viewer } from './layout.js';
@@ -334,6 +335,69 @@ export function accessPage(viewer: Viewer, facts: AccessFacts): string {
 <p class="links"><a href="/rutorrent">Open ruTorrent</a> ·
 <a href="/downloads">Downloads</a> ·
 <a href="/password">Change password</a></p>`,
+    viewer,
+  );
+}
+
+function formatSize(bytes: number): string {
+  const gib = bytes / 1024 ** 3;
+  if (gib >= 1) {
+    return `${gib.toFixed(1)} GiB`;
+  }
+  return `${Math.max(1, Math.round(bytes / 1024 ** 2))} MiB`;
+}
+
+// The end of the journey: what actually landed, ready to watch or take away.
+// Grouped by the folder the file came down into, because that is how people
+// think about it — not by the flat table the database happens to hold.
+export function mediaPage(
+  viewer: Viewer,
+  files: readonly MediaFile[],
+  message?: string,
+): string {
+  const groups = new Map<string, MediaFile[]>();
+  for (const file of files) {
+    const key = file.path.category === '' ? 'Loose files' : file.path.category;
+    groups.set(key, [...(groups.get(key) ?? []), file]);
+  }
+  const sections = [...groups.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(
+      ([category, items]) => html`<h2>${category}</h2>
+<table>
+  <thead><tr><th>File</th><th>Size</th><th></th></tr></thead>
+  <tbody>${items.map(
+    (file) => html`<tr>
+  <td class="path">${file.path.name}</td>
+  <td class="num">${formatSize(file.sizeBytes)}</td>
+  <td>${file.isBrowserPlayable
+      ? html`<a href="/media/watch?path=${file.path.value}">Watch</a> ·
+        <a href="/media/file?path=${file.path.value}" download>Download</a>`
+      : html`<a href="/media/file?path=${file.path.value}" download>Download</a>`}</td>
+</tr>`,
+  )}</tbody>
+</table>`,
+    );
+  return page(
+    'My media',
+    html`<h1>My media</h1>
+${flash(message)}
+${files.length === 0
+      ? html`<p class="muted">Nothing here yet. Files appear once a download finishes.</p>`
+      : html`${sections}`}`,
+    viewer,
+  );
+}
+
+// A player page rather than a bare file link: the browser keeps the session
+// cookie, and seeking works because nginx serves the bytes with range support.
+export function mediaWatchPage(viewer: Viewer, file: MediaFile): string {
+  return page(
+    'Watch',
+    html`<h1>${file.path.name}</h1>
+<video class="app" controls preload="metadata" src="/media/file?path=${file.path.value}"></video>
+<p class="links"><a href="/media">Back to my media</a> ·
+<a href="/media/file?path=${file.path.value}" download>Download this file</a></p>`,
     viewer,
   );
 }

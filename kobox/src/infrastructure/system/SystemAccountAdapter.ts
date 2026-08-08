@@ -14,6 +14,14 @@ export class SystemAccountAdapter implements SystemAccountPort {
       command: 'useradd',
       args: ['-m', '-s', '/bin/bash', '-G', KOBOX_USERS_GROUP, username.value],
     });
+    // 0711, set explicitly rather than inherited from the distribution default:
+    // nginx must TRAVERSE the home to stream a media file the portal authorised,
+    // but nothing may LIST it. Traverse-only is the narrowest grant that works —
+    // the completed-downloads directory itself is 0755, as rtorrent needs.
+    await runOrThrow(this.runner, {
+      command: 'chmod',
+      args: ['0711', `/home/${username.value}`],
+    });
   }
 
   async deleteAccount(username: Username): Promise<void> {

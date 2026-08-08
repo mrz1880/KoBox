@@ -133,6 +133,10 @@ export class JobWorker {
       // and the per-user nginx /RPC-<USER> SCGI mounts (Phase 6)
       await this.queue.enqueue(parseJob('render-rutorrent-users', {}));
     }
+    // what landed on disk just changed: refresh the media listing
+    if (job.type === 'torrent-event' || job.type === 'poll-debrid-downloads') {
+      await this.queue.enqueueUnique(parseJob('index-media', {}));
+    }
     if (hints?.fetchCertHost !== undefined) {
       await this.queue.enqueue(parseJob('fetch-tracker-cert', { host: hints.fetchCertHost }));
     }
@@ -337,6 +341,9 @@ export class JobWorker {
         return;
       case 'send-mails':
         await this.maintenance.sendMails.execute({ now: nowStamp() });
+        return;
+      case 'index-media':
+        await this.torrents.indexMedia.execute();
         return;
       case 'run-speedtest':
         await this.maintenance.runSpeedtest.execute();

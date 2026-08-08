@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Username } from '../../../src/domain/user/Username.js';
+import { MediaPath } from '../../../src/domain/media/MediaFile.js';
 import type { VpnVariant } from '../../../src/domain/security/vpn.js';
 import type { VpnProfileStorePort } from '../../../src/application/portal/ports.js';
 import {
@@ -366,6 +367,97 @@ describe('per-user debrid account', () => {
 
     expect(response.statusCode).toBe(403);
     expect(world.queue.jobs).toHaveLength(0);
+  });
+});
+
+describe('my media', () => {
+  const alice = Username.parse('alice');
+  const boss = Username.parse('boss');
+
+  async function give(owner: Username, ...paths: string[]): Promise<void> {
+    await world.media.replaceFor(
+      owner,
+      paths.map((path) => ({ path: MediaPath.parse(path), sizeBytes: 2 * 1024 ** 3 })),
+      NOW,
+    );
+  }
+
+  it('should_list_the_users_own_files_grouped_by_folder', async () => {
+    await give(alice, 'films/Some.Film.mkv', 'series/Show.S01E01.mp4');
+
+    const response = await world.server.inject({
+      method: 'GET',
+      url: '/media',
+      headers: { cookie: user.cookie },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.body).toContain('Some.Film.mkv');
+    expect(response.body).toContain('films');
+    expect(response.body).toContain('series');
+  });
+
+  it('should_offer_a_player_only_for_what_a_browser_can_play', async () => {
+    await give(alice, 'films/Playable.mp4', 'films/Container.mkv');
+
+    const response = await world.server.inject({
+      method: 'GET',
+      url: '/media',
+      headers: { cookie: user.cookie },
+    });
+
+    // an mkv gets a download link instead of a player that would show black
+    expect(response.body).toContain('/media/watch?path=films/Playable.mp4');
+    expect(response.body).not.toContain('/media/watch?path=films/Container.mkv');
+    expect(response.body).toContain('/media/file?path=films/Container.mkv');
+  });
+
+  it('should_hand_the_bytes_to_nginx_instead_of_reading_them', async () => {
+    await give(alice, 'films/Some.Film.mkv');
+
+    const response = await world.server.inject({
+      method: 'GET',
+      url: '/media/file?path=films/Some.Film.mkv',
+      headers: { cookie: user.cookie },
+    });
+
+    expect(response.statusCode).toBe(200);
+    // the portal authorises; nginx streams, so range requests keep working
+    expect(response.headers['x-accel-redirect']).toBe('/internal-media/alice/films/Some.Film.mkv');
+    expect(response.body).toBe('');
+  });
+
+  it('should_never_serve_another_users_file', async () => {
+    await give(boss, 'films/Admin.Only.mkv');
+
+    const response = await world.server.inject({
+      method: 'GET',
+      url: '/media/file?path=films/Admin.Only.mkv',
+      headers: { cookie: user.cookie },
+    });
+
+    // the path is valid and the file exists — but not in alice's index
+    expect(response.statusCode).toBe(404);
+    expect(response.headers['x-accel-redirect']).toBeUndefined();
+  });
+
+  it('should_refuse_a_traversal_attempt_without_reaching_the_repository', async () => {
+    for (const path of ['../../etc/passwd', '/etc/passwd', 'films/../../../etc/shadow']) {
+      const response = await world.server.inject({
+        method: 'GET',
+        url: `/media/file?path=${encodeURIComponent(path)}`,
+        headers: { cookie: user.cookie },
+      });
+
+      expect(response.statusCode, path).toBe(404);
+      expect(response.headers['x-accel-redirect'], path).toBeUndefined();
+    }
+  });
+
+  it('should_require_a_session', async () => {
+    const response = await world.server.inject({ method: 'GET', url: '/media' });
+
+    expect(response.statusCode).toBe(303);
   });
 });
 
