@@ -3,6 +3,7 @@ import { parseJob, type Job } from '../../../src/application/jobs/contract.js';
 import type { BackupHostPort } from '../../../src/application/maintenance/BackupHostPort.js';
 import type { MailDelivery } from '../../../src/application/maintenance/MailTransportPort.js';
 import { InMemoryMediaRepository } from '../../../src/infrastructure/persistence/InMemoryMediaRepository.js';
+import { FakeSystemd } from '../../../src/infrastructure/system/fakes/FakeSystemd.js';
 import { InMemorySpeedtestRepository } from '../../../src/infrastructure/persistence/InMemorySpeedtestRepository.js';
 import { InMemoryMailOutbox } from '../../../src/infrastructure/persistence/InMemoryMailOutbox.js';
 import type { ClaimedJob, JobQueuePort } from '../../../src/application/jobs/JobQueuePort.js';
@@ -344,6 +345,7 @@ beforeEach(() => {
     backupSettings: { root: '/var/backups/kobox', ttlDays: 7, keepMin: 3, configDirs: [] },
     speedtest: { measure: () => Promise.reject(new Error('no speedtest in this suite')) },
     speedtests: new InMemorySpeedtestRepository(),
+    systemd: new FakeSystemd(),
     clock: () => '2026-07-25 10:00:00',
   });
   const ddlUseCases = buildDdlUseCases({

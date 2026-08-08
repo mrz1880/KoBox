@@ -37,6 +37,8 @@ import type { MailOutboxPort } from '../application/maintenance/MailOutboxPort.j
 import type { MailTransportPort } from '../application/maintenance/MailTransportPort.js';
 import { RunBackup, type BackupSettings } from '../application/maintenance/RunBackup.js';
 import { RunSpeedtest } from '../application/maintenance/RunSpeedtest.js';
+import { RestartService } from '../application/maintenance/RestartService.js';
+import type { SystemdPort } from '../domain/installation/ports.js';
 import type {
   SpeedtestPort,
   SpeedtestRepositoryPort,
@@ -150,6 +152,7 @@ export interface MaintenanceUseCaseDeps {
   readonly backupHost: BackupHostPort;
   readonly backupSettings: BackupSettings;
   readonly speedtest: SpeedtestPort;
+  readonly systemd: SystemdPort;
   readonly speedtests: SpeedtestRepositoryPort;
   readonly clock: () => string;
 }
@@ -158,12 +161,14 @@ export interface MaintenanceUseCases {
   readonly sendMails: SendMails;
   readonly runBackup: RunBackup;
   readonly runSpeedtest: RunSpeedtest;
+  readonly restartService: RestartService;
 }
 
 export function buildMaintenanceUseCases(deps: MaintenanceUseCaseDeps): MaintenanceUseCases {
   return {
     sendMails: new SendMails(deps),
     runBackup: new RunBackup({ backupHost: deps.backupHost, settings: deps.backupSettings }),
+    restartService: new RestartService({ systemd: deps.systemd }),
     runSpeedtest: new RunSpeedtest({
       speedtest: deps.speedtest,
       repo: deps.speedtests,

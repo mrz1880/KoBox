@@ -2,6 +2,7 @@ import type { ReleaseRecord } from '../../../application/maintenance/ReleaseRepo
 import type { OutboxMail } from '../../../application/maintenance/MailOutboxPort.js';
 import type { ComponentRecord } from '../../../domain/installation/ports.js';
 import type { Speedtest } from '../../../domain/maintenance/speedtest.js';
+import { ManagedService } from '../../../domain/maintenance/ManagedService.js';
 import type { HealthCheckResult } from '../../../domain/user/ports.js';
 import { html, type RawHtml } from '../html.js';
 import { flash, page, type Viewer } from './layout.js';
@@ -68,6 +69,29 @@ ${measurements.length === 0
 </table>`}`;
 }
 
+// One row per unit KoBox manages, each with a restart. The list comes from the
+// closed ManagedService type, so this screen cannot offer a unit the worker
+// would refuse — the form and the guard can never drift apart.
+function managedServicesSection(viewer: Viewer): RawHtml {
+  const rows = ManagedService.all().map(
+    (name) => html`<tr>
+  <td class="mono">${name}</td>
+  <td><form class="inline" method="post" action="/admin/services/restart">
+    <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
+    <input type="hidden" name="service" value="${name}">
+    <button class="ghost" type="submit">Restart</button>
+  </form></td>
+</tr>`,
+  );
+  return html`<h2>Managed services</h2>
+<p class="muted">The worker itself is not here on purpose: it is what carries out
+the restart, so restarting it from this page would kill the job mid-flight.</p>
+<table>
+  <thead><tr><th>Unit</th><th></th></tr></thead>
+  <tbody>${rows}</tbody>
+</table>`;
+}
+
 export function adminHealthPage(
   probes: readonly HealthCheckResult[],
   components: readonly ComponentRecord[],
@@ -109,6 +133,8 @@ ${flash(message)}
   <thead><tr><th>Probe</th><th>State</th><th>Detail</th></tr></thead>
   <tbody>${probeRows}</tbody>
 </table>
+
+${managedServicesSection(viewer)}
 
 ${linkSpeedSection(viewer, measurements, speedtestAvailable)}
 

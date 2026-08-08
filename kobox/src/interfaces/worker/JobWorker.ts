@@ -1,6 +1,7 @@
 import { parseJob, type Job } from '../../application/jobs/contract.js';
 import type { JobQueuePort } from '../../application/jobs/JobQueuePort.js';
 import type { MailOutboxPort } from '../../application/maintenance/MailOutboxPort.js';
+import { ManagedService } from '../../domain/maintenance/ManagedService.js';
 import { parseRole } from '../../domain/portal/Role.js';
 import { DynDnsHost } from '../../domain/security/DynDnsHost.js';
 import { IpAddress } from '../../domain/shared/IpAddress.js';
@@ -344,6 +345,11 @@ export class JobWorker {
         return;
       case 'index-media':
         await this.torrents.indexMedia.execute();
+        return;
+      case 'restart-service':
+        await this.maintenance.restartService.execute({
+          service: ManagedService.parse(job.payload.service),
+        });
         return;
       case 'run-speedtest':
         await this.maintenance.runSpeedtest.execute();

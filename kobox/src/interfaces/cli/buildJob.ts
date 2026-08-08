@@ -152,6 +152,9 @@ export const buildJob = {
   indexMedia(): Job {
     return parseJob('index-media', {});
   },
+  restartService(input: { service: string }): Job {
+    return parseJob('restart-service', input);
+  },
   runSpeedtest(): Job {
     return parseJob('run-speedtest', {});
   },

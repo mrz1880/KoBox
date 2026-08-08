@@ -164,6 +164,25 @@ Browsers play mp4/webm/ogg; an mkv or an H.265 file is offered as a download
 instead of a player that would show a black rectangle. Transcoding is out of
 scope — it would be a different, far heavier project.
 
+## Restarting a managed service
+
+**Health → Managed services** restarts a KoBox-managed unit without a shell:
+nginx, kobox-portal, kobox-aria2, kobox-nanomon, fail2ban.
+
+The list is a **closed set** in the domain, not a free text field. An open
+"restart any unit" control would be a root shell behind a nicer form — it would
+reach sshd, or systemd itself. The screen is built from that same set, so the
+form and the guard cannot drift apart, and the worker re-validates the name a
+third time before it reaches `systemctl`.
+
+`kobox-worker` is deliberately absent: it is the process that carries out the
+restart, so restarting it from one of its own jobs would kill it mid-flight and
+leave the job neither done nor failed. That one stays `systemctl restart
+kobox-worker` from a shell.
+
+Disk, CPU, memory and network are **not** duplicated here — NanoMon already
+reports them at `/monitoring`.
+
 ## Measuring the link (speedtest)
 
 The `speedtest` component vendors `librespeed-cli` — open source, pinned and

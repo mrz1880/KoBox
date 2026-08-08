@@ -618,6 +618,7 @@ export function buildContainer(name: string): Container {
     backupHost: new BackupHostAdapter(runner, db),
     backupSettings: backupSettings(),
     speedtest: new LibrespeedAdapter(runner, process.env.KOBOX_SPEEDTEST_BIN),
+    systemd: new SystemdAdapter(runner),
     speedtests: speedtestRepo,
     clock: nowStamp,
   });
