@@ -32,4 +32,8 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
   entry('*/2 * * * *', 'poll-debrid-downloads'),
   // files also appear and vanish over SFTP, outside any KoBox event
   entry('*/15 * * * *', 'index-media'),
+  // only the CHECK is scheduled. An admin who has to remember to click never
+  // finds out a security update is waiting; an unattended upgrade that restarts
+  // daemons at 5am is a different decision, and stays a button.
+  entry('40 5 * * *', 'check-package-updates'),
 ];

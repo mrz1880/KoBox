@@ -298,6 +298,22 @@ export const mediaFiles = sqliteTable(
   (table) => [unique().on(table.username, table.path)],
 );
 
+// The last journal excerpt captured for a unit, one row per unit. Replaced on
+// each capture: this is a diagnostic snapshot, not an archive.
+export const serviceLogs = sqliteTable('service_logs', {
+  unit: text('unit').primaryKey(),
+  content: text('content').notNull(),
+  capturedAt: text('captured_at').notNull(),
+});
+
+// What apt reports as upgradable, as a single replaced snapshot.
+export const packageSnapshot = sqliteTable('package_snapshot', {
+  id: integer('id').primaryKey(),
+  listing: text('listing').notNull(),
+  upgradableCount: integer('upgradable_count').notNull(),
+  checkedAt: text('checked_at').notNull(),
+});
+
 // Link measurements, kept as a series: one figure says little, a drift over
 // weeks says the connection is degrading.
 export const speedtests = sqliteTable('speedtests', {

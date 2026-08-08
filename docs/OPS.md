@@ -183,6 +183,51 @@ kobox-worker` from a shell.
 Disk, CPU, memory and network are **not** duplicated here — NanoMon already
 reports them at `/monitoring`.
 
+## Reading a unit's journal
+
+**Logs** shows the last 200 lines each KoBox unit wrote — nginx, kobox-portal,
+kobox-aria2, kobox-nanomon, fail2ban and kobox-worker. Same closed-set
+discipline as the restart control: `journalctl` on an arbitrary unit from a web
+page would hand over the whole host's journal, including sshd and every
+authentication failure on the box.
+
+`kobox-worker` **is** here, unlike the restart list: reading a journal costs the
+worker nothing, and its own log is usually the one that answers "why did that
+job fail". Reading is not restarting.
+
+An excerpt is a photograph, not a live feed. Nothing on that page refreshes on
+its own, so each card states when it was captured — an excerpt from three days
+ago diagnosed as if it were current is worse than no excerpt at all. The portal
+never reads a journal itself: it enqueues `capture-service-log`, the root worker
+runs `journalctl`, and the result lands in the database for the page to render.
+
+Each unit keeps exactly one excerpt: a new capture replaces the previous one.
+200 lines per unit per capture, archived forever, would grow the database
+without anyone ever reading the older copies.
+
+## System updates
+
+**Updates** shows what `apt` considers upgradable, and offers two buttons —
+deliberately two, never one:
+
+- **Check for updates** — `apt-get update` then `apt list --upgradable`. Free,
+  changes nothing, and also runs nightly at 05:40 (`kobox check-package-updates`,
+  a scheduler entry). An admin who has to remember to click never finds out a
+  security update has been waiting for a month.
+- **Install them** — `apt-get upgrade -y` with `--force-confold`, non-interactive.
+  This one restarts the daemons that were updated, so transfers can drop for a
+  moment. It never reboots, never removes a package, and is **never scheduled**:
+  an unattended upgrade restarting rtorrent at 05:40 is a different decision, and
+  it belongs to whoever runs the box.
+
+Applying re-checks immediately afterwards, so the screen reflects what is
+actually installed rather than the list that was there before.
+
+A conffile prompt would hang the worker until its timeout, so `DEBIAN_FRONTEND=
+noninteractive` and `--force-confold` are not optional: KoBox keeps your existing
+config files and tells you nothing was overwritten. If a package genuinely needs
+a config decision, make it from a shell.
+
 ## Measuring the link (speedtest)
 
 The `speedtest` component vendors `librespeed-cli` — open source, pinned and

@@ -72,6 +72,27 @@ exports[`job contract > should_keep_the_wire_contract_stable 1`] = `
     "properties": {},
     "type": "object",
   },
+  "apply-package-updates": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {},
+    "type": "object",
+  },
+  "capture-service-log": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "service": {
+        "maxLength": 64,
+        "minLength": 1,
+        "type": "string",
+      },
+    },
+    "required": [
+      "service",
+    ],
+    "type": "object",
+  },
   "change-password": {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "additionalProperties": false,
@@ -90,6 +111,12 @@ exports[`job contract > should_keep_the_wire_contract_stable 1`] = `
       "username",
       "passwordHash",
     ],
+    "type": "object",
+  },
+  "check-package-updates": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {},
     "type": "object",
   },
   "clear-debrid-key": {

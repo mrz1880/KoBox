@@ -3,14 +3,19 @@ import type { MailOutboxPort } from '../../../application/maintenance/MailOutbox
 import type { ReleaseRepositoryPort } from '../../../application/maintenance/ReleaseRepositoryPort.js';
 import type { ComponentRegistry, ComponentRecord } from '../../../domain/installation/ports.js';
 import type { SpeedtestRepositoryPort } from '../../../application/maintenance/SpeedtestPort.js';
+import type {
+  DiagnosticsRepositoryPort,
+  ServiceLogSnapshot,
+} from '../../../application/maintenance/DiagnosticsPort.js';
 import type { JobQueuePort } from '../../../application/jobs/JobQueuePort.js';
 import type { HealthCheckResult, HealthProbePort, UserRepository } from '../../../domain/user/ports.js';
 import { z } from 'zod';
-import { ManagedService } from '../../../domain/maintenance/ManagedService.js';
+import { LoggableService, ManagedService } from '../../../domain/maintenance/ManagedService.js';
 import { DomainError } from '../../../domain/shared/DomainError.js';
 import { buildJob } from '../../cli/buildJob.js';
 import { flashOf, redirectWithFlash, viewerOf, type Guards } from '../guards.js';
 import { adminHealthPage, adminMailsPage } from '../views/adminOpsPage.js';
+import { adminLogsPage, adminPackagesPage } from '../views/adminDiagnosticsPage.js';
 import { monitoringPage } from '../views/userPages.js';
 
 export interface AdminOpsDeps {
@@ -21,9 +26,10 @@ export interface AdminOpsDeps {
   readonly queue: JobQueuePort;
   readonly releases: ReleaseRepositoryPort;
   readonly outbox: MailOutboxPort;
+  readonly diagnostics: DiagnosticsRepositoryPort;
 }
 
-const restartServiceSchema = z.object({ service: z.string().min(1).max(64) });
+const serviceSchema = z.object({ service: z.string().min(1).max(64) });
 
 export function registerAdminOpsRoutes(
   server: FastifyInstance,
@@ -83,7 +89,7 @@ export function registerAdminOpsRoutes(
     if (session === undefined) {
       return;
     }
-    const parsed = restartServiceSchema.safeParse(request.body);
+    const parsed = serviceSchema.safeParse(request.body);
     if (!parsed.success) {
       return reply.code(400).send();
     }
@@ -112,6 +118,84 @@ export function registerAdminOpsRoutes(
       reply,
       '/admin/health',
       id === undefined ? 'A measurement is already running.' : 'Measuring the link.',
+    );
+  });
+
+  server.get('/admin/logs', async (request, reply) => {
+    const session = await guards.requireAdmin(request, reply);
+    if (session === undefined) {
+      return;
+    }
+    const found = await Promise.all(
+      LoggableService.all().map((unit) => deps.diagnostics.findLog(unit)),
+    );
+    const snapshots = found.filter(
+      (snapshot): snapshot is ServiceLogSnapshot => snapshot !== undefined,
+    );
+    return reply
+      .type('text/html')
+      .send(adminLogsPage(snapshots, viewerOf(session), flashOf(request)));
+  });
+
+  server.post('/admin/logs/capture', async (request, reply) => {
+    const session = await guards.requireAdminCsrf(request, reply);
+    if (session === undefined) {
+      return;
+    }
+    const parsed = serviceSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.code(400).send();
+    }
+    // same closed-set discipline as the restart: journalctl never sees a unit
+    // name that did not survive the domain type
+    let service: LoggableService;
+    try {
+      service = LoggableService.parse(parsed.data.service);
+    } catch (error) {
+      if (error instanceof DomainError) {
+        return reply.code(400).send();
+      }
+      throw error;
+    }
+    await deps.queue.enqueue(buildJob.captureServiceLog({ service: service.value }));
+    return redirectWithFlash(reply, '/admin/logs', `Capturing the ${service.value} journal.`);
+  });
+
+  server.get('/admin/packages', async (request, reply) => {
+    const session = await guards.requireAdmin(request, reply);
+    if (session === undefined) {
+      return;
+    }
+    const snapshot = await deps.diagnostics.findPackages();
+    return reply
+      .type('text/html')
+      .send(adminPackagesPage(snapshot, viewerOf(session), flashOf(request)));
+  });
+
+  server.post('/admin/packages/check', async (request, reply) => {
+    const session = await guards.requireAdminCsrf(request, reply);
+    if (session === undefined) {
+      return;
+    }
+    // enqueueUnique: apt takes a lock, so a second check would only sit and wait
+    const id = await deps.queue.enqueueUnique(buildJob.checkPackageUpdates());
+    return redirectWithFlash(
+      reply,
+      '/admin/packages',
+      id === undefined ? 'A check is already running.' : 'Checking for updates.',
+    );
+  });
+
+  server.post('/admin/packages/apply', async (request, reply) => {
+    const session = await guards.requireAdminCsrf(request, reply);
+    if (session === undefined) {
+      return;
+    }
+    const id = await deps.queue.enqueueUnique(buildJob.applyPackageUpdates());
+    return redirectWithFlash(
+      reply,
+      '/admin/packages',
+      id === undefined ? 'An update is already running.' : 'Installing the updates.',
     );
   });
 

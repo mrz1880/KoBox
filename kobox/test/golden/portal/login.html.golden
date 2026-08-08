@@ -43,6 +43,20 @@ th, td {
 }
 th { color: var(--muted); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.06em; }
 td.num, td.mono { font-family: ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+.mono { font-family: ui-monospace, monospace; }
+/* Diagnostics: a captured excerpt and the panel that frames it. The excerpt
+   scrolls inside its own box — a 200-line journal must not stretch the page. */
+.panel {
+  border: 1px solid var(--line); border-radius: 6px; background: var(--panel);
+  padding: 0.9rem 1rem; margin: 0.6rem 0;
+}
+.panel .eyebrow { display: flex; gap: 0.6rem; align-items: baseline; }
+.panel .lead { font-size: 1.05rem; margin: 0.3rem 0 0.6rem; }
+.log {
+  font-family: ui-monospace, monospace; font-size: 0.78rem; line-height: 1.45;
+  max-height: 22rem; overflow: auto; white-space: pre; margin: 0.6rem 0 0;
+  padding: 0.7rem; border-radius: 4px; background: var(--bg); border: 1px solid var(--line);
+}
 /* timestamps claim the width they need instead of breaking mid-value */
 td.when {
   white-space: nowrap; width: 1%; font-family: ui-monospace, monospace;

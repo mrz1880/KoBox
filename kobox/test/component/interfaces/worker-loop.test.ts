@@ -4,6 +4,7 @@ import type { BackupHostPort } from '../../../src/application/maintenance/Backup
 import type { MailDelivery } from '../../../src/application/maintenance/MailTransportPort.js';
 import { InMemoryMediaRepository } from '../../../src/infrastructure/persistence/InMemoryMediaRepository.js';
 import { FakeSystemd } from '../../../src/infrastructure/system/fakes/FakeSystemd.js';
+import { InMemoryDiagnosticsRepository } from '../../../src/infrastructure/persistence/InMemoryDiagnosticsRepository.js';
 import { InMemorySpeedtestRepository } from '../../../src/infrastructure/persistence/InMemorySpeedtestRepository.js';
 import { InMemoryMailOutbox } from '../../../src/infrastructure/persistence/InMemoryMailOutbox.js';
 import type { ClaimedJob, JobQueuePort } from '../../../src/application/jobs/JobQueuePort.js';
@@ -169,6 +170,7 @@ interface World {
   pki: FakeVpnPki;
   ipset: FakeIpset;
   outbox: InMemoryMailOutbox;
+  diagnostics: InMemoryDiagnosticsRepository;
   mailTransport: RecordingMailTransport;
   worker: JobWorker;
   hasher: FakePasswordHasher;
@@ -337,6 +339,7 @@ beforeEach(() => {
   });
   const queue = new InMemoryJobQueue();
   const outbox = new InMemoryMailOutbox();
+  const diagnosticsRepo = new InMemoryDiagnosticsRepository();
   const mailTransport = new RecordingMailTransport();
   const maintenanceUseCases = buildMaintenanceUseCases({
     outbox,
@@ -346,6 +349,12 @@ beforeEach(() => {
     speedtest: { measure: () => Promise.reject(new Error('no speedtest in this suite')) },
     speedtests: new InMemorySpeedtestRepository(),
     systemd: new FakeSystemd(),
+    logs: { tail: (service) => Promise.resolve(`journal for ${service.value}`) },
+    packageUpdates: {
+      listUpgradable: () => Promise.resolve({ listing: 'nginx/stable 1.2 upgradable from 1.1', count: 1 }),
+      upgradeAll: () => Promise.resolve('1 upgraded'),
+    },
+    diagnostics: diagnosticsRepo,
     clock: () => '2026-07-25 10:00:00',
   });
   const ddlUseCases = buildDdlUseCases({
@@ -386,6 +395,7 @@ beforeEach(() => {
     ipset,
     outbox,
     mailTransport,
+    diagnostics: diagnosticsRepo,
     worker: new JobWorker(
       queue,
       useCases,
@@ -833,5 +843,44 @@ describe('ipset chain (blocklists -> kernel set)', () => {
     expect(world.queue.statusOf(id)).toBe('done'); // honest skip, not a failure
     expect(world.ipset.restored).toEqual([]);
     expect(world.networkFiles.contentAt('/etc/kobox/blocklist.ipset')).toContain('flush kobox-bl-next');
+  });
+});
+
+describe('diagnostics jobs', () => {
+  it('should_store_a_units_journal_when_capturing_its_log', async () => {
+    await world.queue.enqueue(buildJob.captureServiceLog({ service: 'kobox-worker' }));
+
+    await world.worker.drain();
+
+    const snapshot = await world.diagnostics.findLog('kobox-worker');
+    expect(snapshot?.content).toContain('journal for kobox-worker');
+    expect(snapshot?.capturedAt).toBe('2026-07-25 10:00:00');
+  });
+
+  it('should_store_what_apt_reports_when_checking_for_updates', async () => {
+    await world.queue.enqueue(buildJob.checkPackageUpdates());
+
+    await world.worker.drain();
+
+    const snapshot = await world.diagnostics.findPackages();
+    expect(snapshot?.upgradableCount).toBe(1);
+    expect(snapshot?.listing).toContain('nginx/stable');
+  });
+
+  it('should_refresh_the_listing_after_applying_so_the_screen_is_not_stale', async () => {
+    // a listing left untouched after an upgrade would still advertise the
+    // packages that were just installed
+    await world.diagnostics.savePackages({
+      listing: 'stale',
+      upgradableCount: 99,
+      checkedAt: '2026-07-20 08:00:00',
+    });
+
+    await world.queue.enqueue(buildJob.applyPackageUpdates());
+    await world.worker.drain();
+
+    const snapshot = await world.diagnostics.findPackages();
+    expect(snapshot?.upgradableCount).toBe(1);
+    expect(snapshot?.checkedAt).toBe('2026-07-25 10:00:00');
   });
 });
