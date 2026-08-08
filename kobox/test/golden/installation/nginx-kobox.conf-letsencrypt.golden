@@ -78,6 +78,11 @@ server {
     }
 
     # NanoMon host monitoring (localhost), admin-only through the portal
+    location /internal-media/ {
+        internal;
+        alias /home/;
+    }
+
     location /monitoring/ {
         auth_request /internal/auth/admin;
         proxy_pass http://127.0.0.1:8191/;

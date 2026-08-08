@@ -30,4 +30,6 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
   entry('30 5 * * *', 'run-backup'),
   // advance in-flight debrid downloads (aria2 status -> place / fail)
   entry('*/2 * * * *', 'poll-debrid-downloads'),
+  // files also appear and vanish over SFTP, outside any KoBox event
+  entry('*/15 * * * *', 'index-media'),
 ];

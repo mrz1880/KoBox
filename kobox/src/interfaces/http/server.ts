@@ -15,6 +15,7 @@ import type { VpnProfileStorePort } from '../../application/portal/ports.js';
 import type { PortalCredentialsPort } from '../../domain/portal/ports.js';
 import type { ComponentRegistry } from '../../domain/installation/ports.js';
 import type { SpeedtestRepositoryPort } from '../../application/maintenance/SpeedtestPort.js';
+import type { MediaRepository } from '../../domain/media/ports.js';
 import type {
   DebridAccountRepository,
   DebridDownloadRepository,
@@ -62,6 +63,7 @@ export interface PortalServerDeps {
   readonly requestDownload: RequestDebridDownload;
   readonly debridAccounts: DebridAccountRepository;
   readonly debridEncryptor: DebridKeyEncryptorPort;
+  readonly media: MediaRepository;
   readonly logger?: Logger;
 }
 

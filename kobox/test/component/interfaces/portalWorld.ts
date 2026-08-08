@@ -16,6 +16,7 @@ import { InMemoryBlocklistRepository } from '../../../src/infrastructure/persist
 import { InMemoryFairUseRepository } from '../../../src/infrastructure/persistence/InMemoryFairUseRepository.js';
 import { InMemoryComponentRegistry } from '../../../src/infrastructure/persistence/InMemoryComponentRegistry.js';
 import { InMemorySpeedtestRepository } from '../../../src/infrastructure/persistence/InMemorySpeedtestRepository.js';
+import { InMemoryMediaRepository } from '../../../src/infrastructure/persistence/InMemoryMediaRepository.js';
 import { InMemoryDebridAccountRepository } from '../../../src/infrastructure/persistence/InMemoryDebridAccountRepository.js';
 import { InMemoryDebridDownloadRepository } from '../../../src/infrastructure/persistence/InMemoryDebridDownloadRepository.js';
 import { InMemoryLoginAttemptsRepository } from '../../../src/infrastructure/persistence/InMemoryLoginAttemptsRepository.js';
@@ -117,6 +118,7 @@ export interface PortalWorld {
   readonly outbox: InMemoryMailOutbox;
   readonly downloads: InMemoryDebridDownloadRepository;
   readonly debridAccounts: InMemoryDebridAccountRepository;
+  readonly media: InMemoryMediaRepository;
 }
 
 // Builds a portal server over in-memory fakes with two accounts:
@@ -136,6 +138,7 @@ export async function buildPortalWorld(
   const debridAccounts = new InMemoryDebridAccountRepository();
   // the portal seals with the public half only; this fake makes that visible
   const debridEncryptor = new FakeDebridEncryptor();
+  const media = new InMemoryMediaRepository();
   const authDeps = { users, credentials, sessions, attempts, tokens, hasher };
   const server = buildPortalServer({
     login: new Login(authDeps),
@@ -161,6 +164,7 @@ export async function buildPortalWorld(
     requestDownload: new RequestDebridDownload({ repo: downloads, queue, clock: () => NOW }),
     debridAccounts,
     debridEncryptor,
+    media,
     ...extra,
   });
   await users.save(new UserBuilder().build());
@@ -180,7 +184,7 @@ export async function buildPortalWorld(
     { username: Username.parse('boss'), passwordHash: GOOD_HASH, role: 'admin' },
     NOW,
   );
-  return { server, users, credentials, sessions, queue, outbox, downloads, debridAccounts };
+  return { server, users, credentials, sessions, queue, outbox, downloads, debridAccounts, media };
 }
 
 export interface AgentSession {

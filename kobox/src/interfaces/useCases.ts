@@ -25,6 +25,8 @@ import { AddWatchDir } from '../application/torrent/AddWatchDir.js';
 import { DeprovisionRtorrentInstance } from '../application/torrent/DeprovisionRtorrentInstance.js';
 import { HandleTorrentEvent } from '../application/torrent/HandleTorrentEvent.js';
 import { RestartRtorrentInstance } from '../application/torrent/RestartRtorrentInstance.js';
+import { IndexUserMedia } from '../application/media/IndexUserMedia.js';
+import type { MediaRepository, MediaScanPort } from '../domain/media/ports.js';
 import { ProvisionRtorrentInstance } from '../application/torrent/ProvisionRtorrentInstance.js';
 import { RenderRtorrentConfig } from '../application/torrent/RenderRtorrentConfig.js';
 import { RenderRutorrentUsers } from '../application/torrent/RenderRutorrentUsers.js';
@@ -172,6 +174,9 @@ export function buildMaintenanceUseCases(deps: MaintenanceUseCaseDeps): Maintena
 
 export interface TorrentUseCaseDeps {
   readonly users: UserRepository;
+  readonly mediaScanner: MediaScanPort;
+  readonly media: MediaRepository;
+  readonly clock: () => string;
   readonly instances: TorrentInstanceRepository;
   readonly torrents: TorrentRepository;
   readonly config: RtorrentConfigPort;
@@ -197,6 +202,7 @@ export interface TorrentUseCases {
   readonly handleEvent: HandleTorrentEvent;
   readonly renderRutorrentUsers: RenderRutorrentUsers;
   readonly restart: RestartRtorrentInstance;
+  readonly indexMedia: IndexUserMedia;
 }
 
 export interface TrackerUseCaseDeps {
@@ -313,6 +319,12 @@ export function buildTorrentUseCases(deps: TorrentUseCaseDeps): TorrentUseCases 
       reload: deps.nginx,
     }),
     restart: new RestartRtorrentInstance({ users: deps.users, services: deps.services }),
+    indexMedia: new IndexUserMedia({
+      users: deps.users,
+      scanner: deps.mediaScanner,
+      repo: deps.media,
+      clock: deps.clock,
+    }),
   };
 }
 

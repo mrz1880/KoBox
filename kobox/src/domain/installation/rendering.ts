@@ -483,6 +483,16 @@ export function renderNginxVhost(settings: NginxVhostSettings): RenderedFile {
       '    }',
       '',
       '    # NanoMon host monitoring (localhost), admin-only through the portal',
+      // The bytes of a user's completed downloads. `internal` means a browser
+      // can never request this directly: it is reachable only through an
+      // X-Accel-Redirect the portal emits after checking the session and that
+      // the file belongs to that user. nginx handles range requests, so seeking
+      // in a video works without the portal ever touching disk.
+      '    location /internal-media/ {',
+      '        internal;',
+      '        alias /home/;',
+      '    }',
+      '',
       '    location /monitoring/ {',
       '        auth_request /internal/auth/admin;',
       `        proxy_pass http://127.0.0.1:${String(NANOMON_PORT)}/;`,

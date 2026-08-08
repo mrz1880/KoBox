@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { parseJob, type Job } from '../../../src/application/jobs/contract.js';
 import type { BackupHostPort } from '../../../src/application/maintenance/BackupHostPort.js';
 import type { MailDelivery } from '../../../src/application/maintenance/MailTransportPort.js';
+import { InMemoryMediaRepository } from '../../../src/infrastructure/persistence/InMemoryMediaRepository.js';
 import { InMemorySpeedtestRepository } from '../../../src/infrastructure/persistence/InMemorySpeedtestRepository.js';
 import { InMemoryMailOutbox } from '../../../src/infrastructure/persistence/InMemoryMailOutbox.js';
 import type { ClaimedJob, JobQueuePort } from '../../../src/application/jobs/JobQueuePort.js';
@@ -256,6 +257,9 @@ beforeEach(() => {
     templates: loadRtorrentTemplates(),
     settings: { koboxBin: '/usr/local/bin/kobox' },
     nginx: new FakeNetworkServices(),
+    mediaScanner: { scan: () => Promise.resolve([]) },
+    media: new InMemoryMediaRepository(),
+    clock: () => '2026-07-25 10:00:00',
   });
   const trackers = new InMemoryTrackerRepository();
   const blocklists = new InMemoryBlocklistRepository();

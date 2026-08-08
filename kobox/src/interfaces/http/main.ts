@@ -53,6 +53,7 @@ async function main(): Promise<void> {
     debridAccounts: container.debridAccountRepo,
     // public half only: this process can seal a key, never open one
     debridEncryptor: container.debridEncryptor,
+    media: container.media,
   });
 
   const port = Number(process.env.KOBOX_PORTAL_HTTP_PORT ?? DEFAULT_PORTAL_HTTP_PORT);

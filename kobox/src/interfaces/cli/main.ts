@@ -546,6 +546,18 @@ program
   });
 
 program
+  .command('index-media')
+  .description('refresh the per-user media listing (cron entry point)')
+  .action(async () => {
+    const c = container();
+    const id = await c.queue.enqueueUnique(buildJob.indexMedia());
+    await done(
+      c,
+      id === undefined ? 'index-media already pending' : `job ${String(id)} enqueued: index-media`,
+    );
+  });
+
+program
   .command('run-speedtest')
   .description('measure what the link can carry (saturates it — admin action, never scheduled)')
   .action(async () => {

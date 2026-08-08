@@ -6,6 +6,9 @@ import type { VpnProfileStorePort } from '../../../application/portal/ports.js';
 import { DownloadCategory } from '../../../domain/ddl/DownloadCategory.js';
 import { FilehosterLink } from '../../../domain/ddl/FilehosterLink.js';
 import { DebridApiKey } from '../../../domain/ddl/DebridApiKey.js';
+import { MediaPath, type MediaFile } from '../../../domain/media/MediaFile.js';
+import type { MediaRepository } from '../../../domain/media/ports.js';
+import type { Username } from '../../../domain/user/Username.js';
 import type {
   DebridAccountRepository,
   DebridDownloadRepository,
@@ -24,6 +27,8 @@ import {
   accessPage,
   adminHomePage,
   downloadsPage,
+  mediaPage,
+  mediaWatchPage,
   passwordPage,
   rutorrentPage,
   userHomePage,
@@ -78,6 +83,30 @@ function parseDebridKey(raw: string | undefined): DebridApiKey | undefined {
   }
 }
 
+// A file is served only when it parses as a relative path AND appears in this
+// user's own index. Two independent gates: a crafted path cannot escape, and a
+// valid-looking path belonging to someone else is simply not found.
+async function ownFile(
+  deps: Pick<UserRoutesDeps, 'media'>,
+  session: { readonly username: Username },
+  request: { readonly query: unknown },
+): Promise<MediaFile | undefined> {
+  const raw = (request.query as Record<string, unknown>).path;
+  if (typeof raw !== 'string') {
+    return undefined;
+  }
+  let path: MediaPath;
+  try {
+    path = MediaPath.parse(raw);
+  } catch (error) {
+    if (error instanceof DomainError) {
+      return undefined;
+    }
+    throw error;
+  }
+  return deps.media.find(session.username, path);
+}
+
 export interface UserRoutesDeps {
   readonly users: UserRepository;
   readonly fairUse: FairUseRepository;
@@ -90,6 +119,7 @@ export interface UserRoutesDeps {
   readonly debridAccounts: DebridAccountRepository;
   // the portal holds the PUBLIC half only — it can seal a key, never open one
   readonly debridEncryptor: DebridKeyEncryptorPort;
+  readonly media: MediaRepository;
 }
 
 // One channel of the console, assembled from what the portal can read in the
@@ -276,6 +306,46 @@ export function registerUserRoutes(
     // restart their own instance
     await deps.queue.enqueue(buildJob.restartRtorrent({ username: session.username.value }));
     return redirectWithFlash(reply, '/rutorrent', 'Restarting your rtorrent.');
+  });
+
+  server.get('/media', async (request, reply) => {
+    const session = await guards.requireSession(request, reply);
+    if (session === undefined) {
+      return;
+    }
+    const files = await deps.media.listFor(session.username);
+    return reply.type('text/html').send(mediaPage(viewerOf(session), files, flashOf(request)));
+  });
+
+  server.get('/media/watch', async (request, reply) => {
+    const session = await guards.requireSession(request, reply);
+    if (session === undefined) {
+      return;
+    }
+    const file = await ownFile(deps, session, request);
+    if (file === undefined) {
+      return reply.code(404).send();
+    }
+    return reply.type('text/html').send(mediaWatchPage(viewerOf(session), file));
+  });
+
+  // The bytes themselves. The portal only AUTHORISES: it hands nginx an internal
+  // path and nginx streams the file, which is what makes seeking work (range
+  // requests) and keeps this process without any disk access of its own.
+  server.get('/media/file', async (request, reply) => {
+    const session = await guards.requireSession(request, reply);
+    if (session === undefined) {
+      return;
+    }
+    const file = await ownFile(deps, session, request);
+    if (file === undefined) {
+      return reply.code(404).send();
+    }
+    return reply
+      .header('x-accel-redirect', `/internal-media/${session.username.value}/${file.path.value}`)
+      .header('content-disposition', `inline; filename="${file.path.name}"`)
+      .code(200)
+      .send();
   });
 
   server.get('/access', async (request, reply) => {

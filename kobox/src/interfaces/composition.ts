@@ -32,6 +32,7 @@ import { SendmailTransport } from '../infrastructure/notifications/SendmailTrans
 import { SqliteMailOutbox } from '../infrastructure/persistence/SqliteMailOutbox.js';
 import { SqliteMysbDumpSource } from '../infrastructure/persistence/SqliteMysbDumpSource.js';
 import { SqliteDebridAccountRepository } from '../infrastructure/persistence/SqliteDebridAccountRepository.js';
+import { SqliteMediaRepository } from '../infrastructure/persistence/SqliteMediaRepository.js';
 import { SqliteSpeedtestRepository } from '../infrastructure/persistence/SqliteSpeedtestRepository.js';
 import { SqliteDebridDownloadRepository } from '../infrastructure/persistence/SqliteDebridDownloadRepository.js';
 import {
@@ -44,6 +45,7 @@ import { RequestDebridDownload } from '../application/ddl/RequestDebridDownload.
 import type { DebridKeyEncryptorPort } from '../domain/ddl/ports.js';
 import type { JobQueuePort } from '../application/jobs/JobQueuePort.js';
 import { StoredDebridCredentials } from '../infrastructure/system/StoredDebridCredentials.js';
+import { FsMediaScanner } from '../infrastructure/system/FsMediaScanner.js';
 import { LibrespeedAdapter } from '../infrastructure/system/LibrespeedAdapter.js';
 import { AllDebridAdapter } from '../infrastructure/system/AllDebridAdapter.js';
 import { Aria2Adapter } from '../infrastructure/system/Aria2Adapter.js';
@@ -394,6 +396,7 @@ export interface Container {
   readonly outbox: SqliteMailOutbox;
   readonly ddlUseCases: DdlUseCases;
   readonly speedtestRepo: SqliteSpeedtestRepository;
+  readonly mediaRepo: SqliteMediaRepository;
   readonly debridDownloadRepo: SqliteDebridDownloadRepository;
   readonly debridAccountRepo: SqliteDebridAccountRepository;
   readonly debridCipher: RsaDebridKeyCipher;
@@ -450,6 +453,7 @@ export interface PortalContainer {
   readonly debridDownloadRepo: SqliteDebridDownloadRepository;
   readonly debridAccountRepo: SqliteDebridAccountRepository;
   readonly debridEncryptor: DebridKeyEncryptorPort;
+  readonly media: SqliteMediaRepository;
   readonly requestDownload: RequestDebridDownload;
 }
 
@@ -480,6 +484,7 @@ export function buildPortalContainer(name: string): PortalContainer {
     outbox: new SqliteMailOutbox(db),
     debridDownloadRepo,
     debridAccountRepo: new SqliteDebridAccountRepository(db),
+    media: new SqliteMediaRepository(db),
     debridEncryptor: new RsaDebridKeyCipher(
       process.env.KOBOX_DEBRID_PUBLIC_KEY ?? DEFAULT_DEBRID_PUBLIC_KEY,
       process.env.KOBOX_DEBRID_PRIVATE_KEY ?? DEFAULT_DEBRID_PRIVATE_KEY,
@@ -532,6 +537,7 @@ export function buildContainer(name: string): Container {
     strict: process.env.KOBOX_STRICT_SERVICES === '1',
     tolerateAbsent: ['dnscrypt-proxy'],
   });
+  const mediaRepo = new SqliteMediaRepository(db);
   const torrentUseCases = buildTorrentUseCases({
     users: repo,
     instances: new SqliteTorrentInstanceRepository(db),
@@ -546,6 +552,9 @@ export function buildContainer(name: string): Container {
     templates: loadRtorrentTemplates(),
     settings: { koboxBin: process.env.KOBOX_BIN ?? DEFAULT_KOBOX_BIN },
     nginx: networkServices,
+    mediaScanner: new FsMediaScanner(),
+    media: mediaRepo,
+    clock: nowStamp,
   });
   const iblocklistUser = process.env.KOBOX_IBLOCKLIST_USER;
   const iblocklistPin = process.env.KOBOX_IBLOCKLIST_PIN;
@@ -658,6 +667,7 @@ export function buildContainer(name: string): Container {
     ),
     ddlUseCases,
     speedtestRepo,
+    mediaRepo,
     debridDownloadRepo,
     debridAccountRepo,
     debridCipher,
