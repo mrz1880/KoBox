@@ -3,6 +3,7 @@ import type { MailOutboxPort } from '../../../application/maintenance/MailOutbox
 import type { ReleaseRepositoryPort } from '../../../application/maintenance/ReleaseRepositoryPort.js';
 import type { ComponentRegistry, ComponentRecord } from '../../../domain/installation/ports.js';
 import type { SpeedtestRepositoryPort } from '../../../application/maintenance/SpeedtestPort.js';
+import type { ConfigFileReaderPort } from '../../../application/installation/ConfigFileReaderPort.js';
 import type {
   DiagnosticsRepositoryPort,
   ServiceLogSnapshot,
@@ -11,11 +12,13 @@ import type { JobQueuePort } from '../../../application/jobs/JobQueuePort.js';
 import type { HealthCheckResult, HealthProbePort, UserRepository } from '../../../domain/user/ports.js';
 import { z } from 'zod';
 import { LoggableService, ManagedService } from '../../../domain/maintenance/ManagedService.js';
+import { ConfigDocument } from '../../../domain/installation/ConfigDocument.js';
 import { DomainError } from '../../../domain/shared/DomainError.js';
 import { buildJob } from '../../cli/buildJob.js';
 import { flashOf, redirectWithFlash, viewerOf, type Guards } from '../guards.js';
 import { adminHealthPage, adminMailsPage } from '../views/adminOpsPage.js';
 import { adminLogsPage, adminPackagesPage } from '../views/adminDiagnosticsPage.js';
+import { adminConfigPage } from '../views/adminConfigPage.js';
 import { monitoringPage } from '../views/userPages.js';
 
 export interface AdminOpsDeps {
@@ -27,9 +30,12 @@ export interface AdminOpsDeps {
   readonly releases: ReleaseRepositoryPort;
   readonly outbox: MailOutboxPort;
   readonly diagnostics: DiagnosticsRepositoryPort;
+  readonly configFiles: ConfigFileReaderPort;
 }
 
 const serviceSchema = z.object({ service: z.string().min(1).max(64) });
+// the query carries an id from a closed catalog, never a path
+const configQuerySchema = z.object({ file: z.string().min(1).max(64).optional() });
 
 export function registerAdminOpsRoutes(
   server: FastifyInstance,
@@ -197,6 +203,30 @@ export function registerAdminOpsRoutes(
       '/admin/packages',
       id === undefined ? 'An update is already running.' : 'Installing the updates.',
     );
+  });
+
+  server.get('/admin/config', async (request, reply) => {
+    const session = await guards.requireAdmin(request, reply);
+    if (session === undefined) {
+      return;
+    }
+    const parsed = configQuerySchema.safeParse(request.query);
+    if (!parsed.success) {
+      return reply.code(400).send();
+    }
+    let selected: ConfigDocument | undefined;
+    if (parsed.data.file !== undefined) {
+      try {
+        selected = ConfigDocument.parse(parsed.data.file);
+      } catch (error) {
+        if (error instanceof DomainError) {
+          return reply.code(400).send();
+        }
+        throw error;
+      }
+    }
+    const found = selected === undefined ? undefined : await deps.configFiles.read(selected);
+    return reply.type('text/html').send(adminConfigPage(selected, found, viewerOf(session)));
   });
 
   server.get('/admin/mails', async (request, reply) => {

@@ -300,3 +300,62 @@ describe('package updates', () => {
     expect(world.queue.jobs).toHaveLength(0);
   });
 });
+
+describe('config files', () => {
+  it('should_list_every_catalogued_file_with_what_it_decides', async () => {
+    const response = await world.server.inject({
+      method: 'GET',
+      url: '/admin/config',
+      headers: { cookie: admin.cookie },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.body).toContain('/etc/cron.d/kobox');
+    expect(response.body).toContain('Scheduler');
+  });
+
+  it('should_show_a_files_content_when_one_is_selected', async () => {
+    const response = await world.server.inject({
+      method: 'GET',
+      url: '/admin/config?file=scheduler',
+      headers: { cookie: admin.cookie },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.body).toContain('kobox send-mails');
+  });
+
+  it('should_refuse_an_id_outside_the_catalogue', async () => {
+    const response = await world.server.inject({
+      method: 'GET',
+      url: '/admin/config?file=/etc/kobox/worker.env',
+      headers: { cookie: admin.cookie },
+    });
+
+    // the request carries an id, never a path: nothing here can be traversed
+    expect(response.statusCode).toBe(400);
+  });
+
+  it('should_say_so_when_the_component_was_never_installed', async () => {
+    const response = await world.server.inject({
+      method: 'GET',
+      url: '/admin/config?file=samba',
+      headers: { cookie: admin.cookie },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.body).toContain('not on this box');
+  });
+
+  it('should_refuse_a_non_admin', async () => {
+    const user = await loginAs(world, 'alice');
+
+    const response = await world.server.inject({
+      method: 'GET',
+      url: '/admin/config',
+      headers: { cookie: user.cookie },
+    });
+
+    expect(response.statusCode).toBe(403);
+  });
+});

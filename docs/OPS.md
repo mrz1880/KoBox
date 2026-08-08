@@ -228,6 +228,48 @@ noninteractive` and `--force-confold` are not optional: KoBox keeps your existin
 config files and tells you nothing was overwritten. If a package genuinely needs
 a config decision, make it from a shell.
 
+## Looking at the configuration
+
+**Config** shows every file KoBox writes onto the box, as it is on disk right
+now. Read-only — and read-only in the interface, not merely in the UI: the port
+the page depends on has a `read` method and nothing else, so there is no write,
+upload or delete to accidentally expose later. A screen that can edit `/etc`
+from a browser is a root shell, whatever the form around it looks like.
+
+The request carries a catalogue **id**, never a path. There is no path
+concatenation anywhere in the flow, so there is no traversal to defend against:
+an id that is not in the catalogue is a 400 before anything touches the disk.
+
+The catalogue is built at load time, and the constructor refuses any path that
+lives under `/etc/kobox` or `/etc/openvpn`, ends in `.env`/`.pem`/`.key`/`.crt`,
+or is named `*htpasswd*`. That is deliberate: the screen's safety argument is
+"no entry carries a secret", and an argument that lives only in a review comment
+is one nobody enforces. Adding an entry pointing at `worker.env` does not fail
+review — it fails to load.
+
+The portal reads these files **directly**, as the unprivileged `kobox-portal`
+user, with no job and no root. That only holds because every catalogued file
+installs world-readable, which is a property of the installer rather than of the
+reader — so the E2E asserts it on a real box: every catalogued file that exists
+must be readable by `kobox-portal`, and `worker.env` and `aria2.conf` must not.
+
+Two things are deliberately absent:
+
+- **The SSH drop-in** (`/etc/ssh/sshd_config.d/90-kobox.conf`). It holds no
+  secret, but KoBox installs it `0600`. Loosening a hardening file so a viewer
+  could read it would trade real protection for convenience, and listing it
+  while the read always fails would report "not on this box" for a file that is
+  right there. Read that one from a shell.
+- **Anything holding a secret** — `worker.env`, `portal.env`, `aria2.conf`
+  (it carries the RPC secret), the debrid private key, the VPN PKI, the nginx
+  htpasswd.
+
+A file that is simply missing reads as "not on this box", which is the normal
+answer when the component it belongs to was never installed — no NFS means no
+exports file. Content is capped at 256 KB and says so when it truncates: the
+per-user nginx map grows with the member list, and nothing should try to paint
+an unbounded file into a browser.
+
 ## Measuring the link (speedtest)
 
 The `speedtest` component vendors `librespeed-cli` — open source, pinned and

@@ -47,6 +47,7 @@ import type { DebridKeyEncryptorPort } from '../domain/ddl/ports.js';
 import type { JobQueuePort } from '../application/jobs/JobQueuePort.js';
 import { StoredDebridCredentials } from '../infrastructure/system/StoredDebridCredentials.js';
 import { FsMediaScanner } from '../infrastructure/system/FsMediaScanner.js';
+import { FsConfigFileReader } from '../infrastructure/system/FsConfigFileReader.js';
 import { JournaldLogAdapter } from '../infrastructure/system/JournaldLogAdapter.js';
 import { AptUpdateAdapter } from '../infrastructure/system/AptUpdateAdapter.js';
 import { LibrespeedAdapter } from '../infrastructure/system/LibrespeedAdapter.js';
@@ -454,6 +455,7 @@ export interface PortalContainer {
   readonly releaseRepo: SqliteReleaseRepository;
   readonly speedtests: SqliteSpeedtestRepository;
   readonly diagnostics: SqliteDiagnosticsRepository;
+  readonly configFiles: FsConfigFileReader;
   readonly outbox: SqliteMailOutbox;
   readonly debridDownloadRepo: SqliteDebridDownloadRepository;
   readonly debridAccountRepo: SqliteDebridAccountRepository;
@@ -488,6 +490,9 @@ export function buildPortalContainer(name: string): PortalContainer {
     speedtests: new SqliteSpeedtestRepository(db),
     // read-only from here: the portal displays captures, the worker makes them
     diagnostics: new SqliteDiagnosticsRepository(db),
+    // world-readable files only, from a closed catalog: no privilege needed,
+    // and no job either — a config screen must show what is on disk NOW
+    configFiles: new FsConfigFileReader(),
     outbox: new SqliteMailOutbox(db),
     debridDownloadRepo,
     debridAccountRepo: new SqliteDebridAccountRepository(db),
