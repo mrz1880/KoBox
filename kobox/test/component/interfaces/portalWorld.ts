@@ -119,6 +119,7 @@ export interface PortalWorld {
   readonly downloads: InMemoryDebridDownloadRepository;
   readonly debridAccounts: InMemoryDebridAccountRepository;
   readonly media: InMemoryMediaRepository;
+  readonly fairUse: InMemoryFairUseRepository;
 }
 
 // Builds a portal server over in-memory fakes with two accounts:
@@ -139,6 +140,7 @@ export async function buildPortalWorld(
   // the portal seals with the public half only; this fake makes that visible
   const debridEncryptor = new FakeDebridEncryptor();
   const media = new InMemoryMediaRepository();
+  const fairUse = new InMemoryFairUseRepository();
   const authDeps = { users, credentials, sessions, attempts, tokens, hasher };
   const server = buildPortalServer({
     login: new Login(authDeps),
@@ -152,7 +154,7 @@ export async function buildPortalWorld(
     blocklists: new InMemoryBlocklistRepository(),
     addresses: new InMemoryUserAddressRepository(),
     bindings: new InMemoryUserAddressRepository(),
-    fairUse: new InMemoryFairUseRepository(),
+    fairUse,
     health: new AllHealthyProbe(),
     components: new InMemoryComponentRegistry(),
     speedtests: new InMemorySpeedtestRepository(),
@@ -184,7 +186,7 @@ export async function buildPortalWorld(
     { username: Username.parse('boss'), passwordHash: GOOD_HASH, role: 'admin' },
     NOW,
   );
-  return { server, users, credentials, sessions, queue, outbox, downloads, debridAccounts, media };
+  return { server, users, credentials, sessions, queue, outbox, downloads, debridAccounts, media, fairUse };
 }
 
 export interface AgentSession {
