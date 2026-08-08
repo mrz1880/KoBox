@@ -30,6 +30,7 @@ import type {
 import type { HealthProbePort, PasswordHasherPort, UserRepository } from '../../domain/user/ports.js';
 import type { Logger } from '../../infrastructure/logging/logger.js';
 import { buildGuards, SESSION_COOKIE } from './guards.js';
+import type { DiagnosticsRepositoryPort } from '../../application/maintenance/DiagnosticsPort.js';
 import { registerAdminNetworkRoutes } from './routes/adminNetwork.js';
 import { registerAdminOpsRoutes } from './routes/adminOps.js';
 import { registerAdminTrackerRoutes } from './routes/adminTrackers.js';
@@ -55,6 +56,7 @@ export interface PortalServerDeps {
   readonly health: HealthProbePort;
   readonly components: ComponentRegistry;
   readonly speedtests: SpeedtestRepositoryPort;
+  readonly diagnostics: DiagnosticsRepositoryPort;
   readonly releases: ReleaseRepositoryPort;
   readonly outbox: MailOutboxPort;
   readonly credentials: PortalCredentialsPort;

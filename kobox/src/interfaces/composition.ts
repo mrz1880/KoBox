@@ -33,6 +33,7 @@ import { SqliteMailOutbox } from '../infrastructure/persistence/SqliteMailOutbox
 import { SqliteMysbDumpSource } from '../infrastructure/persistence/SqliteMysbDumpSource.js';
 import { SqliteDebridAccountRepository } from '../infrastructure/persistence/SqliteDebridAccountRepository.js';
 import { SqliteMediaRepository } from '../infrastructure/persistence/SqliteMediaRepository.js';
+import { SqliteDiagnosticsRepository } from '../infrastructure/persistence/SqliteDiagnosticsRepository.js';
 import { SqliteSpeedtestRepository } from '../infrastructure/persistence/SqliteSpeedtestRepository.js';
 import { SqliteDebridDownloadRepository } from '../infrastructure/persistence/SqliteDebridDownloadRepository.js';
 import {
@@ -46,6 +47,8 @@ import type { DebridKeyEncryptorPort } from '../domain/ddl/ports.js';
 import type { JobQueuePort } from '../application/jobs/JobQueuePort.js';
 import { StoredDebridCredentials } from '../infrastructure/system/StoredDebridCredentials.js';
 import { FsMediaScanner } from '../infrastructure/system/FsMediaScanner.js';
+import { JournaldLogAdapter } from '../infrastructure/system/JournaldLogAdapter.js';
+import { AptUpdateAdapter } from '../infrastructure/system/AptUpdateAdapter.js';
 import { LibrespeedAdapter } from '../infrastructure/system/LibrespeedAdapter.js';
 import { AllDebridAdapter } from '../infrastructure/system/AllDebridAdapter.js';
 import { Aria2Adapter } from '../infrastructure/system/Aria2Adapter.js';
@@ -396,6 +399,7 @@ export interface Container {
   readonly outbox: SqliteMailOutbox;
   readonly ddlUseCases: DdlUseCases;
   readonly speedtestRepo: SqliteSpeedtestRepository;
+  readonly diagnosticsRepo: SqliteDiagnosticsRepository;
   readonly mediaRepo: SqliteMediaRepository;
   readonly debridDownloadRepo: SqliteDebridDownloadRepository;
   readonly debridAccountRepo: SqliteDebridAccountRepository;
@@ -449,6 +453,7 @@ export interface PortalContainer {
   readonly componentRegistry: SqliteComponentRegistry;
   readonly releaseRepo: SqliteReleaseRepository;
   readonly speedtests: SqliteSpeedtestRepository;
+  readonly diagnostics: SqliteDiagnosticsRepository;
   readonly outbox: SqliteMailOutbox;
   readonly debridDownloadRepo: SqliteDebridDownloadRepository;
   readonly debridAccountRepo: SqliteDebridAccountRepository;
@@ -481,6 +486,8 @@ export function buildPortalContainer(name: string): PortalContainer {
     componentRegistry: new SqliteComponentRegistry(db),
     releaseRepo: new SqliteReleaseRepository(db),
     speedtests: new SqliteSpeedtestRepository(db),
+    // read-only from here: the portal displays captures, the worker makes them
+    diagnostics: new SqliteDiagnosticsRepository(db),
     outbox: new SqliteMailOutbox(db),
     debridDownloadRepo,
     debridAccountRepo: new SqliteDebridAccountRepository(db),
@@ -612,6 +619,7 @@ export function buildContainer(name: string): Container {
     settings,
   });
   const speedtestRepo = new SqliteSpeedtestRepository(db);
+  const diagnosticsRepo = new SqliteDiagnosticsRepository(db);
   const maintenanceUseCases = buildMaintenanceUseCases({
     outbox,
     transport: new SendmailTransport(runner),
@@ -620,6 +628,9 @@ export function buildContainer(name: string): Container {
     speedtest: new LibrespeedAdapter(runner, process.env.KOBOX_SPEEDTEST_BIN),
     systemd: new SystemdAdapter(runner),
     speedtests: speedtestRepo,
+    logs: new JournaldLogAdapter(runner),
+    packageUpdates: new AptUpdateAdapter(runner),
+    diagnostics: diagnosticsRepo,
     clock: nowStamp,
   });
   // DDL/debrid: debrid accounts are PER-USER — each key is stored sealed and is
@@ -668,6 +679,7 @@ export function buildContainer(name: string): Container {
     ),
     ddlUseCases,
     speedtestRepo,
+    diagnosticsRepo,
     mediaRepo,
     debridDownloadRepo,
     debridAccountRepo,

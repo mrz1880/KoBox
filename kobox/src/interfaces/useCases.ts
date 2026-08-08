@@ -38,6 +38,16 @@ import type { MailTransportPort } from '../application/maintenance/MailTransport
 import { RunBackup, type BackupSettings } from '../application/maintenance/RunBackup.js';
 import { RunSpeedtest } from '../application/maintenance/RunSpeedtest.js';
 import { RestartService } from '../application/maintenance/RestartService.js';
+import {
+  ApplyPackageUpdates,
+  CaptureServiceLog,
+  CheckPackageUpdates,
+} from '../application/maintenance/CaptureDiagnostics.js';
+import type {
+  DiagnosticsRepositoryPort,
+  PackageUpdatePort,
+  ServiceLogPort,
+} from '../application/maintenance/DiagnosticsPort.js';
 import type { SystemdPort } from '../domain/installation/ports.js';
 import type {
   SpeedtestPort,
@@ -153,6 +163,9 @@ export interface MaintenanceUseCaseDeps {
   readonly backupSettings: BackupSettings;
   readonly speedtest: SpeedtestPort;
   readonly systemd: SystemdPort;
+  readonly logs: ServiceLogPort;
+  readonly packageUpdates: PackageUpdatePort;
+  readonly diagnostics: DiagnosticsRepositoryPort;
   readonly speedtests: SpeedtestRepositoryPort;
   readonly clock: () => string;
 }
@@ -162,6 +175,9 @@ export interface MaintenanceUseCases {
   readonly runBackup: RunBackup;
   readonly runSpeedtest: RunSpeedtest;
   readonly restartService: RestartService;
+  readonly captureServiceLog: CaptureServiceLog;
+  readonly checkPackageUpdates: CheckPackageUpdates;
+  readonly applyPackageUpdates: ApplyPackageUpdates;
 }
 
 export function buildMaintenanceUseCases(deps: MaintenanceUseCaseDeps): MaintenanceUseCases {
@@ -169,6 +185,21 @@ export function buildMaintenanceUseCases(deps: MaintenanceUseCaseDeps): Maintena
     sendMails: new SendMails(deps),
     runBackup: new RunBackup({ backupHost: deps.backupHost, settings: deps.backupSettings }),
     restartService: new RestartService({ systemd: deps.systemd }),
+    captureServiceLog: new CaptureServiceLog({
+      logs: deps.logs,
+      repo: deps.diagnostics,
+      clock: deps.clock,
+    }),
+    checkPackageUpdates: new CheckPackageUpdates({
+      packages: deps.packageUpdates,
+      repo: deps.diagnostics,
+      clock: deps.clock,
+    }),
+    applyPackageUpdates: new ApplyPackageUpdates({
+      packages: deps.packageUpdates,
+      repo: deps.diagnostics,
+      clock: deps.clock,
+    }),
     runSpeedtest: new RunSpeedtest({
       speedtest: deps.speedtest,
       repo: deps.speedtests,

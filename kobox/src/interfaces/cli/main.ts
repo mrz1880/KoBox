@@ -572,6 +572,20 @@ program
   });
 
 program
+  .command('check-package-updates')
+  .description('record what apt considers upgradable (cron entry point)')
+  .action(async () => {
+    const c = container();
+    const id = await c.queue.enqueueUnique(buildJob.checkPackageUpdates());
+    await done(
+      c,
+      id === undefined
+        ? 'check-package-updates already pending'
+        : `job ${String(id)} enqueued: check-package-updates`,
+    );
+  });
+
+program
   .command('run-backup')
   .description('dump the database and KoBox configs into a TTL-rotated backup (cron entry point)')
   .action(async () => {

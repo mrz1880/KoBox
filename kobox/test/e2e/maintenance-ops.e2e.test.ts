@@ -230,7 +230,7 @@ describe.skipIf(!onDebianAsRoot)('E2E: maintenance keeps the installed box alive
         .split('\n')
         .filter((line) => line !== '' && !line.startsWith('#') && !/^[A-Z]+=/.test(line))
         .map((line) => line.split(' ').slice(6)); // five schedule fields + 'root'
-      expect(entries).toHaveLength(8);
+      expect(entries).toHaveLength(9);
 
       // a real tick: run the exact command cron would run — twice
       for (const round of [1, 2]) {
@@ -249,6 +249,7 @@ describe.skipIf(!onDebianAsRoot)('E2E: maintenance keeps the installed box alive
         'update-blocklists', 'renew-tracker-certs', 'run-backup',
         'poll-debrid-downloads',
         'index-media',
+        'check-package-updates',
       ]) {
         expect(counts.get(type)?.pending, type).toBe(1);
       }
@@ -264,6 +265,41 @@ describe.skipIf(!onDebianAsRoot)('E2E: maintenance keeps the installed box alive
       }
     },
     300_000,
+  );
+
+  it(
+    'should_capture_a_real_journal_and_a_real_apt_listing_through_the_worker',
+    async () => {
+      // The portal has no CLI for these two: it enqueues, the root worker runs
+      // journalctl and apt. Driving them from the jobs table is how a real
+      // click reaches this code — and the only way to find out that the real
+      // binaries behave as the adapters assume.
+      const db = openDb();
+      db.raw
+        .prepare('INSERT INTO jobs (type, payload_json) VALUES (?, ?)')
+        .run('capture-service-log', JSON.stringify({ service: 'kobox-worker' }));
+      db.close();
+
+      await waitFor('journal captured', () => {
+        const db2 = openDb();
+        const row = db2.raw
+          .prepare("SELECT content FROM service_logs WHERE unit = 'kobox-worker'")
+          .get() as { content: string } | undefined;
+        db2.close();
+        return row !== undefined && row.content.length > 0;
+      }, 120_000);
+
+      // the scheduler tick above already ran a check; the listing row proves
+      // apt-get update + apt list --upgradable both survived a real run
+      const db3 = openDb();
+      const packages = db3.raw
+        .prepare('SELECT upgradable_count, checked_at FROM package_snapshot WHERE id = 1')
+        .get() as { upgradable_count: number; checked_at: string } | undefined;
+      db3.close();
+      expect(packages?.checked_at).toBeTruthy();
+      expect(packages?.upgradable_count).toBeGreaterThanOrEqual(0);
+    },
+    180_000,
   );
 
   it(

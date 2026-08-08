@@ -85,6 +85,13 @@
       "when": 1786167406912,
       "tag": "0011_media-files",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1786181181725,
+      "tag": "0012_admin-diagnostics",
+      "breakpoints": true
     }
   ]
 }

@@ -1,7 +1,7 @@
 import { parseJob, type Job } from '../../application/jobs/contract.js';
 import type { JobQueuePort } from '../../application/jobs/JobQueuePort.js';
 import type { MailOutboxPort } from '../../application/maintenance/MailOutboxPort.js';
-import { ManagedService } from '../../domain/maintenance/ManagedService.js';
+import { LoggableService, ManagedService } from '../../domain/maintenance/ManagedService.js';
 import { parseRole } from '../../domain/portal/Role.js';
 import { DynDnsHost } from '../../domain/security/DynDnsHost.js';
 import { IpAddress } from '../../domain/shared/IpAddress.js';
@@ -350,6 +350,17 @@ export class JobWorker {
         await this.maintenance.restartService.execute({
           service: ManagedService.parse(job.payload.service),
         });
+        return;
+      case 'capture-service-log':
+        await this.maintenance.captureServiceLog.execute(
+          LoggableService.parse(job.payload.service),
+        );
+        return;
+      case 'check-package-updates':
+        await this.maintenance.checkPackageUpdates.execute();
+        return;
+      case 'apply-package-updates':
+        await this.maintenance.applyPackageUpdates.execute();
         return;
       case 'run-speedtest':
         await this.maintenance.runSpeedtest.execute();

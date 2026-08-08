@@ -15,6 +15,7 @@ import type { HealthCheckResult, HealthProbePort, PasswordHasherPort } from '../
 import { InMemoryBlocklistRepository } from '../../../src/infrastructure/persistence/InMemoryBlocklistRepository.js';
 import { InMemoryFairUseRepository } from '../../../src/infrastructure/persistence/InMemoryFairUseRepository.js';
 import { InMemoryComponentRegistry } from '../../../src/infrastructure/persistence/InMemoryComponentRegistry.js';
+import { InMemoryDiagnosticsRepository } from '../../../src/infrastructure/persistence/InMemoryDiagnosticsRepository.js';
 import { InMemorySpeedtestRepository } from '../../../src/infrastructure/persistence/InMemorySpeedtestRepository.js';
 import { InMemoryMediaRepository } from '../../../src/infrastructure/persistence/InMemoryMediaRepository.js';
 import { InMemoryDebridAccountRepository } from '../../../src/infrastructure/persistence/InMemoryDebridAccountRepository.js';
@@ -120,6 +121,7 @@ export interface PortalWorld {
   readonly debridAccounts: InMemoryDebridAccountRepository;
   readonly media: InMemoryMediaRepository;
   readonly fairUse: InMemoryFairUseRepository;
+  readonly diagnostics: InMemoryDiagnosticsRepository;
 }
 
 // Builds a portal server over in-memory fakes with two accounts:
@@ -141,6 +143,7 @@ export async function buildPortalWorld(
   const debridEncryptor = new FakeDebridEncryptor();
   const media = new InMemoryMediaRepository();
   const fairUse = new InMemoryFairUseRepository();
+  const diagnostics = new InMemoryDiagnosticsRepository();
   const authDeps = { users, credentials, sessions, attempts, tokens, hasher };
   const server = buildPortalServer({
     login: new Login(authDeps),
@@ -158,6 +161,7 @@ export async function buildPortalWorld(
     health: new AllHealthyProbe(),
     components: new InMemoryComponentRegistry(),
     speedtests: new InMemorySpeedtestRepository(),
+    diagnostics,
     releases: new InMemoryReleaseRepository(),
     outbox,
     credentials,
@@ -186,7 +190,7 @@ export async function buildPortalWorld(
     { username: Username.parse('boss'), passwordHash: GOOD_HASH, role: 'admin' },
     NOW,
   );
-  return { server, users, credentials, sessions, queue, outbox, downloads, debridAccounts, media, fairUse };
+  return { server, users, credentials, sessions, queue, outbox, downloads, debridAccounts, media, fairUse, diagnostics };
 }
 
 export interface AgentSession {

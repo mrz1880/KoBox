@@ -30,7 +30,7 @@ describe('maintenance rendering', () => {
     const entries = file.content
       .split('\n')
       .filter((line) => line !== '' && !line.startsWith('#') && !/^[A-Z]+=/.test(line));
-    expect(entries).toHaveLength(8);
+    expect(entries).toHaveLength(9);
     for (const line of entries) {
       expect(line).toMatch(/ root \/usr\/local\/bin\/kobox [a-z0-9-]+$/);
     }

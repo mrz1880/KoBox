@@ -47,6 +47,9 @@ export const JOB_TYPES = [
   'run-backup',
   'run-speedtest',
   'restart-service',
+  'capture-service-log',
+  'check-package-updates',
+  'apply-package-updates',
   'index-media',
   'apply-ipset',
   'set-fair-use-override',
@@ -168,6 +171,10 @@ export const jobPayloadSchemas = {
   'run-speedtest': z.strictObject({}),
   // the unit name is re-validated against the closed set in the worker
   'restart-service': z.strictObject({ service: z.string().min(1).max(64) }),
+  'capture-service-log': z.strictObject({ service: z.string().min(1).max(64) }),
+  'check-package-updates': z.strictObject({}),
+  // deliberately separate from the check: applying is the action with consequences
+  'apply-package-updates': z.strictObject({}),
   // refresh what each user has in their completed downloads
   'index-media': z.strictObject({}),
   'apply-ipset': z.strictObject({}),

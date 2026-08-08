@@ -181,3 +181,122 @@ describe('managed services', () => {
     expect(world.queue.jobs).toHaveLength(0);
   });
 });
+
+describe('service logs', () => {
+  it('should_enqueue_a_capture_for_a_unit_in_the_closed_set', async () => {
+    const response = await world.server.inject({
+      method: 'POST',
+      url: '/admin/logs/capture',
+      headers: { cookie: admin.cookie, 'content-type': 'application/x-www-form-urlencoded' },
+      payload: form({ _csrf: admin.csrf, service: 'kobox-worker' }),
+    });
+
+    expect(response.statusCode).toBe(303);
+    // the worker is readable even though it is not restartable from the portal
+    expect(world.queue.jobs[0]).toEqual({
+      type: 'capture-service-log',
+      payload: { service: 'kobox-worker' },
+    });
+  });
+
+  it('should_refuse_a_unit_outside_the_closed_set', async () => {
+    const response = await world.server.inject({
+      method: 'POST',
+      url: '/admin/logs/capture',
+      headers: { cookie: admin.cookie, 'content-type': 'application/x-www-form-urlencoded' },
+      payload: form({ _csrf: admin.csrf, service: 'sshd' }),
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(world.queue.jobs).toHaveLength(0);
+  });
+
+  it('should_show_the_captured_excerpt_with_its_capture_time', async () => {
+    await world.diagnostics.saveLog({
+      unit: 'nginx',
+      content: '2026-08-08T10:00:00 nginx: worker process exited',
+      capturedAt: '2026-08-08 10:01:00',
+    });
+
+    const response = await world.server.inject({
+      method: 'GET',
+      url: '/admin/logs',
+      headers: { cookie: admin.cookie },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.body).toContain('worker process exited');
+    // a stale excerpt must be visibly stale
+    expect(response.body).toContain('2026-08-08 10:01:00');
+  });
+
+  it('should_refuse_a_non_admin', async () => {
+    const user = await loginAs(world, 'alice');
+
+    const response = await world.server.inject({
+      method: 'GET',
+      url: '/admin/logs',
+      headers: { cookie: user.cookie },
+    });
+
+    expect(response.statusCode).toBe(403);
+  });
+});
+
+describe('package updates', () => {
+  it('should_enqueue_a_check', async () => {
+    const response = await world.server.inject({
+      method: 'POST',
+      url: '/admin/packages/check',
+      headers: { cookie: admin.cookie, 'content-type': 'application/x-www-form-urlencoded' },
+      payload: form({ _csrf: admin.csrf }),
+    });
+
+    expect(response.statusCode).toBe(303);
+    expect(world.queue.jobs[0]).toEqual({ type: 'check-package-updates', payload: {} });
+  });
+
+  it('should_enqueue_an_apply_separately_from_the_check', async () => {
+    const response = await world.server.inject({
+      method: 'POST',
+      url: '/admin/packages/apply',
+      headers: { cookie: admin.cookie, 'content-type': 'application/x-www-form-urlencoded' },
+      payload: form({ _csrf: admin.csrf }),
+    });
+
+    expect(response.statusCode).toBe(303);
+    expect(world.queue.jobs[0]).toEqual({ type: 'apply-package-updates', payload: {} });
+  });
+
+  it('should_show_the_last_listing_and_when_it_was_taken', async () => {
+    await world.diagnostics.savePackages({
+      listing: 'openssl/stable 3.0.15 upgradable from 3.0.14',
+      upgradableCount: 1,
+      checkedAt: '2026-08-08 09:00:00',
+    });
+
+    const response = await world.server.inject({
+      method: 'GET',
+      url: '/admin/packages',
+      headers: { cookie: admin.cookie },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.body).toContain('openssl/stable');
+    expect(response.body).toContain('2026-08-08 09:00:00');
+  });
+
+  it('should_refuse_a_non_admin', async () => {
+    const user = await loginAs(world, 'alice');
+
+    const response = await world.server.inject({
+      method: 'POST',
+      url: '/admin/packages/apply',
+      headers: { cookie: user.cookie, 'content-type': 'application/x-www-form-urlencoded' },
+      payload: form({ _csrf: user.csrf }),
+    });
+
+    expect(response.statusCode).toBe(403);
+    expect(world.queue.jobs).toHaveLength(0);
+  });
+});

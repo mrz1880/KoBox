@@ -44,6 +44,7 @@ async function main(): Promise<void> {
     health: container.healthProbe,
     components: container.componentRegistry,
     speedtests: container.speedtests,
+    diagnostics: container.diagnostics,
     releases: container.releaseRepo,
     outbox: container.outbox,
     credentials: container.credentials,
