@@ -525,3 +525,83 @@ describe('ruTorrent iframe', () => {
     expect(response.body).toContain('/ru/');
   });
 });
+
+describe('categories and sending', () => {
+  it('should_list_the_categories_a_member_owns', async () => {
+    const response = await world.server.inject({
+      method: 'GET',
+      url: '/sync',
+      headers: { cookie: user.cookie },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.body).toContain('films');
+  });
+
+  it('should_enqueue_a_new_category', async () => {
+    const response = await world.server.inject({
+      method: 'POST',
+      url: '/sync/categories',
+      headers: { cookie: user.cookie, 'content-type': 'application/x-www-form-urlencoded' },
+      payload: form({ _csrf: user.csrf, label: 'series' }),
+    });
+
+    expect(response.statusCode).toBe(303);
+    expect(world.queue.jobs[0]).toEqual({
+      type: 'add-watch-dir',
+      payload: { username: 'alice', label: 'series' },
+    });
+  });
+
+  it('should_refuse_a_label_that_would_not_be_a_safe_directory_name', async () => {
+    const response = await world.server.inject({
+      method: 'POST',
+      url: '/sync/categories',
+      headers: { cookie: user.cookie, 'content-type': 'application/x-www-form-urlencoded' },
+      payload: form({ _csrf: user.csrf, label: '../../etc' }),
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(world.queue.jobs).toHaveLength(0);
+  });
+
+  it('should_enqueue_a_mode_change_for_a_category', async () => {
+    const response = await world.server.inject({
+      method: 'POST',
+      url: '/sync/categories/mode',
+      headers: { cookie: user.cookie, 'content-type': 'application/x-www-form-urlencoded' },
+      payload: form({ _csrf: user.csrf, label: 'films', mode: 'immediate' }),
+    });
+
+    expect(response.statusCode).toBe(303);
+    expect(world.queue.jobs[0]).toEqual({
+      type: 'set-category-sync-mode',
+      payload: { username: 'alice', label: 'films', mode: 'immediate' },
+    });
+  });
+
+  it('should_refuse_a_mode_that_is_not_one_of_the_three', async () => {
+    const response = await world.server.inject({
+      method: 'POST',
+      url: '/sync/categories/mode',
+      headers: { cookie: user.cookie, 'content-type': 'application/x-www-form-urlencoded' },
+      payload: form({ _csrf: user.csrf, label: 'films', mode: 'always' }),
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(world.queue.jobs).toHaveLength(0);
+  });
+
+  it('should_never_let_a_member_touch_another_members_category', async () => {
+    // the username is taken from the session, never from the form
+    const response = await world.server.inject({
+      method: 'POST',
+      url: '/sync/categories/mode',
+      headers: { cookie: user.cookie, 'content-type': 'application/x-www-form-urlencoded' },
+      payload: form({ _csrf: user.csrf, label: 'films', mode: 'off', username: 'boss' }),
+    });
+
+    expect(response.statusCode).toBe(303);
+    expect(world.queue.jobs[0]?.payload).toMatchObject({ username: 'alice' });
+  });
+});

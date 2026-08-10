@@ -10,6 +10,9 @@ import type { DebridKeyEncryptorPort } from '../../../src/domain/ddl/ports.js';
 import { HashedPassword } from '../../../src/domain/user/HashedPassword.js';
 import type { Password } from '../../../src/domain/user/Password.js';
 import { Username } from '../../../src/domain/user/Username.js';
+import { RtorrentPort, ScgiPort } from '../../../src/domain/user/Port.js';
+import { Label } from '../../../src/domain/torrent/Label.js';
+import { TorrentInstance } from '../../../src/domain/torrent/TorrentInstance.js';
 import type { VpnProfileStorePort } from '../../../src/application/portal/ports.js';
 import type {
   ConfigFileContent,
@@ -20,6 +23,7 @@ import type { HealthCheckResult, HealthProbePort, PasswordHasherPort } from '../
 import { InMemoryBlocklistRepository } from '../../../src/infrastructure/persistence/InMemoryBlocklistRepository.js';
 import { InMemoryFairUseRepository } from '../../../src/infrastructure/persistence/InMemoryFairUseRepository.js';
 import { InMemoryComponentRegistry } from '../../../src/infrastructure/persistence/InMemoryComponentRegistry.js';
+import { InMemoryTorrentInstanceRepository } from '../../../src/infrastructure/persistence/InMemoryTorrentInstanceRepository.js';
 import { InMemoryDiagnosticsRepository } from '../../../src/infrastructure/persistence/InMemoryDiagnosticsRepository.js';
 import { InMemorySpeedtestRepository } from '../../../src/infrastructure/persistence/InMemorySpeedtestRepository.js';
 import { InMemoryMediaRepository } from '../../../src/infrastructure/persistence/InMemoryMediaRepository.js';
@@ -139,6 +143,7 @@ export interface PortalWorld {
   readonly media: InMemoryMediaRepository;
   readonly fairUse: InMemoryFairUseRepository;
   readonly diagnostics: InMemoryDiagnosticsRepository;
+  readonly instances: InMemoryTorrentInstanceRepository;
 }
 
 // Builds a portal server over in-memory fakes with two accounts:
@@ -161,6 +166,7 @@ export async function buildPortalWorld(
   const media = new InMemoryMediaRepository();
   const fairUse = new InMemoryFairUseRepository();
   const diagnostics = new InMemoryDiagnosticsRepository();
+  const instances = new InMemoryTorrentInstanceRepository();
   const authDeps = { users, credentials, sessions, attempts, tokens, hasher };
   const server = buildPortalServer({
     login: new Login(authDeps),
@@ -180,6 +186,7 @@ export async function buildPortalWorld(
     speedtests: new InMemorySpeedtestRepository(),
     diagnostics,
     configFiles: new OneFileOnDisk(),
+    instances,
     releases: new InMemoryReleaseRepository(),
     outbox,
     credentials,
@@ -196,6 +203,13 @@ export async function buildPortalWorld(
     { username: Username.parse('alice'), passwordHash: GOOD_HASH, role: 'user' },
     NOW,
   );
+  // alice runs an instance with one category, the shape every member has
+  const provisioned = TorrentInstance.provision({
+    username: Username.parse('alice'),
+    scgiPort: ScgiPort.parse(51101),
+    rtorrentPort: RtorrentPort.parse(45000),
+  }).instance;
+  await instances.save(provisioned.addWatchDir(Label.parse('films')).instance);
   await users.save(
     new UserBuilder()
       .withUsername('boss')
@@ -208,7 +222,7 @@ export async function buildPortalWorld(
     { username: Username.parse('boss'), passwordHash: GOOD_HASH, role: 'admin' },
     NOW,
   );
-  return { server, users, credentials, sessions, queue, outbox, downloads, debridAccounts, media, fairUse, diagnostics };
+  return { server, users, credentials, sessions, queue, outbox, downloads, debridAccounts, media, fairUse, diagnostics, instances };
 }
 
 export interface AgentSession {

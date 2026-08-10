@@ -1,6 +1,7 @@
 import { eq } from 'drizzle-orm';
 import { Label } from '../../domain/torrent/Label.js';
 import { TorrentInstance } from '../../domain/torrent/TorrentInstance.js';
+import { SyncMode } from '../../domain/torrent/SyncMode.js';
 import { WatchDir } from '../../domain/torrent/WatchDir.js';
 import type { TorrentInstanceRepository } from '../../domain/torrent/ports.js';
 import { RtorrentPort, ScgiPort } from '../../domain/user/Port.js';
@@ -25,8 +26,7 @@ export class SqliteTorrentInstanceRepository implements TorrentInstanceRepositor
       .from(watchDirs)
       .where(eq(watchDirs.instanceId, row.id))
       .all()
-      .map((dirRow) => dirRow.label)
-      .sort();
+      .sort((left, right) => left.label.localeCompare(right.label));
     return Promise.resolve(
       TorrentInstance.restore({
         username: Username.parse(row.username),
@@ -34,7 +34,9 @@ export class SqliteTorrentInstanceRepository implements TorrentInstanceRepositor
         rtorrentPort: RtorrentPort.parse(row.rtorrentPort),
         watchDirs: [
           WatchDir.root(),
-          ...labels.map((label) => WatchDir.labeled(Label.parse(label))),
+          ...labels.map((dirRow) =>
+            WatchDir.labeled(Label.parse(dirRow.label), SyncMode.parse(dirRow.syncMode)),
+          ),
         ],
         allowPublicTracker: row.allowPublicTracker === 1,
         syncDisabled: row.syncDisabled === 1,
@@ -59,12 +61,16 @@ export class SqliteTorrentInstanceRepository implements TorrentInstanceRepositor
         .get();
       // watch dirs are value objects of the aggregate: replace wholesale
       tx.delete(watchDirs).where(eq(watchDirs.instanceId, saved.id)).run();
-      const labels = instance.watchDirs
-        .map((dir) => dir.label?.value)
-        .filter((label): label is string => label !== undefined);
-      if (labels.length > 0) {
+      const labelled = instance.watchDirs.filter((dir) => dir.label !== undefined);
+      if (labelled.length > 0) {
         tx.insert(watchDirs)
-          .values(labels.map((label) => ({ instanceId: saved.id, label })))
+          .values(
+            labelled.map((dir) => ({
+              instanceId: saved.id,
+              label: dir.label?.value ?? '',
+              syncMode: dir.syncMode.value,
+            })),
+          )
           .run();
       }
     });

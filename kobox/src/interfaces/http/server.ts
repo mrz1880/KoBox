@@ -32,6 +32,7 @@ import type { Logger } from '../../infrastructure/logging/logger.js';
 import { buildGuards, SESSION_COOKIE } from './guards.js';
 import type { DiagnosticsRepositoryPort } from '../../application/maintenance/DiagnosticsPort.js';
 import type { ConfigFileReaderPort } from '../../application/installation/ConfigFileReaderPort.js';
+import type { TorrentInstanceRepository } from '../../domain/torrent/ports.js';
 import { registerAdminNetworkRoutes } from './routes/adminNetwork.js';
 import { registerAdminOpsRoutes } from './routes/adminOps.js';
 import { registerAdminTrackerRoutes } from './routes/adminTrackers.js';
@@ -68,6 +69,7 @@ export interface PortalServerDeps {
   readonly debridAccounts: DebridAccountRepository;
   readonly debridEncryptor: DebridKeyEncryptorPort;
   readonly media: MediaRepository;
+  readonly instances: TorrentInstanceRepository;
   readonly logger?: Logger;
 }
 

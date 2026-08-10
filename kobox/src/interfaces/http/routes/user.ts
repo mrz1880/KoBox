@@ -8,6 +8,9 @@ import { FilehosterLink } from '../../../domain/ddl/FilehosterLink.js';
 import { DebridApiKey } from '../../../domain/ddl/DebridApiKey.js';
 import { MediaPath, type MediaFile } from '../../../domain/media/MediaFile.js';
 import type { MediaRepository } from '../../../domain/media/ports.js';
+import { Label } from '../../../domain/torrent/Label.js';
+import { SyncMode } from '../../../domain/torrent/SyncMode.js';
+import type { TorrentInstanceRepository } from '../../../domain/torrent/ports.js';
 import type { Username } from '../../../domain/user/Username.js';
 import type {
   DebridAccountRepository,
@@ -35,6 +38,13 @@ import {
   type FleetRow,
   type SignalRow,
 } from '../views/userPages.js';
+import { syncPage } from '../views/syncPage.js';
+
+const categorySchema = z.object({ label: z.string().min(1).max(64) });
+const categoryModeSchema = z.object({
+  label: z.string().min(1).max(64),
+  mode: z.string().min(1).max(16),
+});
 
 const passwordSchema = z.object({
   current: z.string().min(1).max(256),
@@ -120,6 +130,7 @@ export interface UserRoutesDeps {
   // the portal holds the PUBLIC half only — it can seal a key, never open one
   readonly debridEncryptor: DebridKeyEncryptorPort;
   readonly media: MediaRepository;
+  readonly instances: TorrentInstanceRepository;
 }
 
 // One channel of the console, assembled from what the portal can read in the
@@ -306,6 +317,76 @@ export function registerUserRoutes(
     // restart their own instance
     await deps.queue.enqueue(buildJob.restartRtorrent({ username: session.username.value }));
     return redirectWithFlash(reply, '/rutorrent', 'Restarting your rtorrent.');
+  });
+
+  server.get('/sync', async (request, reply) => {
+    const session = await guards.requireSession(request, reply);
+    if (session === undefined) {
+      return;
+    }
+    const instance = await deps.instances.findByUsername(session.username);
+    // the root watch dir is everything without a label: it is not a folder a
+    // member named, and it cannot be synchronised
+    const categories = (instance?.watchDirs ?? []).filter((dir) => dir.label !== undefined);
+    return reply
+      .type('text/html')
+      .send(syncPage(categories, viewerOf(session), flashOf(request)));
+  });
+
+  server.post('/sync/categories', async (request, reply) => {
+    const session = await guards.requireCsrf(request, reply);
+    if (session === undefined) {
+      return;
+    }
+    const parsed = categorySchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.code(400).send();
+    }
+    let label: Label;
+    try {
+      label = Label.parse(parsed.data.label);
+    } catch (error) {
+      if (error instanceof DomainError) {
+        return reply.code(400).send();
+      }
+      throw error;
+    }
+    // the username comes from the session, never from the form: a member can
+    // only ever create a folder for themselves
+    await deps.queue.enqueue(
+      buildJob.addWatchDir({ username: session.username.value, label: label.value }),
+    );
+    return redirectWithFlash(reply, '/sync', `Creating the ${label.value} folder.`);
+  });
+
+  server.post('/sync/categories/mode', async (request, reply) => {
+    const session = await guards.requireCsrf(request, reply);
+    if (session === undefined) {
+      return;
+    }
+    const parsed = categoryModeSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.code(400).send();
+    }
+    let label: Label;
+    let mode: SyncMode;
+    try {
+      label = Label.parse(parsed.data.label);
+      mode = SyncMode.parse(parsed.data.mode);
+    } catch (error) {
+      if (error instanceof DomainError) {
+        return reply.code(400).send();
+      }
+      throw error;
+    }
+    await deps.queue.enqueue(
+      buildJob.setCategorySyncMode({
+        username: session.username.value,
+        label: label.value,
+        mode: mode.value,
+      }),
+    );
+    return redirectWithFlash(reply, '/sync', `Saved what happens to ${label.value}.`);
   });
 
   server.get('/media', async (request, reply) => {

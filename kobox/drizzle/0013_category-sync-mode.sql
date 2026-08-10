@@ -1,0 +1,1 @@
+ALTER TABLE `watch_dirs` ADD `sync_mode` text DEFAULT 'off' NOT NULL;

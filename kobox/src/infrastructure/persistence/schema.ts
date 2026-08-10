@@ -45,6 +45,8 @@ export const watchDirs = sqliteTable(
       .notNull()
       .references(() => torrentInstances.id, { onDelete: 'cascade' }),
     label: text('label').notNull(),
+    // what this category does with a finished download: off | scheduled | immediate
+    syncMode: text('sync_mode').notNull().default('off'),
   },
   (table) => [unique().on(table.instanceId, table.label)],
 );

@@ -1,8 +1,16 @@
+import { DomainError } from '../shared/DomainError.js';
 import type { RtorrentPort, ScgiPort } from '../user/Port.js';
 import type { Username } from '../user/Username.js';
 import type { Label } from './Label.js';
 import { WatchDir } from './WatchDir.js';
+import type { SyncMode } from './SyncMode.js';
 import type { RtorrentInstanceProvisioned, WatchDirAdded } from './events.js';
+
+export class UnknownCategoryError extends DomainError {
+  constructor(label: string) {
+    super(`no category ${JSON.stringify(label)} on this instance`);
+  }
+}
 
 export type TorrentPrivacy = 'private' | 'public';
 export type AdmissionDecision = 'accepted' | 'rejected-public-tracker';
@@ -68,6 +76,20 @@ export class TorrentInstance {
       }),
       event: { type: 'WatchDirAdded', username: this.username.value, label: label.value },
     };
+  }
+
+  // Only a category this instance actually owns can carry a mode: a label whose
+  // directories were never created would push from a path that does not exist.
+  setSyncMode(label: Label, mode: SyncMode): TorrentInstance {
+    if (!this.watchDirs.some((dir) => dir.label?.equals(label) === true)) {
+      throw new UnknownCategoryError(label.value);
+    }
+    return new TorrentInstance({
+      ...this.props(),
+      watchDirs: this.watchDirs.map((dir) =>
+        dir.label?.equals(label) === true ? dir.withSyncMode(mode) : dir,
+      ),
+    });
   }
 
   setAllowPublicTracker(allowed: boolean): TorrentInstance {

@@ -17,6 +17,7 @@ describe('job contract', () => {
       'deprovision-rtorrent',
       'render-rtorrent-config',
       'add-watch-dir',
+    'set-category-sync-mode',
       'set-sync-disabled',
       'set-allow-public-tracker',
       'torrent-event',

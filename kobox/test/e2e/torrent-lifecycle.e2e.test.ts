@@ -149,6 +149,16 @@ describe.skipIf(!onDebianAsRoot)('E2E: torrent lifecycle with a real rtorrent', 
     await waitForScgi(20_000);
   });
 
+  it('should_remember_what_a_category_does_with_a_finished_download', () => {
+    // the mode lives in the database, not in a rendered file: it must survive
+    // an rtorrent restart and be readable back exactly as it was set
+    kobox(['set-category-sync-mode', USER, 'films', 'immediate']);
+    drainQueue();
+
+    const row = dbRow('SELECT sync_mode FROM watch_dirs WHERE label = ?', 'films');
+    expect(row?.sync_mode).toBe('immediate');
+  });
+
   it('should_process_a_finished_event_from_the_real_shim_and_fan_out_user_scripts', () => {
     sh('install', ['-d', '-o', USER, '-g', 'kobox-users', join(HOME, 'scripts')]);
     writeFileSync(
