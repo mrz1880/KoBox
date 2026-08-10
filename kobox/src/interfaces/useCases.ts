@@ -22,6 +22,7 @@ import { RenderWhitelist } from '../application/tracker/RenderWhitelist.js';
 import { RenewTrackerCerts } from '../application/tracker/RenewTrackerCerts.js';
 import { UpdateBlocklists, type IblocklistCredentials } from '../application/tracker/UpdateBlocklists.js';
 import { AddWatchDir } from '../application/torrent/AddWatchDir.js';
+import { SetCategorySyncMode } from '../application/torrent/SetCategorySyncMode.js';
 import { DeprovisionRtorrentInstance } from '../application/torrent/DeprovisionRtorrentInstance.js';
 import { HandleTorrentEvent } from '../application/torrent/HandleTorrentEvent.js';
 import { RestartRtorrentInstance } from '../application/torrent/RestartRtorrentInstance.js';
@@ -233,6 +234,7 @@ export interface TorrentUseCases {
   readonly deprovision: DeprovisionRtorrentInstance;
   readonly render: RenderRtorrentConfig;
   readonly addWatchDir: AddWatchDir;
+  readonly setCategorySyncMode: SetCategorySyncMode;
   readonly setSyncDisabled: SetSyncDisabled;
   readonly setAllowPublicTracker: SetAllowPublicTracker;
   readonly handleEvent: HandleTorrentEvent;
@@ -346,6 +348,7 @@ export function buildTorrentUseCases(deps: TorrentUseCaseDeps): TorrentUseCases 
     deprovision: new DeprovisionRtorrentInstance(deps),
     render,
     addWatchDir: new AddWatchDir({ instances: deps.instances, render }),
+    setCategorySyncMode: new SetCategorySyncMode({ instances: deps.instances }),
     setSyncDisabled: new SetSyncDisabled(deps),
     setAllowPublicTracker: new SetAllowPublicTracker(deps),
     handleEvent: new HandleTorrentEvent(deps),

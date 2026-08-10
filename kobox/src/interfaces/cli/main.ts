@@ -6,6 +6,7 @@ import { FilehosterLink } from '../../domain/ddl/FilehosterLink.js';
 import { EventHook } from '../../domain/torrent/EventHook.js';
 import { InfoHash } from '../../domain/torrent/InfoHash.js';
 import { LABEL_PATTERN, Label } from '../../domain/torrent/Label.js';
+import { SyncMode } from '../../domain/torrent/SyncMode.js';
 import { AccountType } from '../../domain/user/AccountType.js';
 import { EmailAddress } from '../../domain/user/EmailAddress.js';
 import { Password } from '../../domain/user/Password.js';
@@ -162,6 +163,36 @@ usernameCommand(
     await c.torrentUseCases.render.execute({ username });
   },
 );
+
+program
+  .command('set-category-sync-mode')
+  .argument('<username>')
+  .argument('<label>')
+  .argument('<mode>', 'off | scheduled | immediate')
+  .description('choose what happens to a finished download in that category')
+  .action(async (rawUser: string, rawLabel: string, rawMode: string) => {
+    const { direct } = program.opts<GlobalOptions>();
+    const username = Username.parse(rawUser);
+    const label = Label.parse(rawLabel);
+    const mode = SyncMode.parse(rawMode);
+    const c = container();
+    if (direct) {
+      await c.torrentUseCases.setCategorySyncMode.execute({ username, label, mode });
+      await done(c, `${label.value} set to ${mode.value} for ${username.value}`);
+      return;
+    }
+    const id = await c.queue.enqueue(
+      buildJob.setCategorySyncMode({
+        username: username.value,
+        label: label.value,
+        mode: mode.value,
+      }),
+    );
+    await done(
+      c,
+      `job ${String(id)} enqueued: set-category-sync-mode ${username.value} ${label.value}`,
+    );
+  });
 
 program
   .command('add-watch-dir')

@@ -456,6 +456,7 @@ export interface PortalContainer {
   readonly speedtests: SqliteSpeedtestRepository;
   readonly diagnostics: SqliteDiagnosticsRepository;
   readonly configFiles: FsConfigFileReader;
+  readonly instances: SqliteTorrentInstanceRepository;
   readonly outbox: SqliteMailOutbox;
   readonly debridDownloadRepo: SqliteDebridDownloadRepository;
   readonly debridAccountRepo: SqliteDebridAccountRepository;
@@ -493,6 +494,9 @@ export function buildPortalContainer(name: string): PortalContainer {
     // world-readable files only, from a closed catalog: no privilege needed,
     // and no job either — a config screen must show what is on disk NOW
     configFiles: new FsConfigFileReader(),
+    // read-only from the portal: it lists a member's folders, the worker is
+    // what creates directories and changes a mode
+    instances: new SqliteTorrentInstanceRepository(db),
     outbox: new SqliteMailOutbox(db),
     debridDownloadRepo,
     debridAccountRepo: new SqliteDebridAccountRepository(db),

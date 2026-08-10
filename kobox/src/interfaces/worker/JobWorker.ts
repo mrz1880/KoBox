@@ -9,6 +9,7 @@ import { TrackerHost } from '../../domain/tracker/TrackerHost.js';
 import { EventHook } from '../../domain/torrent/EventHook.js';
 import { InfoHash } from '../../domain/torrent/InfoHash.js';
 import { Label } from '../../domain/torrent/Label.js';
+import { SyncMode } from '../../domain/torrent/SyncMode.js';
 import { AccountType } from '../../domain/user/AccountType.js';
 import { EmailAddress } from '../../domain/user/EmailAddress.js';
 import { HashedPassword } from '../../domain/user/HashedPassword.js';
@@ -215,6 +216,13 @@ export class JobWorker {
         await this.torrents.addWatchDir.execute({
           username: Username.parse(job.payload.username),
           label: Label.parse(job.payload.label),
+        });
+        return;
+      case 'set-category-sync-mode':
+        await this.torrents.setCategorySyncMode.execute({
+          username: Username.parse(job.payload.username),
+          label: Label.parse(job.payload.label),
+          mode: SyncMode.parse(job.payload.mode),
         });
         return;
       case 'set-sync-disabled':
