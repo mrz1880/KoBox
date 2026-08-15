@@ -460,7 +460,10 @@ export function renderNginxVhost(settings: NginxVhostSettings): RenderedFile {
       '        auth_request /internal/auth;',
       '        auth_request_set $kobox_user $upstream_http_x_kobox_user;',
       '        alias /var/www/rutorrent/;',
-      '        index index.php;',
+      // ruTorrent 5.x ships index.html; 4.x shipped index.php. Naming only one
+      // of them makes nginx fall through to a directory listing, which it
+      // refuses — a 403 on the very first visit.
+      '        index index.html index.php;',
       '    }',
       '',
       '    location ~ ^/ru/(.+\\.php)$ {',

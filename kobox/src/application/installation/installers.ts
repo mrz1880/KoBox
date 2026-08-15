@@ -166,6 +166,7 @@ const SYSCTL_DROPIN = '/etc/sysctl.d/90-kobox.conf';
 const NGINX_VHOST = '/etc/nginx/conf.d/kobox.conf';
 const HTPASSWD = '/etc/nginx/kobox.htpasswd';
 const RUTORRENT_DIR = '/var/www/rutorrent';
+const PHP_FPM_UNIT = 'php8.2-fpm';
 const RUTORRENT_MARKER = `${RUTORRENT_DIR}/.kobox-artifact-sha256`;
 const RUTORRENT_ARCHIVE = '/var/tmp/kobox/rutorrent.tar.gz';
 const NANOMON_BIN = '/usr/local/bin/nanomon';
@@ -403,7 +404,7 @@ class RutorrentInstaller implements ComponentInstaller {
   constructor(private readonly ctx: InstallerContext) {}
 
   async install(): Promise<InstallOutcome> {
-    const { packages, host, artifacts, files, install } = this.ctx;
+    const { packages, host, artifacts, files, install, systemd } = this.ctx;
     if (install.rutorrentUrl === undefined || install.rutorrentSha256 === undefined) {
       return {
         state: 'skipped',
@@ -412,6 +413,11 @@ class RutorrentInstaller implements ComponentInstaller {
       };
     }
     await packages.ensureInstalled(['php-fpm', 'php-cli', 'unzip']);
+    // ruTorrent IS a PHP application: without the pool running, nginx answers
+    // 403 on the very first visit. apt enables the unit but does not start it,
+    // so `now` is what makes ruTorrent work today rather than after a reboot.
+    // Debian 12 ships PHP 8.2, which is the platform KoBox targets.
+    await systemd.enable(PHP_FPM_UNIT, { now: true });
     const marker = await host.readFile(RUTORRENT_MARKER);
     if (marker?.trim() !== install.rutorrentSha256) {
       await artifacts.fetchVerified(install.rutorrentUrl, install.rutorrentSha256, RUTORRENT_ARCHIVE);

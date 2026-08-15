@@ -55,7 +55,7 @@ server {
         auth_request /internal/auth;
         auth_request_set $kobox_user $upstream_http_x_kobox_user;
         alias /var/www/rutorrent/;
-        index index.php;
+        index index.html index.php;
     }
 
     location ~ ^/ru/(.+\.php)$ {
