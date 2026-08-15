@@ -23,6 +23,7 @@ const userDto: MysbUser = {
   accountType: 'normal',
   active: true,
   syncDisabled: false,
+  categories: [],
 };
 
 describe('toMappedUser', () => {
@@ -138,5 +139,49 @@ describe('toMappedAddress', () => {
     const mapped = toMappedAddress({ username: 'alice', value: 'dyn.example.org', kind: 'hostname' });
     if (mapped.kind !== 'hostname') throw new Error('expected hostname');
     expect(mapped.hostname.value).toBe('dyn.example.org');
+  });
+});
+
+describe('categories', () => {
+  function withCategories(categories: { name: string; syncMode: number }[]) {
+    return toMappedUser({ ...userDto, categories });
+  }
+
+  it('should_bring_each_folder_across_with_what_it_does_to_a_finished_download', () => {
+    // MySB stored 0, 1, 2 in a column and decoded them in bash. These are the
+    // values a live box actually carries.
+    const mapped = withCategories([
+      { name: 'Films', syncMode: 2 },
+      { name: 'Travail', syncMode: 1 },
+      { name: 'Autres', syncMode: 0 },
+    ]);
+
+    expect(
+      mapped.watchDirs
+        .filter((dir) => dir.label !== undefined)
+        .map((dir) => `${dir.label?.value ?? ''}=${dir.syncMode.value}`),
+    ).toEqual(['Films=immediate', 'Travail=scheduled', 'Autres=off']);
+  });
+
+  it('should_always_keep_the_unlabelled_root', () => {
+    // everything downloaded without a label lives there, on every box
+    expect(withCategories([]).watchDirs.filter((dir) => dir.label === undefined)).toHaveLength(1);
+  });
+
+  it('should_drop_a_folder_whose_name_could_not_be_a_directory_and_keep_the_rest', () => {
+    // one unusable folder must cost a member that folder, not their account
+    const mapped = withCategories([
+      { name: 'Films', syncMode: 2 },
+      { name: '../escape', syncMode: 2 },
+    ]);
+
+    expect(mapped.watchDirs.filter((dir) => dir.label !== undefined)).toHaveLength(1);
+  });
+
+  it('should_treat_a_mode_it_does_not_recognise_as_sending_nothing', () => {
+    // a value outside 0-2 is corruption; the safe reading is "do not send"
+    expect(withCategories([{ name: 'Films', syncMode: 9 }]).watchDirs[1]?.syncMode.value).toBe(
+      'off',
+    );
   });
 });

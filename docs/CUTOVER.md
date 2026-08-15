@@ -55,8 +55,21 @@ doubles as the contract):
 | `user_addresses` | `username, value, kind` (`kind` ∈ `ipv4` \| `hostname`) |
 
 `sync/<username>.sq3` only needs its original `categories(name, sync_mode)`
-table — the importer reads `sync_mode` (a user counts as **sync-disabled** only
-when *every* category is `0`).
+table. The importer reads **both columns**: each category becomes one of the
+member's folders, carrying what it does with a finished download
+(`0` keep it here, `1` send it a bit later, `2` send it straight away), and a
+member counts as **sync-disabled** only when *every* category is `0`.
+
+> Only that table is read. The same file holds `ident`, whose password column is
+> the one thing in a MySB dump nobody should be opening — not the importer, and
+> not whoever produces the dump.
+
+Category names keep their case: a live MySB box carries `Films`, `Series`,
+`Divers`, and the name also becomes the destination folder on the member's own
+machine. Folding it would create a second set of folders beside the ones already
+full of their files. A name that cannot be a directory segment is dropped with
+the rest of the member's import intact — they lose one folder, not their
+account.
 
 ### Producing the dump (read-only, on the MySB box)
 

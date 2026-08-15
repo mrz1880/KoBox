@@ -143,7 +143,7 @@ describe.skipIf(!onDebianAsRoot)('E2E: migrate-from-mysb -> forced reset -> full
           email: `${MEMBER}@example.org`,
           scgiPort: 51150,
           rtorrentPort: 45050,
-          syncMode: [0, 0],
+          categories: [{ name: 'Films', syncMode: 0 }, { name: 'Autres', syncMode: 0 }],
         },
       ],
       trackers: [{ host: 'tracker.example.org', proto: 'https', port: 443, privacy: 'private' }],
@@ -175,6 +175,20 @@ describe.skipIf(!onDebianAsRoot)('E2E: migrate-from-mysb -> forced reset -> full
     expect(existsSync(`/home/${MEMBER}/.rtorrent.rc`)).toBe(true);
     const include = sh('cat', ['/etc/nginx/kobox.d/rutorrent-users.conf']);
     expect(include).toContain(`/RPC-${MEMBER.toUpperCase()}`);
+  });
+
+  it('should_bring_the_members_folders_across_with_them', () => {
+    // Without this a member arrives on a box with no folders at all: their
+    // torrents carry labels pointing at directories that do not exist, and
+    // every sync choice they made is gone. The names keep their case, which is
+    // what a real MySB box carries.
+    for (const folder of ['Films', 'Autres']) {
+      expect(existsSync(`/home/${MEMBER}/rtorrent/watch/${folder}`), folder).toBe(true);
+      expect(existsSync(`/home/${MEMBER}/rtorrent/complete/${folder}`), folder).toBe(true);
+    }
+    expect(sh('cat', [`/home/${MEMBER}/rtorrent/config.d/80-watch.rc`])).toContain(
+      'd.custom1.set=Films',
+    );
   });
 
   it('should_force_the_imported_user_to_reset_before_granting_access', async () => {

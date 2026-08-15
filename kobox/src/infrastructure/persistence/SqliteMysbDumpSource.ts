@@ -19,7 +19,7 @@ import {
   mysbUserSchema,
 } from '../../application/migration/mysbSchemas.js';
 
-const syncRowSchema = z.object({ sync_mode: z.number().int() });
+const categoryRowSchema = z.object({ name: z.string(), sync_mode: z.number().int() });
 
 // Reads a frozen MySB dump directory: `mysb.sqlite` (control-plane tables
 // mirrored from MariaDB) plus `sync/<user>.sq3` (the per-user sync sqlite copied
@@ -43,7 +43,11 @@ export class SqliteMysbDumpSource implements MysbSource {
       .all();
     const users = rows.map((row): MysbUser => {
       const dto = mysbUserSchema.parse(row);
-      return { ...dto, syncDisabled: this.readSyncDisabled(dto.username) };
+      const categories = this.readCategories(dto.username);
+      // A member counts as sync-disabled only when EVERY category is 0 — the
+      // legacy meaning, and it must stay derived from the same rows.
+      const syncDisabled = categories.length > 0 && categories.every((c) => c.syncMode === 0);
+      return { ...dto, syncDisabled, categories };
     });
     return Promise.resolve(users);
   }
@@ -99,18 +103,23 @@ export class SqliteMysbDumpSource implements MysbSource {
   // The single datum from the per-user sync sqlite: the user counts as "sync
   // disabled" only when every category is off (sync_mode = 0). A missing file
   // (a user who never synced) defaults to not-disabled.
-  private readSyncDisabled(username: string): boolean {
+  // The member's folders, straight out of their own sync sqlite. Only this table
+  // is read: the same file holds `ident`, whose password column is the one thing
+  // in a MySB dump nobody should be opening.
+  private readCategories(username: string): { name: string; syncMode: number }[] {
     const syncPath = join(this.dumpDir, 'sync', `${username}.sq3`);
     if (!existsSync(syncPath)) {
-      return false;
+      return [];
     }
     const sync = new Database(syncPath, { readonly: true, fileMustExist: true });
     try {
-      const rows = sync.prepare('SELECT sync_mode FROM categories').all();
-      if (rows.length === 0) {
-        return false;
-      }
-      return rows.every((row) => syncRowSchema.parse(row).sync_mode === 0);
+      return sync
+        .prepare('SELECT name, sync_mode FROM categories')
+        .all()
+        .map((row) => {
+          const parsed = categoryRowSchema.parse(row);
+          return { name: parsed.name, syncMode: parsed.sync_mode };
+        });
     } finally {
       sync.close();
     }

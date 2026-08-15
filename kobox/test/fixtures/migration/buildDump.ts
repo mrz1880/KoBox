@@ -16,8 +16,9 @@ export interface DumpUserSpec {
   readonly quotaBytes?: number;
   readonly accountType?: 'normal' | 'plex';
   readonly active?: 0 | 1;
-  // per-category sync_mode values written to sync/<username>.sq3 (omit for no file)
-  readonly syncMode?: readonly number[];
+  // the categories written to sync/<username>.sq3 (omit for no file). Names
+  // matter: a real MySB box carries Films, Series, Divers — capitalised.
+  readonly categories?: readonly { readonly name: string; readonly syncMode: number }[];
 }
 
 export interface DumpTrackerSpec {
@@ -158,13 +159,15 @@ export function buildDump(spec: DumpSpec): string {
 
   mkdirSync(join(dir, 'sync'));
   for (const u of spec.users) {
-    if (u.syncMode === undefined) {
+    if (u.categories === undefined) {
       continue;
     }
     const sync = new Database(join(dir, 'sync', `${u.username}.sq3`));
     sync.exec('CREATE TABLE categories (name TEXT, sync_mode INTEGER)');
     const insertCategory = sync.prepare('INSERT INTO categories (name, sync_mode) VALUES (?, ?)');
-    u.syncMode.forEach((mode, index) => insertCategory.run(`category-${String(index)}`, mode));
+    for (const category of u.categories) {
+      insertCategory.run(category.name, category.syncMode);
+    }
     sync.close();
   }
 

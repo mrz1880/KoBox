@@ -18,7 +18,16 @@ import { EmailAddress } from '../../domain/user/EmailAddress.js';
 import { ProxyPort, RtorrentPort, ScgiPort } from '../../domain/user/Port.js';
 import { Quota } from '../../domain/user/Quota.js';
 import { Username } from '../../domain/user/Username.js';
-import type { MysbAddress, MysbBlocklist, MysbTorrent, MysbTracker, MysbUser } from './MysbSourcePort.js';
+import { SyncMode } from '../../domain/torrent/SyncMode.js';
+import { WatchDir } from '../../domain/torrent/WatchDir.js';
+import type {
+  MysbAddress,
+  MysbBlocklist,
+  MysbCategory,
+  MysbTorrent,
+  MysbTracker,
+  MysbUser,
+} from './MysbSourcePort.js';
 
 // Pure prod→VO mappers. Zod already validated row shapes at the source
 // boundary; here the Value Objects are the authoritative gate — a row that
@@ -35,6 +44,7 @@ export interface MappedUser {
   readonly proxyPort: ProxyPort;
   readonly suspended: boolean;
   readonly syncDisabled: boolean;
+  readonly watchDirs: readonly WatchDir[];
 }
 
 export function toMappedUser(dto: MysbUser): MappedUser {
@@ -48,7 +58,32 @@ export function toMappedUser(dto: MysbUser): MappedUser {
     proxyPort: ProxyPort.parse(dto.proxyPort),
     suspended: !dto.active,
     syncDisabled: dto.syncDisabled,
+    watchDirs: toWatchDirs(dto.categories),
   };
+}
+
+// MySB stored the mode as 0, 1 or 2 in a column and decoded it in bash. A
+// category whose name cannot be a directory segment is dropped rather than
+// failing the member's whole import: they lose one folder, not their account.
+const SYNC_MODES: Readonly<Record<number, SyncMode>> = {
+  0: SyncMode.off,
+  1: SyncMode.scheduled,
+  2: SyncMode.immediate,
+};
+
+function toWatchDirs(categories: readonly MysbCategory[]): readonly WatchDir[] {
+  const labelled: WatchDir[] = [];
+  for (const category of categories) {
+    try {
+      labelled.push(
+        WatchDir.labeled(Label.parse(category.name), SYNC_MODES[category.syncMode] ?? SyncMode.off),
+      );
+    } catch {
+      continue;
+    }
+  }
+  // the unlabelled root is every member's, always
+  return [WatchDir.root(), ...labelled];
 }
 
 export function toTracker(dto: MysbTracker): Tracker {

@@ -115,7 +115,7 @@ beforeEach(() => {
         email: 'alice@example.org',
         scgiPort: 51101,
         rtorrentPort: 45000,
-        syncMode: [0, 0],
+        categories: [{ name: 'Films', syncMode: 0 }, { name: 'Autres', syncMode: 0 }],
       },
       {
         username: 'bob',
@@ -175,6 +175,18 @@ describe('ImportFromMysb over real SQLite', () => {
     expect((await credentials.find(Username.parse('alice')))?.mustChangePassword).toBe(true);
     const instances = new SqliteTorrentInstanceRepository(db);
     expect((await instances.findByUsername(Username.parse('alice')))?.syncDisabled).toBe(true);
+
+    // the member's folders come across with them. Without this they arrive on a
+    // box with no folders at all: their torrents carry labels pointing at
+    // directories that do not exist, and every sync choice they made is gone.
+    const alicesFolders = (await instances.findByUsername(Username.parse('alice')))?.watchDirs ?? [];
+    // read back sorted by name; what matters is which folders exist and what
+    // each one does with a finished download
+    expect(
+      alicesFolders
+        .filter((dir) => dir.label !== undefined)
+        .map((dir) => `${dir.label?.value ?? ''}=${dir.syncMode.value}`),
+    ).toEqual(['Autres=off', 'Films=off']);
 
     // catalogue + per-user data landed
     expect(await new SqliteTrackerRepository(db).listAll()).toHaveLength(1);
