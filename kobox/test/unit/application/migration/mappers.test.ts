@@ -185,3 +185,36 @@ describe('categories', () => {
     );
   });
 });
+
+describe('blocklist urls from a legacy box', () => {
+  const legacyList = {
+    source: 'iblocklist' as const,
+    author: 'I-Blocklist',
+    name: 'Level 1',
+    url: 'http://list.iblocklist.com/?list=bt_level1&fileformat=p2p&archiveformat=gz',
+    subscription: true,
+    enabled: true,
+  };
+
+  it('should_bring_an_http_list_across_as_https', () => {
+    // Every blocklist on a live MySB box is http. KoBox refuses http on purpose
+    // — an altered list feeds the kernel's IP filter — so dropping them would
+    // cost a member their whole blocklist configuration at cutover. The host
+    // serves https, so the repair is the same list over a transport we accept.
+    expect(toBlocklist(legacyList).url.value).toBe(
+      'https://list.iblocklist.com/?list=bt_level1&fileformat=p2p&archiveformat=gz',
+    );
+  });
+
+  it('should_leave_an_https_list_exactly_as_it_is', () => {
+    const already = { ...legacyList, url: 'https://example.org/list.gz' };
+
+    expect(toBlocklist(already).url.value).toBe('https://example.org/list.gz');
+  });
+
+  it('should_still_refuse_something_that_is_not_a_url_at_all', () => {
+    // the repair is a scheme upgrade, not a licence to accept anything
+    expect(() => toBlocklist({ ...legacyList, url: 'ftp://example.org/list' })).toThrow();
+    expect(() => toBlocklist({ ...legacyList, url: 'not a url' })).toThrow();
+  });
+});
