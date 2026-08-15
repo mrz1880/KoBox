@@ -8,8 +8,15 @@ import type {
 
 // A user as seen from the MySB source: the central control-plane row plus the
 // one datum that lives in the per-user sync sqlite (categories.sync_mode).
+export interface MysbCategory {
+  readonly name: string;
+  // the legacy encoding: 0 never, 1 on the next cron pass, 2 immediately
+  readonly syncMode: number;
+}
+
 export interface MysbUser extends MysbUserRow {
   readonly syncDisabled: boolean;
+  readonly categories: readonly MysbCategory[];
 }
 
 // A tracker with its whitelisted IPv4 rows folded in (trackers_list 1:N

@@ -157,6 +157,7 @@ const aliceDto: MysbUser = {
   accountType: 'normal',
   active: true,
   syncDisabled: false,
+  categories: [],
 };
 const trackerDto: MysbTracker = {
   host: 'tracker.example.org',

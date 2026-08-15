@@ -9,7 +9,6 @@ import type {
 } from '../../domain/tracker/ports.js';
 import { TorrentInstance } from '../../domain/torrent/TorrentInstance.js';
 import type { TorrentInstanceRepository, TorrentRepository } from '../../domain/torrent/ports.js';
-import { WatchDir } from '../../domain/torrent/WatchDir.js';
 import type { Password } from '../../domain/user/Password.js';
 import type { PasswordHasherPort, UserRepository } from '../../domain/user/ports.js';
 import { CreateUser } from '../user/CreateUser.js';
@@ -160,7 +159,7 @@ export class ImportFromMysb {
         username: mapped.username,
         scgiPort: mapped.scgiPort,
         rtorrentPort: mapped.rtorrentPort,
-        watchDirs: [WatchDir.root()],
+        watchDirs: mapped.watchDirs,
         allowPublicTracker: false,
         syncDisabled: mapped.syncDisabled,
       }),
