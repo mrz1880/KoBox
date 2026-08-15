@@ -270,6 +270,58 @@ exports file. Content is capped at 256 KB and says so when it truncates: the
 per-user nginx map grows with the member list, and nothing should try to paint
 an unbounded file into a browser.
 
+## Sending finished downloads to a member's own machine
+
+**Sending** (member side) has two halves: the folders, and where they go.
+
+Each folder carries a mode — keep it here, send it a bit later, send it straight
+away. A new folder starts at *keep it here*: turning on a copy to somebody
+else's machine is their decision, not a default.
+
+The destination is one per member: address, port, account, password, and a root
+folder. Each folder lands in a folder of the same name over there, which is what
+the legacy did and what members' NAS layouts already assume.
+
+### What is deliberately different from MySB
+
+- **The password is never in the clear.** MySB kept it in the member's own
+  SQLite file and passed it as `sshpass -p <password>` — visible in `ps` to every
+  other member of the box. KoBox seals it with the host RSA key (the same pair
+  as per-member debrid keys) and hands it to `sshpass -e` through the
+  environment. It never reaches an argv, and the portal cannot open one: sealing
+  needs the public half, opening needs the private half, and no single process
+  holds both.
+- **The host key is pinned.** MySB passed both `StrictHostKeyChecking=no` and
+  `UserKnownHostsFile=/dev/null`, which hands a member's own NAS credentials to
+  whatever answers on that address. KoBox pins on first sight
+  (`accept-new`) into `/var/lib/kobox/sync/<member>.known_hosts`, one file per
+  member, and refuses — visibly, on the page — if the identity ever changes.
+- **Nothing is interpolated.** Address, account and remote path are value
+  objects before they can reach a command line. A host starting with a dash
+  would be an ssh option rather than a host; a remote path containing `..` would
+  climb out of the folder they chose. Both are refused at the boundary.
+
+### Testing it
+
+**Test it now** enqueues `check-sync-destination`; the root worker opens the
+password, connects, and runs `test -w` on the remote folder — the smallest
+question that proves the whole chain at once. The verdict is stored and shown
+back in words: whether the machine answered, whether the account was accepted,
+whether the folder is writable, and the fingerprint it identified itself with.
+
+Two failures are reported separately on purpose. A password that cannot be
+opened (a database restored without its host key) says *type it in again*; a
+check that could not run at all (a missing binary) says *tell your admin*.
+Telling a member to retype a password that is perfectly fine sends them chasing
+the wrong thing.
+
+`rsync` and `sshpass` install with the `rtorrent` component — they are what
+carries a download across.
+
+From a shell: `kobox set-sync-destination <member> <host> <port> <account>
+<path>` reads the password from **stdin**, never from an argument, and
+`kobox check-sync-destination <member>` runs the test.
+
 ## Measuring the link (speedtest)
 
 The `speedtest` component vendors `librespeed-cli` — open source, pinned and

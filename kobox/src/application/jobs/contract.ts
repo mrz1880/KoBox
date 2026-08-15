@@ -22,6 +22,7 @@ export const JOB_TYPES = [
   'render-rtorrent-config',
   'add-watch-dir',
   'set-category-sync-mode',
+  'check-sync-destination',
   'set-sync-disabled',
   'set-allow-public-tracker',
   'torrent-event',
@@ -132,6 +133,7 @@ export const jobPayloadSchemas = {
   'deprovision-rtorrent': usernameOnly,
   'render-rtorrent-config': usernameOnly,
   'add-watch-dir': z.strictObject({ username: usernameField, label: labelField }),
+  'check-sync-destination': z.strictObject({ username: usernameField }),
   'set-category-sync-mode': z.strictObject({
     username: usernameField,
     label: labelField,

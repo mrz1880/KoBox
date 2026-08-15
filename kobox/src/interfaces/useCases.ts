@@ -23,6 +23,12 @@ import { RenewTrackerCerts } from '../application/tracker/RenewTrackerCerts.js';
 import { UpdateBlocklists, type IblocklistCredentials } from '../application/tracker/UpdateBlocklists.js';
 import { AddWatchDir } from '../application/torrent/AddWatchDir.js';
 import { SetCategorySyncMode } from '../application/torrent/SetCategorySyncMode.js';
+import { CheckSyncDestination } from '../application/sync/CheckSyncDestination.js';
+import type {
+  RemotePasswordOpenerPort,
+  RemoteProbePort,
+  SyncDestinationRepository,
+} from '../domain/sync/ports.js';
 import { DeprovisionRtorrentInstance } from '../application/torrent/DeprovisionRtorrentInstance.js';
 import { HandleTorrentEvent } from '../application/torrent/HandleTorrentEvent.js';
 import { RestartRtorrentInstance } from '../application/torrent/RestartRtorrentInstance.js';
@@ -408,5 +414,30 @@ export function buildDdlUseCases(deps: DdlUseCaseDeps): DdlUseCases {
     }),
     storeDebridKey: new StoreDebridKey({ accounts: deps.accounts, clock: deps.clock }),
     clearDebridKey: new ClearDebridKey({ accounts: deps.accounts }),
+  };
+}
+
+export interface SyncUseCaseDeps {
+  readonly destinations: SyncDestinationRepository;
+  readonly opener: RemotePasswordOpenerPort;
+  readonly probe: RemoteProbePort;
+  readonly clock: () => string;
+}
+
+// Root-side only. Sealing lives in the portal container: it needs the public
+// half of the host key, opening needs the private one, and no single process
+// should hold both.
+export interface SyncUseCases {
+  readonly checkDestination: CheckSyncDestination;
+}
+
+export function buildSyncUseCases(deps: SyncUseCaseDeps): SyncUseCases {
+  return {
+    checkDestination: new CheckSyncDestination({
+      destinations: deps.destinations,
+      opener: deps.opener,
+      probe: deps.probe,
+      clock: deps.clock,
+    }),
   };
 }

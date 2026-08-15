@@ -9,6 +9,7 @@ import {
   loginAs,
   NOW,
   SEAL_PREFIX,
+  REMOTE_SEAL_PREFIX,
   type AgentSession,
   type PortalWorld,
 } from './portalWorld.js';
@@ -603,5 +604,119 @@ describe('categories and sending', () => {
 
     expect(response.statusCode).toBe(303);
     expect(world.queue.jobs[0]?.payload).toMatchObject({ username: 'alice' });
+  });
+});
+
+describe('where a member sends their files', () => {
+  const aForm = {
+    host: 'nas.example.org',
+    port: '2222',
+    account: 'seedbox',
+    password: 'hunter2000',
+    path: '/volume1/torrents',
+    batchSize: '0',
+    placement: 'beside-the-others',
+  };
+
+  it('should_store_the_password_sealed_and_never_render_it_back', async () => {
+    await world.server.inject({
+      method: 'POST',
+      url: '/sync/destination',
+      headers: { cookie: user.cookie, 'content-type': 'application/x-www-form-urlencoded' },
+      payload: form({ _csrf: user.csrf, ...aForm }),
+    });
+
+    const stored = await world.destinations.findByUsername(Username.parse('alice'));
+    expect(stored?.sealedPassword).toBe(`${REMOTE_SEAL_PREFIX}hunter2000`);
+
+    // the page must never hand the password back, sealed or otherwise
+    const page = await world.server.inject({
+      method: 'GET',
+      url: '/sync',
+      headers: { cookie: user.cookie },
+    });
+    expect(page.body).not.toContain('hunter2000');
+    expect(page.body).not.toContain(REMOTE_SEAL_PREFIX);
+  });
+
+  it('should_keep_the_stored_password_when_the_field_is_left_empty', async () => {
+    await world.server.inject({
+      method: 'POST',
+      url: '/sync/destination',
+      headers: { cookie: user.cookie, 'content-type': 'application/x-www-form-urlencoded' },
+      payload: form({ _csrf: user.csrf, ...aForm }),
+    });
+
+    await world.server.inject({
+      method: 'POST',
+      url: '/sync/destination',
+      headers: { cookie: user.cookie, 'content-type': 'application/x-www-form-urlencoded' },
+      payload: form({ _csrf: user.csrf, ...aForm, password: '', path: '/volume2/torrents' }),
+    });
+
+    const stored = await world.destinations.findByUsername(Username.parse('alice'));
+    expect(stored?.sealedPassword).toBe(`${REMOTE_SEAL_PREFIX}hunter2000`);
+    expect(stored?.path.value).toBe('/volume2/torrents');
+  });
+
+  it('should_refuse_a_host_that_would_read_as_an_ssh_option', async () => {
+    const response = await world.server.inject({
+      method: 'POST',
+      url: '/sync/destination',
+      headers: { cookie: user.cookie, 'content-type': 'application/x-www-form-urlencoded' },
+      payload: form({ _csrf: user.csrf, ...aForm, host: '-oProxyCommand=id' }),
+    });
+
+    // a leading dash is remote code execution dressed as a hostname
+    expect(response.statusCode).toBe(303);
+    expect(await world.destinations.findByUsername(Username.parse('alice'))).toBeUndefined();
+  });
+
+  it('should_refuse_a_remote_folder_that_climbs_out_of_itself', async () => {
+    await world.server.inject({
+      method: 'POST',
+      url: '/sync/destination',
+      headers: { cookie: user.cookie, 'content-type': 'application/x-www-form-urlencoded' },
+      payload: form({ _csrf: user.csrf, ...aForm, path: '/volume1/../etc' }),
+    });
+
+    expect(await world.destinations.findByUsername(Username.parse('alice'))).toBeUndefined();
+  });
+
+  it('should_ask_the_root_worker_to_test_it_rather_than_testing_it_itself', async () => {
+    await world.server.inject({
+      method: 'POST',
+      url: '/sync/destination',
+      headers: { cookie: user.cookie, 'content-type': 'application/x-www-form-urlencoded' },
+      payload: form({ _csrf: user.csrf, ...aForm }),
+    });
+    world.queue.jobs.length = 0;
+
+    const response = await world.server.inject({
+      method: 'POST',
+      url: '/sync/destination/test',
+      headers: { cookie: user.cookie, 'content-type': 'application/x-www-form-urlencoded' },
+      payload: form({ _csrf: user.csrf }),
+    });
+
+    // the portal holds the public half only: it cannot open the password, so it
+    // cannot run the probe — it asks
+    expect(response.statusCode).toBe(303);
+    expect(world.queue.jobs[0]).toEqual({
+      type: 'check-sync-destination',
+      payload: { username: 'alice' },
+    });
+  });
+
+  it('should_never_let_a_member_configure_another_members_destination', async () => {
+    await world.server.inject({
+      method: 'POST',
+      url: '/sync/destination',
+      headers: { cookie: user.cookie, 'content-type': 'application/x-www-form-urlencoded' },
+      payload: form({ _csrf: user.csrf, ...aForm, username: 'boss' }),
+    });
+
+    expect(await world.destinations.findByUsername(Username.parse('boss'))).toBeUndefined();
+    expect(await world.destinations.findByUsername(Username.parse('alice'))).toBeDefined();
   });
 });

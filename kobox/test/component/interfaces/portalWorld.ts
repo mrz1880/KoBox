@@ -19,10 +19,14 @@ import type {
   ConfigFileReaderPort,
 } from '../../../src/application/installation/ConfigFileReaderPort.js';
 import type { ConfigDocument } from '../../../src/domain/installation/ConfigDocument.js';
+import type { RemotePasswordSealerPort } from '../../../src/domain/sync/ports.js';
+import type { RemotePassword } from '../../../src/domain/sync/RemotePassword.js';
+import { SetSyncDestination } from '../../../src/application/sync/SetSyncDestination.js';
 import type { HealthCheckResult, HealthProbePort, PasswordHasherPort } from '../../../src/domain/user/ports.js';
 import { InMemoryBlocklistRepository } from '../../../src/infrastructure/persistence/InMemoryBlocklistRepository.js';
 import { InMemoryFairUseRepository } from '../../../src/infrastructure/persistence/InMemoryFairUseRepository.js';
 import { InMemoryComponentRegistry } from '../../../src/infrastructure/persistence/InMemoryComponentRegistry.js';
+import { InMemorySyncDestinationRepository } from '../../../src/infrastructure/persistence/InMemorySyncDestinationRepository.js';
 import { InMemoryTorrentInstanceRepository } from '../../../src/infrastructure/persistence/InMemoryTorrentInstanceRepository.js';
 import { InMemoryDiagnosticsRepository } from '../../../src/infrastructure/persistence/InMemoryDiagnosticsRepository.js';
 import { InMemorySpeedtestRepository } from '../../../src/infrastructure/persistence/InMemorySpeedtestRepository.js';
@@ -65,6 +69,16 @@ class OneFileOnDisk implements ConfigFileReaderPort {
         ? { content: '*/5 * * * * root /usr/local/bin/kobox send-mails\n', truncated: false }
         : undefined,
     );
+  }
+}
+
+// Reversible marker instead of real RSA: a test can then prove the portal
+// stored something SEALED, and which password it sealed, without a key pair.
+export const REMOTE_SEAL_PREFIX = 'rsealed:';
+
+class FakeRemoteSealer implements RemotePasswordSealerPort {
+  seal(password: RemotePassword): Promise<string> {
+    return Promise.resolve(`${REMOTE_SEAL_PREFIX}${password.reveal()}`);
   }
 }
 
@@ -144,6 +158,7 @@ export interface PortalWorld {
   readonly fairUse: InMemoryFairUseRepository;
   readonly diagnostics: InMemoryDiagnosticsRepository;
   readonly instances: InMemoryTorrentInstanceRepository;
+  readonly destinations: InMemorySyncDestinationRepository;
 }
 
 // Builds a portal server over in-memory fakes with two accounts:
@@ -167,6 +182,7 @@ export async function buildPortalWorld(
   const fairUse = new InMemoryFairUseRepository();
   const diagnostics = new InMemoryDiagnosticsRepository();
   const instances = new InMemoryTorrentInstanceRepository();
+  const destinations = new InMemorySyncDestinationRepository();
   const authDeps = { users, credentials, sessions, attempts, tokens, hasher };
   const server = buildPortalServer({
     login: new Login(authDeps),
@@ -187,6 +203,8 @@ export async function buildPortalWorld(
     diagnostics,
     configFiles: new OneFileOnDisk(),
     instances,
+    destinations,
+    setDestination: new SetSyncDestination({ destinations, sealer: new FakeRemoteSealer() }),
     releases: new InMemoryReleaseRepository(),
     outbox,
     credentials,
@@ -222,7 +240,7 @@ export async function buildPortalWorld(
     { username: Username.parse('boss'), passwordHash: GOOD_HASH, role: 'admin' },
     NOW,
   );
-  return { server, users, credentials, sessions, queue, outbox, downloads, debridAccounts, media, fairUse, diagnostics, instances };
+  return { server, users, credentials, sessions, queue, outbox, downloads, debridAccounts, media, fairUse, diagnostics, instances, destinations };
 }
 
 export interface AgentSession {

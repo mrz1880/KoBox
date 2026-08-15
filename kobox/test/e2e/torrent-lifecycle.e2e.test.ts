@@ -159,6 +159,59 @@ describe.skipIf(!onDebianAsRoot)('E2E: torrent lifecycle with a real rtorrent', 
     expect(row?.sync_mode).toBe('immediate');
   });
 
+  it('should_reach_a_real_ssh_target_with_a_sealed_password_and_record_the_verdict', () => {
+    // A real destination, end to end: RSA seals the password, the ROOT worker
+    // opens it, sshpass -e hands it to a real sshd over a real socket, and the
+    // remote folder is really tested for writability. The only thing standing in
+    // for the member's NAS is a second account on this box.
+    const TARGET = 'e2esynctarget';
+    const SECRET = 'nas-password-42';
+    // leftovers from an earlier run must not shadow this one
+    try {
+      sh('userdel', ['-r', TARGET], { stdio: 'ignore' });
+    } catch {
+      /* absent */
+    }
+    sh('useradd', ['--create-home', '--shell', '/bin/sh', TARGET]);
+    sh('chpasswd', [], { input: `${TARGET}:${SECRET}\n` });
+    sh('install', ['-d', '-o', TARGET, '-g', TARGET, `/home/${TARGET}/incoming`]);
+    // the host key pair the portal seals with — install normally lays it down
+    sh('mkdir', ['-p', '/etc/kobox']);
+    sh('openssl', ['genrsa', '-out', '/etc/kobox/debrid-key.pem', '4096'], { stdio: 'pipe' });
+    sh('sh', ['-c', 'openssl rsa -in /etc/kobox/debrid-key.pem -pubout -out /etc/kobox/debrid-pub.pem']);
+
+    kobox(
+      [
+        'set-sync-destination', USER, '127.0.0.1', '22', TARGET, `/home/${TARGET}/incoming`,
+      ],
+      `${SECRET}\n`,
+    );
+    kobox(['check-sync-destination', USER]);
+    drainQueue();
+
+    const row = dbRow('SELECT last_check_ok, last_check_detail, sealed_password FROM sync_destinations WHERE username = ?', USER);
+    expect(row?.last_check_ok, String(row?.last_check_detail)).toBe(1);
+    // never stored in the clear, whatever else happens
+    expect(String(row?.sealed_password)).not.toContain(SECRET);
+    // first sight pinned the key rather than accepting anything that answers
+    expect(existsSync(`/var/lib/kobox/sync/${USER}.known_hosts`)).toBe(true);
+  });
+
+  it('should_say_what_is_wrong_rather_than_just_failing', () => {
+    // same account, a folder it cannot write to: the member needs to know it is
+    // the folder, not the password
+    kobox(
+      ['set-sync-destination', USER, '127.0.0.1', '22', 'e2esynctarget', '/root/nope'],
+      'nas-password-42\n',
+    );
+    kobox(['check-sync-destination', USER]);
+    drainQueue();
+
+    const row = dbRow('SELECT last_check_ok, last_check_detail FROM sync_destinations WHERE username = ?', USER);
+    expect(row?.last_check_ok).toBe(0);
+    expect(String(row?.last_check_detail)).toContain('folder');
+  });
+
   it('should_process_a_finished_event_from_the_real_shim_and_fan_out_user_scripts', () => {
     sh('install', ['-d', '-o', USER, '-g', 'kobox-users', join(HOME, 'scripts')]);
     writeFileSync(

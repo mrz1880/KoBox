@@ -50,10 +50,29 @@ sync on. The sealing above is what makes that acceptable.
 
 ## Slices
 
+### Read off the live box (2026-08-15, read-only)
+
+The deployed `synchro.sh` is **byte-identical** to the archive template — no
+hidden prod patch, unlike the rTorrent hooks in Phase 1. Two things the live box
+said that the archive did not:
+
+- **Categories are capitalised**: Films, Series, Divers, Jeux, Apps, Autres,
+  Audiobook. `Label` accepted lower case only, so the MySB import would have
+  rejected them — and since the label also names the destination folder on the
+  member's own machine, folding the case would have created a second set of
+  folders beside the ones already full of their files. `Label` now preserves
+  case; accents and spaces stay out, as MySB stripped those too.
+- **The schedule is per member**: each member's own crontab carries their own
+  `synchro.sh` line at an hour they chose. Slice 3 keeps that choice without
+  writing per-user crontabs: an hourly system pass that only takes on members
+  whose chosen hour has come.
+
+## Slices
+
 1. **A sync mode per category** — `SyncMode` on the watch dir, persisted, and
    the categories block of the page. Adding a category already exists
    (`add-watch-dir`): directories and rTorrent config are handled.
-2. **The destination** — `SyncDestination` aggregate, sealed password, the
-   connection block, and a "test it now" that says what is wrong in words.
+2. **The destination** (done) — `SyncDestination` aggregate, sealed password,
+   the connection block, and a "test it now" that says what is wrong in words.
 3. **The transfer** — the queue, `rsync` over SSH from the root worker, the
    scheduled pass, immediate mode, retry, and what the member sees.
