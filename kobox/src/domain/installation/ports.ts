@@ -46,6 +46,15 @@ export interface ConfigCheckPort {
 // Small host mutations installers need beyond packages/files/units. The one
 // anti-corruption seam to Debian for installation; every op stays argv-only
 // or plain fs in the adapter.
+// How a release tarball is shaped inside. Not a boolean: "strip one component"
+// describes the tar flag, this describes the archive — and getting it wrong
+// silently produces an empty directory rather than an error.
+export type ArchiveLayout =
+  // ruTorrent: everything under one top-level directory named after the tag
+  | 'inside-one-directory'
+  // librespeed: the binary and its LICENSE sit at the root of the archive
+  | 'files-at-the-top';
+
 export interface InstallHostPort {
   hostname(): Promise<string>;
   pathExists(path: string): Promise<boolean>;
@@ -56,7 +65,7 @@ export interface InstallHostPort {
   ensureFile(file: RenderedFile): Promise<boolean>;
   // creates the symlink only when absent; returns true when it was created
   ensureSymlink(linkPath: string, target: string): Promise<boolean>;
-  extractTarGz(archive: string, destDir: string): Promise<void>;
+  extractTarGz(archive: string, destDir: string, layout: ArchiveLayout): Promise<void>;
   applySysctl(): Promise<void>;
   postconf(settings: Readonly<Record<string, string>>): Promise<void>;
   postmap(path: string): Promise<void>;
