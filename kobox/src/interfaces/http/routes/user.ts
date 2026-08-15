@@ -11,6 +11,15 @@ import type { MediaRepository } from '../../../domain/media/ports.js';
 import { Label } from '../../../domain/torrent/Label.js';
 import { SyncMode } from '../../../domain/torrent/SyncMode.js';
 import type { TorrentInstanceRepository } from '../../../domain/torrent/ports.js';
+import type { SyncDestinationRepository } from '../../../domain/sync/ports.js';
+import type { SetSyncDestination } from '../../../application/sync/SetSyncDestination.js';
+import { LoneFilePlacement } from '../../../domain/sync/LoneFilePlacement.js';
+import { RemoteAccount } from '../../../domain/sync/RemoteAccount.js';
+import { RemoteHost } from '../../../domain/sync/RemoteHost.js';
+import { RemotePassword } from '../../../domain/sync/RemotePassword.js';
+import { RemotePath } from '../../../domain/sync/RemotePath.js';
+import { RemotePort } from '../../../domain/sync/RemotePort.js';
+import { TransferBatchSize } from '../../../domain/sync/TransferBatchSize.js';
 import type { Username } from '../../../domain/user/Username.js';
 import type {
   DebridAccountRepository,
@@ -41,6 +50,16 @@ import {
 import { syncPage } from '../views/syncPage.js';
 
 const categorySchema = z.object({ label: z.string().min(1).max(64) });
+const destinationSchema = z.object({
+  host: z.string().min(1).max(253),
+  port: z.coerce.number().int().min(1).max(65535),
+  account: z.string().min(1).max(64),
+  // empty means "keep the stored one": a form cannot show a password back
+  password: z.string().max(256).optional(),
+  path: z.string().min(1).max(512),
+  batchSize: z.coerce.number().int().min(0).max(1000),
+  placement: z.string().min(1).max(32),
+});
 const categoryModeSchema = z.object({
   label: z.string().min(1).max(64),
   mode: z.string().min(1).max(16),
@@ -131,6 +150,9 @@ export interface UserRoutesDeps {
   readonly debridEncryptor: DebridKeyEncryptorPort;
   readonly media: MediaRepository;
   readonly instances: TorrentInstanceRepository;
+  readonly destinations: SyncDestinationRepository;
+  // seals with the PUBLIC half of the host key; it can never open one back
+  readonly setDestination: SetSyncDestination;
 }
 
 // One channel of the console, assembled from what the portal can read in the
@@ -328,9 +350,10 @@ export function registerUserRoutes(
     // the root watch dir is everything without a label: it is not a folder a
     // member named, and it cannot be synchronised
     const categories = (instance?.watchDirs ?? []).filter((dir) => dir.label !== undefined);
+    const destination = await deps.destinations.findByUsername(session.username);
     return reply
       .type('text/html')
-      .send(syncPage(categories, viewerOf(session), flashOf(request)));
+      .send(syncPage(categories, destination, viewerOf(session), flashOf(request)));
   });
 
   server.post('/sync/categories', async (request, reply) => {
@@ -387,6 +410,56 @@ export function registerUserRoutes(
       }),
     );
     return redirectWithFlash(reply, '/sync', `Saved what happens to ${label.value}.`);
+  });
+
+  server.post('/sync/destination', async (request, reply) => {
+    const session = await guards.requireCsrf(request, reply);
+    if (session === undefined) {
+      return;
+    }
+    const parsed = destinationSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.code(400).send();
+    }
+    const form = parsed.data;
+    try {
+      // every field becomes a value object before it can reach a command line:
+      // a host starting with a dash would be an ssh option, not a host
+      await deps.setDestination.execute({
+        username: session.username,
+        host: RemoteHost.parse(form.host),
+        port: RemotePort.parse(form.port),
+        account: RemoteAccount.parse(form.account),
+        path: RemotePath.parse(form.path),
+        batchSize: TransferBatchSize.parse(form.batchSize),
+        placement: LoneFilePlacement.parse(form.placement),
+        ...(form.password !== undefined &&
+          form.password !== '' && { password: RemotePassword.parse(form.password) }),
+      });
+    } catch (error) {
+      if (error instanceof DomainError) {
+        return redirectWithFlash(reply, '/sync', error.message);
+      }
+      throw error;
+    }
+    return redirectWithFlash(reply, '/sync', 'Saved. Test it before you rely on it.');
+  });
+
+  server.post('/sync/destination/test', async (request, reply) => {
+    const session = await guards.requireCsrf(request, reply);
+    if (session === undefined) {
+      return;
+    }
+    // the portal cannot open the sealed password, so it cannot run this itself:
+    // it asks the root worker, which holds the private half of the host key
+    const id = await deps.queue.enqueueUnique(
+      buildJob.checkSyncDestination({ username: session.username.value }),
+    );
+    return redirectWithFlash(
+      reply,
+      '/sync',
+      id === undefined ? 'A test is already running.' : 'Testing the connection.',
+    );
   });
 
   server.get('/media', async (request, reply) => {

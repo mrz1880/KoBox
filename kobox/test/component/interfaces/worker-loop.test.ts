@@ -4,6 +4,8 @@ import type { BackupHostPort } from '../../../src/application/maintenance/Backup
 import type { MailDelivery } from '../../../src/application/maintenance/MailTransportPort.js';
 import { InMemoryMediaRepository } from '../../../src/infrastructure/persistence/InMemoryMediaRepository.js';
 import { FakeSystemd } from '../../../src/infrastructure/system/fakes/FakeSystemd.js';
+import { InMemorySyncDestinationRepository } from '../../../src/infrastructure/persistence/InMemorySyncDestinationRepository.js';
+import { RemotePassword } from '../../../src/domain/sync/RemotePassword.js';
 import { InMemoryDiagnosticsRepository } from '../../../src/infrastructure/persistence/InMemoryDiagnosticsRepository.js';
 import { InMemorySpeedtestRepository } from '../../../src/infrastructure/persistence/InMemorySpeedtestRepository.js';
 import { InMemoryMailOutbox } from '../../../src/infrastructure/persistence/InMemoryMailOutbox.js';
@@ -64,6 +66,7 @@ import { JobWorker } from '../../../src/interfaces/worker/JobWorker.js';
 import {
   buildDdlUseCases,
   buildMaintenanceUseCases,
+  buildSyncUseCases,
   buildSecurityUseCases,
   buildTorrentUseCases,
   buildTrackerUseCases,
@@ -171,6 +174,7 @@ interface World {
   ipset: FakeIpset;
   outbox: InMemoryMailOutbox;
   diagnostics: InMemoryDiagnosticsRepository;
+  syncDestinations: InMemorySyncDestinationRepository;
   mailTransport: RecordingMailTransport;
   worker: JobWorker;
   hasher: FakePasswordHasher;
@@ -340,6 +344,15 @@ beforeEach(() => {
   const queue = new InMemoryJobQueue();
   const outbox = new InMemoryMailOutbox();
   const diagnosticsRepo = new InMemoryDiagnosticsRepository();
+  const syncDestinations = new InMemorySyncDestinationRepository();
+  const syncUseCases = buildSyncUseCases({
+    destinations: syncDestinations,
+    // the sealed blob is opaque here: this suite proves the worker asks, not
+    // that RSA works — that is the cipher's own test
+    opener: { open: () => Promise.resolve(RemotePassword.parse('from-the-seal')) },
+    probe: { probe: () => Promise.resolve({ ok: true, detail: 'the machine answered' }) },
+    clock: () => '2026-07-25 10:00:00',
+  });
   const mailTransport = new RecordingMailTransport();
   const maintenanceUseCases = buildMaintenanceUseCases({
     outbox,
@@ -396,6 +409,7 @@ beforeEach(() => {
     outbox,
     mailTransport,
     diagnostics: diagnosticsRepo,
+    syncDestinations,
     worker: new JobWorker(
       queue,
       useCases,
@@ -405,6 +419,7 @@ beforeEach(() => {
       maintenanceUseCases,
       outbox,
       ddlUseCases,
+      syncUseCases,
     ),
   };
 });

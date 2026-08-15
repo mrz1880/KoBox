@@ -374,7 +374,12 @@ class RtorrentInstaller implements ComponentInstaller {
   async install(): Promise<InstallOutcome> {
     // Debian 12 ships rtorrent 0.9.8 — prod parity without build-from-source
     // (Annexe B #95: pinned packaging over fragile compilation)
-    await this.ctx.packages.ensureInstalled(['rtorrent']);
+    //
+    // rsync and sshpass ride along: they are what carries a finished download to
+    // the member's own machine. sshpass is only ever used with -e, so the
+    // password travels through the environment and never through an argv where
+    // every other member of the box could read it out of `ps`.
+    await this.ctx.packages.ensureInstalled(['rtorrent', 'rsync', 'sshpass']);
     return installed(await this.ctx.packages.installedVersion('rtorrent'));
   }
 

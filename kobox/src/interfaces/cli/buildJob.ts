@@ -65,6 +65,9 @@ export const buildJob = {
     return parseJob('render-rtorrent-config', { username: input.username });
   },
 
+  checkSyncDestination(input: { username: string }): Job {
+    return parseJob('check-sync-destination', input);
+  },
   setCategorySyncMode(input: { username: string; label: string; mode: string }): Job {
     return parseJob('set-category-sync-mode', input);
   },

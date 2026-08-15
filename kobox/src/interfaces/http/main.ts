@@ -47,6 +47,8 @@ async function main(): Promise<void> {
     diagnostics: container.diagnostics,
     configFiles: container.configFiles,
     instances: container.instances,
+    destinations: container.destinations,
+    setDestination: container.setDestination,
     releases: container.releaseRepo,
     outbox: container.outbox,
     credentials: container.credentials,

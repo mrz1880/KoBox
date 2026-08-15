@@ -356,3 +356,25 @@ export const debridDownloads = sqliteTable(
     index('debrid_downloads_username_idx').on(table.username),
   ],
 );
+
+// Where one member's finished downloads are copied to. One row per member —
+// the legacy kept the same thing in a single-row `ident` table per user.
+//
+// The password is stored SEALED with the host RSA key and nothing here can open
+// it: that takes the private half, which only the root worker reads.
+export const syncDestinations = sqliteTable('sync_destinations', {
+  username: text('username').primaryKey(),
+  host: text('host').notNull(),
+  port: integer('port').notNull(),
+  account: text('account').notNull(),
+  sealedPassword: text('sealed_password').notNull(),
+  path: text('path').notNull(),
+  // 0 means "everything waiting", as it did in the legacy
+  batchSize: integer('batch_size').notNull().default(0),
+  placement: text('placement').notNull().default('beside-the-others'),
+  // what the last "test it now" concluded, so the page can show it back
+  lastCheckOk: integer('last_check_ok'),
+  lastCheckAt: text('last_check_at'),
+  lastCheckDetail: text('last_check_detail'),
+  lastCheckFingerprint: text('last_check_fingerprint'),
+});

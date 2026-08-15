@@ -67,6 +67,10 @@ import { SqlitePortalCredentialsRepository } from '../infrastructure/persistence
 import { SqlitePortalSessionRepository } from '../infrastructure/persistence/SqlitePortalSessionRepository.js';
 import { SqlitePortAllocator } from '../infrastructure/persistence/SqlitePortAllocator.js';
 import { SqliteTorrentInstanceRepository } from '../infrastructure/persistence/SqliteTorrentInstanceRepository.js';
+import { SqliteSyncDestinationRepository } from '../infrastructure/persistence/SqliteSyncDestinationRepository.js';
+import { RsaRemotePasswordCipher } from '../infrastructure/system/RsaRemotePasswordCipher.js';
+import { SetSyncDestination } from '../application/sync/SetSyncDestination.js';
+import { SshRemoteProbe } from '../infrastructure/system/SshRemoteProbe.js';
 import { SqliteTorrentRepository } from '../infrastructure/persistence/SqliteTorrentRepository.js';
 import { SqliteTrackerRepository } from '../infrastructure/persistence/SqliteTrackerRepository.js';
 import { SqliteUserAddressRepository } from '../infrastructure/persistence/SqliteUserAddressRepository.js';
@@ -116,6 +120,7 @@ import { JobWorker } from './worker/JobWorker.js';
 import {
   buildDdlUseCases,
   buildMaintenanceUseCases,
+  buildSyncUseCases,
   buildSecurityUseCases,
   buildTorrentUseCases,
   buildTrackerUseCases,
@@ -123,6 +128,7 @@ import {
   type DdlUseCases,
   type MaintenanceUseCases,
   type SecurityUseCases,
+  type SyncUseCases,
   type TorrentUseCases,
   type TrackerUseCases,
   type UseCases,
@@ -399,6 +405,8 @@ export interface Container {
   readonly maintenanceUseCases: MaintenanceUseCases;
   readonly outbox: SqliteMailOutbox;
   readonly ddlUseCases: DdlUseCases;
+  readonly syncUseCases: SyncUseCases;
+  readonly setDestination: SetSyncDestination;
   readonly speedtestRepo: SqliteSpeedtestRepository;
   readonly diagnosticsRepo: SqliteDiagnosticsRepository;
   readonly mediaRepo: SqliteMediaRepository;
@@ -457,6 +465,8 @@ export interface PortalContainer {
   readonly diagnostics: SqliteDiagnosticsRepository;
   readonly configFiles: FsConfigFileReader;
   readonly instances: SqliteTorrentInstanceRepository;
+  readonly destinations: SqliteSyncDestinationRepository;
+  readonly setDestination: SetSyncDestination;
   readonly outbox: SqliteMailOutbox;
   readonly debridDownloadRepo: SqliteDebridDownloadRepository;
   readonly debridAccountRepo: SqliteDebridAccountRepository;
@@ -468,6 +478,7 @@ export interface PortalContainer {
 export function buildPortalContainer(name: string): PortalContainer {
   const logger = createLogger(name);
   const db = KoboxDatabase.open(process.env.KOBOX_DB ?? DEFAULT_DB_PATH);
+  const syncDestinations = new SqliteSyncDestinationRepository(db);
   // openssl + health probe only; nothing here mutates the host
   const runner = new ExecFileRunner();
   const queue = new SqliteJobQueue(db);
@@ -497,6 +508,12 @@ export function buildPortalContainer(name: string): PortalContainer {
     // read-only from the portal: it lists a member's folders, the worker is
     // what creates directories and changes a mode
     instances: new SqliteTorrentInstanceRepository(db),
+    destinations: syncDestinations,
+    // the PUBLIC half only: the portal can seal a password, never open one
+    setDestination: new SetSyncDestination({
+      destinations: syncDestinations,
+      sealer: new RsaRemotePasswordCipher(),
+    }),
     outbox: new SqliteMailOutbox(db),
     debridDownloadRepo,
     debridAccountRepo: new SqliteDebridAccountRepository(db),
@@ -666,10 +683,25 @@ export function buildContainer(name: string): Container {
     clock: nowStamp,
     stagingBase: process.env.KOBOX_DDL_STAGING ?? DEFAULT_DDL_STAGING,
   });
+  const syncDestinationRepo = new SqliteSyncDestinationRepository(db);
+  const syncUseCases = buildSyncUseCases({
+    destinations: syncDestinationRepo,
+    // the private half of the host key: root only, which is why this lives in
+    // the worker container and not in the portal's
+    opener: new RsaRemotePasswordCipher(),
+    probe: new SshRemoteProbe(runner),
+    clock: nowStamp,
+  });
   return {
     db,
     logger,
     useCases,
+    syncUseCases,
+    // root holds both halves; sealing still only needs the public one
+    setDestination: new SetSyncDestination({
+      destinations: syncDestinationRepo,
+      sealer: new RsaRemotePasswordCipher(),
+    }),
     torrentUseCases,
     trackerUseCases,
     securityUseCases,
@@ -685,6 +717,7 @@ export function buildContainer(name: string): Container {
       maintenanceUseCases,
       outbox,
       ddlUseCases,
+      syncUseCases,
     ),
     ddlUseCases,
     speedtestRepo,

@@ -20,6 +20,7 @@ import type {
   DdlUseCases,
   MaintenanceUseCases,
   SecurityUseCases,
+  SyncUseCases,
   TorrentUseCases,
   TrackerUseCases,
   UseCases,
@@ -53,6 +54,7 @@ export class JobWorker {
     private readonly maintenance: MaintenanceUseCases,
     private readonly outbox: MailOutboxPort,
     private readonly ddl: DdlUseCases,
+    private readonly sync: SyncUseCases,
   ) {}
 
   async processNext(): Promise<boolean> {
@@ -217,6 +219,9 @@ export class JobWorker {
           username: Username.parse(job.payload.username),
           label: Label.parse(job.payload.label),
         });
+        return;
+      case 'check-sync-destination':
+        await this.sync.checkDestination.execute(Username.parse(job.payload.username));
         return;
       case 'set-category-sync-mode':
         await this.torrents.setCategorySyncMode.execute({

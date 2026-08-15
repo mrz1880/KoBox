@@ -7,6 +7,13 @@ import { EventHook } from '../../domain/torrent/EventHook.js';
 import { InfoHash } from '../../domain/torrent/InfoHash.js';
 import { LABEL_PATTERN, Label } from '../../domain/torrent/Label.js';
 import { SyncMode } from '../../domain/torrent/SyncMode.js';
+import { LoneFilePlacement } from '../../domain/sync/LoneFilePlacement.js';
+import { RemoteAccount } from '../../domain/sync/RemoteAccount.js';
+import { RemoteHost } from '../../domain/sync/RemoteHost.js';
+import { RemotePassword } from '../../domain/sync/RemotePassword.js';
+import { RemotePath } from '../../domain/sync/RemotePath.js';
+import { RemotePort } from '../../domain/sync/RemotePort.js';
+import { TransferBatchSize } from '../../domain/sync/TransferBatchSize.js';
 import { AccountType } from '../../domain/user/AccountType.js';
 import { EmailAddress } from '../../domain/user/EmailAddress.js';
 import { Password } from '../../domain/user/Password.js';
@@ -163,6 +170,67 @@ usernameCommand(
     await c.torrentUseCases.render.execute({ username });
   },
 );
+
+program
+  .command('set-sync-destination')
+  .argument('<username>')
+  .argument('<host>')
+  .argument('<port>')
+  .argument('<account>')
+  .argument('<path>', 'absolute directory on the member\'s own machine')
+  .option('--batch-size <n>', 'files per pass, 0 for everything waiting', '0')
+  .option('--lone-file <placement>', 'beside-the-others | in-its-own-folder', 'beside-the-others')
+  .description("set where a member's finished downloads are copied (password on stdin)")
+  .action(
+    async (
+      rawUser: string,
+      rawHost: string,
+      rawPort: string,
+      rawAccount: string,
+      rawPath: string,
+      options: { batchSize: string; loneFile: string },
+    ) => {
+      // stdin, never an argument: a password on the command line is readable in
+      // `ps` by every other member of the box
+      const secret = (await readStdin()).trim();
+      const c = container();
+      await c.setDestination.execute({
+        username: Username.parse(rawUser),
+        host: RemoteHost.parse(rawHost),
+        port: RemotePort.parse(Number(rawPort)),
+        account: RemoteAccount.parse(rawAccount),
+        path: RemotePath.parse(rawPath),
+        batchSize: TransferBatchSize.parse(Number(options.batchSize)),
+        placement: LoneFilePlacement.parse(options.loneFile),
+        ...(secret !== '' && { password: RemotePassword.parse(secret) }),
+      });
+      await done(c, `destination set for ${rawUser}`);
+    },
+  );
+
+program
+  .command('check-sync-destination')
+  .argument('<username>')
+  .description("test a member's destination from the root worker and record the verdict")
+  .action(async (rawUser: string) => {
+    const { direct } = program.opts<GlobalOptions>();
+    const username = Username.parse(rawUser);
+    const c = container();
+    if (direct) {
+      await c.syncUseCases.checkDestination.execute(username);
+      await done(c, `destination checked for ${username.value}`);
+      return;
+    }
+    const id = await c.queue.enqueueUnique(
+      buildJob.checkSyncDestination({ username: username.value }),
+    );
+    await done(
+      c,
+      id === undefined
+        ? 'a check is already pending'
+        : `job ${String(id)} enqueued: check-sync-destination ${username.value}`,
+    );
+  });
 
 program
   .command('set-category-sync-mode')

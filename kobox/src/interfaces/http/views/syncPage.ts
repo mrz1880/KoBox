@@ -1,6 +1,8 @@
+import type { SyncDestination } from '../../../domain/sync/SyncDestination.js';
 import { SyncMode } from '../../../domain/torrent/SyncMode.js';
 import type { WatchDir } from '../../../domain/torrent/WatchDir.js';
 import { html, type RawHtml } from '../html.js';
+import { destinationSection } from './destinationSection.js';
 import { flash, page, type Viewer } from './layout.js';
 
 // The three modes in the words a member would use about their own files. The
@@ -38,6 +40,7 @@ function modeChoice(dir: WatchDir, viewer: Viewer): RawHtml {
 
 export function syncPage(
   categories: readonly WatchDir[],
+  destination: SyncDestination | undefined,
   viewer: Viewer,
   message?: string,
 ): string {
@@ -68,8 +71,11 @@ ${categories.length === 0
   <input name="label" placeholder="films" maxlength="64" required>
   <button type="submit">Add it</button>
 </form>
-<p class="muted">Lower case, no spaces or accents — it becomes a folder name on
-disk. New folders keep everything here until you say otherwise.</p>`,
+<p class="muted">Letters, digits, dot, dash or underscore — no spaces and no
+accents, because it becomes a folder name on this box and on your own machine.
+New folders keep everything here until you say otherwise.</p>
+
+${destinationSection(destination, viewer)}`,
     viewer,
   );
 }
