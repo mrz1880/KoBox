@@ -78,18 +78,43 @@ is a set of **read-only `SELECT`s that alias into the contract shape**. Sketch
 (run as a user with read grants; adjust column names to the live schema, which
 `docs/PROD-INSPECTION.md` §3 maps):
 
+The mapping below was read off a live MySB box (2026-08-15, read-only) rather
+than reconstructed — the real column names and one unit differ from what this
+document used to claim.
+
+| Contract | Real source |
+|---|---|
+| `users.username` / `email` | `users.users_ident` / `users.users_email` |
+| `users.quota_bytes` | `users.quota * 1024` — the column is in **KB**, not GB |
+| `users.active` | `users.is_active` |
+| `trackers_list.host` … | `trackers_list.tracker`, `tracker_proto`, `tracker_port` |
+| `blocklists.name` / `url` | `blocklists.list_name` / `list_url`; `enabled` = `enable` |
+| `blocklists.source` | derived: `iblocklist` when `author = 'I-Blocklist'`, else `personal` |
+| `torrents.username` | `torrents.users_ident` (no join needed) |
+| `torrents.label` | **no source — leave NULL** (see below) |
+| `user_addresses.username` | join `users_addresses.id_users` → `users` |
+| `sync/<user>.sq3` categories | `users_rtorrent_cfg (sub_directory, sync_mode)` |
+
+Two things worth knowing before you write the export:
+
+- **`torrents` has no label column.** MySB never stored one: the label lives in
+  rTorrent's own session (`d.custom1`), and `tree` holds the release name, not a
+  category. Deriving a label from the path invents thousands of them. Import
+  NULL — new downloads carry their own label from the event.
+- **The categories are in the control plane too.** `users_rtorrent_cfg` holds
+  `(sub_directory, sync_mode)` for every member, which is the same data as each
+  member's `categories` table. Building `sync/<user>.sq3` from it means **no real
+  `~/db/<user>.sq3` is ever opened** — that file also holds `ident`, whose
+  password column is the one thing in a MySB dump nobody should read.
+
 ```sh
 # 1. central control plane -> a portable SQLite (single read transaction)
-#    Use a SELECT ... aliasing MySB columns to the contract columns, e.g.:
-#      SELECT login AS username, mail AS email, scgi_port, ... FROM users;
-#      (rtorrent_port joined from users_rtorrent_cfg; proxy_port is the shared 8080)
-#    Materialise each SELECT into mysb.sqlite (sqlite3 .import / a small script).
-#    quota_bytes = quota_gb * 1024^3 ; account_type ∈ {normal,plex} ; active = is_active
+#    Read-only SELECTs aliasing into the contract shape, per the table above,
+#    materialised into mysb.sqlite by a small script.
 
-# 2. per-user sync sqlite (already SQLite) — copy verbatim, read-only
-for u in $(list-of-usernames); do
-  install -Dm600 "/home/$u/db/$u.sq3" "<dump>/sync/$u.sq3"
-done
+# 2. per-user categories -> sync/<user>.sq3, built from users_rtorrent_cfg:
+#    CREATE TABLE categories (name TEXT, sync_mode INTEGER) and one row per
+#    sub_directory. Copying the real .sq3 also works but carries `ident`.
 ```
 
 Then copy `<dump>/` to the KoBox target. **Fixtures for tests are neutral**
@@ -236,6 +261,32 @@ No destructive step (removing MySB, `userdel` on the old box) happens until the
 owner declares the cutover final. Preserving legacy ports (`docs/PHASE-7-BRIEF`
 §6) is what makes rollback non-disruptive: an imported user is never re-routed to
 a different SCGI/rtorrent port.
+
+---
+
+## 8bis. What a real dump actually reports
+
+Rehearsed against the live box on 2026-08-15 (dry-run only, nothing written):
+
+| | Result |
+|---|---|
+| users | 8 created, 0 conflicts |
+| trackers | 46 imported, 0 conflicts |
+| blocklists | 316 imported, 0 conflicts |
+| torrents | 4232 imported, 0 conflicts |
+| addresses | 33 imported, **2 conflicts** |
+
+The two address conflicts are legacy hygiene: a row with `check_by = hostname`
+whose `hostname` column holds an IPv4 literal. Fix those two rows in MySB before
+the real run, or accept losing them — the same address is usually present as a
+static `ipv4` row already.
+
+Every blocklist on that box is `http://`. KoBox refuses http for a blocklist (an
+altered list ends up in the kernel's IP filter), so the **import upgrades the
+scheme to https** — the same hosts serve https. That is a migration repair, not a
+domain concession: `BlocklistUrl` still refuses http everywhere else.
+
+Account types were all `normal`; no `plex` account existed on that box.
 
 ---
 

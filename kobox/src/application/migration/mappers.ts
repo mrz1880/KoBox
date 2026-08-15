@@ -104,12 +104,25 @@ export function toTracker(dto: MysbTracker): Tracker {
   });
 }
 
+// Every blocklist on a live MySB box is http — 316 of them on the one this was
+// checked against. KoBox refuses http on purpose: a list altered in transit ends
+// up in the kernel's IP filter. Dropping them would cost a member their whole
+// blocklist configuration at cutover, and the hosts that serve these lists serve
+// them over https too, so the repair is the same list over a transport we accept.
+//
+// Deliberately a MIGRATION repair, not a domain concession: BlocklistUrl still
+// refuses http everywhere else. Anything that is not http stays untouched and is
+// still rejected if it offends the rule.
+function upgradedToHttps(url: string): string {
+  return url.startsWith('http://') ? `https://${url.slice('http://'.length)}` : url;
+}
+
 export function toBlocklist(dto: MysbBlocklist): Blocklist {
   return Blocklist.restore({
     source: BlocklistSource.parse(dto.source),
     author: dto.author,
     name: dto.name,
-    url: BlocklistUrl.parse(dto.url),
+    url: BlocklistUrl.parse(upgradedToHttps(dto.url)),
     subscription: dto.subscription,
     enabled: dto.enabled,
   });
