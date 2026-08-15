@@ -54,6 +54,16 @@ describe('installation rendering', () => {
     expectGolden('kobox-worker.service.golden', file.content);
   });
 
+  it('should_serve_rutorrents_own_entry_point', () => {
+    // ruTorrent 5.x ships index.html; 4.x shipped index.php. Naming only the
+    // php one makes nginx fall through to a directory listing and answer 403 on
+    // the very first visit, which is what a real install did.
+    const conf = renderNginxVhost({ portalPort: 8189 }).content;
+
+    expect(conf).toContain('index index.html index.php;');
+  });
+
+
   it('should_render_the_portal_systemd_unit_golden', () => {
     const file = renderPortalUnit({
       nodeBin: '/usr/bin/node',

@@ -676,6 +676,15 @@ describe('rutorrent installer', () => {
     expect(unpinned.host.fetched).toHaveLength(0);
   });
 
+  it('should_start_php_now_rather_than_leaving_it_for_the_next_reboot', async () => {
+    // ruTorrent is a PHP application. Enabling the unit without starting it
+    // leaves it working only after the box is rebooted — seen on a real
+    // install, where /ru/ answered 403 until php-fpm was started by hand.
+    await installer(world, 'rutorrent').install();
+
+    expect(world.systemd.log).toContain('enable-now php8.2-fpm');
+  });
+
   it('should_fetch_verify_extract_once_and_render_the_global_config', async () => {
     await installer(world, 'rutorrent').install();
 

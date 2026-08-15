@@ -43,15 +43,22 @@ function topologicalOrder(catalog: readonly ComponentSpec[]): readonly Component
   return ordered;
 }
 
-// The resumable plan: every non-installed component in dependency order —
-// failed re-runs (anti-#122), skipped re-evaluates (recoverable by re-run).
-export function planInstallation(
-  catalog: readonly ComponentSpec[],
-  states: ReadonlyMap<string, InstallState>,
-): readonly ComponentSpec[] {
-  return topologicalOrder(catalog).filter(
-    (spec) => states.get(spec.name.value)?.isPending() ?? true,
-  );
+// The convergence plan: EVERY component, in dependency order.
+//
+// This used to drop anything already `installed`, which made `kobox install` a
+// no-op for a component whose pin had moved — OPS.md promises "the component
+// re-vendors when the sum differs from the installed marker", and that
+// comparison lives inside the installer, so it was never reached. Re-pinning
+// NanoMon on a real box did nothing until the registry row was edited by hand.
+//
+// Converging is the planner's job; no-oping is the installer's. Each one guards
+// its work behind a marker, an ensureInstalled, or a content comparison that
+// only reloads a service when the rendered file actually changed, so revisiting
+// a converged component costs a check and nothing else. Resumability is
+// unaffected: an interrupted run re-runs from the top and reaches the component
+// that failed with its dependencies behind it.
+export function planInstallation(catalog: readonly ComponentSpec[]): readonly ComponentSpec[] {
+  return topologicalOrder(catalog);
 }
 
 // Teardown mirror: installed components only, reverse dependency order.

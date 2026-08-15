@@ -78,13 +78,15 @@ export class RunInstallation {
     }
 
     const states = await deps.registry.states();
-    const plan = planInstallation(deps.catalog, states);
+    const plan = planInstallation(deps.catalog);
     const alreadyInstalled = deps.catalog
       .map((spec) => spec.name.value)
       .filter((name) => states.get(name)?.value === 'installed');
 
-    // a fully converged box pays no apt-get update
-    if (plan.length > 0) {
+    // The pass always walks the whole catalog now, so "is there work" can no
+    // longer be read off its length: a fully converged box still pays no
+    // apt-get update, it just walks its components and finds each one done.
+    if (alreadyInstalled.length < deps.catalog.length) {
       await deps.packages.refresh();
     }
 
@@ -109,7 +111,12 @@ export class RunInstallation {
             outcome.version === undefined ? undefined : Version.parse(outcome.version),
             deps.now(),
           );
-          installed.push(name);
+          // `installed` reports what THIS pass changed, not everything it
+          // walked: the plan now revisits converged components, and a report
+          // that re-lists all of them every run tells an operator nothing.
+          if (!alreadyInstalled.includes(name)) {
+            installed.push(name);
+          }
           this.deps.onProgress?.(
             `${name}: installed${outcome.detail === undefined ? '' : ` — ${outcome.detail}`}`,
           );

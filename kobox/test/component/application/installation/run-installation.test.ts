@@ -159,7 +159,9 @@ describe('RunInstallation', () => {
 
     expect(report.installed).toEqual(['bind', 'fail2ban']);
     expect(report.alreadyInstalled).toEqual(['kobox-core', 'sshd']);
-    expect(world.installers.get('kobox-core')?.installCalls).toBe(1); // never redone
+    // kobox-core is walked again and converges silently: it is not reported as
+    // installed by this pass, because this pass did not change it
+    expect(world.installers.get('kobox-core')?.installCalls).toBe(2);
   });
 
   it('should_record_skips_and_re_evaluate_them_on_every_run', async () => {
@@ -190,10 +192,12 @@ describe('RunInstallation', () => {
 
     expect(report.installed).toEqual([]);
     expect(report.alreadyInstalled).toEqual(['kobox-core', 'sshd', 'bind', 'fail2ban']);
+    // every installer is revisited — that is what makes a changed pin land —
+    // and each one finds its own work already done
     for (const installer of world.installers.values()) {
-      expect(installer.installCalls).toBe(1);
+      expect(installer.installCalls).toBe(2);
     }
-    // fully converged: no plan, no apt-get update either
+    // fully converged: still no second apt-get update
     expect(world.packages.refreshCount).toBe(1);
     // convergence is cheap and idempotent by Phase 1-3 design: always re-run
     expect(world.enqueued).toEqual([

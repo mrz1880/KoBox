@@ -164,6 +164,27 @@ Browsers play mp4/webm/ogg; an mkv or an H.265 file is offered as a download
 instead of a player that would show a black rectangle. Transcoding is out of
 scope — it would be a different, far heavier project.
 
+## Re-running `kobox install`
+
+`kobox install` walks the **whole catalogue** every time, in dependency order,
+and each component decides for itself whether there is anything to do: a marker
+that already matches, a package already installed, a rendered file whose content
+has not changed. Converging is the planner's job, no-oping is the installer's.
+
+That is what makes a **re-pin land**. Point `KOBOX_NANOMON_URL` and
+`KOBOX_NANOMON_SHA256` at a new release, re-run, and the component re-vendors
+because its marker no longer matches. It used to skip anything already recorded
+as `installed`, so the comparison inside the installer was never reached and a
+re-pin did nothing at all — the registry row had to be edited by hand.
+
+The report tells you what **this run changed**: `installed` lists the components
+this pass brought up, `alreadyInstalled` the ones that were converged before it
+started. A fully converged box still pays no `apt-get update`.
+
+A failure stops the run at that component, records the reason, and exits
+non-zero. Re-running walks from the top again — the components before it converge
+in seconds — and arrives at the one that failed.
+
 ## Restarting a managed service
 
 **Health → Managed services** restarts a KoBox-managed unit without a shell:
