@@ -36,6 +36,8 @@ interface ChainHints {
   readonly fail2banDirty?: boolean;
   readonly openVpnDirty?: boolean;
   readonly nfsDirty?: boolean;
+  // a member asked this folder to go out straight away rather than at their hour
+  readonly sendNowFor?: string;
 }
 
 function nowStamp(): string {
@@ -141,6 +143,13 @@ export class JobWorker {
     if (job.type === 'torrent-event' || job.type === 'poll-debrid-downloads') {
       await this.queue.enqueueUnique(parseJob('index-media', {}));
     }
+    if (hints?.sendNowFor !== undefined) {
+      // enqueueUnique: several downloads finishing at once must not stack
+      // several passes over the same queue
+      await this.queue.enqueueUnique(
+        parseJob('send-pending-transfers', { username: hints.sendNowFor }),
+      );
+    }
     if (hints?.fetchCertHost !== undefined) {
       await this.queue.enqueue(parseJob('fetch-tracker-cert', { host: hints.fetchCertHost }));
     }
@@ -220,6 +229,16 @@ export class JobWorker {
           label: Label.parse(job.payload.label),
         });
         return;
+      case 'send-pending-transfers':
+        await this.sync.sendPending.execute(
+          job.payload.username === undefined
+            ? undefined
+            : Username.parse(job.payload.username),
+        );
+        return;
+      case 'requeue-transfer':
+        await this.sync.requeue.execute(Username.parse(job.payload.username), job.payload.id);
+        return;
       case 'check-sync-destination':
         await this.sync.checkDestination.execute(Username.parse(job.payload.username));
         return;
@@ -253,6 +272,19 @@ export class JobWorker {
           ...(job.payload.torrentFile !== undefined && { torrentFile: job.payload.torrentFile }),
           ...(job.payload.label !== undefined && { label: Label.parse(job.payload.label) }),
         });
+        // A finished download in a folder its owner asked to be sent goes into
+        // the transfer queue. Only the label carries that decision, so an
+        // unlabelled finish is nothing to do here.
+        if (job.payload.event === 'finished' && job.payload.label !== undefined) {
+          const verdict = await this.sync.queueFinished.execute({
+            username: Username.parse(job.payload.username),
+            label: Label.parse(job.payload.label),
+            source: job.payload.basePath ?? job.payload.directory ?? '',
+          });
+          if (verdict.sendNow) {
+            return { sendNowFor: job.payload.username };
+          }
+        }
         return;
       case 'discover-tracker': {
         const report = await this.trackers.discover.execute({

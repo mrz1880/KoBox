@@ -24,10 +24,16 @@ import { UpdateBlocklists, type IblocklistCredentials } from '../application/tra
 import { AddWatchDir } from '../application/torrent/AddWatchDir.js';
 import { SetCategorySyncMode } from '../application/torrent/SetCategorySyncMode.js';
 import { CheckSyncDestination } from '../application/sync/CheckSyncDestination.js';
+import { QueueFinishedDownload } from '../application/sync/QueueFinishedDownload.js';
+import { RequeueTransfer } from '../application/sync/RequeueTransfer.js';
+import { SendPendingTransfers } from '../application/sync/SendPendingTransfers.js';
 import type {
+  FileTransferPort,
+  LocalFileFactsPort,
   RemotePasswordOpenerPort,
   RemoteProbePort,
   SyncDestinationRepository,
+  SyncTransferRepository,
 } from '../domain/sync/ports.js';
 import { DeprovisionRtorrentInstance } from '../application/torrent/DeprovisionRtorrentInstance.js';
 import { HandleTorrentEvent } from '../application/torrent/HandleTorrentEvent.js';
@@ -418,10 +424,16 @@ export function buildDdlUseCases(deps: DdlUseCaseDeps): DdlUseCases {
 }
 
 export interface SyncUseCaseDeps {
+  readonly users: UserRepository;
+  readonly instances: TorrentInstanceRepository;
   readonly destinations: SyncDestinationRepository;
+  readonly transfers: SyncTransferRepository;
   readonly opener: RemotePasswordOpenerPort;
   readonly probe: RemoteProbePort;
+  readonly transport: FileTransferPort;
+  readonly facts: LocalFileFactsPort;
   readonly clock: () => string;
+  readonly hour: () => number;
 }
 
 // Root-side only. Sealing lives in the portal container: it needs the public
@@ -429,6 +441,9 @@ export interface SyncUseCaseDeps {
 // should hold both.
 export interface SyncUseCases {
   readonly checkDestination: CheckSyncDestination;
+  readonly queueFinished: QueueFinishedDownload;
+  readonly sendPending: SendPendingTransfers;
+  readonly requeue: RequeueTransfer;
 }
 
 export function buildSyncUseCases(deps: SyncUseCaseDeps): SyncUseCases {
@@ -439,5 +454,21 @@ export function buildSyncUseCases(deps: SyncUseCaseDeps): SyncUseCases {
       probe: deps.probe,
       clock: deps.clock,
     }),
+    queueFinished: new QueueFinishedDownload({
+      instances: deps.instances,
+      transfers: deps.transfers,
+      clock: deps.clock,
+    }),
+    sendPending: new SendPendingTransfers({
+      users: deps.users,
+      destinations: deps.destinations,
+      transfers: deps.transfers,
+      opener: deps.opener,
+      transport: deps.transport,
+      facts: deps.facts,
+      clock: deps.clock,
+      hour: deps.hour,
+    }),
+    requeue: new RequeueTransfer({ transfers: deps.transfers, clock: deps.clock }),
   };
 }

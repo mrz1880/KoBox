@@ -92,6 +92,18 @@ describe.skipIf(!onDebianAsRoot)('E2E: torrent lifecycle with a real rtorrent', 
       KOBOX_BIN: `/usr/bin/env node ${process.cwd()}/${CLI}`,
     };
     sh('bash', ['docker/e2e-setup.sh']);
+    // This suite never runs `kobox install`, so it lays down what the rtorrent
+    // component would have: rsync and sshpass are what carry a download across.
+    // That the INSTALLER really provides them is asserted in installation.e2e.
+    sh(
+      'sh',
+      [
+        '-c',
+        'DEBIAN_FRONTEND=noninteractive apt-get update -qq && ' +
+          'DEBIAN_FRONTEND=noninteractive apt-get install -y -qq rsync sshpass',
+      ],
+      { stdio: 'ignore' },
+    );
     try {
       execFileSync('systemctl', ['disable', '--now', `rtorrent-${USER}`], { stdio: 'ignore' });
     } catch {
@@ -210,6 +222,52 @@ describe.skipIf(!onDebianAsRoot)('E2E: torrent lifecycle with a real rtorrent', 
     const row = dbRow('SELECT last_check_ok, last_check_detail FROM sync_destinations WHERE username = ?', USER);
     expect(row?.last_check_ok).toBe(0);
     expect(String(row?.last_check_detail)).toContain('folder');
+  });
+
+  it('should_carry_a_finished_download_to_a_real_machine_over_a_real_connection', () => {
+    // The whole chain, nothing stubbed: rTorrent's own shim fires as the member,
+    // the category's mode decides, the sealed password is opened by the root
+    // worker, rsync goes over a real ssh connection to a real sshd, and the file
+    // lands in a folder named after the category on the other side.
+    const TARGET = 'e2esynctarget';
+    const inbox = `/home/${TARGET}/incoming`;
+    kobox(['set-sync-destination', USER, '127.0.0.1', '22', TARGET, inbox], 'nas-password-42\n');
+    kobox(['set-category-sync-mode', USER, 'films', 'immediate']);
+    drainQueue();
+
+    // a real file where a real finished download would have left one
+    const completed = join(HOME, 'rtorrent/complete/films');
+    sh('install', ['-d', '-o', USER, '-g', USER, completed]);
+    const payload = join(completed, 'Some.Release.2026.mkv');
+    writeFileSync(payload, 'x'.repeat(4096));
+    sh('chown', [`${USER}:${USER}`, payload]);
+
+    sh('runuser', [
+      '-u',
+      USER,
+      '--',
+      'sh',
+      join(HOME, '.rTorrent_finished.sh'),
+      'c'.repeat(40),
+      payload,
+      completed,
+      'Some.Release.2026.mkv',
+      '',
+      'films',
+    ]);
+    // the spool sweep runs the event, which queues the transfer and chains the
+    // immediate pass: one drain per step
+    drainQueue();
+    drainQueue();
+    drainQueue();
+
+    const row = dbRow('SELECT state, last_error FROM sync_transfers WHERE username = ?', USER);
+    expect(row?.state, String(row?.last_error)).toBe('sent');
+    // and it is really there, with its bytes, under a folder named after the
+    // category — the layout members' machines already assume
+    const landed = `${inbox}/films/Some.Release.2026.mkv`;
+    expect(existsSync(landed)).toBe(true);
+    expect(readFileSync(landed, 'utf8')).toHaveLength(4096);
   });
 
   it('should_process_a_finished_event_from_the_real_shim_and_fan_out_user_scripts', () => {

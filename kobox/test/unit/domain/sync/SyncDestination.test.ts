@@ -5,6 +5,7 @@ import { RemoteHost } from '../../../../src/domain/sync/RemoteHost.js';
 import { RemotePath } from '../../../../src/domain/sync/RemotePath.js';
 import { SyncDestination } from '../../../../src/domain/sync/SyncDestination.js';
 import { TransferBatchSize } from '../../../../src/domain/sync/TransferBatchSize.js';
+import { SendHour } from '../../../../src/domain/sync/SendHour.js';
 import { RemotePort } from '../../../../src/domain/sync/RemotePort.js';
 import { Username } from '../../../../src/domain/user/Username.js';
 
@@ -18,6 +19,7 @@ function aDestination(): SyncDestination {
     path: RemotePath.parse('/volume1/torrents'),
     batchSize: TransferBatchSize.unlimited(),
     placement: LoneFilePlacement.besideTheOthers,
+    sendHour: SendHour.default(),
   });
 }
 

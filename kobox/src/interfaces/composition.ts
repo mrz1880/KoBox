@@ -68,6 +68,9 @@ import { SqlitePortalSessionRepository } from '../infrastructure/persistence/Sql
 import { SqlitePortAllocator } from '../infrastructure/persistence/SqlitePortAllocator.js';
 import { SqliteTorrentInstanceRepository } from '../infrastructure/persistence/SqliteTorrentInstanceRepository.js';
 import { SqliteSyncDestinationRepository } from '../infrastructure/persistence/SqliteSyncDestinationRepository.js';
+import { SqliteSyncTransferRepository } from '../infrastructure/persistence/SqliteSyncTransferRepository.js';
+import { RsyncOverSshTransfer } from '../infrastructure/system/RsyncOverSshTransfer.js';
+import { FsLocalFileFacts } from '../infrastructure/system/FsLocalFileFacts.js';
 import { RsaRemotePasswordCipher } from '../infrastructure/system/RsaRemotePasswordCipher.js';
 import { SetSyncDestination } from '../application/sync/SetSyncDestination.js';
 import { SshRemoteProbe } from '../infrastructure/system/SshRemoteProbe.js';
@@ -466,6 +469,7 @@ export interface PortalContainer {
   readonly configFiles: FsConfigFileReader;
   readonly instances: SqliteTorrentInstanceRepository;
   readonly destinations: SqliteSyncDestinationRepository;
+  readonly transfers: SqliteSyncTransferRepository;
   readonly setDestination: SetSyncDestination;
   readonly outbox: SqliteMailOutbox;
   readonly debridDownloadRepo: SqliteDebridDownloadRepository;
@@ -509,6 +513,8 @@ export function buildPortalContainer(name: string): PortalContainer {
     // what creates directories and changes a mode
     instances: new SqliteTorrentInstanceRepository(db),
     destinations: syncDestinations,
+    // read-only from here: the portal shows the queue, the worker moves it
+    transfers: new SqliteSyncTransferRepository(db),
     // the PUBLIC half only: the portal can seal a password, never open one
     setDestination: new SetSyncDestination({
       destinations: syncDestinations,
@@ -684,8 +690,15 @@ export function buildContainer(name: string): Container {
     stagingBase: process.env.KOBOX_DDL_STAGING ?? DEFAULT_DDL_STAGING,
   });
   const syncDestinationRepo = new SqliteSyncDestinationRepository(db);
+  const syncTransferRepo = new SqliteSyncTransferRepository(db);
   const syncUseCases = buildSyncUseCases({
+    users: repo,
+    instances: new SqliteTorrentInstanceRepository(db),
     destinations: syncDestinationRepo,
+    transfers: syncTransferRepo,
+    transport: new RsyncOverSshTransfer(runner),
+    facts: new FsLocalFileFacts(),
+    hour: () => new Date().getHours(),
     // the private half of the host key: root only, which is why this lives in
     // the worker container and not in the portal's
     opener: new RsaRemotePasswordCipher(),

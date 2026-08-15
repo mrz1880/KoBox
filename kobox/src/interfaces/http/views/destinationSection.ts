@@ -45,6 +45,15 @@ export function destinationSection(
         : html``
     }>${PLACEMENT_WORDS[placement.value] ?? placement.value}</option>`,
   );
+  // A member on a slow link picks the middle of the night on purpose. The
+  // legacy gave them the same choice through their own crontab; here one hourly
+  // system pass takes on whoever's hour has come.
+  const chosenHour = destination?.sendHour.value ?? 2;
+  const hours = Array.from({ length: 24 }, (_, hour) =>
+    html`<option value="${String(hour)}"${hour === chosenHour ? html` selected` : html``}>${
+      `${String(hour).padStart(2, '0')}:00`
+    }</option>`,
+  );
   return html`<h2>Where your files go</h2>
 <p class="muted">The machine of yours KoBox copies finished downloads to — a NAS,
 a home server, anything that accepts an SSH connection. Each folder above lands
@@ -75,6 +84,8 @@ in a folder of the same name over there.</p>
           value="${String(destination?.batchSize.value ?? 0)}" required></label>
       <label>A download that is one single file
         <select name="placement">${placements}</select></label>
+      <label>Send the "a bit later" folders at
+        <select name="sendHour">${hours}</select></label>
     </div>
     <button type="submit">Save</button>
   </form>

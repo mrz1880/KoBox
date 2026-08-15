@@ -322,6 +322,42 @@ From a shell: `kobox set-sync-destination <member> <host> <port> <account>
 <path>` reads the password from **stdin**, never from an argument, and
 `kobox check-sync-destination <member>` runs the test.
 
+### What actually carries a download across
+
+A finished download in a folder set to send goes into a queue: one row per
+download, `waiting -> sending -> sent` or `failed`. The queue is what the member
+sees on their own page, in words rather than states — *waiting its turn*, *on
+its way*, *arrived*, *did not arrive* — with the reason attached when it did not,
+and a **Try again** button that puts it back in the queue.
+
+- **One hourly pass**, `send-pending-transfers`, takes on only the members whose
+  chosen hour has come. MySB wrote a cron line into every member's own crontab so
+  they could pick their hour; the hour is still theirs, and nothing writes into
+  anybody's crontab.
+- **"Send it straight away"** does not wait for that: the finished event chains a
+  pass for that member alone, deduplicated so several downloads finishing at once
+  do not stack several passes over the same queue.
+- **Files per pass** caps how many a single pass takes on, for a member who does
+  not want one big evening to monopolise their link. 0 means everything waiting.
+- **The same download is queued once.** rTorrent can fire `finished` more than
+  once for one torrent; a unique index on (member, source) is what makes the
+  second one a no-op rather than a duplicate transfer.
+- **A path outside the member's own home is ignored.** The path arrives from a
+  shim the member controls and the root worker is what reads it.
+
+`rsync --archive --partial --append-verify` runs **once** per transfer. The
+legacy looped `for ((i = 3; i >= 1; i -= 1))` with its `break` commented out, so
+every file crossed the link three times on every pass. A dropped connection
+resumes where it stopped rather than starting the file over, and a failure is
+recorded with its reason rather than retried blindly — retry is the member's
+call, on a button.
+
+The remote folder is created before anything is copied into it: copying into a
+folder that does not exist scatters files at the root of the member's NAS, which
+is worse than not copying. The transfer uses `StrictHostKeyChecking=yes` against
+the key pinned when they tested the connection, so an identity change between the
+test and the transfer stops the transfer instead of proceeding.
+
 ## Measuring the link (speedtest)
 
 The `speedtest` component vendors `librespeed-cli` — open source, pinned and

@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Username } from '../../../src/domain/user/Username.js';
+import { Label } from '../../../src/domain/torrent/Label.js';
+import { LocalPath } from '../../../src/domain/sync/LocalPath.js';
+import { SyncTransfer } from '../../../src/domain/sync/SyncTransfer.js';
 import { MediaPath } from '../../../src/domain/media/MediaFile.js';
 import type { VpnVariant } from '../../../src/domain/security/vpn.js';
 import type { VpnProfileStorePort } from '../../../src/application/portal/ports.js';
@@ -616,6 +619,7 @@ describe('where a member sends their files', () => {
     path: '/volume1/torrents',
     batchSize: '0',
     placement: 'beside-the-others',
+    sendHour: '2',
   };
 
   it('should_store_the_password_sealed_and_never_render_it_back', async () => {
@@ -718,5 +722,84 @@ describe('where a member sends their files', () => {
 
     expect(await world.destinations.findByUsername(Username.parse('boss'))).toBeUndefined();
     expect(await world.destinations.findByUsername(Username.parse('alice'))).toBeDefined();
+  });
+});
+
+describe('the queue a member can see', () => {
+  async function aFailedTransfer(): Promise<number> {
+    const queued = await world.transfers.queue(
+      SyncTransfer.queue({
+        username: Username.parse('alice'),
+        label: Label.parse('Films'),
+        source: LocalPath.parse('/home/alice/rtorrent/complete/Films/Some.Film.mkv'),
+        queuedAt: '2026-08-15 10:00:00',
+      }),
+    );
+    if (queued?.id === undefined) {
+      throw new Error('the fixture failed to queue a transfer');
+    }
+    await world.transfers.save(
+      queued.start('2026-08-15 10:01:00').fail('the other machine has no room left', '2026-08-15 10:02:00'),
+    );
+    return queued.id;
+  }
+
+  it('should_show_what_happened_in_words_rather_than_a_state_name', async () => {
+    await aFailedTransfer();
+
+    const response = await world.server.inject({
+      method: 'GET',
+      url: '/sync',
+      headers: { cookie: user.cookie },
+    });
+
+    expect(response.body).toContain('Some.Film.mkv');
+    expect(response.body).toContain('did not arrive');
+    expect(response.body).toContain('the other machine has no room left');
+    // "queued", "pending" and friends say nothing about the member's file
+    expect(response.body).not.toContain('>failed<');
+  });
+
+  it('should_ask_the_worker_to_put_a_failed_transfer_back_in_the_queue', async () => {
+    const id = await aFailedTransfer();
+    world.queue.jobs.length = 0;
+
+    const response = await world.server.inject({
+      method: 'POST',
+      url: '/sync/transfers/retry',
+      headers: { cookie: user.cookie, 'content-type': 'application/x-www-form-urlencoded' },
+      payload: form({ _csrf: user.csrf, id: String(id) }),
+    });
+
+    expect(response.statusCode).toBe(303);
+    expect(world.queue.jobs[0]).toEqual({
+      type: 'requeue-transfer',
+      payload: { username: 'alice', id },
+    });
+  });
+
+  it('should_carry_the_session_username_rather_than_one_from_the_form', async () => {
+    const id = await aFailedTransfer();
+    world.queue.jobs.length = 0;
+
+    await world.server.inject({
+      method: 'POST',
+      url: '/sync/transfers/retry',
+      headers: { cookie: user.cookie, 'content-type': 'application/x-www-form-urlencoded' },
+      payload: form({ _csrf: user.csrf, id: String(id), username: 'boss' }),
+    });
+
+    expect(world.queue.jobs[0]?.payload).toMatchObject({ username: 'alice' });
+  });
+
+  it('should_refuse_an_id_that_is_not_a_positive_number', async () => {
+    const response = await world.server.inject({
+      method: 'POST',
+      url: '/sync/transfers/retry',
+      headers: { cookie: user.cookie, 'content-type': 'application/x-www-form-urlencoded' },
+      payload: form({ _csrf: user.csrf, id: '-1' }),
+    });
+
+    expect(response.statusCode).toBe(400);
   });
 });
