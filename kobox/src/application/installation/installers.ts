@@ -42,6 +42,9 @@ import type { SecuritySettings } from '../security/settings.js';
 
 export interface InstallSettings {
   readonly nodeBin: string;
+  // where the shared SQLite store lives: the installer has to fix the FILE's
+  // ownership, not only its directory's (see KoboxCoreInstaller)
+  readonly dbPath: string;
   // the running source tree (linked as `current` on first install) and the
   // symlink the worker unit executes through — upgrades flip the link only
   readonly sourceDir: string;
@@ -201,6 +204,12 @@ class KoboxCoreInstaller implements ComponentInstaller {
     // files group-owned so both processes can open them.
     await host.ensureDir('/var/lib/kobox', '2770');
     await host.setOwnership('/var/lib/kobox', 'root', PORTAL_GROUP, '2770');
+    // The directory being setgid is not enough. The database file is created by
+    // whichever CLI invocation opens it first — on a fresh box that is this very
+    // `kobox install`, before this line runs — so it lands root:root 0644 and
+    // the non-root portal restart-loops on "attempt to write a readonly
+    // database". setgid gives new files the right GROUP, never the write bit.
+    await host.setOwnership(install.dbPath, 'root', PORTAL_GROUP, '0660');
     await host.ensureDir('/var/spool/kobox/events', '1733');
     // first install: current -> the tree the installer runs from; upgrades
     // own the link afterwards (ensureSymlink never overwrites an existing one)

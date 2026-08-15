@@ -288,6 +288,7 @@ export async function buildInstallation(
     security: securitySettings(),
     install: {
       nodeBin: process.execPath,
+      dbPath: process.env.KOBOX_DB ?? DEFAULT_DB_PATH,
       // the package root of the RUNNING build (contains dist/, node_modules)
       sourceDir: fileURLToPath(new URL('../..', import.meta.url)).replace(/\/$/, ''),
       currentLink: process.env.KOBOX_CURRENT_LINK ?? DEFAULT_CURRENT_LINK,
