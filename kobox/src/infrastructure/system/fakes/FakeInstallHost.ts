@@ -1,5 +1,6 @@
 import type {
   ArtifactFetchPort,
+  ArchiveLayout,
   InstallHostPort,
 } from '../../../domain/installation/ports.js';
 import type { ManagedFilesPort, RenderedFile } from '../../../domain/shared/files.js';
@@ -79,7 +80,7 @@ export class FakeInstallHost implements ManagedFilesPort, InstallHostPort, Artif
     return Promise.resolve(true);
   }
 
-  extractTarGz(archive: string, destDir: string): Promise<void> {
+  extractTarGz(archive: string, destDir: string, _layout: ArchiveLayout): Promise<void> {
     this.extracted.push([archive, destDir]);
     return Promise.resolve();
   }

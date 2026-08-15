@@ -155,9 +155,18 @@ describe('InstallHostAdapter (fs side)', () => {
     );
     const host = new InstallHostAdapter(runner);
 
-    await host.extractTarGz(join(dir, 'x.tar.gz'), join(dir, 'dest'));
+    // ruTorrent's release wraps everything in one directory, so that level is
+    // stripped away
+    await host.extractTarGz(join(dir, 'x.tar.gz'), join(dir, 'dest'), 'inside-one-directory');
     expect(runner.argvs()[0]).toBe(
       `tar -xzf ${join(dir, 'x.tar.gz')} -C ${join(dir, 'dest')} --strip-components=1`,
+    );
+
+    // librespeed's does not: stripping a level there deletes the whole archive
+    // on the way in, and leaves an empty directory behind
+    await host.extractTarGz(join(dir, 'y.tar.gz'), join(dir, 'dest'), 'files-at-the-top');
+    expect(runner.argvs()[1]).toBe(
+      `tar -xzf ${join(dir, 'y.tar.gz')} -C ${join(dir, 'dest')}`,
     );
 
     expect(await host.mountOptions('/home')).toEqual(['rw', 'relatime', 'usrquota']);

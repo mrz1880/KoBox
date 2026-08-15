@@ -407,7 +407,7 @@ class RutorrentInstaller implements ComponentInstaller {
     if (marker?.trim() !== install.rutorrentSha256) {
       await artifacts.fetchVerified(install.rutorrentUrl, install.rutorrentSha256, RUTORRENT_ARCHIVE);
       await host.ensureDir(RUTORRENT_DIR, '0755');
-      await host.extractTarGz(RUTORRENT_ARCHIVE, RUTORRENT_DIR);
+      await host.extractTarGz(RUTORRENT_ARCHIVE, RUTORRENT_DIR, 'inside-one-directory');
       await files.apply([
         {
           path: RUTORRENT_MARKER,
@@ -899,7 +899,7 @@ class SpeedtestInstaller implements ComponentInstaller {
       SPEEDTEST_ARCHIVE,
     );
     await host.ensureDir(SPEEDTEST_DIR, '0755');
-    await host.extractTarGz(SPEEDTEST_ARCHIVE, SPEEDTEST_DIR);
+    await host.extractTarGz(SPEEDTEST_ARCHIVE, SPEEDTEST_DIR, 'files-at-the-top');
     await host.setOwnership(SPEEDTEST_BIN, 'root', 'root', '0755');
     await host.ensureFile({
       path: SPEEDTEST_MARKER,

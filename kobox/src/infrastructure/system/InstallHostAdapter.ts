@@ -1,7 +1,7 @@
 import { hostname } from 'node:os';
 import { existsSync } from 'node:fs';
 import { mkdir, chmod, lstat, readFile, rm, symlink, writeFile } from 'node:fs/promises';
-import type { InstallHostPort } from '../../domain/installation/ports.js';
+import type { ArchiveLayout, InstallHostPort } from '../../domain/installation/ports.js';
 import type { RenderedFile } from '../../domain/shared/files.js';
 import { runOrThrow, type CommandRunner } from './CommandRunner.js';
 
@@ -61,10 +61,16 @@ export class InstallHostAdapter implements InstallHostPort {
     return true;
   }
 
-  async extractTarGz(archive: string, destDir: string): Promise<void> {
+  async extractTarGz(archive: string, destDir: string, layout: ArchiveLayout): Promise<void> {
     await runOrThrow(this.runner, {
       command: 'tar',
-      args: ['-xzf', archive, '-C', destDir, '--strip-components=1'],
+      args: [
+        '-xzf',
+        archive,
+        '-C',
+        destDir,
+        ...(layout === 'inside-one-directory' ? ['--strip-components=1'] : []),
+      ],
       timeoutMs: HOST_TIMEOUT_MS,
     });
   }
