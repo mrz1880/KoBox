@@ -11,6 +11,7 @@ import { RemotePassword } from '../../../../src/domain/sync/RemotePassword.js';
 import { RemotePath } from '../../../../src/domain/sync/RemotePath.js';
 import { RemotePort } from '../../../../src/domain/sync/RemotePort.js';
 import { TransferBatchSize } from '../../../../src/domain/sync/TransferBatchSize.js';
+import { SendHour } from '../../../../src/domain/sync/SendHour.js';
 import type {
   ProbeOutcome,
   RemotePasswordOpenerPort,
@@ -66,6 +67,7 @@ function withoutPassword(overrides: Partial<Command> = {}): Command {
     path: RemotePath.parse('/volume1/torrents'),
     batchSize: TransferBatchSize.unlimited(),
     placement: LoneFilePlacement.besideTheOthers,
+    sendHour: SendHour.default(),
     ...overrides,
   };
 }

@@ -4,6 +4,7 @@ import type { RemoteHost } from '../../domain/sync/RemoteHost.js';
 import type { RemotePassword } from '../../domain/sync/RemotePassword.js';
 import type { RemotePath } from '../../domain/sync/RemotePath.js';
 import type { RemotePort } from '../../domain/sync/RemotePort.js';
+import type { SendHour } from '../../domain/sync/SendHour.js';
 import { SyncDestination } from '../../domain/sync/SyncDestination.js';
 import { TransferBatchSize } from '../../domain/sync/TransferBatchSize.js';
 import type {
@@ -27,6 +28,7 @@ export interface SetSyncDestinationCommand {
   readonly path: RemotePath;
   readonly batchSize: TransferBatchSize;
   readonly placement: LoneFilePlacement;
+  readonly sendHour: SendHour;
   // absent means "leave the stored one alone": a form cannot show a password
   // back, so an empty field must not erase what is there
   readonly password?: RemotePassword;
@@ -64,6 +66,7 @@ export class SetSyncDestination {
             path: command.path,
             batchSize: command.batchSize,
             placement: command.placement,
+            sendHour: command.sendHour,
           })
         : this.applyTo(existing, command, sealedPassword);
 
@@ -85,6 +88,9 @@ export class SetSyncDestination {
     });
     const withSecret =
       command.password === undefined ? reconnected : reconnected.withPassword(sealedPassword);
-    return withSecret.withBatchSize(command.batchSize).withPlacement(command.placement);
+    return withSecret
+      .withBatchSize(command.batchSize)
+      .withPlacement(command.placement)
+      .withSendHour(command.sendHour);
   }
 }

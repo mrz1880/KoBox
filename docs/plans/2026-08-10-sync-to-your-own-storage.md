@@ -74,5 +74,6 @@ said that the archive did not:
    (`add-watch-dir`): directories and rTorrent config are handled.
 2. **The destination** (done) — `SyncDestination` aggregate, sealed password,
    the connection block, and a "test it now" that says what is wrong in words.
-3. **The transfer** — the queue, `rsync` over SSH from the root worker, the
-   scheduled pass, immediate mode, retry, and what the member sees.
+3. **The transfer** (done) — the queue, `rsync` over SSH from the root worker,
+   the hourly pass that respects each member's chosen hour, immediate mode,
+   retry, and what the member sees.

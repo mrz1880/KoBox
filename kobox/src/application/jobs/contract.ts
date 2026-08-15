@@ -23,6 +23,8 @@ export const JOB_TYPES = [
   'add-watch-dir',
   'set-category-sync-mode',
   'check-sync-destination',
+  'send-pending-transfers',
+  'requeue-transfer',
   'set-sync-disabled',
   'set-allow-public-tracker',
   'torrent-event',
@@ -134,6 +136,10 @@ export const jobPayloadSchemas = {
   'render-rtorrent-config': usernameOnly,
   'add-watch-dir': z.strictObject({ username: usernameField, label: labelField }),
   'check-sync-destination': z.strictObject({ username: usernameField }),
+  // no username: the scheduled pass takes on whoever's hour has come. With one,
+  // it is the "send it straight away" folders of that member.
+  'send-pending-transfers': z.strictObject({ username: usernameField.optional() }),
+  'requeue-transfer': z.strictObject({ username: usernameField, id: z.number().int().positive() }),
   'set-category-sync-mode': z.strictObject({
     username: usernameField,
     label: labelField,

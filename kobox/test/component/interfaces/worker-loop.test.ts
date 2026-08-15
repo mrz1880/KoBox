@@ -4,6 +4,7 @@ import type { BackupHostPort } from '../../../src/application/maintenance/Backup
 import type { MailDelivery } from '../../../src/application/maintenance/MailTransportPort.js';
 import { InMemoryMediaRepository } from '../../../src/infrastructure/persistence/InMemoryMediaRepository.js';
 import { FakeSystemd } from '../../../src/infrastructure/system/fakes/FakeSystemd.js';
+import { InMemorySyncTransferRepository } from '../../../src/infrastructure/persistence/InMemorySyncTransferRepository.js';
 import { InMemorySyncDestinationRepository } from '../../../src/infrastructure/persistence/InMemorySyncDestinationRepository.js';
 import { RemotePassword } from '../../../src/domain/sync/RemotePassword.js';
 import { InMemoryDiagnosticsRepository } from '../../../src/infrastructure/persistence/InMemoryDiagnosticsRepository.js';
@@ -175,6 +176,7 @@ interface World {
   outbox: InMemoryMailOutbox;
   diagnostics: InMemoryDiagnosticsRepository;
   syncDestinations: InMemorySyncDestinationRepository;
+  syncTransfers: InMemorySyncTransferRepository;
   mailTransport: RecordingMailTransport;
   worker: JobWorker;
   hasher: FakePasswordHasher;
@@ -345,8 +347,15 @@ beforeEach(() => {
   const outbox = new InMemoryMailOutbox();
   const diagnosticsRepo = new InMemoryDiagnosticsRepository();
   const syncDestinations = new InMemorySyncDestinationRepository();
+  const syncTransfers = new InMemorySyncTransferRepository();
   const syncUseCases = buildSyncUseCases({
+    users: repo,
+    instances,
     destinations: syncDestinations,
+    transfers: syncTransfers,
+    transport: { send: () => Promise.resolve({ ok: true }) },
+    facts: { isDirectory: () => Promise.resolve(false), exists: () => Promise.resolve(true) },
+    hour: () => 2,
     // the sealed blob is opaque here: this suite proves the worker asks, not
     // that RSA works — that is the cipher's own test
     opener: { open: () => Promise.resolve(RemotePassword.parse('from-the-seal')) },
@@ -410,6 +419,7 @@ beforeEach(() => {
     mailTransport,
     diagnostics: diagnosticsRepo,
     syncDestinations,
+    syncTransfers,
     worker: new JobWorker(
       queue,
       useCases,

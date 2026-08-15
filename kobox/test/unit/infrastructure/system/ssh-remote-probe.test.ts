@@ -7,6 +7,7 @@ import { RemotePath } from '../../../../src/domain/sync/RemotePath.js';
 import { RemotePort } from '../../../../src/domain/sync/RemotePort.js';
 import { SyncDestination } from '../../../../src/domain/sync/SyncDestination.js';
 import { TransferBatchSize } from '../../../../src/domain/sync/TransferBatchSize.js';
+import { SendHour } from '../../../../src/domain/sync/SendHour.js';
 import { SshRemoteProbe } from '../../../../src/infrastructure/system/SshRemoteProbe.js';
 import type {
   CommandRequest,
@@ -40,6 +41,7 @@ const destination = SyncDestination.define({
   path: RemotePath.parse('/volume1/torrents'),
   batchSize: TransferBatchSize.unlimited(),
   placement: LoneFilePlacement.besideTheOthers,
+  sendHour: SendHour.default(),
 });
 const password = RemotePassword.parse('hunter2000');
 

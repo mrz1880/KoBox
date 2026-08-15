@@ -106,6 +106,20 @@
       "when": 1786794915988,
       "tag": "0014_sync-destination",
       "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "6",
+      "when": 1786797992112,
+      "tag": "0015_transfer-queue",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "6",
+      "when": 1786798000835,
+      "tag": "0016_transfer-queue-table",
+      "breakpoints": true
     }
   ]
 }

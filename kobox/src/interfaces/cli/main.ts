@@ -13,6 +13,7 @@ import { RemoteHost } from '../../domain/sync/RemoteHost.js';
 import { RemotePassword } from '../../domain/sync/RemotePassword.js';
 import { RemotePath } from '../../domain/sync/RemotePath.js';
 import { RemotePort } from '../../domain/sync/RemotePort.js';
+import { SendHour } from '../../domain/sync/SendHour.js';
 import { TransferBatchSize } from '../../domain/sync/TransferBatchSize.js';
 import { AccountType } from '../../domain/user/AccountType.js';
 import { EmailAddress } from '../../domain/user/EmailAddress.js';
@@ -180,6 +181,7 @@ program
   .argument('<path>', 'absolute directory on the member\'s own machine')
   .option('--batch-size <n>', 'files per pass, 0 for everything waiting', '0')
   .option('--lone-file <placement>', 'beside-the-others | in-its-own-folder', 'beside-the-others')
+  .option('--send-hour <h>', 'hour of day the scheduled folders go out', '2')
   .description("set where a member's finished downloads are copied (password on stdin)")
   .action(
     async (
@@ -188,7 +190,7 @@ program
       rawPort: string,
       rawAccount: string,
       rawPath: string,
-      options: { batchSize: string; loneFile: string },
+      options: { batchSize: string; loneFile: string; sendHour: string },
     ) => {
       // stdin, never an argument: a password on the command line is readable in
       // `ps` by every other member of the box
@@ -202,11 +204,26 @@ program
         path: RemotePath.parse(rawPath),
         batchSize: TransferBatchSize.parse(Number(options.batchSize)),
         placement: LoneFilePlacement.parse(options.loneFile),
+        sendHour: SendHour.parse(Number(options.sendHour)),
         ...(secret !== '' && { password: RemotePassword.parse(secret) }),
       });
       await done(c, `destination set for ${rawUser}`);
     },
   );
+
+program
+  .command('send-pending-transfers')
+  .description('carry waiting downloads to members whose hour has come (cron entry point)')
+  .action(async () => {
+    const c = container();
+    const id = await c.queue.enqueueUnique(buildJob.sendPendingTransfers());
+    await done(
+      c,
+      id === undefined
+        ? 'send-pending-transfers already pending'
+        : `job ${String(id)} enqueued: send-pending-transfers`,
+    );
+  });
 
 program
   .command('check-sync-destination')

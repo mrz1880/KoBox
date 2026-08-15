@@ -65,6 +65,12 @@ export const buildJob = {
     return parseJob('render-rtorrent-config', { username: input.username });
   },
 
+  sendPendingTransfers(input: { username?: string } = {}): Job {
+    return parseJob('send-pending-transfers', input);
+  },
+  requeueTransfer(input: { username: string; id: number }): Job {
+    return parseJob('requeue-transfer', input);
+  },
   checkSyncDestination(input: { username: string }): Job {
     return parseJob('check-sync-destination', input);
   },

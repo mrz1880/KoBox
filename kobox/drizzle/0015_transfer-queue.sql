@@ -1,0 +1,1 @@
+ALTER TABLE `sync_destinations` ADD `send_hour` integer DEFAULT 2 NOT NULL;

@@ -11,7 +11,7 @@ import type { MediaRepository } from '../../../domain/media/ports.js';
 import { Label } from '../../../domain/torrent/Label.js';
 import { SyncMode } from '../../../domain/torrent/SyncMode.js';
 import type { TorrentInstanceRepository } from '../../../domain/torrent/ports.js';
-import type { SyncDestinationRepository } from '../../../domain/sync/ports.js';
+import type { SyncDestinationRepository, SyncTransferRepository } from '../../../domain/sync/ports.js';
 import type { SetSyncDestination } from '../../../application/sync/SetSyncDestination.js';
 import { LoneFilePlacement } from '../../../domain/sync/LoneFilePlacement.js';
 import { RemoteAccount } from '../../../domain/sync/RemoteAccount.js';
@@ -19,6 +19,7 @@ import { RemoteHost } from '../../../domain/sync/RemoteHost.js';
 import { RemotePassword } from '../../../domain/sync/RemotePassword.js';
 import { RemotePath } from '../../../domain/sync/RemotePath.js';
 import { RemotePort } from '../../../domain/sync/RemotePort.js';
+import { SendHour } from '../../../domain/sync/SendHour.js';
 import { TransferBatchSize } from '../../../domain/sync/TransferBatchSize.js';
 import type { Username } from '../../../domain/user/Username.js';
 import type {
@@ -50,6 +51,7 @@ import {
 import { syncPage } from '../views/syncPage.js';
 
 const categorySchema = z.object({ label: z.string().min(1).max(64) });
+const retrySchema = z.object({ id: z.coerce.number().int().positive() });
 const destinationSchema = z.object({
   host: z.string().min(1).max(253),
   port: z.coerce.number().int().min(1).max(65535),
@@ -59,6 +61,7 @@ const destinationSchema = z.object({
   path: z.string().min(1).max(512),
   batchSize: z.coerce.number().int().min(0).max(1000),
   placement: z.string().min(1).max(32),
+  sendHour: z.coerce.number().int().min(0).max(23),
 });
 const categoryModeSchema = z.object({
   label: z.string().min(1).max(64),
@@ -153,6 +156,7 @@ export interface UserRoutesDeps {
   readonly destinations: SyncDestinationRepository;
   // seals with the PUBLIC half of the host key; it can never open one back
   readonly setDestination: SetSyncDestination;
+  readonly transfers: SyncTransferRepository;
 }
 
 // One channel of the console, assembled from what the portal can read in the
@@ -351,9 +355,10 @@ export function registerUserRoutes(
     // member named, and it cannot be synchronised
     const categories = (instance?.watchDirs ?? []).filter((dir) => dir.label !== undefined);
     const destination = await deps.destinations.findByUsername(session.username);
+    const transfers = await deps.transfers.listRecent(session.username, 25);
     return reply
       .type('text/html')
-      .send(syncPage(categories, destination, viewerOf(session), flashOf(request)));
+      .send(syncPage(categories, destination, transfers, viewerOf(session), flashOf(request)));
   });
 
   server.post('/sync/categories', async (request, reply) => {
@@ -433,6 +438,7 @@ export function registerUserRoutes(
         path: RemotePath.parse(form.path),
         batchSize: TransferBatchSize.parse(form.batchSize),
         placement: LoneFilePlacement.parse(form.placement),
+        sendHour: SendHour.parse(form.sendHour),
         ...(form.password !== undefined &&
           form.password !== '' && { password: RemotePassword.parse(form.password) }),
       });
@@ -460,6 +466,23 @@ export function registerUserRoutes(
       '/sync',
       id === undefined ? 'A test is already running.' : 'Testing the connection.',
     );
+  });
+
+  server.post('/sync/transfers/retry', async (request, reply) => {
+    const session = await guards.requireCsrf(request, reply);
+    if (session === undefined) {
+      return;
+    }
+    const parsed = retrySchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.code(400).send();
+    }
+    // the worker owns the queue; ownership of the row is checked there too,
+    // against the username from THIS session rather than from the form
+    await deps.queue.enqueue(
+      buildJob.requeueTransfer({ username: session.username.value, id: parsed.data.id }),
+    );
+    return redirectWithFlash(reply, '/sync', 'Putting it back in the queue.');
   });
 
   server.get('/media', async (request, reply) => {

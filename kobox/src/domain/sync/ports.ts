@@ -1,4 +1,6 @@
 import type { Username } from '../user/Username.js';
+import type { LocalPath } from './LocalPath.js';
+import type { SyncTransfer, TransferState } from './SyncTransfer.js';
 import type { RemotePassword } from './RemotePassword.js';
 import type { SyncDestination } from './SyncDestination.js';
 
@@ -31,4 +33,39 @@ export interface ProbeOutcome {
 // it opens a password the portal cannot read.
 export interface RemoteProbePort {
   probe(destination: SyncDestination, password: RemotePassword): Promise<ProbeOutcome>;
+}
+
+export interface SyncTransferRepository {
+  // undefined when this download is already queued — rTorrent can fire
+  // `finished` more than once for one torrent
+  queue(transfer: SyncTransfer): Promise<SyncTransfer | undefined>;
+  save(transfer: SyncTransfer): Promise<void>;
+  findById(id: number): Promise<SyncTransfer | undefined>;
+  listWaiting(username: Username, limit?: number): Promise<readonly SyncTransfer[]>;
+  listRecent(username: Username, limit: number): Promise<readonly SyncTransfer[]>;
+  countByState(username: Username, state: TransferState): Promise<number>;
+}
+
+// What a finished download actually left on disk. A torrent that produced a
+// directory and one that produced a single file are copied differently, and
+// only the filesystem knows which happened.
+export interface LocalFileFactsPort {
+  isDirectory(path: LocalPath): Promise<boolean>;
+  exists(path: LocalPath): Promise<boolean>;
+}
+
+export interface TransferOutcome {
+  readonly ok: boolean;
+  readonly detail?: string;
+}
+
+// Carries one finished download across. Root-side: it opens a password the
+// portal cannot read, and reads files under a member's home.
+export interface FileTransferPort {
+  send(request: {
+    readonly destination: SyncDestination;
+    readonly password: RemotePassword;
+    readonly source: LocalPath;
+    readonly remoteFolder: string;
+  }): Promise<TransferOutcome>;
 }

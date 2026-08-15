@@ -36,4 +36,8 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
   // finds out a security update is waiting; an unattended upgrade that restarts
   // daemons at 5am is a different decision, and stays a button.
   entry('40 5 * * *', 'check-package-updates'),
+  // hourly, and each pass takes on only the members whose chosen hour has come.
+  // MySB wrote a cron line into every member's own crontab to give them that
+  // choice; the choice survives, the crontab writing does not.
+  entry('5 * * * *', 'send-pending-transfers'),
 ];

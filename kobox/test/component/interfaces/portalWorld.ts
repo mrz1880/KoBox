@@ -26,6 +26,7 @@ import type { HealthCheckResult, HealthProbePort, PasswordHasherPort } from '../
 import { InMemoryBlocklistRepository } from '../../../src/infrastructure/persistence/InMemoryBlocklistRepository.js';
 import { InMemoryFairUseRepository } from '../../../src/infrastructure/persistence/InMemoryFairUseRepository.js';
 import { InMemoryComponentRegistry } from '../../../src/infrastructure/persistence/InMemoryComponentRegistry.js';
+import { InMemorySyncTransferRepository } from '../../../src/infrastructure/persistence/InMemorySyncTransferRepository.js';
 import { InMemorySyncDestinationRepository } from '../../../src/infrastructure/persistence/InMemorySyncDestinationRepository.js';
 import { InMemoryTorrentInstanceRepository } from '../../../src/infrastructure/persistence/InMemoryTorrentInstanceRepository.js';
 import { InMemoryDiagnosticsRepository } from '../../../src/infrastructure/persistence/InMemoryDiagnosticsRepository.js';
@@ -159,6 +160,7 @@ export interface PortalWorld {
   readonly diagnostics: InMemoryDiagnosticsRepository;
   readonly instances: InMemoryTorrentInstanceRepository;
   readonly destinations: InMemorySyncDestinationRepository;
+  readonly transfers: InMemorySyncTransferRepository;
 }
 
 // Builds a portal server over in-memory fakes with two accounts:
@@ -183,6 +185,7 @@ export async function buildPortalWorld(
   const diagnostics = new InMemoryDiagnosticsRepository();
   const instances = new InMemoryTorrentInstanceRepository();
   const destinations = new InMemorySyncDestinationRepository();
+  const transfers = new InMemorySyncTransferRepository();
   const authDeps = { users, credentials, sessions, attempts, tokens, hasher };
   const server = buildPortalServer({
     login: new Login(authDeps),
@@ -204,6 +207,7 @@ export async function buildPortalWorld(
     configFiles: new OneFileOnDisk(),
     instances,
     destinations,
+    transfers,
     setDestination: new SetSyncDestination({ destinations, sealer: new FakeRemoteSealer() }),
     releases: new InMemoryReleaseRepository(),
     outbox,
@@ -240,7 +244,7 @@ export async function buildPortalWorld(
     { username: Username.parse('boss'), passwordHash: GOOD_HASH, role: 'admin' },
     NOW,
   );
-  return { server, users, credentials, sessions, queue, outbox, downloads, debridAccounts, media, fairUse, diagnostics, instances, destinations };
+  return { server, users, credentials, sessions, queue, outbox, downloads, debridAccounts, media, fairUse, diagnostics, instances, destinations, transfers };
 }
 
 export interface AgentSession {

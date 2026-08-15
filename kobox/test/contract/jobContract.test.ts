@@ -19,6 +19,8 @@ describe('job contract', () => {
       'add-watch-dir',
     'set-category-sync-mode',
     'check-sync-destination',
+    'send-pending-transfers',
+    'requeue-transfer',
       'set-sync-disabled',
       'set-allow-public-tracker',
       'torrent-event',

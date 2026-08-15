@@ -372,9 +372,34 @@ export const syncDestinations = sqliteTable('sync_destinations', {
   // 0 means "everything waiting", as it did in the legacy
   batchSize: integer('batch_size').notNull().default(0),
   placement: text('placement').notNull().default('beside-the-others'),
+  // the hour of day the "send it a bit later" folders go out
+  sendHour: integer('send_hour').notNull().default(2),
   // what the last "test it now" concluded, so the page can show it back
   lastCheckOk: integer('last_check_ok'),
   lastCheckAt: text('last_check_at'),
   lastCheckDetail: text('last_check_detail'),
   lastCheckFingerprint: text('last_check_fingerprint'),
 });
+
+// One finished download on its way to a member's own machine. The legacy kept
+// the same thing in a per-user `list` table, driven from bash.
+export const syncTransfers = sqliteTable(
+  'sync_transfers',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    username: text('username').notNull(),
+    label: text('label').notNull(),
+    source: text('source').notNull(),
+    state: text('state', { enum: ['waiting', 'sending', 'sent', 'failed'] }).notNull(),
+    attempts: integer('attempts').notNull().default(0),
+    lastError: text('last_error'),
+    queuedAt: text('queued_at').notNull(),
+    updatedAt: text('updated_at').notNull(),
+  },
+  (table) => [
+    // the same download must not queue twice: rTorrent can fire finished more
+    // than once for one torrent, and the legacy happily stacked duplicates
+    unique().on(table.username, table.source),
+    index('sync_transfers_state_idx').on(table.username, table.state),
+  ],
+);

@@ -74,7 +74,9 @@ describe('SCHEDULED_JOBS', () => {
     // the update CHECK is scheduled; applying them never is
     expect(bySubcommand.get('check-package-updates')?.schedule.value).toBe('40 5 * * *');
     expect(bySubcommand.has('apply-package-updates')).toBe(false);
-    expect(SCHEDULED_JOBS).toHaveLength(9);
+    // hourly: the pass itself decides whose hour it is
+    expect(bySubcommand.get('send-pending-transfers')?.schedule.value).toBe('5 * * * *');
+    expect(SCHEDULED_JOBS).toHaveLength(10);
   });
 
   it('should_only_reference_shell_safe_kobox_subcommands', () => {

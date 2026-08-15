@@ -4,6 +4,7 @@ import type { RemoteAccount } from './RemoteAccount.js';
 import type { RemoteHost } from './RemoteHost.js';
 import type { RemotePath } from './RemotePath.js';
 import type { RemotePort } from './RemotePort.js';
+import type { SendHour } from './SendHour.js';
 import type { TransferBatchSize } from './TransferBatchSize.js';
 
 // What the last "test it now" concluded, in words the page can show as they are.
@@ -25,6 +26,7 @@ interface SyncDestinationProps {
   readonly path: RemotePath;
   readonly batchSize: TransferBatchSize;
   readonly placement: LoneFilePlacement;
+  readonly sendHour: SendHour;
   readonly lastCheck?: ConnectionCheck;
 }
 
@@ -49,6 +51,7 @@ export class SyncDestination {
   readonly path: RemotePath;
   readonly batchSize: TransferBatchSize;
   readonly placement: LoneFilePlacement;
+  readonly sendHour: SendHour;
   readonly lastCheck?: ConnectionCheck;
 
   private constructor(props: SyncDestinationProps) {
@@ -60,6 +63,7 @@ export class SyncDestination {
     this.path = props.path;
     this.batchSize = props.batchSize;
     this.placement = props.placement;
+    this.sendHour = props.sendHour;
     if (props.lastCheck !== undefined) {
       this.lastCheck = props.lastCheck;
     }
@@ -113,6 +117,10 @@ export class SyncDestination {
     return new SyncDestination({ ...this.props(), batchSize });
   }
 
+  withSendHour(sendHour: SendHour): SyncDestination {
+    return new SyncDestination({ ...this.props(), sendHour });
+  }
+
   recordCheck(check: ConnectionCheck): SyncDestination {
     return new SyncDestination({ ...this.connection(), lastCheck: check });
   }
@@ -128,6 +136,7 @@ export class SyncDestination {
       path: this.path,
       batchSize: this.batchSize,
       placement: this.placement,
+      sendHour: this.sendHour,
     };
   }
 

@@ -299,6 +299,15 @@ describe.skipIf(!onDebianAsRoot)('E2E: fresh Debian 12 -> bootstrap -> full stac
     240_000,
   );
 
+  it('should_have_installed_what_carries_a_download_to_a_members_own_machine', () => {
+    // rsync and sshpass are not decoration: without them the transfer adapter
+    // fails at spawn, and the member is told the test could not run. They come
+    // with the rtorrent component, and only a real install proves it.
+    for (const binary of ['rsync', 'sshpass']) {
+      expect(() => sh('dpkg', ['-s', binary], { stdio: 'pipe' }), binary).not.toThrow();
+    }
+  });
+
   it('should_let_the_unprivileged_portal_read_every_catalogued_config_it_wrote', () => {
     // The config screen reads these files directly as kobox-portal — no job, no
     // root. That only holds if every catalogued file is world-readable, which
