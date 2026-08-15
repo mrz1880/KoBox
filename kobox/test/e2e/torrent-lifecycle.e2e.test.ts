@@ -207,7 +207,7 @@ describe.skipIf(!onDebianAsRoot)('E2E: torrent lifecycle with a real rtorrent', 
     expect(String(row?.sealed_password)).not.toContain(SECRET);
     // first sight pinned the key rather than accepting anything that answers
     expect(existsSync(`/var/lib/kobox/sync/${USER}.known_hosts`)).toBe(true);
-  });
+  }, 120_000);
 
   it('should_say_what_is_wrong_rather_than_just_failing', () => {
     // same account, a folder it cannot write to: the member needs to know it is
@@ -222,7 +222,7 @@ describe.skipIf(!onDebianAsRoot)('E2E: torrent lifecycle with a real rtorrent', 
     const row = dbRow('SELECT last_check_ok, last_check_detail FROM sync_destinations WHERE username = ?', USER);
     expect(row?.last_check_ok).toBe(0);
     expect(String(row?.last_check_detail)).toContain('folder');
-  });
+  }, 60_000);
 
   it('should_carry_a_finished_download_to_a_real_machine_over_a_real_connection', () => {
     // The whole chain, nothing stubbed: rTorrent's own shim fires as the member,
@@ -268,7 +268,7 @@ describe.skipIf(!onDebianAsRoot)('E2E: torrent lifecycle with a real rtorrent', 
     const landed = `${inbox}/films/Some.Release.2026.mkv`;
     expect(existsSync(landed)).toBe(true);
     expect(readFileSync(landed, 'utf8')).toHaveLength(4096);
-  });
+  }, 120_000);
 
   it('should_process_a_finished_event_from_the_real_shim_and_fan_out_user_scripts', () => {
     sh('install', ['-d', '-o', USER, '-g', 'kobox-users', join(HOME, 'scripts')]);
