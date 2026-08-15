@@ -137,6 +137,7 @@ function buildWorld(overrides?: {
       }),
       ...(overrides?.quotaFs !== undefined && { quotaFs: overrides.quotaFs }),
       ...(overrides?.letsencrypt !== undefined && { letsencrypt: overrides.letsencrypt }),
+      dbPath: '/var/lib/kobox/kobox.db',
       workerEnv: new Map([
         ['KOBOX_DB', '/var/lib/kobox/kobox.db'],
         // a worker-only secret: the root worker gets it, the portal must not
@@ -177,6 +178,16 @@ describe('kobox-core installer', () => {
       owner: 'root',
       group: 'kobox-portal',
       mode: '2770',
+    });
+    // The DIRECTORY being setgid is not enough: the database file is created by
+    // whichever CLI invocation opens it first, and on a fresh box that happens
+    // before this installer runs — so it lands root:root 0644 and the non-root
+    // portal cannot write to it. Seen on a real install: the portal restart-
+    // looped on "attempt to write a readonly database".
+    expect(world.host.ownership.get('/var/lib/kobox/kobox.db')).toEqual({
+      owner: 'root',
+      group: 'kobox-portal',
+      mode: '0660',
     });
     expect(world.host.dirs.get('/var/spool/kobox/events')).toBe('1733');
     // the unit executes THROUGH the current symlink: upgrades flip the link,
