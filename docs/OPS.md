@@ -164,6 +164,14 @@ Browsers play mp4/webm/ogg; an mkv or an H.265 file is offered as a download
 instead of a player that would show a black rectangle. Transcoding is out of
 scope — it would be a different, far heavier project.
 
+> **Upgrading a vendored binary that is running.** `fetchVerified` writes beside
+> the target and renames into place. Overwriting directly fails with `ETXTBSY`
+> when the target is an executable the kernel is running — every upgrade of a
+> daemon whose unit is up. The rename replaces the *name*: the running process
+> keeps the old inode until it is restarted, which the component does. It is also
+> atomic, so a crash mid-write cannot leave a truncated artifact behind a
+> checksum marker that declares it good.
+
 ## Re-running `kobox install`
 
 `kobox install` walks the **whole catalogue** every time, in dependency order,
@@ -418,29 +426,25 @@ systemd unit health), run non-root and bound to loopback; nginx proxies
 installs only from a pinned, verified binary — unset = honest skip. To pin:
 
 ```
-# v0.3.1, linux x86_64 static musl — verified 2026-08-16
-export KOBOX_NANOMON_URL=https://github.com/mrz1880/nanomon/releases/download/v0.3.1/nanomon-x86_64-unknown-linux-musl
-export KOBOX_NANOMON_SHA256=f84d629b8ddd53c427b0bf58b936305a9f810dc74031ec35f14d3dfa59d24cac
+# v0.3.2, linux x86_64 static musl — verified 2026-08-16
+export KOBOX_NANOMON_URL=https://github.com/mrz1880/nanomon/releases/download/v0.3.2/nanomon-x86_64-unknown-linux-musl
+export KOBOX_NANOMON_SHA256=dd6722aa734ec4bab34da4c39e9dd8eae2eddfe32f64fb0c897ab492ffb73e1d
 kobox install        # re-vendors when the sha differs from the installed marker
 ```
 
-The `.sha256` published beside the binary is the authority; the value above is a
-copy, and `fetchVerified` refuses anything that does not match it.
+An `aarch64-unknown-linux-musl` asset is published alongside, for a box that is
+not x86_64. The `.sha256` published beside each binary is the authority; the
+value above is a copy, and `fetchVerified` refuses anything that does not match.
 
 Admins reach the dashboard at `https://<host>:8189/monitoring`. NanoMon's own
 alerting (its `alerts.toml` → webhook) stays standalone for now.
 
-> **Known upstream gap (2026-08-16).** v0.3.1 serves its API and `/metrics`, but
-> **not its dashboard**: it looks for the web assets at a path relative to the
-> working directory (`src/interface/web/static`), which exists when it runs from
-> its own repo or its Docker image and never for `/usr/local/bin/nanomon` under
-> systemd. `/monitoring` therefore answers 404 where the UI should be, while
-> `/monitoring/api/dashboard` and `/monitoring/metrics` work. Nothing on the
-> KoBox side fixes that; it needs the assets embedded in the released binary.
-> Until then, pinning NanoMon buys the metrics endpoints, not the screen.
-
-> NanoMon before v0.3.1 **refused to start** on a host with no Docker daemon —
-> which is every seedbox. Do not pin v0.3.0.
+> **Pin v0.3.2 or later.** The two releases before it are broken for a seedbox in
+> ways that look like KoBox faults: **v0.3.0 refuses to start** on a host with no
+> Docker daemon, which is every seedbox; **v0.3.1** starts and serves its API and
+> `/metrics` but **not its dashboard** — it looked for its web assets at a path
+> relative to the working directory, so `/monitoring` answered 404 where the UI
+> should be. v0.3.2 embeds them in the binary.
 
 ## DDL & debrid downloads (aria2 + AllDebrid)
 
