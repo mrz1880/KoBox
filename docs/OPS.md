@@ -418,14 +418,29 @@ systemd unit health), run non-root and bound to loopback; nginx proxies
 installs only from a pinned, verified binary — unset = honest skip. To pin:
 
 ```
-# from a NanoMon release (x86_64 static musl binary + its published .sha256)
-export KOBOX_NANOMON_URL=https://<nanomon-release-host>/nanomon-x86_64-unknown-linux-musl
-export KOBOX_NANOMON_SHA256=<the sum>
+# v0.3.1, linux x86_64 static musl — verified 2026-08-16
+export KOBOX_NANOMON_URL=https://github.com/mrz1880/nanomon/releases/download/v0.3.1/nanomon-x86_64-unknown-linux-musl
+export KOBOX_NANOMON_SHA256=f84d629b8ddd53c427b0bf58b936305a9f810dc74031ec35f14d3dfa59d24cac
 kobox install        # re-vendors when the sha differs from the installed marker
 ```
 
+The `.sha256` published beside the binary is the authority; the value above is a
+copy, and `fetchVerified` refuses anything that does not match it.
+
 Admins reach the dashboard at `https://<host>:8189/monitoring`. NanoMon's own
 alerting (its `alerts.toml` → webhook) stays standalone for now.
+
+> **Known upstream gap (2026-08-16).** v0.3.1 serves its API and `/metrics`, but
+> **not its dashboard**: it looks for the web assets at a path relative to the
+> working directory (`src/interface/web/static`), which exists when it runs from
+> its own repo or its Docker image and never for `/usr/local/bin/nanomon` under
+> systemd. `/monitoring` therefore answers 404 where the UI should be, while
+> `/monitoring/api/dashboard` and `/monitoring/metrics` work. Nothing on the
+> KoBox side fixes that; it needs the assets embedded in the released binary.
+> Until then, pinning NanoMon buys the metrics endpoints, not the screen.
+
+> NanoMon before v0.3.1 **refused to start** on a host with no Docker daemon —
+> which is every seedbox. Do not pin v0.3.0.
 
 ## DDL & debrid downloads (aria2 + AllDebrid)
 
