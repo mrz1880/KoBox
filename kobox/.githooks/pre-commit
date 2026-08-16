@@ -23,9 +23,18 @@ echo "[pre-commit] guard: no production/personal identifiers"
 forbidden="$(printf '%s' \
   'a29mYW1pbHl8MTk1XC4xNTRcLjE3MXxtcnoxODgwfFxiYW50aG9ueVxifFxibHVkb1xifFxibHVkb2ZcYnxcYmxlb25ldWZcYnxcYmp1bGllblxifFxidGl0aVxifFxidG9ueXpcYnxcYmZyZWRcYnxcYnJvbWFpblxi' \
   | base64 -d)"
+# One deliberate exception, encoded for the same reason as the list above: the
+# public NanoMon repository whose release KoBox pins. Authorised by the owner on
+# 2026-08-16 so the pin in OPS.md is copy-pasteable rather than a placeholder.
+# The substring is REMOVED from the line rather than the line being skipped, so
+# any other identifier sharing that line still blocks.
+allowed="$(printf '%s' \
+  'aHR0cHM6Ly9naXRodWIuY29tL21yejE4ODAvbmFub21vbg==' \
+  | base64 -d)"
 if git -C "$repo_root" diff --cached -U0 --no-color \
     | grep -nE '^\+' \
     | grep -viE '^\+\+\+' \
+    | sed "s|$allowed||g" \
     | grep -inE "$forbidden"; then
   echo "[pre-commit] BLOCKED: staged lines contain a production/personal identifier." >&2
   exit 1
