@@ -49,7 +49,13 @@ export function registerAdminOpsRoutes(
     if (session === undefined) {
       return;
     }
-    return reply.type('text/html').send(monitoringPage(viewerOf(session)));
+    // the same registry the Health screen reads: one truth about what is on
+    // the box, rather than a second opinion baked into this page
+    const installed = (await deps.components.list()).some(
+      (component: ComponentRecord) =>
+        String(component.name) === 'nanomon' && String(component.state) === 'installed',
+    );
+    return reply.type('text/html').send(monitoringPage(viewerOf(session), installed));
   });
 
   server.get('/admin/health', async (request, reply) => {

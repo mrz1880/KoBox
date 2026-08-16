@@ -471,11 +471,27 @@ ${flash(message)}
   );
 }
 
-export function monitoringPage(viewer: Viewer): string {
+// The nav offers this screen unconditionally, so it has to account for the
+// backend not being there. Framing an iframe over nothing gives an admin an
+// empty rectangle with a 404 inside it and no way to know why.
+export function monitoringPage(viewer: Viewer, available: boolean): string {
   return page(
     'Monitoring',
-    html`<h1>Monitoring</h1>
-<iframe class="app" src="/monitoring/" title="Monitoring"></iframe>`,
+    available
+      ? html`<h1>Monitoring</h1>
+<iframe class="app" src="/monitoring/" title="Monitoring"></iframe>`
+      : html`<h1>Monitoring</h1>
+<section class="panel">
+  <p class="lead">No monitoring is installed on this box.</p>
+  <p class="muted">KoBox vendors NanoMon from a pinned, checksum-verified
+  release. Nothing is pinned, so the component skipped rather than fetching
+  whatever a URL happened to serve. Set
+  <span class="mono">KOBOX_NANOMON_URL</span> and
+  <span class="mono">KOBOX_NANOMON_SHA256</span>, then run
+  <span class="mono">kobox install</span>.</p>
+  <p class="muted">Health tells you the same thing about every component, with
+  the reason each one gave.</p>
+</section>`,
     viewer,
   );
 }
