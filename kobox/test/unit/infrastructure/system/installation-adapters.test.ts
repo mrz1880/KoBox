@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { chmodSync, copyFileSync, existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { spawn } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -156,6 +157,47 @@ describe('ArtifactFetchAdapter', () => {
     await adapter.fetchVerified('https://releases.example.net/rutorrent.tar.gz', goodSha, dest);
 
     expect(readFileSync(dest)).toEqual(body);
+  });
+
+  it('should_replace_a_binary_that_is_currently_running', async () => {
+    // Upgrading a pinned release means writing over a file the kernel is
+    // executing, and Linux refuses to open a running executable for writing:
+    // ETXTBSY. Seen for real when re-pinning NanoMon while its unit was up, and
+    // only reachable at all since the installer stopped skipping converged
+    // components. Writing beside it and renaming into place is what makes the
+    // upgrade work: the running process keeps the old inode, the name gets the
+    // new one.
+    //
+    // Not under os.tmpdir(): in the E2E container /tmp is a noexec tmpfs, the
+    // child would never start, and the test would pass having proved nothing.
+    const execDir = mkdtempSync(
+      join(process.platform === 'linux' ? '/var/tmp' : tmpdir(), 'kobox-exec-'),
+    );
+    const dest = join(execDir, 'nanomon');
+    // a real ELF: for a script the kernel maps the interpreter, so the file
+    // itself is never busy
+    copyFileSync('/bin/sleep', dest);
+    chmodSync(dest, 0o755);
+    const child = spawn(dest, ['30'], { stdio: 'ignore' });
+    await new Promise((resolve) => {
+      child.once('spawn', resolve);
+      child.once('error', resolve);
+    });
+
+    try {
+      // the precondition itself is asserted: a test that cannot hold the file
+      // open must fail, not report success
+      expect(child.pid, 'the fixture binary did not start').toBeGreaterThan(0);
+      expect(child.exitCode).toBeNull();
+
+      const adapter = new ArtifactFetchAdapter(() => Promise.resolve(body));
+      await adapter.fetchVerified('https://releases.example.net/nanomon', goodSha, dest);
+
+      expect(readFileSync(dest)).toEqual(body);
+    } finally {
+      child.kill();
+      rmSync(execDir, { recursive: true, force: true });
+    }
   });
 
   it('should_throw_and_leave_nothing_behind_on_a_digest_mismatch', async () => {

@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, rename, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import type { ArtifactFetchPort } from '../../domain/installation/ports.js';
 import { httpsGet, type HttpsDownloadOptions } from './HttpsBlocklistDownloadAdapter.js';
@@ -45,6 +45,15 @@ export class ArtifactFetchAdapter implements ArtifactFetchPort {
       );
     }
     await mkdir(dirname(destPath), { recursive: true });
-    await writeFile(destPath, body);
+    // Write beside the target and rename into place. Overwriting directly fails
+    // with ETXTBSY when the target is a binary the kernel is currently
+    // executing — which is every upgrade of a vendored daemon while its unit is
+    // up. rename() replaces the NAME: the running process keeps the old inode
+    // until it exits, the next start gets the new one. It is also atomic, so a
+    // crash mid-write cannot leave a half-written artifact behind the checksum
+    // marker that says it is good.
+    const staged = `${destPath}.incoming`;
+    await writeFile(staged, body);
+    await rename(staged, destPath);
   }
 }
