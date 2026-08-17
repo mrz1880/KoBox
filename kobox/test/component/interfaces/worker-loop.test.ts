@@ -9,7 +9,6 @@ import { InMemorySyncDestinationRepository } from '../../../src/infrastructure/p
 import { RemotePassword } from '../../../src/domain/sync/RemotePassword.js';
 import { InMemoryDiagnosticsRepository } from '../../../src/infrastructure/persistence/InMemoryDiagnosticsRepository.js';
 import { InMemorySpeedtestRepository } from '../../../src/infrastructure/persistence/InMemorySpeedtestRepository.js';
-import { InMemoryMailOutbox } from '../../../src/infrastructure/persistence/InMemoryMailOutbox.js';
 import type { ClaimedJob, JobQueuePort } from '../../../src/application/jobs/JobQueuePort.js';
 import { InfoHash } from '../../../src/domain/torrent/InfoHash.js';
 import { HashedPassword } from '../../../src/domain/user/HashedPassword.js';
@@ -29,6 +28,7 @@ import { InMemoryUserAddressRepository } from '../../../src/infrastructure/persi
 import { InMemoryPortalCredentialsRepository } from '../../../src/infrastructure/persistence/InMemoryPortalCredentialsRepository.js';
 import { InMemoryPortalSessionRepository } from '../../../src/infrastructure/persistence/InMemoryPortalSessionRepository.js';
 import { InMemoryDiskUsageRepository } from '../../../src/infrastructure/persistence/InMemoryDiskUsageRepository.js';
+import { InMemoryMailOutbox } from '../../../src/infrastructure/persistence/InMemoryMailOutbox.js';
 import { InMemoryUserRepository } from '../../../src/infrastructure/persistence/InMemoryUserRepository.js';
 import { FakeBlocklistCache } from '../../../src/infrastructure/system/fakes/FakeBlocklistCache.js';
 import { FakeBlocklistDownload } from '../../../src/infrastructure/system/fakes/FakeBlocklistDownload.js';
@@ -256,6 +256,7 @@ beforeEach(() => {
   const rutorrentFiles = new FakeRtorrentConfig();
   const torrentUseCases = buildTorrentUseCases({
     users: repo,
+    outbox: new InMemoryMailOutbox(),
     instances,
     torrents,
     config: rutorrentFiles,

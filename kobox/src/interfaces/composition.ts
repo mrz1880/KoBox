@@ -603,6 +603,7 @@ export function buildContainer(name: string): Container {
   const mediaRepo = new SqliteMediaRepository(db);
   const torrentUseCases = buildTorrentUseCases({
     users: repo,
+    outbox,
     instances: new SqliteTorrentInstanceRepository(db),
     torrents: new SqliteTorrentRepository(db),
     config: new RtorrentConfigAdapter(runner),

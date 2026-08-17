@@ -244,6 +244,7 @@ export interface TorrentUseCaseDeps {
   readonly metainfo: TorrentMetainfoPort;
   readonly control: RtorrentControlPort;
   readonly scripts: UserScriptRunnerPort;
+  readonly outbox: MailOutboxPort;
   readonly announcers: AnnouncerSink;
   readonly templates: RtorrentTemplates;
   readonly settings: RenderSettings;

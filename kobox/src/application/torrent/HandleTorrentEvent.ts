@@ -12,7 +12,9 @@ import type {
   TorrentRepository,
   UserScriptRunnerPort,
 } from '../../domain/torrent/ports.js';
+import type { UserRepository } from '../../domain/user/ports.js';
 import type { Username } from '../../domain/user/Username.js';
+import type { MailOutboxPort } from '../maintenance/MailOutboxPort.js';
 import { TorrentInstanceNotFoundError } from './errors.js';
 
 export interface TorrentEventCommand {
@@ -29,6 +31,22 @@ export interface TorrentEventCommand {
   readonly isPrivate?: boolean;
 }
 
+// Plain words, and the reason first: the member did nothing wrong procedurally,
+// they hit a rule of this box.
+function removalBody(name: string): string {
+  return [
+    `"${name}" has been taken out of your seedbox.`,
+    '',
+    'It announces to a public tracker, and this seedbox only carries private',
+    'ones. Public trackers are watched by anti-piracy monitors, which puts the',
+    'whole machine at risk, so the rule applies to everybody.',
+    '',
+    'Nothing else of yours was touched, and no files were deleted. If you think',
+    'this torrent is private, tell an admin: they can check and, if they agree,',
+    'allow public trackers on your account.',
+  ].join('\n');
+}
+
 interface Deps {
   readonly instances: TorrentInstanceRepository;
   readonly torrents: TorrentRepository;
@@ -36,6 +54,9 @@ interface Deps {
   readonly control: RtorrentControlPort;
   readonly scripts: UserScriptRunnerPort;
   readonly announcers: AnnouncerSink;
+  readonly users: UserRepository;
+  readonly outbox: MailOutboxPort;
+  readonly clock: () => string;
 }
 
 // The typed replacement for the legacy 400-line bash hooks. Behavior flags
@@ -112,6 +133,30 @@ export class HandleTorrentEvent {
     await this.deps.control
       .stopAndClose(instance.scgiPort, command.infoHash)
       .catch(() => undefined);
+    await this.notifyRemoval(command.username, torrent.name);
+  }
+
+  // A torrent that vanishes without a word reads as a bug on KoBox's side. The
+  // removal was already right; saying so is what was missing. Best-effort like
+  // the stop above: a mail that cannot be queued must not fail the event, and
+  // the rejection is already recorded either way.
+  private async notifyRemoval(username: Username, name: string): Promise<void> {
+    try {
+      const user = await this.deps.users.findByUsername(username);
+      if (user === undefined) {
+        return;
+      }
+      await this.deps.outbox.enqueue(
+        {
+          recipient: user.email.value,
+          subject: 'A torrent was removed from your seedbox',
+          body: removalBody(name),
+        },
+        this.deps.clock(),
+      );
+    } catch {
+      return;
+    }
   }
 
   private async onFinished(instance: TorrentInstance, command: TorrentEventCommand): Promise<void> {
