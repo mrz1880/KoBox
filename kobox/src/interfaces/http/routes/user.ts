@@ -504,7 +504,11 @@ export function registerUserRoutes(
       return;
     }
     const files = await deps.media.listFor(session.username);
-    return reply.type('text/html').send(mediaPage(viewerOf(session), files, flashOf(request)));
+    return reply
+      .type('text/html')
+      .send(
+        mediaPage(viewerOf(session), files, await foldersOf(session.username), flashOf(request)),
+      );
   });
 
   server.get('/media/watch', async (request, reply) => {
