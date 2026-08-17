@@ -5,7 +5,11 @@ import { USERNAME_PATTERN } from '../../../domain/user/Username.js';
 import { Password } from '../../../domain/user/Password.js';
 import { Username } from '../../../domain/user/Username.js';
 import type { TorrentInstanceRepository } from '../../../domain/torrent/ports.js';
-import type { PasswordHasherPort, UserRepository } from '../../../domain/user/ports.js';
+import type {
+  DiskUsageRepository,
+  PasswordHasherPort,
+  UserRepository,
+} from '../../../domain/user/ports.js';
 import { buildJob } from '../../cli/buildJob.js';
 import { flashOf, redirectWithFlash, viewerOf, type Guards } from '../guards.js';
 import { adminUserDetailPage, adminUsersPage } from '../views/adminUsersPage.js';
@@ -28,6 +32,7 @@ export interface AdminUsersDeps {
   readonly queue: JobQueuePort;
   readonly hasher: PasswordHasherPort;
   readonly instances: TorrentInstanceRepository;
+  readonly diskSamples: DiskUsageRepository;
 }
 
 // Every mutation is an enqueue of the same typed jobs the CLI produces; the
@@ -96,9 +101,10 @@ export function registerAdminUserRoutes(
       return reply.code(404).type('text/html').send('Not found');
     }
     const instance = await deps.instances.findByUsername(user.username);
+    const usage = await deps.diskSamples.find(user.username);
     return reply
       .type('text/html')
-      .send(adminUserDetailPage(user, viewerOf(session), instance, flashOf(request)));
+      .send(adminUserDetailPage(user, viewerOf(session), instance, usage, flashOf(request)));
   });
 
   const lifecycle = [
@@ -122,6 +128,28 @@ export function registerAdminUserRoutes(
       return redirectWithFlash(reply, target, `${ACTION_WORDS[action]} ${params.data.name}.`);
     });
   }
+
+  const quotaSchema = z.object({ quotaGib: z.coerce.number().int().positive() });
+
+  server.post('/admin/users/:name/quota', async (request, reply) => {
+    const session = await guards.requireAdminCsrf(request, reply);
+    if (session === undefined) {
+      return;
+    }
+    const params = usernameParamSchema.safeParse(request.params);
+    const parsed = quotaSchema.safeParse(request.body);
+    if (!params.success || !parsed.success) {
+      return reply.code(400).send();
+    }
+    await deps.queue.enqueue(
+      buildJob.setUserQuota({ username: params.data.name, quotaGib: parsed.data.quotaGib }),
+    );
+    return redirectWithFlash(
+      reply,
+      `/admin/users/${params.data.name}`,
+      `${params.data.name} now has ${parsed.data.quotaGib} GiB. Nobody else is affected.`,
+    );
+  });
 
   // An unchecked HTML checkbox sends nothing at all, so presence is the value.
   const checkboxSchema = z.object({ allowed: z.literal('on').optional() });

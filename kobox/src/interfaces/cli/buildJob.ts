@@ -81,6 +81,10 @@ export const buildJob = {
     return parseJob('add-watch-dir', input);
   },
 
+  setUserQuota(input: { username: string; quotaGib: number }): Job {
+    return parseJob('set-user-quota', input);
+  },
+
   setSyncDisabled(input: { username: string; disabled: boolean }): Job {
     return parseJob('set-sync-disabled', input);
   },

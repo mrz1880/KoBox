@@ -10,6 +10,8 @@ describe('job contract', () => {
       'create-user',
       'delete-user',
       'change-password',
+      'set-user-quota',
+      'sample-disk-usage',
       'suspend-user',
       'resume-user',
       'provision-rtorrent',

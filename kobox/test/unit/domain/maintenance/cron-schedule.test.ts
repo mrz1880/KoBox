@@ -76,7 +76,10 @@ describe('SCHEDULED_JOBS', () => {
     expect(bySubcommand.has('apply-package-updates')).toBe(false);
     // hourly: the pass itself decides whose hour it is
     expect(bySubcommand.get('send-pending-transfers')?.schedule.value).toBe('5 * * * *');
-    expect(SCHEDULED_JOBS).toHaveLength(10);
+    // the portal is non-root and cannot read another account's quota, so this
+    // one exists for KoBox itself rather than for legacy parity
+    expect(bySubcommand.get('sample-disk-usage')?.schedule.value).toBe('20 * * * *');
+    expect(SCHEDULED_JOBS).toHaveLength(11);
   });
 
   it('should_only_reference_shell_safe_kobox_subcommands', () => {

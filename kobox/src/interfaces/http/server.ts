@@ -37,6 +37,7 @@ import { buildGuards, SESSION_COOKIE } from './guards.js';
 import type { DiagnosticsRepositoryPort } from '../../application/maintenance/DiagnosticsPort.js';
 import type { ConfigFileReaderPort } from '../../application/installation/ConfigFileReaderPort.js';
 import type { TorrentInstanceRepository } from '../../domain/torrent/ports.js';
+import type { DiskUsageRepository } from '../../domain/user/ports.js';
 import type { SyncDestinationRepository, SyncTransferRepository } from '../../domain/sync/ports.js';
 import type { SetSyncDestination } from '../../application/sync/SetSyncDestination.js';
 import { registerAdminNetworkRoutes } from './routes/adminNetwork.js';
@@ -78,6 +79,7 @@ export interface PortalServerDeps {
   readonly debridEncryptor: DebridKeyEncryptorPort;
   readonly media: MediaRepository;
   readonly instances: TorrentInstanceRepository;
+  readonly diskSamples: DiskUsageRepository;
   readonly destinations: SyncDestinationRepository;
   readonly setDestination: SetSyncDestination;
   readonly transfers: SyncTransferRepository;

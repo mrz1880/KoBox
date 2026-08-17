@@ -1,5 +1,6 @@
 import type { TorrentInstance } from '../../../domain/torrent/TorrentInstance.js';
 import type { SeedboxUser } from '../../../domain/user/SeedboxUser.js';
+import type { DiskUsageSample } from '../../../domain/user/ports.js';
 import { html, type RawHtml } from '../html.js';
 import { flash, page, type Viewer } from './layout.js';
 
@@ -112,10 +113,33 @@ follows its own setting and is unaffected by this.</p>
 </form>`;
 }
 
+// The allowance and what the disk actually holds. The reading is a sample the
+// privileged worker wrote down, so it carries its own timestamp: a stale number
+// presented as live is worse than no number.
+function storage(user: SeedboxUser, usage: DiskUsageSample | undefined, viewer: Viewer): RawHtml {
+  const name = user.username.value;
+  const allowance = user.quota.toGib();
+  const used =
+    usage === undefined
+      ? html`<p class="muted">Nothing measured yet. The hourly pass writes this down.</p>`
+      : html`<p>Using <strong>${usage.used.toGib()} GiB</strong> of ${allowance} GiB
+(<span class="muted">measured ${usage.sampledAt}</span>).</p>`;
+  return html`${used}
+<form method="post" action="/admin/users/${name}/quota">
+  <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
+  <label for="quotaGib">Allowance (GiB)</label>
+  <input id="quotaGib" name="quotaGib" type="number" min="1" value="${allowance}" required>
+  <button type="submit">Save</button>
+</form>
+<p class="muted">Changing this affects ${name} and nobody else. Lowering it below
+what they already store does not delete anything; it stops them writing more.</p>`;
+}
+
 export function adminUserDetailPage(
   user: SeedboxUser,
   viewer: Viewer,
   instance?: TorrentInstance,
+  usage?: DiskUsageSample,
   message?: string,
 ): string {
   const name = user.username.value;
@@ -144,6 +168,9 @@ ${flash(message)}
     <button type="submit" class="danger">Delete (irreversible)</button>
   </form>
 </div>
+
+<h2>Storage</h2>
+<div class="card">${storage(user, usage, viewer)}</div>
 
 <h2>Public trackers</h2>
 <div class="card">${publicTrackers(name, instance, viewer)}</div>

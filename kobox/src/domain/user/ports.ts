@@ -31,6 +31,20 @@ export interface QuotaPort {
   getUsage(username: Username): Promise<Quota>;
 }
 
+// What the disk actually held for a member, last time somebody with the
+// privilege to ask looked. The portal runs non-root and cannot read another
+// account's quota, so it reads the sample rather than the disk.
+export interface DiskUsageSample {
+  readonly username: Username;
+  readonly used: Quota;
+  readonly sampledAt: string;
+}
+
+export interface DiskUsageRepository {
+  save(sample: DiskUsageSample): Promise<void>;
+  find(username: Username): Promise<DiskUsageSample | undefined>;
+}
+
 export interface SftpPort {
   enableChrootAccess(username: Username): Promise<void>;
   disableChrootAccess(username: Username): Promise<void>;

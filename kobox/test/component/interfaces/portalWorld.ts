@@ -30,6 +30,7 @@ import { InMemoryFairUseRepository } from '../../../src/infrastructure/persisten
 import { InMemoryComponentRegistry } from '../../../src/infrastructure/persistence/InMemoryComponentRegistry.js';
 import { InMemorySyncTransferRepository } from '../../../src/infrastructure/persistence/InMemorySyncTransferRepository.js';
 import { InMemorySyncDestinationRepository } from '../../../src/infrastructure/persistence/InMemorySyncDestinationRepository.js';
+import { InMemoryDiskUsageRepository } from '../../../src/infrastructure/persistence/InMemoryDiskUsageRepository.js';
 import { InMemoryTorrentInstanceRepository } from '../../../src/infrastructure/persistence/InMemoryTorrentInstanceRepository.js';
 import { InMemoryDiagnosticsRepository } from '../../../src/infrastructure/persistence/InMemoryDiagnosticsRepository.js';
 import { InMemorySpeedtestRepository } from '../../../src/infrastructure/persistence/InMemorySpeedtestRepository.js';
@@ -161,6 +162,7 @@ export interface PortalWorld {
   readonly fairUse: InMemoryFairUseRepository;
   readonly diagnostics: InMemoryDiagnosticsRepository;
   readonly instances: InMemoryTorrentInstanceRepository;
+  readonly diskSamples: InMemoryDiskUsageRepository;
   readonly destinations: InMemorySyncDestinationRepository;
   readonly transfers: InMemorySyncTransferRepository;
 }
@@ -186,6 +188,7 @@ export async function buildPortalWorld(
   const fairUse = new InMemoryFairUseRepository();
   const diagnostics = new InMemoryDiagnosticsRepository();
   const instances = new InMemoryTorrentInstanceRepository();
+  const diskSamples = new InMemoryDiskUsageRepository();
   const destinations = new InMemorySyncDestinationRepository();
   const transfers = new InMemorySyncTransferRepository();
   const authDeps = { users, credentials, sessions, attempts, tokens, hasher };
@@ -215,6 +218,7 @@ export async function buildPortalWorld(
     diagnostics,
     configFiles: new OneFileOnDisk(),
     instances,
+    diskSamples,
     destinations,
     transfers,
     setDestination: new SetSyncDestination({ destinations, sealer: new FakeRemoteSealer() }),
@@ -253,7 +257,7 @@ export async function buildPortalWorld(
     { username: Username.parse('boss'), passwordHash: GOOD_HASH, role: 'admin' },
     NOW,
   );
-  return { server, users, credentials, sessions, queue, outbox, downloads, debridAccounts, media, fairUse, diagnostics, instances, destinations, transfers };
+  return { server, users, credentials, sessions, queue, outbox, downloads, debridAccounts, media, fairUse, diagnostics, instances, diskSamples, destinations, transfers };
 }
 
 export interface AgentSession {

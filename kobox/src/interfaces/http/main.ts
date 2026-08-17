@@ -49,6 +49,7 @@ async function main(): Promise<void> {
     diagnostics: container.diagnostics,
     configFiles: container.configFiles,
     instances: container.instances,
+    diskSamples: container.diskSamples,
     destinations: container.destinations,
     transfers: container.transfers,
     setDestination: container.setDestination,

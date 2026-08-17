@@ -187,6 +187,14 @@ export const fairUsePolicies = sqliteTable('fair_use_policies', {
 });
 
 // Last cumulative meter reading per user — the delta basis for rates.
+// What the disk held for a member the last time the privileged worker looked.
+// One row per member, overwritten: this is a current reading, not a history.
+export const diskSamples = sqliteTable('disk_samples', {
+  username: text('username').primaryKey(),
+  usedBytes: integer('used_bytes').notNull(),
+  sampledAt: text('sampled_at').notNull(),
+});
+
 export const usageSamples = sqliteTable('usage_samples', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   username: text('username').notNull().unique(),

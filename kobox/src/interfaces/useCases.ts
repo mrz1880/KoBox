@@ -79,6 +79,8 @@ import { RenderOpenVpn } from '../application/security/RenderOpenVpn.js';
 import { ResolveDynDns } from '../application/security/ResolveDynDns.js';
 import type { SecuritySettings } from '../application/security/settings.js';
 import { ChangePassword } from '../application/user/ChangePassword.js';
+import { SampleDiskUsage } from '../application/user/SampleDiskUsage.js';
+import { SetUserQuota } from '../application/user/SetUserQuota.js';
 import { CreateUser } from '../application/user/CreateUser.js';
 import { DeleteUser } from '../application/user/DeleteUser.js';
 import { ResumeUser } from '../application/user/ResumeUser.js';
@@ -129,6 +131,7 @@ import type { PortAllocatorPort } from '../domain/user/PortAllocatorPort.js';
 import type {
   HealthProbePort,
   NotificationPort,
+  DiskUsageRepository,
   QuotaPort,
   ServiceControlPort,
   SftpPort,
@@ -140,6 +143,7 @@ export interface UseCaseDeps {
   readonly repo: UserRepository;
   readonly accounts: SystemAccountPort;
   readonly quota: QuotaPort;
+  readonly diskSamples: DiskUsageRepository;
   readonly sftp: SftpPort;
   readonly services: ServiceControlPort;
   readonly notifications: NotificationPort;
@@ -155,6 +159,8 @@ export interface UseCases {
   readonly createUser: CreateUser;
   readonly deleteUser: DeleteUser;
   readonly changePassword: ChangePassword;
+  readonly setUserQuota: SetUserQuota;
+  readonly sampleDiskUsage: SampleDiskUsage;
   readonly suspendUser: SuspendUser;
   readonly resumeUser: ResumeUser;
 }
@@ -164,6 +170,8 @@ export function buildUseCases(deps: UseCaseDeps): UseCases {
     createUser: new CreateUser(deps),
     deleteUser: new DeleteUser(deps),
     changePassword: new ChangePassword(deps),
+    setUserQuota: new SetUserQuota(deps),
+    sampleDiskUsage: new SampleDiskUsage({ ...deps, samples: deps.diskSamples }),
     suspendUser: new SuspendUser(deps),
     resumeUser: new ResumeUser(deps),
   };
