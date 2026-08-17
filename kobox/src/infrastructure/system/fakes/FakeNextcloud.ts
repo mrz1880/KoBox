@@ -7,7 +7,7 @@ export class FakeNextcloud implements NextcloudPort {
   private installed = false;
   readonly enabledApps: string[] = [];
   readonly users: string[] = [];
-  readonly disabled: string[] = [];
+  readonly deleted: string[] = [];
   readonly admins = new Map<string, boolean>();
   readonly mounts: { username: string; label: string; path: string }[] = [];
 
@@ -32,8 +32,9 @@ export class FakeNextcloud implements NextcloudPort {
     return Promise.resolve();
   }
 
-  disableUser(username: Username): Promise<void> {
-    this.disabled.push(username.value);
+  deleteUser(username: Username): Promise<void> {
+    this.deleted.push(username.value);
+    this.users.splice(this.users.indexOf(username.value), 1);
     return Promise.resolve();
   }
 

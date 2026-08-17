@@ -564,8 +564,9 @@ describe('CLI enqueue -> root worker loop (the privilege seam)', () => {
     expect(mails.some((m) => m.subject.includes('Nextcloud'))).toBe(false);
   });
 
-  it('should_close_the_nextcloud_account_when_the_member_is_deleted', async () => {
-    // an account that outlives its member is a login nobody is watching
+  it('should_delete_the_nextcloud_account_when_the_member_is_deleted', async () => {
+    // deleting a member removes their home with userdel -r, so a surviving
+    // Nextcloud account would be an orphan holding data nobody can reach
     await world.components.markInstalled(ComponentName.parse('nextcloud'), undefined, '2026-08-17 12:00:00');
     await enqueueCreateAlice();
     await world.worker.drain();
@@ -573,7 +574,7 @@ describe('CLI enqueue -> root worker loop (the privilege seam)', () => {
 
     await world.worker.drain();
 
-    expect(world.nextcloud.disabled).toContain('alice');
+    expect(world.nextcloud.deleted).toContain('alice');
   });
 
   it('should_chain_deprovisioning_after_delete_user', async () => {

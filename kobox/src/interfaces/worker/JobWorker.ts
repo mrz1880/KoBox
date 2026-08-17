@@ -133,7 +133,7 @@ export class JobWorker {
     if (job.type === 'delete-user') {
       // an account that outlives its member is a login nobody is watching
       await this.queue.enqueue(
-        parseJob('close-nextcloud-account', { username: job.payload.username }),
+        parseJob('delete-nextcloud-account', { username: job.payload.username }),
       );
     }
     if (job.type === 'create-user' || job.type === 'delete-user') {
@@ -222,8 +222,8 @@ export class JobWorker {
       case 'apply-mail-relay':
         await this.maintenance.applyMailRelay.execute();
         return;
-      case 'close-nextcloud-account':
-        await this.useCases.closeNextcloudAccount.execute({
+      case 'delete-nextcloud-account':
+        await this.useCases.deleteNextcloudAccount.execute({
           username: Username.parse(job.payload.username),
         });
         return;

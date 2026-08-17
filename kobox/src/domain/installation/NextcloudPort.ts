@@ -18,7 +18,10 @@ export interface NextcloudPort {
   enableApp(app: string): Promise<void>;
   // idempotent: creating a member who exists is a no-op, not a failure
   ensureUser(username: Username, password: string): Promise<void>;
-  disableUser(username: Username): Promise<void>;
+  // deletes the account and the data Nextcloud itself holds for it. KoBox
+  // removes a deleted member's home with userdel -r, so leaving the account
+  // would leave an orphan nobody administers.
+  deleteUser(username: Username): Promise<void>;
   setAdmin(username: Username, admin: boolean): Promise<void>;
   ensureLocalMount(username: Username, label: string, absolutePath: string): Promise<void>;
 }

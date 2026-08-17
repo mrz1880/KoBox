@@ -85,16 +85,17 @@ export class ProvisionNextcloudAccount {
   }
 }
 
-// Closing rather than deleting: Nextcloud keeps the member's files until an
-// operator decides otherwise, and a disabled account cannot be signed in to.
-// Deleting a member must not silently delete data on a second system.
-export class CloseNextcloudAccount {
+// Deleting a member deletes their system account and home with userdel -r, so
+// their Nextcloud account goes too, along with the data Nextcloud itself held
+// for them. Anything less leaves an account nobody administers on a system
+// whose owner no longer exists.
+export class DeleteNextcloudAccount {
   constructor(private readonly deps: { readonly components: ComponentRegistry; readonly nextcloud: NextcloudPort }) {}
 
   async execute(command: { username: Username }): Promise<void> {
     if (!(await nextcloudIsInstalled(this.deps.components))) {
       return;
     }
-    await this.deps.nextcloud.disableUser(command.username);
+    await this.deps.nextcloud.deleteUser(command.username);
   }
 }
