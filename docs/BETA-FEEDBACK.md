@@ -6,7 +6,16 @@
 
 ---
 
-## A. Confirmé dans le code, à corriger
+## Statut
+
+**Tout est livré** (PR #47 à #58, 2026-08-17). Ce document reste la trace du
+tri : ce qui était un défaut, ce qui n'en était pas, et ce qui n'avait jamais
+été construit. Le détail des tranches est dans `docs/BETA-FEEDBACK-PLAN.md`, la
+comparaison exhaustive avec MySB dans `docs/MYSB-INVENTORY.md`.
+
+---
+
+## A. Confirmé dans le code, corrigé
 
 ### A1. « Sending » et « Download a link » ne montrent pas les mêmes dossiers
 
