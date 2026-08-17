@@ -163,6 +163,7 @@ export interface PortalWorld {
   readonly diagnostics: InMemoryDiagnosticsRepository;
   readonly instances: InMemoryTorrentInstanceRepository;
   readonly diskSamples: InMemoryDiskUsageRepository;
+  readonly components: InMemoryComponentRegistry;
   readonly destinations: InMemorySyncDestinationRepository;
   readonly transfers: InMemorySyncTransferRepository;
 }
@@ -189,6 +190,7 @@ export async function buildPortalWorld(
   const diagnostics = new InMemoryDiagnosticsRepository();
   const instances = new InMemoryTorrentInstanceRepository();
   const diskSamples = new InMemoryDiskUsageRepository();
+  const components = new InMemoryComponentRegistry();
   const destinations = new InMemorySyncDestinationRepository();
   const transfers = new InMemorySyncTransferRepository();
   const authDeps = { users, credentials, sessions, attempts, tokens, hasher };
@@ -213,7 +215,7 @@ export async function buildPortalWorld(
     bindings: new InMemoryUserAddressRepository(),
     fairUse,
     health: new AllHealthyProbe(),
-    components: new InMemoryComponentRegistry(),
+    components,
     speedtests: new InMemorySpeedtestRepository(),
     diagnostics,
     configFiles: new OneFileOnDisk(),
@@ -257,7 +259,7 @@ export async function buildPortalWorld(
     { username: Username.parse('boss'), passwordHash: GOOD_HASH, role: 'admin' },
     NOW,
   );
-  return { server, users, credentials, sessions, queue, outbox, downloads, debridAccounts, media, fairUse, diagnostics, instances, diskSamples, destinations, transfers };
+  return { server, users, credentials, sessions, queue, outbox, downloads, debridAccounts, media, fairUse, diagnostics, instances, diskSamples, components, destinations, transfers };
 }
 
 export interface AgentSession {

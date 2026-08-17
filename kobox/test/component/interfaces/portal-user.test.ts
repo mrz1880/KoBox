@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Username } from '../../../src/domain/user/Username.js';
+import { ComponentName } from '../../../src/domain/installation/ComponentName.js';
 import { Label } from '../../../src/domain/torrent/Label.js';
 import { LocalPath } from '../../../src/domain/sync/LocalPath.js';
 import { SyncTransfer } from '../../../src/domain/sync/SyncTransfer.js';
@@ -251,6 +252,24 @@ describe('debrid downloads', () => {
       expect(job.payload.downloadId).toBe(stored[0]?.id);
       expect(JSON.stringify(job.payload)).not.toContain('1fichier');
     }
+  });
+
+  it('should_say_when_the_download_engine_is_not_there_rather_than_failing_link_by_link', async () => {
+    // aria2 skips its own install without an RPC secret, and every submitted
+    // link then fails one at a time with a message about the last hop
+    await world.components.markSkipped(
+      ComponentName.parse('aria2'),
+      'no aria2 RPC secret',
+      '2026-08-17 12:00:00',
+    );
+
+    const response = await world.server.inject({
+      method: 'GET',
+      url: '/downloads',
+      headers: { cookie: user.cookie },
+    });
+
+    expect(response.body).toContain('not set up on this box');
   });
 
   it('should_offer_the_member_own_folders_rather_than_two_hard_coded_ones', async () => {
