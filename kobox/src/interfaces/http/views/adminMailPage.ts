@@ -13,7 +13,7 @@ export function adminMailPage(
 ): string {
   return page(
     'Mail',
-    html`<h1>Mail</h1>
+    html`<h1>${viewer.t('Mail')}</h1>
 ${flash(message)}
 ${flash(error, 'error')}
 <p class="muted">KoBox sends mail: a temporary password when you create an account,
@@ -27,27 +27,27 @@ being lost.</p>`
 as <span class="mono">${settings.user}</span>.</p>`}
 <form class="card" method="post" action="/admin/mail-relay">
   <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
-  <label for="host">Relay host</label>
+  <label for="host">${viewer.t('Relay host')}</label>
   <input id="host" name="host" required placeholder="smtp.example.org"
     value="${settings?.host ?? ''}">
-  <label for="port">Port</label>
+  <label for="port">${viewer.t('Port')}</label>
   <input id="port" name="port" type="number" min="1" max="65535"
     value="${String(settings?.port ?? 587)}">
-  <label for="user">Login</label>
+  <label for="user">${viewer.t('Login')}</label>
   <input id="user" name="user" required value="${settings?.user ?? ''}">
-  <label for="password">Password</label>
+  <label for="password">${viewer.t('Password')}</label>
   <input id="password" name="password" type="password" required>
   <p class="muted">The password is sealed with this box's key before it is stored.
 It is never shown again, so type it in full each time you change anything here.</p>
-  <button type="submit">Save and apply</button>
+  <button type="submit">${viewer.t('Save and apply')}</button>
 </form>
 
-<h2>Does it work?</h2>
+<h2>${viewer.t('Does it work?')}</h2>
 <form class="card" method="post" action="/admin/mail-relay/test">
   <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
   <p class="muted">Sends one message to your own address. A relay you have never
 tested is a relay you find out about on the day it matters.</p>
-  <button type="submit">Send me a test message</button>
+  <button type="submit">${viewer.t('Send me a test message')}</button>
 </form>`,
     viewer,
   );

@@ -42,7 +42,7 @@ export function adminTrackersPage(
   );
   return page(
     'Trackers',
-    html`<h1>Trackers</h1>
+    html`<h1>${viewer.t('Trackers')}</h1>
 <p class="muted">The trackers KoBox knows about, discovered from the torrents
 members actually add. A <strong>private</strong> tracker is one that expects an
 account; a <strong>public</strong> one is open to anyone. Members can be refused
@@ -59,7 +59,7 @@ ${flash(message)}
 </form>
 <table>
   <thead>
-    <tr><th>Host</th><th>Endpoint</th><th>Privacy</th><th>Cert expiry</th><th>State</th><th>Actions</th></tr>
+    <tr><th>${viewer.t('Host')}</th><th>Endpoint</th><th>${viewer.t('Privacy')}</th><th>Cert expiry</th><th>State</th><th>Actions</th></tr>
   </thead>
   <tbody>${rows}</tbody>
 </table>`,
@@ -77,7 +77,7 @@ function toggle(list: Blocklist, viewer: Viewer): RawHtml {
   <input type="hidden" name="name" value="${list.name}">
   <label class="check"><input type="checkbox" name="enabled" ${list.enabled ? html`checked` : html``}>
   in the filter</label>
-  <button type="submit">Save</button>
+  <button type="submit">${viewer.t('Save')}</button>
 </form>`;
 }
 
@@ -101,7 +101,7 @@ export function adminBlocklistsPage(
   );
   return page(
     'Blocklists',
-    html`<h1>Blocklists</h1>
+    html`<h1>${viewer.t('Blocklists')}</h1>
 <p class="muted">Lists of IP ranges that never get to talk to your members'
 torrent clients: anti-piracy monitors, known bad actors, advertising networks.
 Each list is published by someone else and fetched by KoBox; the merged ranges
@@ -124,7 +124,7 @@ ${flash(message)}
 </form>
 <table>
   <thead>
-    <tr><th>Source</th><th>Author</th><th>Name</th><th>Enabled</th><th>Last update</th></tr>
+    <tr><th>${viewer.t('Source')}</th><th>${viewer.t('Author')}</th><th>${viewer.t('Name')}</th><th>${viewer.t('Enabled')}</th><th>${viewer.t('Last update')}</th></tr>
   </thead>
   <tbody>${rows}</tbody>
 </table>`,

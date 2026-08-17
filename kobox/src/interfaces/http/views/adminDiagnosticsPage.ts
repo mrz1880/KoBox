@@ -39,7 +39,7 @@ export function adminLogsPage(
   const cards = LoggableService.all().map((unit) => logCard(unit, byUnit.get(unit), viewer));
   return page(
     'Logs',
-    html`<h1>Logs</h1>
+    html`<h1>${viewer.t('Logs')}</h1>
 <p class="muted">The last 200 lines each KoBox unit wrote, captured on demand.
 Only these units — reading the whole host journal from a web page is not
 something this portal is allowed to do.</p>

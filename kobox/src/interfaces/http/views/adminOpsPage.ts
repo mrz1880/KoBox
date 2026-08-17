@@ -126,11 +126,11 @@ export function adminHealthPage(
   );
   return page(
     'Health',
-    html`<h1>Health</h1>
+    html`<h1>${viewer.t('Health')}</h1>
 ${flash(message)}
 <h2>Service probes</h2>
 <table>
-  <thead><tr><th>Probe</th><th>State</th><th>Detail</th></tr></thead>
+  <thead><tr><th>Probe</th><th>State</th><th>${viewer.t('Detail')}</th></tr></thead>
   <tbody>${probeRows}</tbody>
 </table>
 
@@ -184,7 +184,7 @@ export function adminMailsPage(
 ${flash(message)}
 <table>
   <thead>
-    <tr><th>Created</th><th>Recipient</th><th>Subject</th><th>Status</th><th>Attempts</th><th>Last error</th></tr>
+    <tr><th>Created</th><th>Recipient</th><th>Subject</th><th>${viewer.t('Status')}</th><th>Attempts</th><th>Last error</th></tr>
   </thead>
   <tbody>${rows}</tbody>
 </table>`,

@@ -338,3 +338,37 @@ describe('reusing content already on the box', () => {
     expect(response.body).toContain('quota');
   });
 });
+
+describe('the admin console in French', () => {
+  it('should_translate_the_console_for_an_admin_who_asked_for_french', async () => {
+    await world.server.inject({
+      method: 'POST',
+      url: '/access/language',
+      headers: { cookie: admin.cookie, 'content-type': 'application/x-www-form-urlencoded' },
+      payload: form({ _csrf: admin.csrf, language: 'fr' }),
+    });
+    const french = await loginAs(world, 'boss');
+
+    const response = await world.server.inject({
+      method: 'GET',
+      url: '/admin/users',
+      headers: { cookie: french.cookie },
+    });
+
+    expect(response.body).toContain('Créer un membre');
+    expect(response.body).toContain('Listes de blocage');
+  });
+
+  it('should_render_the_long_explanations_in_english_rather_than_their_key', async () => {
+    // a keyed paragraph has no English string to fall back to, so English
+    // needs a row of its own or an English admin reads "members.intro"
+    const response = await world.server.inject({
+      method: 'GET',
+      url: '/admin/users',
+      headers: { cookie: admin.cookie },
+    });
+
+    expect(response.body).not.toContain('members.intro');
+    expect(response.body).toContain('Everyone with an account on the box');
+  });
+});

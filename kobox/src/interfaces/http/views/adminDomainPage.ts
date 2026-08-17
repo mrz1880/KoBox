@@ -13,7 +13,7 @@ export function adminDomainPage(
 ): string {
   return page(
     'Domain',
-    html`<h1>Domain and certificate</h1>
+    html`<h1>${viewer.t('Domain and certificate')}</h1>
 ${flash(message)}
 ${flash(error, 'error')}
 <p class="muted">Out of the box this machine serves its pages under a certificate
@@ -26,12 +26,12 @@ ${settings === undefined
 notices to <span class="mono">${settings.email}</span>.</p>`}
 <form class="card" method="post" action="/admin/domain">
   <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
-  <label for="domain">Public name</label>
+  <label for="domain">${viewer.t('Public name')}</label>
   <input id="domain" name="domain" required placeholder="seedbox.example.org"
     value="${settings?.domain ?? ''}">
-  <label for="email">Where certificate notices go</label>
+  <label for="email">${viewer.t('Where certificate notices go')}</label>
   <input id="email" name="email" type="email" required value="${settings?.email ?? ''}">
-  <button type="submit">Save</button>
+  <button type="submit">${viewer.t('Save')}</button>
 </form>
 <p class="muted">Two things have to be true before a certificate can be issued:
 the name must already resolve to this machine, and someone must run
