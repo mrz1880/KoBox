@@ -356,10 +356,13 @@ program
   .option('--base-path <path>')
   .option('--torrent-file <path>')
   .option('--label <label>')
+  // rTorrent's d.is_private, as "1" or "0": the only privacy source that exists
+  // for an XMLRPC add, which carries no .torrent file
+  .option('--is-private <flag>')
   .description('report an rtorrent event (called by the KoBox shims)')
   .action((rawType: string, options: Record<string, string | undefined>) => {
     const hook = EventHook.parse(rawType);
-    const submission: Record<string, string> = {
+    const submission: Record<string, string | boolean> = {
       event: hook.type,
       infoHash: InfoHash.parse(options.hash ?? '').value,
     };
@@ -373,6 +376,15 @@ program
       if (value !== undefined && value !== '') {
         submission[key] = value;
       }
+    }
+    // rTorrent prints d.is_private as 1 or 0. Anything else (an older shim, an
+    // empty value) is left out rather than guessed: the handler would rather
+    // skip the torrent than decide wrongly about somebody's tracker.
+    if (options.isPrivate === '1' || options.isPrivate === '0') {
+      // a real boolean into the spool: the job contract asks for one, and the
+      // "1"/"0" that rTorrent prints is this boundary's business, not the
+      // worker's
+      submission.isPrivate = options.isPrivate === '1';
     }
     // labels can come from ruTorrent free text: forward only what the
     // contract will accept, dropping the field beats dropping the event

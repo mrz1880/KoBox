@@ -29,7 +29,7 @@ execute.throw = sh, -c, (cat, "mkdir -p ", (cfg.watch))
 execute.throw = sh, -c, (cat, "mkdir -p ", (cfg.torrents))
 
 ## Event hooks -> KoBox shims (typed job pipeline; zero logic in the shims)
-method.set_key = event.download.inserted_new, kobox_inserted_new, "execute2={sh,/home/alice/.rTorrent_inserted_new.sh,$d.hash=,$d.name=,$d.directory=,$d.loaded_file=,$d.custom2=,$d.custom1=}"
+method.set_key = event.download.inserted_new, kobox_inserted_new, "execute2={sh,/home/alice/.rTorrent_inserted_new.sh,$d.hash=,$d.name=,$d.directory=,$d.loaded_file=,$d.custom2=,$d.custom1=,$d.is_private=}"
 method.set_key = event.download.finished, kobox_finished, "execute2={sh,/home/alice/.rTorrent_finished.sh,$d.hash=,$d.base_path=,$d.directory=,$d.name=,$d.loaded_file=,$d.custom1=}"
 method.set_key = event.download.erased, kobox_erased, "execute2={sh,/home/alice/.rTorrent_erased.sh,$d.hash=,$d.name=,$d.directory=}"
 

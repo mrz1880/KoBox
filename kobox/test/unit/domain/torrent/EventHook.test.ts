@@ -18,6 +18,8 @@ describe('EventHook', () => {
       '$d.loaded_file=',
       '$d.custom2=',
       '$d.custom1=',
+      // rTorrent's own verdict: the only privacy source an XMLRPC add has
+      '$d.is_private=',
     ]);
 
     const finished = EventHook.parse('finished');

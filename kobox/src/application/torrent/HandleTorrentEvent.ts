@@ -24,6 +24,9 @@ export interface TorrentEventCommand {
   readonly basePath?: string;
   readonly torrentFile?: string;
   readonly label?: Label;
+  // rTorrent's own answer (d.is_private), carried on the event. It is the only
+  // source that exists for every way a torrent can arrive.
+  readonly isPrivate?: boolean;
 }
 
 interface Deps {
@@ -68,29 +71,38 @@ export class HandleTorrentEvent {
   }
 
   private async onInsertedNew(instance: TorrentInstance, command: TorrentEventCommand): Promise<void> {
-    // Native early-exit (ex-Radarr bypass patch): an XMLRPC add carries no
-    // .torrent file — nothing to inspect, nothing to do, and above all no crash.
-    if (command.torrentFile === undefined) {
-      return;
-    }
-    const metainfo = await this.deps.metainfo.read(command.torrentFile);
-    if (!metainfo) {
+    // An XMLRPC add — Sonarr, Radarr, any client driving rTorrent — carries no
+    // .torrent file, so there is nothing on disk to inspect. Privacy still has
+    // to be decided: skipping meant the rule silently did not apply, and
+    // guessing meant a private torrent could be blocked as public, which is
+    // exactly what made an operator disable the rule for themselves.
+    //
+    // rTorrent knows, and now says so on the event. The file is only needed for
+    // tracker discovery and the fallback name.
+    const metainfo =
+      command.torrentFile === undefined
+        ? undefined
+        : await this.deps.metainfo.read(command.torrentFile);
+    const isPrivate = command.isPrivate ?? metainfo?.isPrivate;
+    if (isPrivate === undefined) {
+      // no file and no answer: an older shim that has not been re-rendered.
+      // Deciding either way would be a guess about somebody's tracker.
       return;
     }
     // Tracker discovery happens on every readable insert, accepted or not:
     // rejection is the user's policy, tracker knowledge is global. Best-effort
     // — a sink failure must never fail the event.
-    if (metainfo.announcers.length > 0) {
+    if (metainfo !== undefined && metainfo.announcers.length > 0) {
       await this.deps.announcers
         .publish(metainfo.announcers, metainfo.isPrivate ? 'private' : 'public')
         .catch(() => undefined);
     }
     const torrent = Torrent.load({
       infoHash: command.infoHash,
-      name: command.name ?? metainfo.name,
+      name: command.name ?? metainfo?.name ?? command.infoHash.value,
       ...(command.label !== undefined && { label: command.label }),
     });
-    const decision = instance.admitTorrent(metainfo.isPrivate ? 'private' : 'public');
+    const decision = instance.admitTorrent(isPrivate ? 'private' : 'public');
     if (decision === 'accepted') {
       await this.deps.torrents.upsert(command.username, torrent);
       return;

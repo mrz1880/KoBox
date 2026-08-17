@@ -271,6 +271,7 @@ export class JobWorker {
           ...(job.payload.basePath !== undefined && { basePath: job.payload.basePath }),
           ...(job.payload.torrentFile !== undefined && { torrentFile: job.payload.torrentFile }),
           ...(job.payload.label !== undefined && { label: Label.parse(job.payload.label) }),
+          ...(job.payload.isPrivate !== undefined && { isPrivate: job.payload.isPrivate }),
         });
         // A finished download in a folder its owner asked to be sent goes into
         // the transfer queue. Only the label carries that decision, so an

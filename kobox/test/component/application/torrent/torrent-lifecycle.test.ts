@@ -213,7 +213,44 @@ describe('HandleTorrentEvent', () => {
     await c.provision.execute({ username: alice });
   });
 
-  it('should_early_exit_natively_on_an_xmlrpc_add_without_torrent_file', async () => {
+  it('should_judge_an_rpc_add_on_what_rtorrent_says_rather_than_skipping_it', async () => {
+    // Sonarr and Radarr add through ruTorrent's httprpc: there is no .torrent
+    // file to inspect, so privacy used to be unknowable and the torrent was
+    // skipped entirely — the rule silently did not apply, and on MySB the same
+    // gap made a private torrent look public and get blocked. rTorrent knows
+    // the answer, and now says so on the event.
+    await c.handleEvent.execute({
+      username: alice,
+      event: 'inserted_new',
+      infoHash: HASH,
+      name: 'x',
+      isPrivate: true,
+    });
+
+    const torrent = await c.torrents.findByInfoHash(alice, HASH);
+    expect(torrent?.state.value).toBe('loaded');
+    expect(c.control.stopped).toHaveLength(0);
+  });
+
+  it('should_reject_a_public_rpc_add_the_same_way_it_rejects_a_watched_one', async () => {
+    // the rule must not depend on how the torrent arrived
+    await c.handleEvent.execute({
+      username: alice,
+      event: 'inserted_new',
+      infoHash: HASH,
+      name: 'x',
+      isPrivate: false,
+    });
+
+    const torrent = await c.torrents.findByInfoHash(alice, HASH);
+    expect(torrent?.state.value).toBe('rejected');
+    expect(c.control.stopped).toHaveLength(1);
+  });
+
+  it('should_still_skip_an_add_it_knows_nothing_about', async () => {
+    // no file and no answer from rTorrent: an older shim that has not been
+    // re-rendered. Guessing would either block a private torrent or wave a
+    // public one through.
     await c.handleEvent.execute({
       username: alice,
       event: 'inserted_new',

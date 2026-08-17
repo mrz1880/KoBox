@@ -327,6 +327,40 @@ describe.skipIf(!onDebianAsRoot)('E2E: torrent lifecycle with a real rtorrent', 
     expect(markerCount()).toBe(1); // no new fan-out: flag honored from the DB
   });
 
+  it('should_admit_a_private_torrent_added_without_a_file_the_way_a_client_adds_one', () => {
+    // Sonarr and Radarr drive rTorrent over httprpc: there is no .torrent file
+    // on disk, so privacy used to be unknowable and the torrent was skipped.
+    // On MySB the same gap made a private torrent look public and get blocked,
+    // which is why an operator had to disable the rule for themselves.
+    // stored uppercase: InfoHash normalises, and querying the lower-case form
+    // finds nothing while the code is working perfectly
+    const hash = 'D'.repeat(40);
+
+    sh('runuser', [
+      '-u',
+      USER,
+      '--',
+      'sh',
+      join(HOME, '.rTorrent_inserted_new.sh'),
+      hash,
+      'Client.Added.Release',
+      `${HOME}/rtorrent/complete`,
+      '', // no loaded file: this is the whole point
+      `${HOME}/rtorrent/torrents`,
+      '',
+      '1', // d.is_private, straight from rTorrent
+    ]);
+    drainQueue();
+
+    const row = dbRow(
+      'SELECT state FROM torrents WHERE username = ? AND info_hash = ?',
+      USER,
+      hash,
+    );
+    // admitted on rTorrent's own answer, with no bypass flag set on the account
+    expect(row?.state).toBe('loaded');
+  });
+
   it('should_reject_public_trackers_until_the_per_user_flag_allows_them', () => {
     const fixture = aTorrentFile({ name: 'public-linux.iso', isPrivate: false });
     const torrentPath = join(HOME, 'rtorrent/torrents/public-linux.iso.torrent');

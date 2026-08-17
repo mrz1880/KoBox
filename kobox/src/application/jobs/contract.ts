@@ -150,6 +150,7 @@ export const jobPayloadSchemas = {
   'torrent-event': z.strictObject({
     username: usernameField,
     event: z.enum(['inserted_new', 'finished', 'erased']),
+    isPrivate: z.boolean().optional(),
     infoHash: infoHashField,
     name: z.string().min(1).optional(),
     directory: absolutePathField.optional(),
