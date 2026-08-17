@@ -45,10 +45,12 @@ import type { MediaRepository, MediaScanPort } from '../domain/media/ports.js';
 import { ProvisionRtorrentInstance } from '../application/torrent/ProvisionRtorrentInstance.js';
 import { RenderRtorrentConfig } from '../application/torrent/RenderRtorrentConfig.js';
 import { RenderRutorrentUsers } from '../application/torrent/RenderRutorrentUsers.js';
+import { SetRecycling } from '../application/torrent/SetRecycling.js';
 import { SetAllowPublicTracker } from '../application/torrent/SetAllowPublicTracker.js';
 import { SetSyncDisabled } from '../application/torrent/SetSyncDisabled.js';
 import type { BackupHostPort } from '../application/maintenance/BackupHostPort.js';
 import type { InstallHostPort } from '../domain/installation/ports.js';
+import type { ContentRecyclerPort } from '../domain/torrent/ports.js';
 import type { MailOutboxPort } from '../application/maintenance/MailOutboxPort.js';
 import type { MailTransportPort } from '../application/maintenance/MailTransportPort.js';
 import { RunBackup, type BackupSettings } from '../application/maintenance/RunBackup.js';
@@ -265,6 +267,7 @@ export interface TorrentUseCaseDeps {
   readonly control: RtorrentControlPort;
   readonly scripts: UserScriptRunnerPort;
   readonly outbox: MailOutboxPort;
+  readonly recycler: ContentRecyclerPort;
   readonly announcers: AnnouncerSink;
   readonly templates: RtorrentTemplates;
   readonly settings: RenderSettings;
@@ -280,6 +283,7 @@ export interface TorrentUseCases {
   readonly setCategorySyncMode: SetCategorySyncMode;
   readonly setSyncDisabled: SetSyncDisabled;
   readonly setAllowPublicTracker: SetAllowPublicTracker;
+  readonly setRecycling: SetRecycling;
   readonly handleEvent: HandleTorrentEvent;
   readonly renderRutorrentUsers: RenderRutorrentUsers;
   readonly restart: RestartRtorrentInstance;
@@ -398,6 +402,7 @@ export function buildTorrentUseCases(deps: TorrentUseCaseDeps): TorrentUseCases 
     setCategorySyncMode: new SetCategorySyncMode({ instances: deps.instances }),
     setSyncDisabled: new SetSyncDisabled(deps),
     setAllowPublicTracker: new SetAllowPublicTracker(deps),
+    setRecycling: new SetRecycling(deps),
     handleEvent: new HandleTorrentEvent(deps),
     renderRutorrentUsers: new RenderRutorrentUsers({
       users: deps.users,

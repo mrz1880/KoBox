@@ -7,6 +7,7 @@ import type {
   TrackerRepository,
   UserAddressRepository,
 } from '../../domain/tracker/ports.js';
+import { RecyclingMode } from '../../domain/torrent/RecyclingMode.js';
 import { TorrentInstance } from '../../domain/torrent/TorrentInstance.js';
 import type { TorrentInstanceRepository, TorrentRepository } from '../../domain/torrent/ports.js';
 import type { Password } from '../../domain/user/Password.js';
@@ -166,6 +167,9 @@ export class ImportFromMysb {
         // the flag has no reason left to be on. Importing it would carry a
         // workaround past the thing it worked around.
         allowPublicTracker: false,
+        // recycling stays off on import: it is a decision about disk and quotas
+        // that the operator makes deliberately, not one a migration makes for them
+        recycling: RecyclingMode.none,
         syncDisabled: mapped.syncDisabled,
       }),
     );

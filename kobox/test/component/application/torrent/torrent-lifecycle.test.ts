@@ -15,6 +15,9 @@ import { TorrentInstanceNotFoundError } from '../../../../src/application/torren
 import { UserNotFoundError } from '../../../../src/application/user/errors.js';
 import { InMemoryTorrentInstanceRepository } from '../../../../src/infrastructure/persistence/InMemoryTorrentInstanceRepository.js';
 import { InMemoryTorrentRepository } from '../../../../src/infrastructure/persistence/InMemoryTorrentRepository.js';
+import { Torrent } from '../../../../src/domain/torrent/Torrent.js';
+import type { ContentRecyclerPort } from '../../../../src/domain/torrent/ports.js';
+import { RecyclingMode } from '../../../../src/domain/torrent/RecyclingMode.js';
 import { InMemoryMailOutbox } from '../../../../src/infrastructure/persistence/InMemoryMailOutbox.js';
 import { InMemoryUserRepository } from '../../../../src/infrastructure/persistence/InMemoryUserRepository.js';
 import { FakeAnnouncerSink } from '../../../../src/infrastructure/system/fakes/FakeAnnouncerSink.js';
@@ -59,6 +62,18 @@ interface Context {
   readonly setAllowPublicTracker: SetAllowPublicTracker;
   readonly handleEvent: HandleTorrentEvent;
   readonly outbox: InMemoryMailOutbox;
+  readonly recycler: FakeContentRecycler;
+}
+
+
+// Records what would have been put where, without touching a filesystem.
+class FakeContentRecycler implements ContentRecyclerPort {
+  readonly replications: { source: string; targetDir: string; mode: string }[] = [];
+
+  replicate(source: string, targetDir: string, mode: RecyclingMode): Promise<void> {
+    this.replications.push({ source, targetDir, mode: mode.value });
+    return Promise.resolve();
+  }
 }
 
 function makeContext(): Context {
@@ -73,6 +88,7 @@ function makeContext(): Context {
   const scripts = new FakeUserScriptRunner();
   const announcers = new FakeAnnouncerSink();
   const outbox = new InMemoryMailOutbox();
+  const recycler = new FakeContentRecycler();
   const templates = loadRtorrentTemplates();
   const settings = { koboxBin: '/usr/local/bin/kobox' };
   const render = new RenderRtorrentConfig({ instances, config, watchDirs, services, templates, settings });
@@ -111,8 +127,10 @@ function makeContext(): Context {
       users,
       outbox,
       clock: () => '2026-08-17 12:00:00',
+      recycler,
     }),
     outbox,
+    recycler,
   };
 }
 
@@ -504,6 +522,7 @@ describe('HandleTorrentEvent announcer publication (Torrent -> Tracker seam)', (
       metainfo: c.meta,
       control: c.control,
       scripts: c.scripts,
+      recycler: c.recycler,
       users: c.users,
       outbox: c.outbox,
       clock: () => '2026-08-17 12:00:00',
@@ -514,5 +533,79 @@ describe('HandleTorrentEvent announcer publication (Torrent -> Tracker seam)', (
 
     await expect(failing.execute(insertedNew)).resolves.toBeUndefined();
     expect(await c.torrents.findByInfoHash(alice, HASH)).toBeDefined();
+  });
+});
+
+describe('recycling content another member already has', () => {
+  const bob = Username.parse('bob');
+
+  it('should_leave_a_torrent_to_download_normally_when_recycling_is_off', async () => {
+    await c.provision.execute({ username: alice });
+    c.meta.preload(TORRENT_FILE, metainfo(true));
+
+    await c.handleEvent.execute({
+      username: alice,
+      event: 'inserted_new',
+      infoHash: HASH,
+      torrentFile: TORRENT_FILE,
+      directory: '/home/alice/rtorrent/complete',
+    });
+
+    expect(c.recycler.replications).toEqual([]);
+  });
+
+  it('should_put_an_existing_copy_where_rtorrent_expects_it_rather_than_downloading_again', async () => {
+    await c.users.save(aUser().withUsername('bob').withScgiPort(51102).withRtorrentPort(45002).build());
+    await c.provision.execute({ username: alice });
+    await c.provision.execute({ username: bob });
+    const withRecycling = await c.instances.findByUsername(alice);
+    if (withRecycling === undefined) throw new Error('alice should be provisioned');
+    await c.instances.save(withRecycling.setRecycling(RecyclingMode.hardlink));
+    // bob already finished the same content
+    await c.torrents.upsert(
+      bob,
+      Torrent.load({ infoHash: HASH, name: 'Some Release' }).complete('/home/bob/rtorrent/complete/Some Release'),
+    );
+    c.meta.preload(TORRENT_FILE, metainfo(true));
+
+    await c.handleEvent.execute({
+      username: alice,
+      event: 'inserted_new',
+      infoHash: HASH,
+      name: 'Some Release',
+      torrentFile: TORRENT_FILE,
+      directory: '/home/alice/rtorrent/complete',
+    });
+
+    expect(c.recycler.replications).toEqual([
+      {
+        source: '/home/bob/rtorrent/complete/Some Release',
+        targetDir: '/home/alice/rtorrent/complete',
+        mode: 'hardlink',
+      },
+    ]);
+  });
+
+  it('should_never_recycle_from_the_member_own_earlier_copy', async () => {
+    await c.provision.execute({ username: alice });
+    const withRecycling = await c.instances.findByUsername(alice);
+    if (withRecycling === undefined) throw new Error('alice should be provisioned');
+    await c.instances.save(withRecycling.setRecycling(RecyclingMode.copy));
+    await c.torrents.upsert(
+      alice,
+      Torrent.load({ infoHash: HASH, name: 'Some Release' }).complete('/home/alice/rtorrent/complete/Some Release'),
+    );
+    c.meta.preload(TORRENT_FILE, metainfo(true));
+
+    await c.handleEvent.execute({
+      username: alice,
+      event: 'inserted_new',
+      infoHash: HASH,
+      name: 'Some Release',
+      torrentFile: TORRENT_FILE,
+      directory: '/home/alice/rtorrent/complete',
+    });
+
+    expect(c.recycler.replications).toEqual([]);
   });
 });

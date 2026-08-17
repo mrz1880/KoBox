@@ -13,6 +13,7 @@ import type {
   UserScriptRunnerPort,
 } from '../../domain/torrent/ports.js';
 import type { UserRepository } from '../../domain/user/ports.js';
+import type { ContentRecyclerPort } from '../../domain/torrent/ports.js';
 import type { Username } from '../../domain/user/Username.js';
 import type { MailOutboxPort } from '../maintenance/MailOutboxPort.js';
 import { TorrentInstanceNotFoundError } from './errors.js';
@@ -57,6 +58,7 @@ interface Deps {
   readonly users: UserRepository;
   readonly outbox: MailOutboxPort;
   readonly clock: () => string;
+  readonly recycler: ContentRecyclerPort;
 }
 
 // The typed replacement for the legacy 400-line bash hooks. Behavior flags
@@ -126,6 +128,7 @@ export class HandleTorrentEvent {
     const decision = instance.admitTorrent(isPrivate ? 'private' : 'public');
     if (decision === 'accepted') {
       await this.deps.torrents.upsert(command.username, torrent);
+      await this.recycleIfPossible(instance, command);
       return;
     }
     await this.deps.torrents.upsert(command.username, torrent.reject());
@@ -140,6 +143,31 @@ export class HandleTorrentEvent {
   // removal was already right; saying so is what was missing. Best-effort like
   // the stop above: a mail that cannot be queued must not fail the event, and
   // the rejection is already recorded either way.
+  // What another member already finished can be put where this member's
+  // rtorrent expects it, so the torrent hash-checks and seeds instead of pulling
+  // down bytes the box already holds. Best-effort: a failed copy costs a
+  // download, never the torrent.
+  private async recycleIfPossible(
+    instance: TorrentInstance,
+    command: TorrentEventCommand,
+  ): Promise<void> {
+    if (!instance.recycling.reusesExistingContent || command.directory === undefined) {
+      return;
+    }
+    try {
+      const existing = await this.deps.torrents.findCompletedElsewhere(
+        command.infoHash,
+        command.username,
+      );
+      if (existing === undefined) {
+        return;
+      }
+      await this.deps.recycler.replicate(existing.tree, command.directory, instance.recycling);
+    } catch {
+      return;
+    }
+  }
+
   private async notifyRemoval(username: Username, name: string): Promise<void> {
     try {
       const user = await this.deps.users.findByUsername(username);

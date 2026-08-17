@@ -1,6 +1,7 @@
 import { DomainError } from '../shared/DomainError.js';
 import type { RtorrentPort, ScgiPort } from '../user/Port.js';
 import type { Username } from '../user/Username.js';
+import { RecyclingMode } from './RecyclingMode.js';
 import type { Label } from './Label.js';
 import { WatchDir } from './WatchDir.js';
 import type { SyncMode } from './SyncMode.js';
@@ -21,6 +22,7 @@ interface TorrentInstanceProps {
   readonly rtorrentPort: RtorrentPort;
   readonly watchDirs: readonly WatchDir[];
   readonly allowPublicTracker: boolean;
+  readonly recycling: RecyclingMode;
   readonly syncDisabled: boolean;
 }
 
@@ -34,6 +36,7 @@ export class TorrentInstance {
   readonly rtorrentPort: RtorrentPort;
   readonly watchDirs: readonly WatchDir[];
   readonly allowPublicTracker: boolean;
+  readonly recycling: RecyclingMode;
   readonly syncDisabled: boolean;
 
   private constructor(props: TorrentInstanceProps) {
@@ -42,6 +45,7 @@ export class TorrentInstance {
     this.rtorrentPort = props.rtorrentPort;
     this.watchDirs = props.watchDirs;
     this.allowPublicTracker = props.allowPublicTracker;
+    this.recycling = props.recycling;
     this.syncDisabled = props.syncDisabled;
   }
 
@@ -52,6 +56,7 @@ export class TorrentInstance {
       ...props,
       watchDirs: [WatchDir.root()],
       allowPublicTracker: false,
+      recycling: RecyclingMode.none,
       syncDisabled: false,
     });
     return {
@@ -92,6 +97,12 @@ export class TorrentInstance {
     });
   }
 
+  setRecycling(mode: RecyclingMode): TorrentInstance {
+    return this.recycling.equals(mode)
+      ? this
+      : new TorrentInstance({ ...this.props(), recycling: mode });
+  }
+
   setAllowPublicTracker(allowed: boolean): TorrentInstance {
     if (this.allowPublicTracker === allowed) {
       return this;
@@ -120,6 +131,7 @@ export class TorrentInstance {
       rtorrentPort: this.rtorrentPort,
       watchDirs: this.watchDirs,
       allowPublicTracker: this.allowPublicTracker,
+      recycling: this.recycling,
       syncDisabled: this.syncDisabled,
     };
   }

@@ -135,6 +135,36 @@ function storage(user: SeedboxUser, usage: DiskUsageSample | undefined, viewer: 
 what they already store does not delete anything; it stops them writing more.</p>`;
 }
 
+// The three modes, said as consequences. "hardlink" is not a better "copy": it
+// is the one that makes a quota stop measuring what a member actually holds, so
+// it says that where the choice is made rather than in a manual.
+function recycling(name: string, instance: TorrentInstance | undefined, viewer: Viewer): RawHtml {
+  if (instance === undefined) {
+    return html`<p class="muted">No rTorrent instance yet.</p>`;
+  }
+  const current = instance.recycling.value;
+  const option = (value: string, label: string): RawHtml =>
+    html`<option value="${value}" ${current === value ? html`selected` : html``}>${label}</option>`;
+  return html`<p class="muted">When ${name} adds a torrent whose files another member
+already has here, KoBox can reuse them instead of downloading the same bytes again.</p>
+<form method="post" action="/admin/users/${name}/recycling">
+  <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
+  <label for="mode">What to do</label>
+  <select id="mode" name="mode">
+    ${option('none', 'Download it again (default)')}
+    ${option('copy', 'Copy the files, so they get their own')}
+    ${option('hardlink', 'Share the same files on disk')}
+  </select>
+  <button type="submit">Save</button>
+</form>
+<p class="muted"><strong>Copy</strong> spends disk to save bandwidth, and every
+member still holds their own bytes, so their quota keeps meaning what it says.
+<strong>Sharing</strong> spends almost nothing, and breaks that: the same blocks
+are counted once, for whoever the filesystem happens to attribute them to, and
+one member deleting their torrent frees nothing while another still points at
+the files. Changing this affects future adds only.</p>`;
+}
+
 export function adminUserDetailPage(
   user: SeedboxUser,
   viewer: Viewer,
@@ -171,6 +201,9 @@ ${flash(message)}
 
 <h2>Storage</h2>
 <div class="card">${storage(user, usage, viewer)}</div>
+
+<h2>Reusing what is already here</h2>
+<div class="card">${recycling(name, instance, viewer)}</div>
 
 <h2>Public trackers</h2>
 <div class="card">${publicTrackers(name, instance, viewer)}</div>

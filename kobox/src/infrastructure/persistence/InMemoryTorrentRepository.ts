@@ -1,7 +1,7 @@
 import type { InfoHash } from '../../domain/torrent/InfoHash.js';
 import type { Torrent } from '../../domain/torrent/Torrent.js';
 import type { TorrentRepository } from '../../domain/torrent/ports.js';
-import type { Username } from '../../domain/user/Username.js';
+import { Username } from '../../domain/user/Username.js';
 
 function keyOf(username: Username, infoHash: InfoHash): string {
   return `${username.value}:${infoHash.value}`;
@@ -30,6 +30,24 @@ export class InMemoryTorrentRepository implements TorrentRepository {
         .filter(([key]) => key.startsWith(`${username.value}:`))
         .map(([, torrent]) => torrent),
     );
+  }
+
+  findCompletedElsewhere(
+    infoHash: InfoHash,
+    excluding: Username,
+  ): Promise<{ username: Username; tree: string } | undefined> {
+    for (const [key, torrent] of this.byKey.entries()) {
+      const owner = key.slice(0, key.indexOf(':'));
+      if (
+        owner !== excluding.value &&
+        torrent.infoHash.equals(infoHash) &&
+        torrent.state.value === 'completed' &&
+        torrent.tree !== undefined
+      ) {
+        return Promise.resolve({ username: Username.parse(owner), tree: torrent.tree });
+      }
+    }
+    return Promise.resolve(undefined);
   }
 
   deleteAllFor(username: Username): Promise<void> {

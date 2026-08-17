@@ -31,6 +31,9 @@ export const torrentInstances = sqliteTable('torrent_instances', {
   scgiPort: integer('scgi_port').notNull(),
   rtorrentPort: integer('rtorrent_port').notNull(),
   allowPublicTracker: integer('allow_public_tracker').notNull().default(0),
+  // none | copy | hardlink: what to do when another member already has the
+  // content. Defaults to none, the only mode with no consequence for quotas.
+  recycling: text('recycling').notNull().default('none'),
   syncDisabled: integer('sync_disabled').notNull().default(0),
   createdAt: text('created_at')
     .notNull()

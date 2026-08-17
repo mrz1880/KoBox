@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Label } from '../../../../src/domain/torrent/Label.js';
+import { RecyclingMode } from '../../../../src/domain/torrent/RecyclingMode.js';
 import { TorrentInstance } from '../../../../src/domain/torrent/TorrentInstance.js';
 import { RtorrentPort, ScgiPort } from '../../../../src/domain/user/Port.js';
 import { Username } from '../../../../src/domain/user/Username.js';
@@ -64,6 +65,7 @@ describe('TorrentInstance', () => {
       rtorrentPort: RtorrentPort.parse(45002),
       watchDirs: provisioned().watchDirs,
       allowPublicTracker: true,
+      recycling: RecyclingMode.none,
       syncDisabled: true,
     });
     expect(restored.username.value).toBe('bob');

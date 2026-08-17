@@ -80,6 +80,7 @@ import { FsLocalFileFacts } from '../infrastructure/system/FsLocalFileFacts.js';
 import { RsaRemotePasswordCipher } from '../infrastructure/system/RsaRemotePasswordCipher.js';
 import { SetSyncDestination } from '../application/sync/SetSyncDestination.js';
 import { SshRemoteProbe } from '../infrastructure/system/SshRemoteProbe.js';
+import { ContentRecyclerAdapter } from '../infrastructure/system/ContentRecyclerAdapter.js';
 import { SqliteTorrentRepository } from '../infrastructure/persistence/SqliteTorrentRepository.js';
 import { SqliteTrackerRepository } from '../infrastructure/persistence/SqliteTrackerRepository.js';
 import { SqliteUserAddressRepository } from '../infrastructure/persistence/SqliteUserAddressRepository.js';
@@ -616,6 +617,7 @@ export function buildContainer(name: string): Container {
   const torrentUseCases = buildTorrentUseCases({
     users: repo,
     outbox,
+    recycler: new ContentRecyclerAdapter(runner),
     instances: new SqliteTorrentInstanceRepository(db),
     torrents: new SqliteTorrentRepository(db),
     config: new RtorrentConfigAdapter(runner),

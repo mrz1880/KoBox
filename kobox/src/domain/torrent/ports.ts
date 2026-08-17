@@ -3,6 +3,7 @@ import type { ScgiPort } from '../user/Port.js';
 import type { Username } from '../user/Username.js';
 import type { Announcer } from './Announcer.js';
 import type { InfoHash } from './InfoHash.js';
+import type { RecyclingMode } from './RecyclingMode.js';
 import type { Torrent } from './Torrent.js';
 import type { TorrentInstance } from './TorrentInstance.js';
 import type { WatchDir } from './WatchDir.js';
@@ -21,6 +22,20 @@ export interface TorrentRepository {
   delete(username: Username, infoHash: InfoHash): Promise<void>;
   listFor(username: Username): Promise<readonly Torrent[]>;
   deleteAllFor(username: Username): Promise<void>;
+  // Someone else's finished copy of the same content, for recycling. Excluding
+  // the asker matters: a member re-adding their own torrent must not be told to
+  // copy it from themselves.
+  findCompletedElsewhere(
+    infoHash: InfoHash,
+    excluding: Username,
+  ): Promise<{ username: Username; tree: string } | undefined>;
+}
+
+// Puts an existing tree where a member's rtorrent expects to find it, so the
+// torrent hash-checks and goes straight to seeding instead of downloading what
+// this box already holds.
+export interface ContentRecyclerPort {
+  replicate(source: string, targetDir: string, mode: RecyclingMode): Promise<void>;
 }
 
 // RenderedFile moved to domain/shared/files.ts (re-exported above): the
