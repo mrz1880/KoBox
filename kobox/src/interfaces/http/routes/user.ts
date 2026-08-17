@@ -52,6 +52,7 @@ import {
   type SignalRow,
 } from '../views/userPages.js';
 import { syncPage } from '../views/syncPage.js';
+import { Language } from '../../../domain/portal/Language.js';
 
 const categorySchema = z.object({ label: z.string().min(1).max(64) });
 const retrySchema = z.object({ id: z.coerce.number().int().positive() });
@@ -143,6 +144,7 @@ async function ownFile(
 }
 
 export interface UserRoutesDeps {
+  readonly now: () => string;
   readonly components: ComponentRegistry;
   readonly users: UserRepository;
   readonly fairUse: FairUseRepository;
@@ -561,6 +563,30 @@ export function registerUserRoutes(
       .header('content-disposition', `inline; filename="${file.path.name}"`)
       .code(200)
       .send();
+  });
+
+  const languageSchema = z.object({ language: z.enum(['en', 'fr']) });
+
+  server.post('/access/language', async (request, reply) => {
+    const session = await guards.requireCsrf(request, reply);
+    if (session === undefined) {
+      return;
+    }
+    const parsed = languageSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.code(400).send();
+    }
+    // a preference on the member's own account, written straight through: it
+    // touches nothing privileged, so it needs no job
+    const existing = await deps.credentials.find(session.username);
+    if (existing === undefined) {
+      return reply.code(400).send();
+    }
+    await deps.credentials.save(
+      { ...existing, language: Language.parse(parsed.data.language) },
+      deps.now(),
+    );
+    return redirectWithFlash(reply, '/access', 'Saved.');
   });
 
   server.get('/access', async (request, reply) => {

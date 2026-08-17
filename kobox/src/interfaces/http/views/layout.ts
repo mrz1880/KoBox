@@ -1,3 +1,5 @@
+import type { Language } from '../../../domain/portal/Language.js';
+import type { Translate } from './messages.js';
 import type { Role } from '../../../domain/portal/Role.js';
 import { html, raw, type RawHtml } from '../html.js';
 
@@ -187,6 +189,10 @@ export interface Viewer {
   readonly username: string;
   readonly role: Role;
   readonly csrfToken: string;
+  // the member's language, and the lookup bound to it. Every view already
+  // receives a Viewer, so this is the one seam that reaches all of them.
+  readonly language: Language;
+  readonly t: Translate;
 }
 
 const ADMIN_NAV: readonly (readonly [string, string])[] = [
@@ -222,11 +228,11 @@ const USER_NAV: readonly (readonly [string, string])[] = [
 export function page(title: string, body: RawHtml, viewer?: Viewer): string {
   const nav = viewer === undefined ? [] : viewer.role === 'admin' ? ADMIN_NAV : USER_NAV;
   const document = html`<!doctype html>
-<html lang="en">
+<html lang="${viewer?.language.value ?? 'en'}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${title} — KoBox</title>
+<title>${viewer === undefined ? title : viewer.t(title)}, KoBox</title>
 <style>${raw(STYLES)}</style>
 </head>
 <body>
@@ -234,10 +240,10 @@ export function page(title: string, body: RawHtml, viewer?: Viewer): string {
   <span class="brand">KOBOX</span>
   ${viewer === undefined
     ? undefined
-    : html`<nav>${nav.map(([href, label]) => html`<a href="${href}">${label}</a>`)}</nav>
+    : html`<nav>${nav.map(([href, label]) => html`<a href="${href}">${viewer.t(label)}</a>`)}</nav>
   <form class="inline" method="post" action="/logout">
     <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
-    <button class="ghost" type="submit">Sign out (${viewer.username})</button>
+    <button class="ghost" type="submit">${viewer.t('Sign out')} (${viewer.username})</button>
   </form>`}
 </header>
 <main>

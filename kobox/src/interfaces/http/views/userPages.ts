@@ -322,7 +322,7 @@ export function downloadsPage(
 ): string {
   const rows =
     downloads.length === 0
-      ? html`<tr><td colspan="4">Nothing here yet. Submit a link above to start.</td></tr>`
+      ? html`<tr><td colspan="4">${viewer.t('Nothing here yet. Submit a link above to start.')}</td></tr>`
       : downloads.map(
           (download) => html`<tr>
   <td>${download.category.value}</td>
@@ -333,21 +333,21 @@ export function downloadsPage(
         );
   return page(
     'Downloads',
-    html`<h1>Downloads</h1>
+    html`<h1>${viewer.t('Downloads')}</h1>
 ${flash(message)}
 ${flash(error, 'error')}
 ${engineNotice(engineReady)}
 ${debridAccountCard(viewer, hasKey)}
 <form class="card" method="post" action="/downloads">
   <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
-  <label for="link">Filehoster link</label>
+  <label for="link">${viewer.t('Filehoster link')}</label>
   <input id="link" name="link" type="url" inputmode="url" placeholder="https://…" required>
-  <label for="category">Folder</label>
+  <label for="category">${viewer.t('Folder')}</label>
   ${folderChoice(folders)}
-  <button type="submit">Start download</button>
+  <button type="submit">${viewer.t('Start download')}</button>
 </form>
 <table>
-  <thead><tr><th>Category</th><th>Status</th><th>Detail</th><th>Requested</th></tr></thead>
+  <thead><tr><th>${viewer.t('Folder')}</th><th>${viewer.t('Status')}</th><th>${viewer.t('Detail')}</th><th>${viewer.t('Requested')}</th></tr></thead>
   <tbody>${rows}</tbody>
 </table>`,
     viewer,
@@ -436,17 +436,17 @@ export function accessPage(viewer: Viewer, facts: AccessFacts): string {
   );
   return page(
     'My access',
-    html`<h1>My access</h1>
+    html`<h1>${viewer.t('My access')}</h1>
 <h2>Connect over VPN</h2>
 <p class="muted">Download one profile and open it with your OpenVPN client.</p>
 <div class="choices">${choices}</div>
-<h2>Your details</h2>
+<h2>${viewer.t('Your details')}</h2>
 <dl class="facts">
-  <dt>Username</dt><dd>${facts.username}</dd>
+  <dt>${viewer.t('Username')}</dt><dd>${facts.username}</dd>
   ${facts.sftpHost !== undefined
     ? html`<dt>SFTP host</dt><dd>${facts.sftpHost}</dd>`
     : undefined}
-  <dt>Files</dt><dd>~/rtorrent/complete</dd>
+  <dt>${viewer.t('Files')}</dt><dd>~/rtorrent/complete</dd>
   <dt>rtorrent port</dt><dd>${facts.rtorrentPort}</dd>
 </dl>
 <p class="muted">Your SFTP password is the one you use here.</p>
@@ -455,7 +455,7 @@ ${appTokenSection(viewer, facts)}
 
 <p class="links"><a href="/rutorrent">Open ruTorrent</a> ·
 <a href="/downloads">Downloads</a> ·
-<a href="/password">Change password</a></p>`,
+<a href="/password">${viewer.t('Change password')}</a></p>`,
     viewer,
   );
 }
@@ -485,7 +485,7 @@ export function mediaPage(
     groups.set(folder.value, []);
   }
   for (const file of files) {
-    const key = file.path.category === '' ? 'Loose files' : file.path.category;
+    const key = file.path.category === '' ? viewer.t('Loose files') : file.path.category;
     groups.set(key, [...(groups.get(key) ?? []), file]);
   }
   const sections = [...groups.entries()]
@@ -494,17 +494,17 @@ export function mediaPage(
       ([category, items]) =>
         items.length === 0
           ? html`<h2>${category}</h2>
-<p class="muted">Empty for now.</p>`
+<p class="muted">${viewer.t('Empty for now.')}</p>`
           : html`<h2>${category}</h2>
 <table>
-  <thead><tr><th>File</th><th>Size</th><th></th></tr></thead>
+  <thead><tr><th>${viewer.t('File')}</th><th>${viewer.t('Size')}</th><th></th></tr></thead>
   <tbody>${items.map(
     (file) => html`<tr>
   <td class="path">${file.path.name}</td>
   <td class="num">${formatSize(file.sizeBytes)}</td>
   <td>${file.isBrowserPlayable
-      ? html`<a href="/media/watch?path=${file.path.value}">Watch</a> ·
-        <a href="/media/file?path=${file.path.value}" download>Download</a>`
+      ? html`<a href="/media/watch?path=${file.path.value}">${viewer.t('Watch')}</a> ·
+        <a href="/media/file?path=${file.path.value}" download>${viewer.t('Download')}</a>`
       : html`<a href="/media/file?path=${file.path.value}" download>Download</a>`}</td>
 </tr>`,
   )}</tbody>
@@ -512,7 +512,7 @@ export function mediaPage(
     );
   return page(
     'My media',
-    html`<h1>My media</h1>
+    html`<h1>${viewer.t('My media')}</h1>
 ${flash(message)}
 ${sections.length === 0
       ? html`<p class="muted">You have no folders yet. Create one under

@@ -3,6 +3,8 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { loginPage } from '../../../../src/interfaces/http/views/loginPage.js';
+import { Language } from '../../../../src/domain/portal/Language.js';
+import { translatorFor } from '../../../../src/interfaces/http/views/messages.js';
 import {
   accessPage,
   adminHomePage,
@@ -10,8 +12,9 @@ import {
   type SignalRow,
 } from '../../../../src/interfaces/http/views/userPages.js';
 
-const VIEWER = { username: 'alice', role: 'user' as const, csrfToken: 'csrf' };
-const ADMIN = { username: 'boss', role: 'admin' as const, csrfToken: 'csrf' };
+const ENGLISH = { language: Language.en, t: translatorFor(Language.en) };
+const VIEWER = { username: 'alice', role: 'user' as const, csrfToken: 'csrf', ...ENGLISH };
+const ADMIN = { username: 'boss', role: 'admin' as const, csrfToken: 'csrf', ...ENGLISH };
 const G = 1024 ** 3;
 
 function row(overrides: Partial<SignalRow> = {}): SignalRow {

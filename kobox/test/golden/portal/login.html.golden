@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Sign in — KoBox</title>
+<title>Sign in, KoBox</title>
 <style>
 :root {
   --bg: #efebe2; --panel: #fbfaf6; --line: #d8d2c4; --ink: #1b242e;

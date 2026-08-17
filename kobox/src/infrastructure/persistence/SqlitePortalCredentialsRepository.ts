@@ -1,6 +1,7 @@
 import { eq } from 'drizzle-orm';
 import type { PortalCredentials, PortalCredentialsPort } from '../../domain/portal/ports.js';
 import { HashedPassword } from '../../domain/user/HashedPassword.js';
+import { Language } from '../../domain/portal/Language.js';
 import { Username } from '../../domain/user/Username.js';
 import type { KoboxDatabase } from './db.js';
 import { portalCredentials } from './schema.js';
@@ -23,6 +24,7 @@ export class SqlitePortalCredentialsRepository implements PortalCredentialsPort 
       role: row.role,
       mustChangePassword: row.mustChangePassword === 1,
       ...(row.appTokenHash !== null && { appTokenHash: row.appTokenHash }),
+      ...(row.language !== null && { language: Language.parse(row.language) }),
     });
   }
 
@@ -36,6 +38,7 @@ export class SqlitePortalCredentialsRepository implements PortalCredentialsPort 
         role: credentials.role,
         mustChangePassword: mustChange,
         appTokenHash: credentials.appTokenHash ?? null,
+        language: credentials.language?.value ?? null,
         updatedAt: now,
       })
       .onConflictDoUpdate({
@@ -45,6 +48,7 @@ export class SqlitePortalCredentialsRepository implements PortalCredentialsPort 
           role: credentials.role,
           mustChangePassword: mustChange,
           appTokenHash: credentials.appTokenHash ?? null,
+          language: credentials.language?.value ?? null,
           updatedAt: now,
         },
       })
