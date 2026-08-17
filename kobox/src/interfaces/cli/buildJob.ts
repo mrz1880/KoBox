@@ -85,6 +85,10 @@ export const buildJob = {
     return parseJob('apply-mail-relay', {});
   },
 
+  provisionNextcloudAccount(input: { username: string }): Job {
+    return parseJob('provision-nextcloud-account', input);
+  },
+
   setUserQuota(input: { username: string; quotaGib: number }): Job {
     return parseJob('set-user-quota', input);
   },

@@ -418,6 +418,9 @@ describe.skipIf(!onDebianAsRoot)('E2E: fresh Debian 12 -> bootstrap -> full stac
       'nanomon',
       'aria2',
       'speedtest',
+      // unpinned here like nanomon and aria2: no KOBOX_NEXTCLOUD_URL in this
+      // suite, so it skips honestly and never reaches to_install
+      'nextcloud',
     ];
     for (const row of status) {
       if (!skippedOnDebian12.includes(row.name)) {

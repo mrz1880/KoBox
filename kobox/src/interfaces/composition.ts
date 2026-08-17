@@ -14,6 +14,7 @@ import {
 } from '../infrastructure/system/ArtifactFetchAdapter.js';
 import { CertbotAdapter } from '../infrastructure/system/CertbotAdapter.js';
 import { ConfigCheckAdapter } from '../infrastructure/system/ConfigCheckAdapter.js';
+import { OccNextcloudAdapter } from '../infrastructure/system/OccNextcloudAdapter.js';
 import { InstallHostAdapter } from '../infrastructure/system/InstallHostAdapter.js';
 import { SystemdAdapter } from '../infrastructure/system/SystemdAdapter.js';
 import { SystemFactsAdapter } from '../infrastructure/system/SystemFactsAdapter.js';
@@ -296,6 +297,7 @@ export async function buildInstallation(
     artifacts: new ArtifactFetchAdapter(defaultBodyFetcher()),
     facts,
     security: securitySettings(),
+    nextcloud: new OccNextcloudAdapter(runner),
     install: {
       nodeBin: process.execPath,
       dbPath: process.env.KOBOX_DB ?? DEFAULT_DB_PATH,
@@ -595,6 +597,9 @@ export function buildContainer(name: string): Container {
     accounts: new SystemAccountAdapter(runner),
     quota,
     diskSamples: new SqliteDiskUsageRepository(db),
+    nextcloud: new OccNextcloudAdapter(runner),
+    outbox,
+    newPassword: () => Password.parse(randomBytes(12).toString('base64url')),
     sftp: new SftpAdapter(runner),
     services,
     notifications,

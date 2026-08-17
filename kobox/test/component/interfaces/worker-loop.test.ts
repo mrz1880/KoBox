@@ -79,6 +79,7 @@ import {
 } from '../../../src/interfaces/useCases.js';
 import { InMemoryDebridAccountRepository } from '../../../src/infrastructure/persistence/InMemoryDebridAccountRepository.js';
 import { InMemoryDebridDownloadRepository } from '../../../src/infrastructure/persistence/InMemoryDebridDownloadRepository.js';
+import { FakeNextcloud } from '../../../src/infrastructure/system/fakes/FakeNextcloud.js';
 
 class InMemoryJobQueue implements JobQueuePort {
   private readonly rows: { id: number; job: Job; status: string; error?: string }[] = [];
@@ -244,6 +245,9 @@ beforeEach(() => {
     accounts,
     quota,
     diskSamples: new InMemoryDiskUsageRepository(),
+    nextcloud: new FakeNextcloud(),
+    outbox: new InMemoryMailOutbox(),
+    newPassword: () => Password.parse('nextcloud-generated-pass'),
     sftp,
     services,
     notifications,

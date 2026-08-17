@@ -4,6 +4,7 @@ import { DomainError } from '../shared/DomainError.js';
 // legacy `services` registry). Closed on purpose: the privileged installer
 // only ever executes strategies it knows, never an arbitrary name.
 export const COMPONENT_NAMES = [
+  'nextcloud',
   'kobox-core',
   'apt-sources',
   'sshd',
