@@ -3,6 +3,8 @@ import { RequestDebridDownload } from '../../../src/application/ddl/RequestDebri
 import type { Job } from '../../../src/application/jobs/contract.js';
 import type { ClaimedJob, JobQueuePort } from '../../../src/application/jobs/JobQueuePort.js';
 import { Authenticate } from '../../../src/application/portal/Authenticate.js';
+import { AuthenticateApp } from '../../../src/application/portal/AuthenticateApp.js';
+import { IssueAppToken } from '../../../src/application/portal/IssueAppToken.js';
 import { Login } from '../../../src/application/portal/Login.js';
 import { Logout } from '../../../src/application/portal/Logout.js';
 import type { DebridApiKey } from '../../../src/domain/ddl/DebridApiKey.js';
@@ -191,6 +193,13 @@ export async function buildPortalWorld(
     login: new Login(authDeps),
     logout: new Logout(authDeps),
     authenticate: new Authenticate(authDeps),
+    issueAppToken: new IssueAppToken({ credentials, tokens, clock: () => NOW }),
+    authenticateApp: new AuthenticateApp({
+      credentials,
+      attempts,
+      tokens,
+      clock: () => NOW,
+    }),
     now: () => NOW,
     users,
     queue,

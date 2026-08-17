@@ -257,6 +257,10 @@ export const portalCredentials = sqliteTable('portal_credentials', {
   // Phase 7: a migrated user starts with a temporary password and must set a
   // new one at first login before the portal grants any other access.
   mustChangePassword: integer('must_change_password').notNull().default(0),
+  // sha256 of the member's app token, when they have issued one. Machines
+  // present it as HTTP Basic (Radarr/Sonarr driving rTorrent); the raw token
+  // only ever exists on the page that showed it once.
+  appTokenHash: text('app_token_hash'),
   updatedAt: text('updated_at').notNull(),
 });
 

@@ -290,6 +290,32 @@ Account types were all `normal`; no `plex` account existed on that box.
 
 ---
 
+## 8ter. The *arr stack: hand out an app token before cutover
+
+Radarr and Sonarr on the owner's NAS drive rTorrent **natively** (their
+`TorrentBlackhole` client is present but disabled), pointing at
+`/ru/plugins/httprpc/action.php` with HTTP Basic. MySB answered that path with
+`www-authenticate: Basic realm="Restricted area"`.
+
+KoBox accepts Basic there too, but the credential is the member's **app token**,
+not their account password — issued from the Account page, revocable on its own.
+See `docs/OPS.md`, "Connecting an app".
+
+**On the day.** Each member using a download client issues a token and pastes it
+where the password used to be. The password in those configs is going to break
+anyway: the import mails a temporary one and forces a reset, so the config has to
+be touched regardless.
+
+Their **remote path mapping** — `/home/<member>/rtorrent/complete/<category>/` to
+a local path they scan — keeps working: Sending writes into the same
+`<root>/<category>/` layout.
+
+A member who would rather not connect anything can switch that client to
+*Torrent Blackhole* and drop `.torrent` files into the folder's watch directory.
+Both paths are supported.
+
+---
+
 ## 9. Known drifts & post-migration toggles
 
 - **`allow_public_tracker`** has no prod DB source (the legacy patch lived in a

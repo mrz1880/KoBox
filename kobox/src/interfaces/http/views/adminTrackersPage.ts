@@ -43,6 +43,15 @@ export function adminTrackersPage(
   return page(
     'Trackers',
     html`<h1>Trackers</h1>
+<p class="muted">The trackers KoBox knows about, discovered from the torrents
+members actually add. A <strong>private</strong> tracker is one that expects an
+account; a <strong>public</strong> one is open to anyone. Members can be refused
+public trackers individually, from their own page under Users.</p>
+<p class="muted">KoBox watches the certificate of each https tracker and warns
+before it expires, because an expired one stops announcing and torrents go quiet
+without saying why. <strong>Renew certificates</strong> re-checks them all now
+instead of waiting for the nightly pass. A tracker marked <strong>dead</strong>
+is kept but no longer checked.</p>
 ${flash(message)}
 <form class="inline" method="post" action="/admin/trackers/renew-certs">
   <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
@@ -79,6 +88,17 @@ export function adminBlocklistsPage(
   return page(
     'Blocklists',
     html`<h1>Blocklists</h1>
+<p class="muted">Lists of IP ranges that never get to talk to your members'
+torrent clients — anti-piracy monitors, known bad actors, advertising networks.
+Each list is published by someone else and fetched by KoBox; the merged ranges
+go into the kernel's packet filter, so blocking costs nothing at transfer time.</p>
+<p class="muted"><strong>Enabled</strong> is what decides whether a list counts:
+a disabled one stays here for later and is not fetched. <strong>Update now</strong>
+re-downloads every enabled list instead of waiting for the scheduled pass, and
+<strong>Import catalog</strong> adds the well-known public lists so you can pick
+from them rather than typing URLs.</p>
+<p class="muted">None of this is a guarantee, and it is not a substitute for the
+VPN under Account. It removes the loudest, best-known watchers.</p>
 ${flash(message)}
 <form class="inline" method="post" action="/admin/blocklists/update">
   <input type="hidden" name="_csrf" value="${viewer.csrfToken}">

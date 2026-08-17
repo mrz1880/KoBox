@@ -359,6 +359,46 @@ export interface AccessFacts {
   readonly username: string;
   readonly sftpHost?: string;
   readonly rtorrentPort: number;
+  readonly hasAppToken: boolean;
+  // set exactly once, on the response that issued it: only its hash is stored,
+  // so no later page can show it again
+  readonly freshToken?: string;
+}
+
+// What a member gives to Sonarr, Radarr or any other program that drives their
+// torrents for them. Deliberately not their password: a download client's
+// config file is a text file on another machine, and this one can be thrown
+// away on its own.
+function appTokenSection(viewer: Viewer, facts: AccessFacts): RawHtml {
+  return html`<h2>Connect an app</h2>
+<p class="muted">Sonarr, Radarr and friends can add torrents for you and follow
+them. They sign in with your username and a <strong>token</strong> instead of
+your password, so a program that leaks its settings costs you the token and not
+your account. Throw it away here and it stops working immediately, everywhere.</p>
+${facts.freshToken === undefined
+    ? html``
+    : html`<section class="panel">
+  <p class="lead">Here is your token. Copy it now.</p>
+  <p class="mono">${facts.freshToken}</p>
+  <p class="muted">It will not be shown again — KoBox only keeps a fingerprint of
+  it. If you lose it, make a new one; the old one stops working at that moment.</p>
+</section>`}
+<p class="muted">In the app, choose <span class="mono">rTorrent</span>, use your
+own username, paste the token where it asks for a password, and point it at this
+box on port 8189 with the path
+<span class="mono">/ru/plugins/httprpc/action.php</span>. If you would rather not
+connect anything, dropping a .torrent file into a folder's
+<span class="mono">watch</span> directory works just as well.</p>
+<form class="inline" method="post" action="/access/app-token">
+  <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
+  <button type="submit">${facts.hasAppToken ? 'Make a new token' : 'Make a token'}</button>
+</form>
+${facts.hasAppToken
+    ? html`<form class="inline" method="post" action="/access/app-token/revoke">
+  <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
+  <button class="ghost" type="submit">Throw it away</button>
+</form>`
+    : html``}`;
 }
 
 export function accessPage(viewer: Viewer, facts: AccessFacts): string {
@@ -386,6 +426,9 @@ export function accessPage(viewer: Viewer, facts: AccessFacts): string {
   <dt>rtorrent port</dt><dd>${facts.rtorrentPort}</dd>
 </dl>
 <p class="muted">Your SFTP password is the one you use here.</p>
+
+${appTokenSection(viewer, facts)}
+
 <p class="links"><a href="/rutorrent">Open ruTorrent</a> ·
 <a href="/downloads">Downloads</a> ·
 <a href="/password">Change password</a></p>`,

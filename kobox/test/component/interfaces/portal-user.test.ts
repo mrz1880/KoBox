@@ -803,3 +803,76 @@ describe('the queue a member can see', () => {
     expect(response.statusCode).toBe(400);
   });
 });
+
+describe('connecting an app', () => {
+  it('should_issue_a_token_and_show_it_once', async () => {
+    const response = await world.server.inject({
+      method: 'POST',
+      url: '/access/app-token',
+      headers: { cookie: user.cookie, 'content-type': 'application/x-www-form-urlencoded' },
+      payload: form({ _csrf: user.csrf }),
+    });
+
+    expect(response.statusCode).toBe(200);
+    // shown once, on the page that issued it: only its sha256 is stored, so
+    // nothing can ever display it again
+    // anchored on the element that renders it: the CSRF token is emitted by the
+    // same generator, so a bare pattern would match that instead
+    const shown = /<p class="mono">([a-f0-9]{64})<\/p>/.exec(response.body)?.[1];
+    expect(shown).toBeDefined();
+    const stored = (await world.credentials.find(Username.parse('alice')))?.appTokenHash;
+    expect(stored).toBeDefined();
+    expect(stored).not.toBe(shown);
+  });
+
+  it('should_replace_the_previous_one_when_a_member_issues_another', async () => {
+    await world.server.inject({
+      method: 'POST',
+      url: '/access/app-token',
+      headers: { cookie: user.cookie, 'content-type': 'application/x-www-form-urlencoded' },
+      payload: form({ _csrf: user.csrf }),
+    });
+    const first = (await world.credentials.find(Username.parse('alice')))?.appTokenHash;
+
+    await world.server.inject({
+      method: 'POST',
+      url: '/access/app-token',
+      headers: { cookie: user.cookie, 'content-type': 'application/x-www-form-urlencoded' },
+      payload: form({ _csrf: user.csrf }),
+    });
+
+    expect((await world.credentials.find(Username.parse('alice')))?.appTokenHash).not.toBe(first);
+  });
+
+  it('should_revoke_it_without_touching_the_account', async () => {
+    await world.server.inject({
+      method: 'POST',
+      url: '/access/app-token',
+      headers: { cookie: user.cookie, 'content-type': 'application/x-www-form-urlencoded' },
+      payload: form({ _csrf: user.csrf }),
+    });
+
+    await world.server.inject({
+      method: 'POST',
+      url: '/access/app-token/revoke',
+      headers: { cookie: user.cookie, 'content-type': 'application/x-www-form-urlencoded' },
+      payload: form({ _csrf: user.csrf }),
+    });
+
+    const after = await world.credentials.find(Username.parse('alice'));
+    expect(after?.appTokenHash).toBeUndefined();
+    // the account itself is untouched: they can still sign in
+    expect(after?.passwordHash).toBeDefined();
+  });
+
+  it('should_refuse_without_a_csrf_token', async () => {
+    const response = await world.server.inject({
+      method: 'POST',
+      url: '/access/app-token',
+      headers: { cookie: user.cookie, 'content-type': 'application/x-www-form-urlencoded' },
+      payload: form({}),
+    });
+
+    expect(response.statusCode).toBe(403);
+  });
+});

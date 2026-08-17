@@ -1,9 +1,13 @@
+import type { FastifyReply, FastifyRequest } from 'fastify';
 import fastifyCookie from '@fastify/cookie';
 import fastifyFormbody from '@fastify/formbody';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import type { RequestDebridDownload } from '../../application/ddl/RequestDebridDownload.js';
 import type { JobQueuePort } from '../../application/jobs/JobQueuePort.js';
+import type { Role } from '../../domain/portal/Role.js';
+import type { AuthenticateApp } from '../../application/portal/AuthenticateApp.js';
+import type { IssueAppToken } from '../../application/portal/IssueAppToken.js';
 import type { Authenticate } from '../../application/portal/Authenticate.js';
 import type { Login } from '../../application/portal/Login.js';
 import type { Logout } from '../../application/portal/Logout.js';
@@ -48,6 +52,8 @@ export interface PortalServerDeps {
   readonly login: Login;
   readonly logout: Logout;
   readonly authenticate: Authenticate;
+  readonly authenticateApp: AuthenticateApp;
+  readonly issueAppToken: IssueAppToken;
   readonly now: () => string;
   readonly users: UserRepository;
   readonly queue: JobQueuePort;
@@ -154,7 +160,33 @@ export function buildPortalServer(deps: PortalServerDeps): FastifyInstance {
 
   // nginx auth_request subrequests: bare status codes, no redirects. The
   // authenticated username travels back on a header for REMOTE_USER wiring.
+  // A machine has no cookie: Radarr and Sonarr drive rTorrent through
+  // ruTorrent's httprpc endpoint with HTTP Basic. Their credential is the
+  // member's app token, never the account password — so a leaked download-client
+  // config costs the token and not the portal account.
+  const appOf = async (
+    request: FastifyRequest,
+  ): Promise<{ username: Username; role: Role } | undefined> => {
+    const header = request.headers.authorization ?? '';
+    if (!header.startsWith('Basic ')) {
+      return undefined;
+    }
+    const decoded = Buffer.from(header.slice('Basic '.length), 'base64').toString('utf8');
+    const separator = decoded.indexOf(':');
+    if (separator < 0) {
+      return undefined;
+    }
+    return deps.authenticateApp.execute({
+      username: decoded.slice(0, separator),
+      token: decoded.slice(separator + 1),
+    });
+  };
+
   server.get('/internal/auth', async (request, reply) => {
+    const app = await appOf(request);
+    if (app !== undefined) {
+      return reply.header('x-kobox-user', app.username.value).code(204).send();
+    }
     const session = await guards.sessionOf(request);
     if (session === undefined) {
       return reply.code(401).send();
@@ -165,7 +197,31 @@ export function buildPortalServer(deps: PortalServerDeps): FastifyInstance {
     return reply.header('x-kobox-user', session.username.value).code(204).send();
   });
 
+  // ONE ownership rule, whether the caller arrived with a cookie or a token: a
+  // second copy of an authorisation check is a second copy to get wrong.
+  const rpcVerdict = (
+    reply: FastifyReply,
+    request: FastifyRequest,
+    username: string,
+    role: Role,
+  ): FastifyReply => {
+    const original = String(request.headers['x-original-uri'] ?? '');
+    const match = /^\/RPC-([A-Za-z0-9]+)(?:[/?].*)?$/.exec(original);
+    const owner = match?.[1]?.toLowerCase();
+    if (owner === undefined) {
+      return reply.code(403).send();
+    }
+    if (role !== 'admin' && username !== owner) {
+      return reply.code(403).send();
+    }
+    return reply.header('x-kobox-user', username).code(204).send();
+  };
+
   server.get('/internal/auth/rpc', async (request, reply) => {
+    const app = await appOf(request);
+    if (app !== undefined) {
+      return rpcVerdict(reply, request, app.username.value, app.role);
+    }
     const session = await guards.sessionOf(request);
     if (session === undefined) {
       return reply.code(401).send();
@@ -174,16 +230,7 @@ export function buildPortalServer(deps: PortalServerDeps): FastifyInstance {
     if (session.mustChangePassword) {
       return reply.code(403).send();
     }
-    const original = String(request.headers['x-original-uri'] ?? '');
-    const match = /^\/RPC-([A-Za-z0-9]+)(?:[/?].*)?$/.exec(original);
-    const owner = match?.[1]?.toLowerCase();
-    if (owner === undefined) {
-      return reply.code(403).send();
-    }
-    if (session.role !== 'admin' && session.username.value !== owner) {
-      return reply.code(403).send();
-    }
-    return reply.header('x-kobox-user', session.username.value).code(204).send();
+    return rpcVerdict(reply, request, session.username.value, session.role);
   });
 
   server.get('/internal/auth/admin', async (request, reply) => {

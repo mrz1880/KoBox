@@ -2,8 +2,13 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import {
   buildPortalWorld,
   loginAs as loginTo,
+  NOW,
+  TEST_PASSWORD,
   type PortalWorld,
 } from './portalWorld.js';
+import { HashedPassword } from '../../../src/domain/user/HashedPassword.js';
+import { Username } from '../../../src/domain/user/Username.js';
+import { FakeSessionTokens } from '../../../src/infrastructure/system/fakes/FakeSessionTokens.js';
 
 let world: PortalWorld;
 
@@ -174,5 +179,87 @@ describe('nginx auth_request endpoints', () => {
 
     expect(denied.statusCode).toBe(403);
     expect(allowed.statusCode).toBe(204);
+  });
+});
+
+describe('a machine presenting HTTP Basic', () => {
+  const TOKEN = 'a'.repeat(64);
+
+  async function withToken(): Promise<PortalWorld> {
+    const world = await buildPortalWorld();
+    const tokens = new FakeSessionTokens();
+    await world.credentials.save(
+      {
+        username: Username.parse('alice'),
+        passwordHash: HashedPassword.parse(`$6$fakesalt$${'x'.repeat(20)}8`),
+        role: 'user',
+        appTokenHash: tokens.hashToken(TOKEN),
+      },
+      NOW,
+    );
+    return world;
+  }
+
+  function basic(user: string, secret: string): string {
+    return `Basic ${Buffer.from(`${user}:${secret}`).toString('base64')}`;
+  }
+
+  it('should_let_a_download_client_through_with_its_token', async () => {
+    // Radarr and Sonarr drive rTorrent through ruTorrent's httprpc endpoint and
+    // have no cookie: without this, automation stops dead at cutover.
+    const world = await withToken();
+
+    const response = await world.server.inject({
+      method: 'GET',
+      url: '/internal/auth',
+      headers: { authorization: basic('alice', TOKEN) },
+    });
+
+    expect(response.statusCode).toBe(204);
+    expect(response.headers['x-kobox-user']).toBe('alice');
+  });
+
+  it('should_refuse_the_account_password_on_that_door', async () => {
+    // the token is the machine credential; accepting the password here would
+    // put the portal account itself in every download client's config file
+    const world = await withToken();
+
+    const response = await world.server.inject({
+      method: 'GET',
+      url: '/internal/auth',
+      headers: { authorization: basic('alice', TEST_PASSWORD) },
+    });
+
+    expect(response.statusCode).toBe(401);
+  });
+
+  it('should_scope_the_rpc_mount_to_its_owner', async () => {
+    const world = await withToken();
+
+    const own = await world.server.inject({
+      method: 'GET',
+      url: '/internal/auth/rpc',
+      headers: { authorization: basic('alice', TOKEN), 'x-original-uri': '/RPC-ALICE' },
+    });
+    const other = await world.server.inject({
+      method: 'GET',
+      url: '/internal/auth/rpc',
+      headers: { authorization: basic('alice', TOKEN), 'x-original-uri': '/RPC-BOSS' },
+    });
+
+    expect(own.statusCode).toBe(204);
+    expect(other.statusCode).toBe(403);
+  });
+
+  it('should_refuse_a_token_that_was_never_issued', async () => {
+    const world = await buildPortalWorld();
+
+    const response = await world.server.inject({
+      method: 'GET',
+      url: '/internal/auth',
+      headers: { authorization: basic('alice', TOKEN) },
+    });
+
+    expect(response.statusCode).toBe(401);
   });
 });

@@ -193,6 +193,52 @@ describe.skipIf(!onDebianAsRoot)('E2E: portal login -> create user -> member sel
     expect(memberCookie).toBeDefined();
   });
 
+  it('should_let_a_download_client_in_with_a_token_and_keep_the_password_out', async () => {
+    // Radarr and Sonarr drive rTorrent over HTTP Basic, with no cookie and no
+    // way to get one. This is the exact door they knock on, against a real
+    // portal process and a real SQLite store.
+    const cookie = await login(MEMBER);
+    const csrf = await csrfFrom('/access', cookie ?? '');
+
+    const issued = await fetch(`${BASE}/access/app-token`, {
+      method: 'POST',
+      headers: { cookie: cookie ?? '', 'content-type': 'application/x-www-form-urlencoded' },
+      body: `_csrf=${encodeURIComponent(csrf)}`,
+    });
+    // anchored on the element that renders it: the CSRF token comes from the
+    // same generator and is also 64 hex characters, so a bare pattern picks the
+    // wrong one and proves nothing
+    const token = /<p class="mono">([a-f0-9]{64})<\/p>/.exec(await issued.text())?.[1];
+    expect(token, 'the page must show the token exactly once').toBeDefined();
+
+    const basic = (secret: string): string =>
+      `Basic ${Buffer.from(`${MEMBER}:${secret}`).toString('base64')}`;
+
+    const withToken = await fetch(`${BASE}/internal/auth`, {
+      headers: { authorization: basic(token ?? '') },
+    });
+    expect(withToken.status).toBe(204);
+    expect(withToken.headers.get('x-kobox-user')).toBe(MEMBER);
+
+    // the account password is not a machine credential
+    const withPassword = await fetch(`${BASE}/internal/auth`, {
+      headers: { authorization: basic(PASSWORD) },
+    });
+    expect(withPassword.status).toBe(401);
+
+    // and throwing it away stops it everywhere, at once
+    await fetch(`${BASE}/access/app-token/revoke`, {
+      method: 'POST',
+      headers: { cookie: cookie ?? '', 'content-type': 'application/x-www-form-urlencoded' },
+      body: `_csrf=${encodeURIComponent(csrf)}`,
+      redirect: 'manual',
+    });
+    const revoked = await fetch(`${BASE}/internal/auth`, {
+      headers: { authorization: basic(token ?? '') },
+    });
+    expect(revoked.status).toBe(401);
+  });
+
   it('should_serve_the_member_their_ovpn_profile_and_frame_rutorrent', async () => {
     // render the profiles from the staged fixture material (the chained
     // provision-vpn-user cannot issue without easy-rsa in this container)
