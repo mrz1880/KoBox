@@ -14,6 +14,7 @@ import { AccountType } from '../../domain/user/AccountType.js';
 import { EmailAddress } from '../../domain/user/EmailAddress.js';
 import { HashedPassword } from '../../domain/user/HashedPassword.js';
 import { ProxyPort } from '../../domain/user/Port.js';
+import { RecyclingMode } from '../../domain/torrent/RecyclingMode.js';
 import { BlocklistSource } from '../../domain/tracker/BlocklistSource.js';
 import { Quota } from '../../domain/user/Quota.js';
 import { Username } from '../../domain/user/Username.js';
@@ -271,6 +272,12 @@ export class JobWorker {
         await this.torrents.setSyncDisabled.execute({
           username: Username.parse(job.payload.username),
           disabled: job.payload.disabled,
+        });
+        return;
+      case 'set-recycling':
+        await this.torrents.setRecycling.execute({
+          username: Username.parse(job.payload.username),
+          mode: RecyclingMode.parse(job.payload.mode),
         });
         return;
       case 'set-allow-public-tracker':

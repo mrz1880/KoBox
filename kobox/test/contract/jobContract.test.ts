@@ -27,6 +27,7 @@ describe('job contract', () => {
     'requeue-transfer',
       'set-sync-disabled',
       'set-allow-public-tracker',
+      'set-recycling',
       'torrent-event',
       'discover-tracker',
       'fetch-tracker-cert',

@@ -273,6 +273,7 @@ beforeEach(() => {
   const torrentUseCases = buildTorrentUseCases({
     users: repo,
     outbox: new InMemoryMailOutbox(),
+    recycler: { replicate: () => Promise.resolve() },
     instances,
     torrents,
     config: rutorrentFiles,

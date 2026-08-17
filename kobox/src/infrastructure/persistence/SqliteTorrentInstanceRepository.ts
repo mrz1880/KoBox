@@ -1,5 +1,6 @@
 import { eq } from 'drizzle-orm';
 import { Label } from '../../domain/torrent/Label.js';
+import { RecyclingMode } from '../../domain/torrent/RecyclingMode.js';
 import { TorrentInstance } from '../../domain/torrent/TorrentInstance.js';
 import { SyncMode } from '../../domain/torrent/SyncMode.js';
 import { WatchDir } from '../../domain/torrent/WatchDir.js';
@@ -39,6 +40,7 @@ export class SqliteTorrentInstanceRepository implements TorrentInstanceRepositor
           ),
         ],
         allowPublicTracker: row.allowPublicTracker === 1,
+        recycling: RecyclingMode.parse(row.recycling),
         syncDisabled: row.syncDisabled === 1,
       }),
     );
@@ -51,6 +53,7 @@ export class SqliteTorrentInstanceRepository implements TorrentInstanceRepositor
         scgiPort: instance.scgiPort.value,
         rtorrentPort: instance.rtorrentPort.value,
         allowPublicTracker: instance.allowPublicTracker ? 1 : 0,
+        recycling: instance.recycling.value,
         syncDisabled: instance.syncDisabled ? 1 : 0,
       };
       const saved = tx

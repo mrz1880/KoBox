@@ -1,0 +1,1 @@
+ALTER TABLE `torrent_instances` ADD `recycling` text DEFAULT 'none' NOT NULL;

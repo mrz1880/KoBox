@@ -97,6 +97,10 @@ export const buildJob = {
     return parseJob('set-sync-disabled', input);
   },
 
+  setRecycling(input: { username: string; mode: string }): Job {
+    return parseJob('set-recycling', input);
+  },
+
   setAllowPublicTracker(input: { username: string; allowed: boolean }): Job {
     return parseJob('set-allow-public-tracker', input);
   },

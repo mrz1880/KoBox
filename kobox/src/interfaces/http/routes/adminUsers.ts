@@ -194,6 +194,28 @@ export function registerAdminUserRoutes(
     );
   });
 
+  const recyclingSchema = z.object({ mode: z.enum(['none', 'copy', 'hardlink']) });
+
+  server.post('/admin/users/:name/recycling', async (request, reply) => {
+    const session = await guards.requireAdminCsrf(request, reply);
+    if (session === undefined) {
+      return;
+    }
+    const params = usernameParamSchema.safeParse(request.params);
+    const parsed = recyclingSchema.safeParse(request.body);
+    if (!params.success || !parsed.success) {
+      return reply.code(400).send();
+    }
+    await deps.queue.enqueue(
+      buildJob.setRecycling({ username: params.data.name, mode: parsed.data.mode }),
+    );
+    return redirectWithFlash(
+      reply,
+      `/admin/users/${params.data.name}`,
+      'Saved. It applies to what they add from now on, and changes nothing already on disk.',
+    );
+  });
+
   // Phrased positively for the operator ("run them") while the flag underneath
   // is negative ("disabled"). The inversion happens once, here.
   const runScriptsSchema = z.object({ run: z.literal('on').optional() });

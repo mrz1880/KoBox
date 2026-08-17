@@ -300,3 +300,41 @@ describe('admin per-instance settings', () => {
     expect(response.body).toContain('name="run" checked');
   });
 });
+
+describe('reusing content already on the box', () => {
+  it('should_let_an_admin_choose_what_happens_to_a_duplicate', async () => {
+    const response = await world.server.inject({
+      method: 'POST',
+      url: '/admin/users/alice/recycling',
+      headers: { cookie: admin.cookie, 'content-type': 'application/x-www-form-urlencoded' },
+      payload: form({ _csrf: admin.csrf, mode: 'hardlink' }),
+    });
+
+    expect(response.statusCode).toBe(303);
+    const job = world.queue.jobs.find((j) => j.type === 'set-recycling');
+    expect(job?.payload).toMatchObject({ username: 'alice', mode: 'hardlink' });
+  });
+
+  it('should_refuse_a_mode_that_does_not_exist', async () => {
+    const response = await world.server.inject({
+      method: 'POST',
+      url: '/admin/users/alice/recycling',
+      headers: { cookie: admin.cookie, 'content-type': 'application/x-www-form-urlencoded' },
+      payload: form({ _csrf: admin.csrf, mode: 'symlink' }),
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(world.queue.jobs).toHaveLength(0);
+  });
+
+  it('should_say_on_the_page_what_sharing_costs_before_it_is_chosen', async () => {
+    const response = await world.server.inject({
+      method: 'GET',
+      url: '/admin/users/alice',
+      headers: { cookie: admin.cookie },
+    });
+
+    expect(response.body).toContain('/admin/users/alice/recycling');
+    expect(response.body).toContain('quota');
+  });
+});

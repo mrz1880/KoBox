@@ -1,4 +1,4 @@
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, isNotNull, ne, sql } from 'drizzle-orm';
 import { InfoHash } from '../../domain/torrent/InfoHash.js';
 import { Label } from '../../domain/torrent/Label.js';
 import { Torrent } from '../../domain/torrent/Torrent.js';
@@ -68,6 +68,29 @@ export class SqliteTorrentRepository implements TorrentRepository {
         .where(eq(torrents.username, username.value))
         .all()
         .map(toDomain),
+    );
+  }
+
+  findCompletedElsewhere(
+    infoHash: InfoHash,
+    excluding: Username,
+  ): Promise<{ username: Username; tree: string } | undefined> {
+    const row = this.db.orm
+      .select()
+      .from(torrents)
+      .where(
+        and(
+          eq(torrents.infoHash, infoHash.value),
+          eq(torrents.state, 'completed'),
+          ne(torrents.username, excluding.value),
+          isNotNull(torrents.tree),
+        ),
+      )
+      .get();
+    return Promise.resolve(
+      row?.tree == null
+        ? undefined
+        : { username: Username.parse(row.username), tree: row.tree },
     );
   }
 

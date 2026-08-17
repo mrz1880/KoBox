@@ -31,6 +31,7 @@ export const JOB_TYPES = [
   'requeue-transfer',
   'set-sync-disabled',
   'set-allow-public-tracker',
+  'set-recycling',
   'torrent-event',
   'discover-tracker',
   'fetch-tracker-cert',
@@ -160,6 +161,10 @@ export const jobPayloadSchemas = {
   }),
   'set-sync-disabled': z.strictObject({ username: usernameField, disabled: z.boolean() }),
   'set-allow-public-tracker': z.strictObject({ username: usernameField, allowed: z.boolean() }),
+  'set-recycling': z.strictObject({
+    username: usernameField,
+    mode: z.enum(['none', 'copy', 'hardlink']),
+  }),
   'torrent-event': z.strictObject({
     username: usernameField,
     event: z.enum(['inserted_new', 'finished', 'erased']),
