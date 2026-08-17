@@ -209,6 +209,11 @@ export class JobWorker {
       case 'apply-mail-relay':
         await this.maintenance.applyMailRelay.execute();
         return;
+      case 'provision-nextcloud-account':
+        await this.useCases.provisionNextcloudAccount.execute({
+          username: Username.parse(job.payload.username),
+        });
+        return;
       case 'sample-disk-usage':
         await this.useCases.sampleDiskUsage.execute();
         return;

@@ -1,3 +1,4 @@
+import type { NextcloudPort } from '../../domain/installation/NextcloudPort.js';
 import type { ComponentNameValue } from '../../domain/installation/ComponentName.js';
 import type {
   ArtifactFetchPort,
@@ -23,6 +24,7 @@ import {
   renderNanomonUnit,
   renderPortalEnv,
   renderPortalUnit,
+  renderNextcloudSite,
   renderRutorrentConfig,
   renderShellinaboxDefault,
   renderSmbConf,
@@ -53,6 +55,9 @@ export interface InstallSettings {
   readonly manageAptSources: boolean;
   // release pin for the vendored ruTorrent archive (env-driven: shipping a
   // baked sha for a moving upstream would be a lie) — unset = honest skip
+  readonly nextcloudUrl?: string;
+  readonly nextcloudSha256?: string;
+  readonly nextcloudAdminPassword?: string;
   readonly rutorrentUrl?: string;
   readonly rutorrentSha256?: string;
   // release pin for the vendored NanoMon binary (env-driven, same rationale as
@@ -92,6 +97,7 @@ export interface InstallerContext {
   readonly artifacts: ArtifactFetchPort;
   readonly facts: SystemFacts;
   readonly security: SecuritySettings;
+  readonly nextcloud: NextcloudPort;
   readonly install: InstallSettings;
 }
 
@@ -165,6 +171,10 @@ const SSHD_DROPIN = '/etc/ssh/sshd_config.d/90-kobox.conf';
 const SYSCTL_DROPIN = '/etc/sysctl.d/90-kobox.conf';
 const NGINX_VHOST = '/etc/nginx/conf.d/kobox.conf';
 const HTPASSWD = '/etc/nginx/kobox.htpasswd';
+const NEXTCLOUD_DIR = '/var/www/nextcloud';
+const NEXTCLOUD_DATA = '/var/lib/nextcloud/data';
+const NEXTCLOUD_MARKER = `${NEXTCLOUD_DIR}/.kobox-artifact-sha256`;
+const NEXTCLOUD_ARCHIVE = '/var/tmp/kobox/nextcloud.tar.gz';
 const RUTORRENT_DIR = '/var/www/rutorrent';
 const PHP_FPM_UNIT = 'php8.2-fpm';
 const RUTORRENT_MARKER = `${RUTORRENT_DIR}/.kobox-artifact-sha256`;
@@ -440,6 +450,86 @@ class RutorrentInstaller implements ComponentInstaller {
   async uninstall(): Promise<void> {
     // the vendored tree stays (nothing references it once nginx drops the
     // vhost); removal is an operator decision
+  }
+}
+
+class NextcloudInstaller implements ComponentInstaller {
+  readonly name = 'nextcloud';
+
+  constructor(private readonly ctx: InstallerContext) {}
+
+  async install(): Promise<InstallOutcome> {
+    const { packages, host, artifacts, files, install, systemd, nextcloud } = this.ctx;
+    if (install.nextcloudUrl === undefined || install.nextcloudSha256 === undefined) {
+      return {
+        state: 'skipped',
+        reason:
+          'no Nextcloud release pinned: set KOBOX_NEXTCLOUD_URL and KOBOX_NEXTCLOUD_SHA256, then re-run kobox install',
+      };
+    }
+    if (install.nextcloudAdminPassword === undefined) {
+      return {
+        state: 'skipped',
+        reason:
+          'no Nextcloud admin password: set KOBOX_NEXTCLOUD_ADMIN_PASSWORD, then re-run kobox install',
+      };
+    }
+    await packages.ensureInstalled([
+      'php-fpm',
+      'php-cli',
+      'php-sqlite3',
+      'php-gd',
+      'php-curl',
+      'php-mbstring',
+      'php-xml',
+      'php-zip',
+      'php-intl',
+      'php-bcmath',
+      'php-gmp',
+      'unzip',
+    ]);
+    await systemd.enable(PHP_FPM_UNIT, { now: true });
+    const marker = await host.readFile(NEXTCLOUD_MARKER);
+    if (marker?.trim() !== install.nextcloudSha256) {
+      await artifacts.fetchVerified(
+        install.nextcloudUrl,
+        install.nextcloudSha256,
+        NEXTCLOUD_ARCHIVE,
+      );
+      await host.ensureDir(NEXTCLOUD_DIR, '0755');
+      await host.extractTarGz(NEXTCLOUD_ARCHIVE, NEXTCLOUD_DIR, 'inside-one-directory');
+      await files.apply([
+        {
+          path: NEXTCLOUD_MARKER,
+          content: `${install.nextcloudSha256}\n`,
+          mode: '0644',
+          owner: 'root',
+          group: 'root',
+        },
+      ]);
+    }
+    // the data directory lives OUTSIDE the web root: nginx serves the tree by
+    // alias, and a data dir under it would be one misconfigured location block
+    // away from being downloadable
+    await host.ensureDir(NEXTCLOUD_DATA, '0750');
+    await host.chown(NEXTCLOUD_DIR, 'www-data', 'www-data');
+    await host.chown(NEXTCLOUD_DATA, 'www-data', 'www-data');
+    if (!(await nextcloud.isInstalled())) {
+      await nextcloud.install('kobox-admin', install.nextcloudAdminPassword);
+    }
+    // external storage is how a member's rtorrent folders appear at the root of
+    // their Nextcloud; without this app the mounts silently do nothing
+    await nextcloud.enableApp('files_external');
+    await files.apply([renderNextcloudSite()]);
+    await systemd.reloadOrRestart('nginx');
+    return installed();
+  }
+
+  async uninstall(): Promise<void> {
+    await this.ctx.host.removeFile('/etc/nginx/kobox.d/nextcloud.conf');
+    await this.ctx.systemd.reloadOrRestart('nginx');
+    // the tree and the data directory stay: removing somebody's files is an
+    // operator decision, never a side effect of uninstalling a component
   }
 }
 
@@ -1004,6 +1094,7 @@ export function buildInstallers(ctx: InstallerContext): ReadonlyMap<string, Comp
     new NanomonInstaller(ctx),
     new Aria2Installer(ctx),
     new SpeedtestInstaller(ctx),
+    new NextcloudInstaller(ctx),
   ];
   return new Map(list.map((entry) => [entry.name, entry]));
 }

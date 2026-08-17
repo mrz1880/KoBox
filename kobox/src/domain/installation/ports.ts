@@ -61,6 +61,7 @@ export interface InstallHostPort {
   readFile(path: string): Promise<string | undefined>;
   removeFile(path: string): Promise<void>;
   ensureDir(path: string, mode: string): Promise<void>;
+  chown(path: string, owner: string, group: string): Promise<void>;
   // creates the file only when absent; returns true when it was created
   ensureFile(file: RenderedFile): Promise<boolean>;
   // creates the symlink only when absent; returns true when it was created

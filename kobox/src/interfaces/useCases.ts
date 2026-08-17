@@ -87,6 +87,7 @@ import { RenderOpenVpn } from '../application/security/RenderOpenVpn.js';
 import { ResolveDynDns } from '../application/security/ResolveDynDns.js';
 import type { SecuritySettings } from '../application/security/settings.js';
 import { ChangePassword } from '../application/user/ChangePassword.js';
+import { ProvisionNextcloudAccount } from '../application/user/ProvisionNextcloudAccount.js';
 import { SampleDiskUsage } from '../application/user/SampleDiskUsage.js';
 import { SetUserQuota } from '../application/user/SetUserQuota.js';
 import { CreateUser } from '../application/user/CreateUser.js';
@@ -136,6 +137,8 @@ import type {
 import type { RenderSettings, RtorrentTemplates } from '../domain/torrent/rendering.js';
 import type { PortalCredentialsPort, SessionStorePort } from '../domain/portal/ports.js';
 import type { PortAllocatorPort } from '../domain/user/PortAllocatorPort.js';
+import type { NextcloudPort } from '../domain/installation/NextcloudPort.js';
+import type { Password } from '../domain/user/Password.js';
 import type {
   HealthProbePort,
   NotificationPort,
@@ -152,6 +155,9 @@ export interface UseCaseDeps {
   readonly accounts: SystemAccountPort;
   readonly quota: QuotaPort;
   readonly diskSamples: DiskUsageRepository;
+  readonly nextcloud: NextcloudPort;
+  readonly outbox: MailOutboxPort;
+  readonly newPassword: () => Password;
   readonly sftp: SftpPort;
   readonly services: ServiceControlPort;
   readonly notifications: NotificationPort;
@@ -169,6 +175,7 @@ export interface UseCases {
   readonly changePassword: ChangePassword;
   readonly setUserQuota: SetUserQuota;
   readonly sampleDiskUsage: SampleDiskUsage;
+  readonly provisionNextcloudAccount: ProvisionNextcloudAccount;
   readonly suspendUser: SuspendUser;
   readonly resumeUser: ResumeUser;
 }
@@ -180,6 +187,7 @@ export function buildUseCases(deps: UseCaseDeps): UseCases {
     changePassword: new ChangePassword(deps),
     setUserQuota: new SetUserQuota(deps),
     sampleDiskUsage: new SampleDiskUsage({ ...deps, samples: deps.diskSamples }),
+    provisionNextcloudAccount: new ProvisionNextcloudAccount(deps),
     suspendUser: new SuspendUser(deps),
     resumeUser: new ResumeUser(deps),
   };

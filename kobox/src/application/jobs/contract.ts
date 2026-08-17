@@ -16,6 +16,7 @@ export const JOB_TYPES = [
   'change-password',
   'set-user-quota',
   'sample-disk-usage',
+  'provision-nextcloud-account',
   'apply-mail-relay',
   'suspend-user',
   'resume-user',
@@ -138,6 +139,7 @@ export const jobPayloadSchemas = {
   // readable months later.
   'set-user-quota': z.strictObject({ username: usernameField, quotaGib: z.number().int().positive() }),
   'sample-disk-usage': z.strictObject({}),
+  'provision-nextcloud-account': usernameOnly,
   // deliberately empty: the relay password never transits the jobs table
   'apply-mail-relay': z.strictObject({}),
   'suspend-user': usernameOnly,

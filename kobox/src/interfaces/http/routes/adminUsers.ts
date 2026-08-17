@@ -129,6 +129,23 @@ export function registerAdminUserRoutes(
     });
   }
 
+  server.post('/admin/users/:name/nextcloud', async (request, reply) => {
+    const session = await guards.requireAdminCsrf(request, reply);
+    if (session === undefined) {
+      return;
+    }
+    const params = usernameParamSchema.safeParse(request.params);
+    if (!params.success) {
+      return reply.code(400).send();
+    }
+    await deps.queue.enqueue(buildJob.provisionNextcloudAccount({ username: params.data.name }));
+    return redirectWithFlash(
+      reply,
+      `/admin/users/${params.data.name}`,
+      `Creating a Nextcloud account for ${params.data.name}. They will be mailed its password.`,
+    );
+  });
+
   const quotaSchema = z.object({ quotaGib: z.coerce.number().int().positive() });
 
   server.post('/admin/users/:name/quota', async (request, reply) => {

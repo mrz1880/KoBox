@@ -631,6 +631,41 @@ export function renderRutorrentUserConfig(user: RutorrentUserWiring): RenderedFi
   };
 }
 
+// Nextcloud is a PHP application like ruTorrent, served from its own prefix
+// behind the same portal session. Its own front controller does the routing, so
+// this is a plain fastcgi block rather than the per-user SCGI wiring above.
+export function renderNextcloudSite(): RenderedFile {
+  return {
+    path: '/etc/nginx/kobox.d/nextcloud.conf',
+    content: [
+      MANAGED_HEADER,
+      'location /nextcloud/ {',
+      '    auth_request /internal/auth;',
+      '    alias /var/www/nextcloud/;',
+      '    index index.php;',
+      '    client_max_body_size 512M;',
+      '    try_files $uri $uri/ /nextcloud/index.php$is_args$args;',
+      '',
+      '    location ~ \\.php$ {',
+      '        include fastcgi_params;',
+      '        fastcgi_param SCRIPT_FILENAME $request_filename;',
+      '        fastcgi_pass unix:/run/php/php8.2-fpm.sock;',
+      '    }',
+      '}',
+      '',
+      '# the data directory must never be reachable over http, whatever the',
+      '# alias above resolves to',
+      'location ~ ^/nextcloud/(data|config|\\.ht) {',
+      '    deny all;',
+      '}',
+      '',
+    ].join('\n'),
+    mode: '0644',
+    owner: 'root',
+    group: 'root',
+  };
+}
+
 // Renewals ride the packaged certbot.timer; this hook makes nginx pick the
 // fresh chain up. deploy/ = runs only after an actual renewal, never on dry
 // runs or no-ops.

@@ -37,6 +37,15 @@ export class InstallHostAdapter implements InstallHostPort {
     await chmod(path, parseInt(mode, 8));
   }
 
+  // by name rather than by uid: the account exists by the time anything is
+  // chowned onto it, and a name survives a box where ids differ
+  async chown(path: string, owner: string, group: string): Promise<void> {
+    await runOrThrow(this.runner, {
+      command: 'chown',
+      args: ['-R', `${owner}:${group}`, path],
+    });
+  }
+
   async ensureSymlink(linkPath: string, target: string): Promise<boolean> {
     // lstat, not exists: a dangling link counts as present (upgrade owns it)
     const present = await lstat(linkPath).then(

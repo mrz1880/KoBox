@@ -15,6 +15,7 @@ import { FakeIpset } from '../../../../src/infrastructure/system/fakes/FakeIpset
 import { FakePackages } from '../../../../src/infrastructure/system/fakes/FakePackages.js';
 import { FakeSystemd } from '../../../../src/infrastructure/system/fakes/FakeSystemd.js';
 import { FakeVpnPki } from '../../../../src/infrastructure/system/fakes/FakeVpnPki.js';
+import { FakeNextcloud } from '../../../../src/infrastructure/system/fakes/FakeNextcloud.js';
 
 const healthyFacts: SystemFacts = {
   osId: 'debian',
@@ -35,6 +36,7 @@ interface World {
   readonly ipset: FakeIpset;
   readonly debridKeys: FakeDebridKeyPair;
   readonly certbot: FakeCertbot;
+  readonly nextcloud: FakeNextcloud;
   readonly installers: ReadonlyMap<string, ComponentInstaller>;
 }
 
@@ -76,6 +78,7 @@ function buildWorld(overrides?: {
   quotaFs?: string;
   rutorrentPin?: 'none';
   nanomonPin?: 'none';
+  nextcloud?: { url: string; sha256: string; adminPassword?: string };
   aria2Pin?: 'none';
   speedtestPin?: 'none';
   letsencrypt?: { domain: string; email: string; acmeUrl?: string };
@@ -88,8 +91,10 @@ function buildWorld(overrides?: {
   const ipset = new FakeIpset();
   const debridKeys = new FakeDebridKeyPair();
   const certbot = new FakeCertbot(host);
+  const nextcloud = new FakeNextcloud();
   const ctx: InstallerContext = {
     packages,
+    nextcloud,
     files: host,
     systemd,
     checks,
@@ -123,6 +128,13 @@ function buildWorld(overrides?: {
         rutorrentUrl: 'https://releases.example.net/rutorrent-4.3.9.tar.gz',
         rutorrentSha256: 'a'.repeat(64),
       }),
+      ...(overrides?.nextcloud !== undefined && {
+        nextcloudUrl: overrides.nextcloud.url,
+        nextcloudSha256: overrides.nextcloud.sha256,
+        ...(overrides.nextcloud.adminPassword !== undefined && {
+          nextcloudAdminPassword: overrides.nextcloud.adminPassword,
+        }),
+      }),
       ...(overrides?.nanomonPin !== 'none' && {
         nanomonUrl: 'https://releases.example.net/nanomon-x86_64',
         nanomonSha256: 'b'.repeat(64),
@@ -146,7 +158,7 @@ function buildWorld(overrides?: {
     },
   };
   return {
-    packages, host, systemd, checks, pki, ipset, debridKeys, certbot,
+    packages, host, systemd, checks, pki, ipset, debridKeys, certbot, nextcloud,
     installers: buildInstallers(ctx),
   };
 }
@@ -831,5 +843,43 @@ describe('fail2ban installer', () => {
 
     expect(world.packages.installed).toContain('fail2ban');
     expect(world.systemd.log).toContain('enable-now fail2ban');
+  });
+});
+
+describe('nextcloud installer', () => {
+  it('should_skip_honestly_when_no_release_is_pinned', async () => {
+    const outcome = await installer(world, 'nextcloud').install();
+
+    expect(outcome.state).toBe('skipped');
+    if (outcome.state === 'skipped') {
+      expect(outcome.reason).toContain('KOBOX_NEXTCLOUD_URL');
+    }
+  });
+
+  it('should_skip_rather_than_install_with_an_admin_password_nobody_chose', async () => {
+    // an installed Nextcloud whose admin password KoBox invented would be a
+    // door nobody knows the key to, on a box exposed to the web
+    const pinned = buildWorld({ nextcloud: { url: 'https://example.net/nc.tar.gz', sha256: 'd'.repeat(64) } });
+
+    const outcome = await installer(pinned, 'nextcloud').install();
+
+    expect(outcome.state).toBe('skipped');
+    if (outcome.state === 'skipped') {
+      expect(outcome.reason).toContain('KOBOX_NEXTCLOUD_ADMIN_PASSWORD');
+    }
+  });
+
+  it('should_keep_the_data_directory_out_of_the_web_root', async () => {
+    const pinned = buildWorld({
+      nextcloud: { url: 'https://example.net/nc.tar.gz', sha256: 'd'.repeat(64), adminPassword: 'chosen-by-the-operator' },
+    });
+
+    const outcome = await installer(pinned, 'nextcloud').install();
+
+    expect(outcome.state).toBe('installed');
+    // served by alias from /var/www/nextcloud; the data lives elsewhere so no
+    // location block can ever hand a member's files to the open web
+    expect(pinned.host.dirs.get('/var/lib/nextcloud/data')).toBe('0750');
+    expect(pinned.nextcloud.enabledApps).toContain('files_external');
   });
 });
