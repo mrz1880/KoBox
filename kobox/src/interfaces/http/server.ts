@@ -38,11 +38,14 @@ import type { DiagnosticsRepositoryPort } from '../../application/maintenance/Di
 import type { ConfigFileReaderPort } from '../../application/installation/ConfigFileReaderPort.js';
 import type { TorrentInstanceRepository } from '../../domain/torrent/ports.js';
 import type { DiskUsageRepository } from '../../domain/user/ports.js';
+import type { MailRelayRepository } from '../../application/maintenance/ConfigureMailRelay.js';
+import type { RemotePasswordSealerPort } from '../../domain/sync/ports.js';
 import type { SyncDestinationRepository, SyncTransferRepository } from '../../domain/sync/ports.js';
 import type { SetSyncDestination } from '../../application/sync/SetSyncDestination.js';
 import { registerAdminNetworkRoutes } from './routes/adminNetwork.js';
 import { registerAdminOpsRoutes } from './routes/adminOps.js';
 import { registerAdminTrackerRoutes } from './routes/adminTrackers.js';
+import { registerAdminMailRoutes } from './routes/adminMail.js';
 import { registerAdminUserRoutes } from './routes/adminUsers.js';
 import { registerUserRoutes } from './routes/user.js';
 import { loginPage } from './views/loginPage.js';
@@ -80,6 +83,8 @@ export interface PortalServerDeps {
   readonly media: MediaRepository;
   readonly instances: TorrentInstanceRepository;
   readonly diskSamples: DiskUsageRepository;
+  readonly mailRelay: MailRelayRepository;
+  readonly sealer: RemotePasswordSealerPort;
   readonly destinations: SyncDestinationRepository;
   readonly setDestination: SetSyncDestination;
   readonly transfers: SyncTransferRepository;
@@ -251,6 +256,7 @@ export function buildPortalServer(deps: PortalServerDeps): FastifyInstance {
 
   registerUserRoutes(server, deps, guards);
   registerAdminUserRoutes(server, deps, guards);
+  registerAdminMailRoutes(server, deps, guards);
   registerAdminTrackerRoutes(server, deps, guards);
   registerAdminNetworkRoutes(server, deps, guards);
   registerAdminOpsRoutes(server, deps, guards);

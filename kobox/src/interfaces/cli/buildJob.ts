@@ -81,6 +81,10 @@ export const buildJob = {
     return parseJob('add-watch-dir', input);
   },
 
+  applyMailRelay(): Job {
+    return parseJob('apply-mail-relay', {});
+  },
+
   setUserQuota(input: { username: string; quotaGib: number }): Job {
     return parseJob('set-user-quota', input);
   },
