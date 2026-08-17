@@ -1,5 +1,6 @@
 import type { DebridDownload } from '../../../domain/ddl/DebridDownload.js';
 import type { MediaFile } from '../../../domain/media/MediaFile.js';
+import type { Label } from '../../../domain/torrent/Label.js';
 import type { SeedboxUser } from '../../../domain/user/SeedboxUser.js';
 import { html, type RawHtml } from '../html.js';
 import { flash, page, type Viewer } from './layout.js';
@@ -287,10 +288,23 @@ function detailCell(download: DebridDownload): RawHtml {
   return html`<span class="path">${download.sourceLink.value}</span>`;
 }
 
+// The member's own folders, the same list "Sending" shows. A closed films|series
+// enum used to live here, so a member with a Divers folder could sync it and
+// never download into it.
+function folderChoice(folders: readonly Label[]): RawHtml {
+  if (folders.length === 0) {
+    return html`<p class="muted">You have no folders yet. Create one under
+<a href="/sync">Sending</a> and it will show up here.</p>`;
+  }
+  const options = folders.map((folder) => html`<option value="${folder.value}">${folder.value}</option>`);
+  return html`<select id="category" name="category">${options}</select>`;
+}
+
 export function downloadsPage(
   viewer: Viewer,
   downloads: readonly DebridDownload[],
   hasKey: boolean,
+  folders: readonly Label[],
   message?: string,
   error?: string,
 ): string {
@@ -315,11 +329,8 @@ ${debridAccountCard(viewer, hasKey)}
   <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
   <label for="link">Filehoster link</label>
   <input id="link" name="link" type="url" inputmode="url" placeholder="https://…" required>
-  <label for="category">Category</label>
-  <select id="category" name="category">
-    <option value="films">Films</option>
-    <option value="series">Series</option>
-  </select>
+  <label for="category">Folder</label>
+  ${folderChoice(folders)}
   <button type="submit">Start download</button>
 </form>
 <table>

@@ -253,6 +253,43 @@ describe('debrid downloads', () => {
     }
   });
 
+  it('should_offer_the_member_own_folders_rather_than_two_hard_coded_ones', async () => {
+    const alice = Username.parse('alice');
+    const instance = await world.instances.findByUsername(alice);
+    if (instance === undefined) {
+      throw new Error('the world should have provisioned alice');
+    }
+    await world.instances.save(instance.addWatchDir(Label.parse('Divers')).instance);
+
+    const response = await world.server.inject({
+      method: 'GET',
+      url: '/downloads',
+      headers: { cookie: user.cookie },
+    });
+
+    expect(response.body).toContain('<option value="Divers">');
+  });
+
+  it('should_route_a_download_to_any_folder_the_member_actually_has', async () => {
+    // "Sending" lists the member's real folders while this form accepted a
+    // closed films|series enum: a member with a Divers folder could sync it and
+    // never download into it
+    const response = await world.server.inject({
+      method: 'POST',
+      url: '/downloads',
+      headers: { cookie: user.cookie, 'content-type': 'application/x-www-form-urlencoded' },
+      payload: form({
+        _csrf: user.csrf,
+        link: 'https://1fichier.example/abc',
+        category: 'Divers',
+      }),
+    });
+
+    expect(response.statusCode).toBe(303);
+    const stored = await world.downloads.listForUser(Username.parse('alice'));
+    expect(stored[0]?.category.value).toBe('Divers');
+  });
+
   it('should_reject_a_non_http_link_without_enqueueing', async () => {
     const response = await world.server.inject({
       method: 'POST',

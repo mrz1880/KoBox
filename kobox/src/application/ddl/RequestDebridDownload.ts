@@ -1,5 +1,5 @@
 import { DebridDownload } from '../../domain/ddl/DebridDownload.js';
-import type { DownloadCategory } from '../../domain/ddl/DownloadCategory.js';
+import type { Label } from '../../domain/torrent/Label.js';
 import type { FilehosterLink } from '../../domain/ddl/FilehosterLink.js';
 import type { DebridDownloadRepository } from '../../domain/ddl/ports.js';
 import type { Username } from '../../domain/user/Username.js';
@@ -8,7 +8,7 @@ import type { JobQueuePort } from '../jobs/JobQueuePort.js';
 
 export interface RequestDebridDownloadCommand {
   readonly username: Username;
-  readonly category: DownloadCategory;
+  readonly category: Label;
   readonly link: FilehosterLink;
 }
 

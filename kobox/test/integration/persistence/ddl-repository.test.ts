@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { DebridDownload } from '../../../src/domain/ddl/DebridDownload.js';
-import { DownloadCategory } from '../../../src/domain/ddl/DownloadCategory.js';
+import { Label } from '../../../src/domain/torrent/Label.js';
 import { DownloadGid } from '../../../src/domain/ddl/DownloadGid.js';
 import { FilehosterLink } from '../../../src/domain/ddl/FilehosterLink.js';
 import { Username } from '../../../src/domain/user/Username.js';
@@ -34,7 +34,7 @@ describe('SqliteDebridDownloadRepository', () => {
 
     const saved = await repo.save(
       DebridDownload.request(
-        { username: alice, category: DownloadCategory.films, sourceLink: link },
+        { username: alice, category: Label.parse('films'), sourceLink: link },
         '2026-07-26 12:00:00',
       ),
     );
@@ -51,7 +51,7 @@ describe('SqliteDebridDownloadRepository', () => {
     const repo = new SqliteDebridDownloadRepository(db);
     const saved = await repo.save(
       DebridDownload.request(
-        { username: alice, category: DownloadCategory.films, sourceLink: link },
+        { username: alice, category: Label.parse('films'), sourceLink: link },
         '2026-07-26 12:00:00',
       ),
     );
@@ -66,11 +66,11 @@ describe('SqliteDebridDownloadRepository', () => {
   it('should_list_only_active_downloads', async () => {
     const repo = new SqliteDebridDownloadRepository(db);
     const a = await repo.save(
-      DebridDownload.request({ username: alice, category: DownloadCategory.films, sourceLink: link }, 'now'),
+      DebridDownload.request({ username: alice, category: Label.parse('films'), sourceLink: link }, 'now'),
     );
     await repo.save(a.startedWith(DownloadGid.parse('2089b05ecca3d829')));
     await repo.save(
-      DebridDownload.request({ username: bob, category: DownloadCategory.series, sourceLink: link }, 'now'),
+      DebridDownload.request({ username: bob, category: Label.parse('series'), sourceLink: link }, 'now'),
     ); // stays pending
 
     const active = await repo.listActive();
@@ -82,10 +82,10 @@ describe('SqliteDebridDownloadRepository', () => {
   it('should_list_a_users_own_downloads', async () => {
     const repo = new SqliteDebridDownloadRepository(db);
     await repo.save(
-      DebridDownload.request({ username: alice, category: DownloadCategory.films, sourceLink: link }, 'now'),
+      DebridDownload.request({ username: alice, category: Label.parse('films'), sourceLink: link }, 'now'),
     );
     await repo.save(
-      DebridDownload.request({ username: bob, category: DownloadCategory.series, sourceLink: link }, 'now'),
+      DebridDownload.request({ username: bob, category: Label.parse('series'), sourceLink: link }, 'now'),
     );
 
     expect(await repo.listForUser(alice)).toHaveLength(1);

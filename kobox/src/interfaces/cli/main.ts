@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
 import { DebridApiKey } from '../../domain/ddl/DebridApiKey.js';
-import { DownloadCategory } from '../../domain/ddl/DownloadCategory.js';
+
 import { FilehosterLink } from '../../domain/ddl/FilehosterLink.js';
 import { EventHook } from '../../domain/torrent/EventHook.js';
 import { InfoHash } from '../../domain/torrent/InfoHash.js';
@@ -639,7 +639,7 @@ program
     const c = container();
     const id = await c.ddlUseCases.requestDownload.execute({
       username: Username.parse(username),
-      category: DownloadCategory.parse(options.category ?? 'films'),
+      category: Label.parse(options.category ?? 'films'),
       link: FilehosterLink.parse(link),
     });
     await done(c, `download ${String(id)} requested for ${username}`);

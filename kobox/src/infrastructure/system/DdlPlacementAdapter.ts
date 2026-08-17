@@ -1,6 +1,6 @@
 import { copyFile, mkdir, rm } from 'node:fs/promises';
 import { basename, join } from 'node:path';
-import type { DownloadCategory } from '../../domain/ddl/DownloadCategory.js';
+import type { Label } from '../../domain/torrent/Label.js';
 import type { DownloadPlacementPort } from '../../domain/ddl/ports.js';
 import type { Username } from '../../domain/user/Username.js';
 import { runOrThrow, type CommandRunner } from './CommandRunner.js';
@@ -20,9 +20,9 @@ export class DdlPlacementAdapter implements DownloadPlacementPort {
   async place(
     stagedPath: string,
     username: Username,
-    category: DownloadCategory,
+    category: Label,
   ): Promise<string> {
-    const targetDir = join(this.homeBase, username.value, 'rtorrent', 'complete', category.subdir);
+    const targetDir = join(this.homeBase, username.value, 'rtorrent', 'complete', category.value);
     await mkdir(targetDir, { recursive: true });
     const targetPath = join(targetDir, basename(stagedPath));
     await copyFile(stagedPath, targetPath);

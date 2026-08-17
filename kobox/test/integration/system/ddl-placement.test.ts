@@ -2,7 +2,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'no
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { DownloadCategory } from '../../../src/domain/ddl/DownloadCategory.js';
+import { Label } from '../../../src/domain/torrent/Label.js';
 import { Username } from '../../../src/domain/user/Username.js';
 import type {
   CommandRequest,
@@ -48,7 +48,7 @@ describe('DdlPlacementAdapter', () => {
     writeFileSync(stagedPath, 'CONTENT');
     const adapter = new DdlPlacementAdapter(runner, homeBase);
 
-    const finalPath = await adapter.place(stagedPath, Username.parse('alice'), DownloadCategory.films);
+    const finalPath = await adapter.place(stagedPath, Username.parse('alice'), Label.parse('films'));
 
     expect(finalPath).toBe(join(homeBase, 'alice', 'rtorrent', 'complete', 'films', 'Movie.2026.mkv'));
     expect(existsSync(finalPath)).toBe(true);

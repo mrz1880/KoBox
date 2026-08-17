@@ -345,7 +345,9 @@ export const debridDownloads = sqliteTable(
   {
     id: integer('id').primaryKey({ autoIncrement: true }),
     username: text('username').notNull(),
-    category: text('category', { enum: ['films', 'series'] }).notNull(),
+    // free text validated by Label, not a closed enum: the member's own
+    // folders are what a download is routed into, and they are not two
+    category: text('category').notNull(),
     sourceLink: text('source_link').notNull(),
     status: text('status', { enum: ['pending', 'downloading', 'done', 'failed'] })
       .notNull()

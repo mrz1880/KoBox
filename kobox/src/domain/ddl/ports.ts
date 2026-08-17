@@ -1,7 +1,7 @@
 import type { Username } from '../user/Username.js';
 import type { DebridApiKey } from './DebridApiKey.js';
 import type { DebridDownload } from './DebridDownload.js';
-import type { DownloadCategory } from './DownloadCategory.js';
+import type { Label } from '../torrent/Label.js';
 import type { DirectUrl } from './DirectUrl.js';
 import type { DownloadGid } from './DownloadGid.js';
 import type { FilehosterLink } from './FilehosterLink.js';
@@ -30,7 +30,7 @@ export interface DownloaderPort {
 // ~/rtorrent/complete/<category>/ (the layout Radarr/Sonarr import from) and
 // hands ownership to the user. Root-only (the worker). Returns the final path.
 export interface DownloadPlacementPort {
-  place(stagedPath: string, username: Username, category: DownloadCategory): Promise<string>;
+  place(stagedPath: string, username: Username, category: Label): Promise<string>;
 }
 
 // Resolves a filehoster link to an unrestricted direct URL, using the key of the
