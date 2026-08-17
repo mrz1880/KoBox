@@ -66,6 +66,8 @@ import { SqliteJobQueue } from '../infrastructure/persistence/SqliteJobQueue.js'
 import { SqliteLoginAttemptsRepository } from '../infrastructure/persistence/SqliteLoginAttemptsRepository.js';
 import { SqliteSiteSettingsRepository } from '../infrastructure/persistence/SqliteSiteSettingsRepository.js';
 import { SqliteMailRelayRepository } from '../infrastructure/persistence/SqliteMailRelayRepository.js';
+import { SqliteSshKeyRepository } from '../infrastructure/persistence/SqliteSshKeyRepository.js';
+import { AuthorizedKeysAdapter } from '../infrastructure/system/AuthorizedKeysAdapter.js';
 import { SqliteDiskUsageRepository } from '../infrastructure/persistence/SqliteDiskUsageRepository.js';
 import { SqlitePortalCredentialsRepository } from '../infrastructure/persistence/SqlitePortalCredentialsRepository.js';
 import { SqlitePortalSessionRepository } from '../infrastructure/persistence/SqlitePortalSessionRepository.js';
@@ -488,6 +490,7 @@ export interface PortalContainer {
   readonly mailRelay: SqliteMailRelayRepository;
   readonly siteSettings: SqliteSiteSettingsRepository;
   readonly sealer: RsaRemotePasswordCipher;
+  readonly sshKeys: SqliteSshKeyRepository;
   readonly destinations: SqliteSyncDestinationRepository;
   readonly transfers: SqliteSyncTransferRepository;
   readonly setDestination: SetSyncDestination;
@@ -550,6 +553,7 @@ export function buildPortalContainer(name: string): PortalContainer {
     mailRelay: new SqliteMailRelayRepository(db),
     siteSettings: new SqliteSiteSettingsRepository(db),
     sealer: new RsaRemotePasswordCipher(),
+    sshKeys: new SqliteSshKeyRepository(db),
     destinations: syncDestinations,
     // read-only from here: the portal shows the queue, the worker moves it
     transfers: new SqliteSyncTransferRepository(db),
@@ -601,6 +605,8 @@ export function buildContainer(name: string): Container {
     nextcloud: new OccNextcloudAdapter(runner),
     outbox,
     newPassword: () => Password.parse(randomBytes(12).toString('base64url')),
+    sshKeys: new SqliteSshKeyRepository(db),
+    authorizedKeys: new AuthorizedKeysAdapter(runner, new RtorrentConfigAdapter(runner)),
     sftp: new SftpAdapter(runner),
     services,
     notifications,

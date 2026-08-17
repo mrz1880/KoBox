@@ -215,6 +215,17 @@ export class JobWorker {
           username: Username.parse(job.payload.username),
         });
         return;
+      case 'set-ssh-key':
+        await this.useCases.setSshKey.execute({
+          username: Username.parse(job.payload.username),
+          key: job.payload.key,
+        });
+        return;
+      case 'remove-ssh-key':
+        await this.useCases.removeSshKey.execute({
+          username: Username.parse(job.payload.username),
+        });
+        return;
       case 'sample-disk-usage':
         await this.useCases.sampleDiskUsage.execute();
         return;

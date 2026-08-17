@@ -53,6 +53,7 @@ async function main(): Promise<void> {
     mailRelay: container.mailRelay,
     siteSettings: container.siteSettings,
     sealer: container.sealer,
+    sshKeys: container.sshKeys,
     destinations: container.destinations,
     transfers: container.transfers,
     setDestination: container.setDestination,

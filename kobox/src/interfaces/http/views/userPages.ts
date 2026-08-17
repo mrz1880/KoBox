@@ -1,6 +1,7 @@
 import type { DebridDownload } from '../../../domain/ddl/DebridDownload.js';
 import type { MediaFile } from '../../../domain/media/MediaFile.js';
 import type { Label } from '../../../domain/torrent/Label.js';
+import type { SshPublicKey } from '../../../domain/user/SshPublicKey.js';
 import type { SeedboxUser } from '../../../domain/user/SeedboxUser.js';
 import { html, type RawHtml } from '../html.js';
 import { flash, page, type Viewer } from './layout.js';
@@ -387,6 +388,37 @@ export interface AccessFacts {
   // set exactly once, on the response that issued it: only its hash is stored,
   // so no later page can show it again
   readonly freshToken?: string;
+  readonly sshKey?: SshPublicKey;
+  readonly sshKeyAddedAt?: string;
+}
+
+// A key is for a script on the member's own machine dropping torrent files in.
+// It is deliberately not a way in to a shell: KoBox writes the entry with
+// `restrict` and a forced internal-sftp command, so the key transfers files and
+// does nothing else. Saying that here is the difference between a member
+// understanding the limit and reporting it as a bug.
+function sshKeySection(viewer: Viewer, facts: AccessFacts): RawHtml {
+  return html`<h2>Your own SSH key</h2>
+${facts.sshKey === undefined
+    ? html`<p class="muted">No key installed. Add your public key and a script on your
+own machine can drop torrent files straight into your folders, without a password.</p>`
+    : html`<p>Installed: <span class="mono">${facts.sshKey.type}</span>
+${facts.sshKey.comment === '' ? html`` : html`<span class="mono">${facts.sshKey.comment}</span>`}
+<span class="muted">since ${facts.sshKeyAddedAt ?? ''}</span></p>
+<form class="inline" method="post" action="/access/ssh-key/remove">
+  <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
+  <button type="submit" class="danger">Remove it</button>
+</form>`}
+<form class="card" method="post" action="/access/ssh-key">
+  <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
+  <label for="sshkey">Public key</label>
+  <input id="sshkey" name="key" required placeholder="ssh-ed25519 AAAA... you@yourmachine">
+  <p class="muted">The <strong>public</strong> half, the one line from
+<span class="mono">~/.ssh/id_ed25519.pub</span>. Never paste a private key here or
+anywhere else. This key transfers files and cannot open a shell, which is all a
+send-my-torrents script needs.</p>
+  <button type="submit">Install this key</button>
+</form>`;
 }
 
 // What a member gives to Sonarr, Radarr or any other program that drives their
@@ -452,6 +484,8 @@ export function accessPage(viewer: Viewer, facts: AccessFacts): string {
 <p class="muted">Your SFTP password is the one you use here.</p>
 
 ${appTokenSection(viewer, facts)}
+
+${sshKeySection(viewer, facts)}
 
 <p class="links"><a href="/rutorrent">Open ruTorrent</a> ·
 <a href="/downloads">Downloads</a> ·

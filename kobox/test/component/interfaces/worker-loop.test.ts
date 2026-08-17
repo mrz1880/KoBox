@@ -26,6 +26,7 @@ import { InMemoryTrackerRepository } from '../../../src/infrastructure/persisten
 import { InMemoryUserAddressRepository } from '../../../src/infrastructure/persistence/InMemoryUserAddressRepository.js';
 import { InMemoryPortalCredentialsRepository } from '../../../src/infrastructure/persistence/InMemoryPortalCredentialsRepository.js';
 import { InMemoryPortalSessionRepository } from '../../../src/infrastructure/persistence/InMemoryPortalSessionRepository.js';
+import { InMemorySshKeyRepository } from '../../../src/infrastructure/persistence/InMemorySshKeyRepository.js';
 import { InMemoryDiskUsageRepository } from '../../../src/infrastructure/persistence/InMemoryDiskUsageRepository.js';
 import { InMemoryMailOutbox } from '../../../src/infrastructure/persistence/InMemoryMailOutbox.js';
 import { InMemoryUserRepository } from '../../../src/infrastructure/persistence/InMemoryUserRepository.js';
@@ -248,6 +249,8 @@ beforeEach(() => {
     nextcloud: new FakeNextcloud(),
     outbox: new InMemoryMailOutbox(),
     newPassword: () => Password.parse('nextcloud-generated-pass'),
+    sshKeys: new InMemorySshKeyRepository(),
+    authorizedKeys: { write: () => Promise.resolve(), clear: () => Promise.resolve() },
     sftp,
     services,
     notifications,

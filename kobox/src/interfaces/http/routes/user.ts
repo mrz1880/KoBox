@@ -11,6 +11,8 @@ import type { MediaRepository } from '../../../domain/media/ports.js';
 import { ComponentName } from '../../../domain/installation/ComponentName.js';
 import type { ComponentRegistry } from '../../../domain/installation/ports.js';
 import { LABEL_PATTERN, Label } from '../../../domain/torrent/Label.js';
+import { SshPublicKey } from '../../../domain/user/SshPublicKey.js';
+import type { SshKeyRepository } from '../../../domain/user/ports.js';
 import { SyncMode } from '../../../domain/torrent/SyncMode.js';
 import type { TorrentInstanceRepository } from '../../../domain/torrent/ports.js';
 import type { SyncDestinationRepository, SyncTransferRepository } from '../../../domain/sync/ports.js';
@@ -145,6 +147,7 @@ async function ownFile(
 
 export interface UserRoutesDeps {
   readonly now: () => string;
+  readonly sshKeys: SshKeyRepository;
   readonly components: ComponentRegistry;
   readonly users: UserRepository;
   readonly fairUse: FairUseRepository;
@@ -272,6 +275,43 @@ export function registerUserRoutes(
       .map((dir) => dir.label)
       .filter((label): label is Label => label !== undefined);
   };
+
+  const sshKeySchema = z.object({ key: z.string().min(32).max(1024) });
+
+  server.post('/access/ssh-key', async (request, reply) => {
+    const session = await guards.requireCsrf(request, reply);
+    if (session === undefined) {
+      return;
+    }
+    const parsed = sshKeySchema.safeParse(request.body);
+    if (!parsed.success) {
+      return redirectWithFlash(reply, '/access', 'That does not look like a public key.');
+    }
+    // parsed here so a bad paste is a form error rather than a job that fails
+    // out of sight, and so the member sees why
+    try {
+      SshPublicKey.parse(parsed.data.key);
+    } catch (error) {
+      return redirectWithFlash(
+        reply,
+        '/access',
+        error instanceof Error ? error.message : 'That does not look like a public key.',
+      );
+    }
+    await deps.queue.enqueue(
+      buildJob.setSshKey({ username: session.username.value, key: parsed.data.key }),
+    );
+    return redirectWithFlash(reply, '/access', 'Key accepted. It is being installed.');
+  });
+
+  server.post('/access/ssh-key/remove', async (request, reply) => {
+    const session = await guards.requireCsrf(request, reply);
+    if (session === undefined) {
+      return;
+    }
+    await deps.queue.enqueue(buildJob.removeSshKey({ username: session.username.value }));
+    return redirectWithFlash(reply, '/access', 'Key removed.');
+  });
 
   server.get('/downloads', async (request, reply) => {
     const session = await guards.requireSession(request, reply);
@@ -606,6 +646,10 @@ export function registerUserRoutes(
         // only shown when the operator configured a reachable name for the box
         ...(sftpHost !== undefined && sftpHost !== '' && { sftpHost }),
         rtorrentPort: user.rtorrentPort.value,
+        ...(await (async () => {
+          const stored = await deps.sshKeys.find(session.username);
+          return stored === undefined ? {} : { sshKey: stored.key, sshKeyAddedAt: stored.addedAt };
+        })()),
       }),
     );
   });

@@ -999,3 +999,45 @@ describe('the language a member reads the portal in', () => {
     expect(response.body).toContain('<html lang="en">');
   });
 });
+
+describe("a member's own SSH key", () => {
+  const KEY =
+    'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIB7Kk1p2vQ0Hn3xYqZ8mLsRtWuVdEfGhIjKlMnOpQrSt nas';
+
+  it('should_enqueue_the_key_for_installation', async () => {
+    const response = await world.server.inject({
+      method: 'POST',
+      url: '/access/ssh-key',
+      headers: { cookie: user.cookie, 'content-type': 'application/x-www-form-urlencoded' },
+      payload: form({ _csrf: user.csrf, key: KEY }),
+    });
+
+    expect(response.statusCode).toBe(303);
+    const job = world.queue.jobs.find((j) => j.type === 'set-ssh-key');
+    expect(job?.payload).toMatchObject({ username: 'alice', key: KEY });
+  });
+
+  it('should_tell_the_member_what_is_wrong_rather_than_queueing_a_job_that_fails_unseen', async () => {
+    const response = await world.server.inject({
+      method: 'POST',
+      url: '/access/ssh-key',
+      headers: { cookie: user.cookie, 'content-type': 'application/x-www-form-urlencoded' },
+      payload: form({ _csrf: user.csrf, key: 'command="/bin/sh" ' + KEY }),
+    });
+
+    expect(response.statusCode).toBe(303);
+    expect(world.queue.jobs).toHaveLength(0);
+  });
+
+  it('should_only_ever_touch_the_signed_in_member', async () => {
+    await world.server.inject({
+      method: 'POST',
+      url: '/access/ssh-key',
+      headers: { cookie: user.cookie, 'content-type': 'application/x-www-form-urlencoded' },
+      payload: form({ _csrf: user.csrf, key: KEY, username: 'boss' }),
+    });
+
+    const job = world.queue.jobs.find((j) => j.type === 'set-ssh-key');
+    expect(job?.payload).toMatchObject({ username: 'alice' });
+  });
+});

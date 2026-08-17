@@ -3,6 +3,7 @@ import type { Password } from './Password.js';
 import type { Quota } from './Quota.js';
 import type { SeedboxUser } from './SeedboxUser.js';
 import type { UserEvent } from './events.js';
+import type { SshPublicKey } from './SshPublicKey.js';
 import type { Username } from './Username.js';
 
 export interface UserRepository {
@@ -43,6 +44,25 @@ export interface DiskUsageSample {
 export interface DiskUsageRepository {
   save(sample: DiskUsageSample): Promise<void>;
   find(username: Username): Promise<DiskUsageSample | undefined>;
+}
+
+// Writes a member's authorized_keys. Root-only: the file lives in their home
+// and must end up owned by them with 0600, which the portal process cannot do.
+export interface AuthorizedKeysPort {
+  write(username: Username, line: string): Promise<void>;
+  clear(username: Username): Promise<void>;
+}
+
+export interface StoredSshKey {
+  readonly username: Username;
+  readonly key: SshPublicKey;
+  readonly addedAt: string;
+}
+
+export interface SshKeyRepository {
+  find(username: Username): Promise<StoredSshKey | undefined>;
+  save(stored: StoredSshKey): Promise<void>;
+  remove(username: Username): Promise<void>;
 }
 
 export interface SftpPort {

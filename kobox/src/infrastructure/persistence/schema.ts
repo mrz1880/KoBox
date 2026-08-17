@@ -209,6 +209,14 @@ export const mailRelay = sqliteTable('mail_relay', {
   sealedPassword: text('sealed_password').notNull(),
 });
 
+// One public key per member: the credential a script on their own machine uses
+// to drop torrent files in. Public by nature, so nothing here is sealed.
+export const sshKeys = sqliteTable('ssh_keys', {
+  username: text('username').primaryKey(),
+  key: text('key').notNull(),
+  addedAt: text('added_at').notNull(),
+});
+
 export const diskSamples = sqliteTable('disk_samples', {
   username: text('username').primaryKey(),
   usedBytes: integer('used_bytes').notNull(),
