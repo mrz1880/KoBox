@@ -17,6 +17,7 @@ export const JOB_TYPES = [
   'set-user-quota',
   'sample-disk-usage',
   'provision-nextcloud-account',
+  'close-nextcloud-account',
   'apply-mail-relay',
   'set-ssh-key',
   'remove-ssh-key',
@@ -143,6 +144,7 @@ export const jobPayloadSchemas = {
   'set-user-quota': z.strictObject({ username: usernameField, quotaGib: z.number().int().positive() }),
   'sample-disk-usage': z.strictObject({}),
   'provision-nextcloud-account': usernameOnly,
+  'close-nextcloud-account': usernameOnly,
   // deliberately empty: the relay password never transits the jobs table
   'apply-mail-relay': z.strictObject({}),
   // the key is public by nature: nothing here is a secret, and the domain
