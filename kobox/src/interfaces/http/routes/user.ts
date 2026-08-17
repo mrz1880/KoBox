@@ -8,6 +8,8 @@ import { FilehosterLink } from '../../../domain/ddl/FilehosterLink.js';
 import { DebridApiKey } from '../../../domain/ddl/DebridApiKey.js';
 import { MediaPath, type MediaFile } from '../../../domain/media/MediaFile.js';
 import type { MediaRepository } from '../../../domain/media/ports.js';
+import { ComponentName } from '../../../domain/installation/ComponentName.js';
+import type { ComponentRegistry } from '../../../domain/installation/ports.js';
 import { LABEL_PATTERN, Label } from '../../../domain/torrent/Label.js';
 import { SyncMode } from '../../../domain/torrent/SyncMode.js';
 import type { TorrentInstanceRepository } from '../../../domain/torrent/ports.js';
@@ -141,6 +143,7 @@ async function ownFile(
 }
 
 export interface UserRoutesDeps {
+  readonly components: ComponentRegistry;
   readonly users: UserRepository;
   readonly fairUse: FairUseRepository;
   readonly queue: JobQueuePort;
@@ -254,6 +257,13 @@ export function registerUserRoutes(
 
   // The folders a member actually has, read from their instance. "Sending" and
   // "Download a link" must never disagree about what exists.
+  // aria2 is the engine behind every debrid download. Reading its install state
+  // once per page beats letting each link discover the absence on its own.
+  const engineReady = async (): Promise<boolean> => {
+    const record = await deps.components.get(ComponentName.parse('aria2'));
+    return record?.state.value === 'installed';
+  };
+
   const foldersOf = async (username: Username): Promise<readonly Label[]> => {
     const instance = await deps.instances.findByUsername(username);
     return (instance?.watchDirs ?? [])
@@ -270,7 +280,16 @@ export function registerUserRoutes(
     const hasKey = await deps.debridAccounts.has(session.username);
     return reply
       .type('text/html')
-      .send(downloadsPage(viewerOf(session), rows, hasKey, await foldersOf(session.username), flashOf(request)));
+      .send(
+        downloadsPage(
+          viewerOf(session),
+          rows,
+          hasKey,
+          await foldersOf(session.username),
+          await engineReady(),
+          flashOf(request),
+        ),
+      );
   });
 
   server.post('/downloads/debrid-key', async (request, reply) => {
@@ -292,6 +311,7 @@ export function registerUserRoutes(
             rows,
             hasKey,
             await foldersOf(session.username),
+            await engineReady(),
             undefined,
             "That doesn't look like an AllDebrid API key.",
           ),
@@ -334,6 +354,7 @@ export function registerUserRoutes(
             rows,
             hasKey,
             await foldersOf(session.username),
+            await engineReady(),
             undefined,
             'Please provide a valid http(s) link and a category.',
           ),

@@ -300,11 +300,23 @@ function folderChoice(folders: readonly Label[]): RawHtml {
   return html`<select id="category" name="category">${options}</select>`;
 }
 
+// aria2 is what actually pulls the file down, and it skips its own install when
+// no RPC secret is configured. Without this, every submitted link fails one at a
+// time with a message about the last hop, and nothing says the engine is absent.
+function engineNotice(engineReady: boolean): RawHtml {
+  return engineReady
+    ? html``
+    : html`<p class="card bad">The download engine is <strong>not set up on this box</strong>,
+so links will not go anywhere. This is not something you can fix from here:
+tell an admin, and they will find the reason under Health.</p>`;
+}
+
 export function downloadsPage(
   viewer: Viewer,
   downloads: readonly DebridDownload[],
   hasKey: boolean,
   folders: readonly Label[],
+  engineReady: boolean,
   message?: string,
   error?: string,
 ): string {
@@ -324,6 +336,7 @@ export function downloadsPage(
     html`<h1>Downloads</h1>
 ${flash(message)}
 ${flash(error, 'error')}
+${engineNotice(engineReady)}
 ${debridAccountCard(viewer, hasKey)}
 <form class="card" method="post" action="/downloads">
   <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
