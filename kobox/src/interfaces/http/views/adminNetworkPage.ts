@@ -124,7 +124,7 @@ export function adminFairUsePage(
     .map(
       (row) => html`<h3>${row.username}</h3>
 <table>
-  <thead><tr><th>When</th><th>Event</th><th>Detail</th></tr></thead>
+  <thead><tr><th>When</th><th>Event</th><th>${viewer.t('Detail')}</th></tr></thead>
   <tbody>${row.events
     .slice(-10)
     .reverse()
@@ -139,7 +139,7 @@ export function adminFairUsePage(
     );
   return page(
     'Fair use',
-    html`<h1>Fair use</h1>
+    html`<h1>${viewer.t('Fair use')}</h1>
 <p class="muted">One member saturating the link makes the box unusable for
 everyone else. KoBox samples what each one actually moves and answers in steps
 rather than cutting them off: <strong>none</strong> is the normal state,
@@ -152,7 +152,7 @@ reason, without changing it for anyone else.</p>
 ${flash(message)}
 <table>
   <thead>
-    <tr><th>User</th><th>Level</th><th>Health</th><th>Egress</th><th>Ingress</th><th>Sampled</th></tr>
+    <tr><th>User</th><th>Level</th><th>${viewer.t('Health')}</th><th>Egress</th><th>Ingress</th><th>Sampled</th></tr>
   </thead>
   <tbody>${tableRows}</tbody>
 </table>

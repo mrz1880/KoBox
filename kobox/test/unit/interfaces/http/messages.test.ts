@@ -18,4 +18,11 @@ describe('translatorFor', () => {
       'Something nobody has translated yet',
     );
   });
+
+  it('should_let_a_translation_put_the_value_where_its_own_grammar_needs_it', () => {
+    // French does not always keep English word order, so substitution happens
+    // after lookup rather than by concatenating around a fixed hole
+    expect(translatorFor(Language.fr)('{name} may now add torrents from public trackers.', { name: 'alice' }))
+      .toBe('alice peut désormais ajouter des torrents depuis des trackers publics.');
+  });
 });
