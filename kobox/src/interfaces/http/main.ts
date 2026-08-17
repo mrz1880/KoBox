@@ -51,6 +51,7 @@ async function main(): Promise<void> {
     instances: container.instances,
     diskSamples: container.diskSamples,
     mailRelay: container.mailRelay,
+    siteSettings: container.siteSettings,
     sealer: container.sealer,
     destinations: container.destinations,
     transfers: container.transfers,

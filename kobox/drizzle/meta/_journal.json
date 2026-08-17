@@ -141,6 +141,13 @@
       "when": 1786972284378,
       "tag": "0019_mail-relay",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "6",
+      "when": 1786973202304,
+      "tag": "0020_site-settings",
+      "breakpoints": true
     }
   ]
 }
