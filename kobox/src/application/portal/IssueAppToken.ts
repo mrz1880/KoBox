@@ -8,7 +8,7 @@ interface Deps {
   readonly clock: () => string;
 }
 
-// Issues the credential a member gives to a machine — a download client, a
+// Issues the credential a member gives to a machine: a download client, a
 // script, a phone app. Only its sha256 is kept, so the raw value exists on the
 // page that issued it and nowhere else afterwards: KoBox cannot show it again,
 // which is the point.

@@ -160,6 +160,11 @@ export class ImportFromMysb {
         scgiPort: mapped.scgiPort,
         rtorrentPort: mapped.rtorrentPort,
         watchDirs: mapped.watchDirs,
+        // Nobody arrives with the bypass, including whoever had it on MySB.
+        // It existed because an XMLRPC add lost its privacy attribute and got
+        // blocked as public; rTorrent now answers that question directly, so
+        // the flag has no reason left to be on. Importing it would carry a
+        // workaround past the thing it worked around.
         allowPublicTracker: false,
         syncDisabled: mapped.syncDisabled,
       }),

@@ -27,7 +27,7 @@ interface Deps {
 // portal account.
 //
 // The token is compared by its sha256, the same treatment sessions get: it is
-// 32 bytes of CSPRNG, so a fast hash is right — a slow KDF protects a guessable
+// 32 bytes of CSPRNG, so a fast hash is right: a slow KDF protects a guessable
 // secret, and this one is not guessable.
 export class AuthenticateApp {
   constructor(private readonly deps: Deps) {}

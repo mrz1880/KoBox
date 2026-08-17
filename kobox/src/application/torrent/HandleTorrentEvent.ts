@@ -71,7 +71,7 @@ export class HandleTorrentEvent {
   }
 
   private async onInsertedNew(instance: TorrentInstance, command: TorrentEventCommand): Promise<void> {
-    // An XMLRPC add — Sonarr, Radarr, any client driving rTorrent — carries no
+    // An XMLRPC add (Sonarr, Radarr, any client driving rTorrent) carries no
     // .torrent file, so there is nothing on disk to inspect. Privacy still has
     // to be decided: skipping meant the rule silently did not apply, and
     // guessing meant a private torrent could be blocked as public, which is
@@ -90,8 +90,8 @@ export class HandleTorrentEvent {
       return;
     }
     // Tracker discovery happens on every readable insert, accepted or not:
-    // rejection is the user's policy, tracker knowledge is global. Best-effort
-    // — a sink failure must never fail the event.
+    // rejection is the user's policy, tracker knowledge is global. Best-effort:
+    // a sink failure must never fail the event.
     if (metainfo !== undefined && metainfo.announcers.length > 0) {
       await this.deps.announcers
         .publish(metainfo.announcers, metainfo.isPrivate ? 'private' : 'public')

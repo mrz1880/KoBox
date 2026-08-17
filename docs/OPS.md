@@ -322,14 +322,14 @@ whether a torrent is private, and **where that answer comes from used to depend
 on how the torrent arrived**: reading the `.torrent` file works for a watch
 directory, and there is no file at all for an XMLRPC add. MySB lost the
 attribute on that path and blocked private torrents as if they were public,
-which is why an operator ended up disabling the rule for themselves — losing the
-protection for every torrent, to fix it for one kind.
+which is why an operator ended up disabling the rule for themselves, losing the
+protection for every torrent to fix it for one kind.
 
 KoBox asks **rTorrent** instead: `d.is_private` rides on the `inserted_new`
 event, so the rule reaches every add the same way and nobody needs a bypass. The
 `.torrent` file is still read when there is one, for tracker discovery.
 
-If neither is available — an old shim that has not been re-rendered — the torrent
+If neither is available (an old shim that has not been re-rendered), the torrent
 is skipped rather than judged. Deciding either way would be a guess about
 somebody's tracker. `kobox install` re-renders the shims, so this resolves
 itself.

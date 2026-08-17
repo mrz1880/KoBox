@@ -380,7 +380,7 @@ ${facts.freshToken === undefined
     : html`<section class="panel">
   <p class="lead">Here is your token. Copy it now.</p>
   <p class="mono">${facts.freshToken}</p>
-  <p class="muted">It will not be shown again — KoBox only keeps a fingerprint of
+  <p class="muted">It will not be shown again. KoBox only keeps a fingerprint of
   it. If you lose it, make a new one; the old one stops working at that moment.</p>
 </section>`}
 <p class="muted">In the app, choose <span class="mono">rTorrent</span>, use your

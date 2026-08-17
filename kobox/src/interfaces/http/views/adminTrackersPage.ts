@@ -89,7 +89,7 @@ export function adminBlocklistsPage(
     'Blocklists',
     html`<h1>Blocklists</h1>
 <p class="muted">Lists of IP ranges that never get to talk to your members'
-torrent clients — anti-piracy monitors, known bad actors, advertising networks.
+torrent clients: anti-piracy monitors, known bad actors, advertising networks.
 Each list is published by someone else and fetched by KoBox; the merged ranges
 go into the kernel's packet filter, so blocking costs nothing at transfer time.</p>
 <p class="muted"><strong>Enabled</strong> is what decides whether a list counts:
