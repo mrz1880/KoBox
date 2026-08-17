@@ -461,9 +461,16 @@ function formatSize(bytes: number): string {
 export function mediaPage(
   viewer: Viewer,
   files: readonly MediaFile[],
+  folders: readonly Label[],
   message?: string,
 ): string {
+  // A folder exists before its contents do. Seeding the groups from the
+  // member's own folders means an empty seedbox looks empty rather than broken,
+  // and the shape stays the same whether or not anything has landed.
   const groups = new Map<string, MediaFile[]>();
+  for (const folder of folders) {
+    groups.set(folder.value, []);
+  }
   for (const file of files) {
     const key = file.path.category === '' ? 'Loose files' : file.path.category;
     groups.set(key, [...(groups.get(key) ?? []), file]);
@@ -471,7 +478,11 @@ export function mediaPage(
   const sections = [...groups.entries()]
     .sort(([a], [b]) => a.localeCompare(b))
     .map(
-      ([category, items]) => html`<h2>${category}</h2>
+      ([category, items]) =>
+        items.length === 0
+          ? html`<h2>${category}</h2>
+<p class="muted">Empty for now.</p>`
+          : html`<h2>${category}</h2>
 <table>
   <thead><tr><th>File</th><th>Size</th><th></th></tr></thead>
   <tbody>${items.map(
@@ -490,8 +501,9 @@ export function mediaPage(
     'My media',
     html`<h1>My media</h1>
 ${flash(message)}
-${files.length === 0
-      ? html`<p class="muted">Nothing here yet. Files appear once a download finishes.</p>`
+${sections.length === 0
+      ? html`<p class="muted">You have no folders yet. Create one under
+<a href="/sync">Sending</a>, and what lands in it shows up here.</p>`
       : html`${sections}`}`,
     viewer,
   );

@@ -438,6 +438,25 @@ describe('my media', () => {
   const alice = Username.parse('alice');
   const boss = Username.parse('boss');
 
+  it('should_show_the_folders_even_before_anything_lands_in_them', async () => {
+    // a folder exists before its contents do. Hiding the tree until a file
+    // arrives makes an empty seedbox look broken rather than empty.
+    const instance = await world.instances.findByUsername(alice);
+    if (instance === undefined) {
+      throw new Error('the world should have provisioned alice');
+    }
+    await world.instances.save(instance.addWatchDir(Label.parse('Documentaires')).instance);
+
+    const response = await world.server.inject({
+      method: 'GET',
+      url: '/media',
+      headers: { cookie: user.cookie },
+    });
+
+    expect(response.body).toContain('Documentaires');
+    expect(response.body).toContain('films');
+  });
+
   async function give(owner: Username, ...paths: string[]): Promise<void> {
     await world.media.replaceFor(
       owner,
