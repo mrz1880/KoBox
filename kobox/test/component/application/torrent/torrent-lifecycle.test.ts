@@ -15,6 +15,7 @@ import { TorrentInstanceNotFoundError } from '../../../../src/application/torren
 import { UserNotFoundError } from '../../../../src/application/user/errors.js';
 import { InMemoryTorrentInstanceRepository } from '../../../../src/infrastructure/persistence/InMemoryTorrentInstanceRepository.js';
 import { InMemoryTorrentRepository } from '../../../../src/infrastructure/persistence/InMemoryTorrentRepository.js';
+import { InMemoryMailOutbox } from '../../../../src/infrastructure/persistence/InMemoryMailOutbox.js';
 import { InMemoryUserRepository } from '../../../../src/infrastructure/persistence/InMemoryUserRepository.js';
 import { FakeAnnouncerSink } from '../../../../src/infrastructure/system/fakes/FakeAnnouncerSink.js';
 import { FakeRtorrentConfig } from '../../../../src/infrastructure/system/fakes/FakeRtorrentConfig.js';
@@ -57,6 +58,7 @@ interface Context {
   readonly setSyncDisabled: SetSyncDisabled;
   readonly setAllowPublicTracker: SetAllowPublicTracker;
   readonly handleEvent: HandleTorrentEvent;
+  readonly outbox: InMemoryMailOutbox;
 }
 
 function makeContext(): Context {
@@ -70,6 +72,7 @@ function makeContext(): Context {
   const control = new FakeRtorrentControl();
   const scripts = new FakeUserScriptRunner();
   const announcers = new FakeAnnouncerSink();
+  const outbox = new InMemoryMailOutbox();
   const templates = loadRtorrentTemplates();
   const settings = { koboxBin: '/usr/local/bin/kobox' };
   const render = new RenderRtorrentConfig({ instances, config, watchDirs, services, templates, settings });
@@ -105,7 +108,11 @@ function makeContext(): Context {
       control,
       scripts,
       announcers,
+      users,
+      outbox,
+      clock: () => '2026-08-17 12:00:00',
     }),
+    outbox,
   };
 }
 
@@ -308,6 +315,25 @@ describe('HandleTorrentEvent', () => {
     expect(torrent?.name).toBe('x'); // name from metainfo
   });
 
+  it('should_tell_the_member_why_their_torrent_was_taken_out', async () => {
+    // a torrent that vanishes without a word reads as a bug. The removal was
+    // already correct; nobody was told about it.
+    c.meta.preload(TORRENT_FILE, metainfo(false));
+
+    await c.handleEvent.execute({
+      username: alice,
+      event: 'inserted_new',
+      infoHash: HASH,
+      name: 'Some Public Release',
+      torrentFile: TORRENT_FILE,
+    });
+
+    const [mail] = await c.outbox.listRecent(10);
+    expect(mail?.recipient).toBe('alice@example.org');
+    expect(mail?.body).toContain('Some Public Release');
+    expect(mail?.body).toContain('public tracker');
+  });
+
   it('should_reject_a_public_torrent_unless_the_user_flag_allows_it', async () => {
     c.meta.preload(TORRENT_FILE, metainfo(false));
 
@@ -478,6 +504,9 @@ describe('HandleTorrentEvent announcer publication (Torrent -> Tracker seam)', (
       metainfo: c.meta,
       control: c.control,
       scripts: c.scripts,
+      users: c.users,
+      outbox: c.outbox,
+      clock: () => '2026-08-17 12:00:00',
       announcers: {
         publish: () => Promise.reject(new Error('queue down')),
       },
