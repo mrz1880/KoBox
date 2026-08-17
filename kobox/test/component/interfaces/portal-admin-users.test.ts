@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
+import { Username } from '../../../src/domain/user/Username.js';
 import { buildPortalWorld, form, loginAs, type AgentSession, type PortalWorld } from './portalWorld.js';
 
 let world: PortalWorld;
@@ -178,5 +179,93 @@ describe('admin user lifecycle actions', () => {
     });
 
     expect(response.statusCode).toBe(404);
+  });
+});
+
+describe('admin per-instance settings', () => {
+  it('should_let_an_admin_allow_public_trackers_for_one_member', async () => {
+    const response = await world.server.inject({
+      method: 'POST',
+      url: '/admin/users/alice/public-trackers',
+      headers: { cookie: admin.cookie, 'content-type': 'application/x-www-form-urlencoded' },
+      payload: form({ _csrf: admin.csrf, allowed: 'on' }),
+    });
+
+    expect(response.statusCode).toBe(303);
+    const job = world.queue.jobs.find((j) => j.type === 'set-allow-public-tracker');
+    expect(job?.payload).toMatchObject({ username: 'alice', allowed: true });
+  });
+
+  it('should_let_an_admin_take_the_permission_back', async () => {
+    // an unchecked box sends no field at all, which is the whole difficulty:
+    // "absent" has to mean "off" and not "leave it alone"
+    const response = await world.server.inject({
+      method: 'POST',
+      url: '/admin/users/alice/public-trackers',
+      headers: { cookie: admin.cookie, 'content-type': 'application/x-www-form-urlencoded' },
+      payload: form({ _csrf: admin.csrf }),
+    });
+
+    expect(response.statusCode).toBe(303);
+    const job = world.queue.jobs.find((j) => j.type === 'set-allow-public-tracker');
+    expect(job?.payload).toMatchObject({ username: 'alice', allowed: false });
+  });
+
+  it('should_show_on_the_member_page_where_they_stand_on_public_trackers', async () => {
+    // the setting existed as a use case for months with no way to reach it:
+    // the control has to be on the page, not just behind the URL
+    const response = await world.server.inject({
+      method: 'GET',
+      url: '/admin/users/alice',
+      headers: { cookie: admin.cookie },
+    });
+
+    expect(response.body).toContain('/admin/users/alice/public-trackers');
+    expect(response.body).toContain('private trackers only');
+  });
+
+  it('should_reflect_the_permission_once_it_is_granted', async () => {
+    const instance = await world.instances.findByUsername(Username.parse('alice'));
+    if (instance === undefined) {
+      throw new Error('the world should have provisioned alice');
+    }
+    await world.instances.save(instance.setAllowPublicTracker(true));
+
+    const response = await world.server.inject({
+      method: 'GET',
+      url: '/admin/users/alice',
+      headers: { cookie: admin.cookie },
+    });
+
+    expect(response.body).toContain('any tracker, public ones included');
+    // the box has to come back pre-ticked, or saving the form silently
+    // revokes what the admin just granted
+    expect(response.body).toContain('name="allowed" checked');
+  });
+
+  it('should_let_an_admin_stop_a_member_own_post_download_scripts', async () => {
+    // the checkbox is phrased positively ("run them"), the flag is negative
+    // ("disabled"): the inversion has to happen once, here, and be pinned
+    const response = await world.server.inject({
+      method: 'POST',
+      url: '/admin/users/alice/finish-scripts',
+      headers: { cookie: admin.cookie, 'content-type': 'application/x-www-form-urlencoded' },
+      payload: form({ _csrf: admin.csrf }),
+    });
+
+    expect(response.statusCode).toBe(303);
+    const job = world.queue.jobs.find((j) => j.type === 'set-sync-disabled');
+    expect(job?.payload).toMatchObject({ username: 'alice', disabled: true });
+  });
+
+  it('should_offer_the_scripts_control_on_the_member_page', async () => {
+    const response = await world.server.inject({
+      method: 'GET',
+      url: '/admin/users/alice',
+      headers: { cookie: admin.cookie },
+    });
+
+    expect(response.body).toContain('/admin/users/alice/finish-scripts');
+    expect(response.body).toContain('name="run" checked');
   });
 });

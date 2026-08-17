@@ -75,6 +75,10 @@ form.card, div.card {
   padding: 1rem 1.25rem; margin: 1rem 0; max-width: 34rem;
 }
 label { display: block; margin: 0.6rem 0 0.15rem; color: var(--muted); font-size: 0.85rem; }
+/* a checkbox reads as a sentence, not as a field: the box sits with its words
+   and must escape the full-width rule below */
+label.check { display: flex; align-items: center; gap: 0.5rem; color: var(--ink); font-size: 0.95rem; }
+label.check input { width: auto; margin: 0; }
 input, select {
   width: 100%; padding: 0.45rem 0.6rem; border: 1px solid var(--line);
   border-radius: 4px; background: var(--bg); color: var(--ink); font: inherit;

@@ -1,3 +1,4 @@
+import type { TorrentInstance } from '../../../domain/torrent/TorrentInstance.js';
 import type { SeedboxUser } from '../../../domain/user/SeedboxUser.js';
 import { html, type RawHtml } from '../html.js';
 import { flash, page, type Viewer } from './layout.js';
@@ -69,9 +70,52 @@ ${flash(message)}
   );
 }
 
+// The one per-member policy an admin can move. It is phrased as what the member
+// will be able to do, not as the column name: "allow_public_tracker" tells you
+// nothing about the consequence, and the consequence is the whole decision.
+function publicTrackers(name: string, instance: TorrentInstance | undefined, viewer: Viewer): RawHtml {
+  if (instance === undefined) {
+    return html`<p class="muted">No rTorrent instance yet, so there is nothing to allow.</p>`;
+  }
+  const allowed = instance.allowPublicTracker;
+  return html`<p>${name} can currently add torrents from
+${allowed ? html`<strong>any tracker, public ones included</strong>` : html`<strong>private trackers only</strong>`}.</p>
+<p class="muted">Public trackers are watched by anti-piracy monitors, which is why this
+stays off unless someone asks for it. Torrents already added are not touched.</p>
+<form method="post" action="/admin/users/${name}/public-trackers">
+  <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
+  <label class="check"><input type="checkbox" name="allowed" ${allowed ? html`checked` : html``}>
+  Let ${name} add torrents from public trackers</label>
+  <button type="submit">Save</button>
+</form>`;
+}
+
+// Not the KoBox sync (that follows each folder's own mode) but the member's own
+// shell scripts in ~/scripts, run after every finished download. Migrated
+// members arrive with these off when none of their MySB folders synced, and
+// until now nothing could turn them back on.
+function finishScripts(name: string, instance: TorrentInstance | undefined, viewer: Viewer): RawHtml {
+  if (instance === undefined) {
+    return html`<p class="muted">No rTorrent instance yet, so nothing runs.</p>`;
+  }
+  const run = !instance.syncDisabled;
+  return html`<p>Scripts in <span class="mono">/home/${name}/scripts</span> currently
+${run ? html`<strong>run</strong>` : html`<strong>do not run</strong>`} when one of
+${name}'s downloads finishes.</p>
+<p class="muted">These are their own scripts, not KoBox's: each folder's sync
+follows its own setting and is unaffected by this.</p>
+<form method="post" action="/admin/users/${name}/finish-scripts">
+  <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
+  <label class="check"><input type="checkbox" name="run" ${run ? html`checked` : html``}>
+  Run ${name}'s own scripts after a finished download</label>
+  <button type="submit">Save</button>
+</form>`;
+}
+
 export function adminUserDetailPage(
   user: SeedboxUser,
   viewer: Viewer,
+  instance?: TorrentInstance,
   message?: string,
 ): string {
   const name = user.username.value;
@@ -100,6 +144,12 @@ ${flash(message)}
     <button type="submit" class="danger">Delete (irreversible)</button>
   </form>
 </div>
+
+<h2>Public trackers</h2>
+<div class="card">${publicTrackers(name, instance, viewer)}</div>
+
+<h2>Their own scripts</h2>
+<div class="card">${finishScripts(name, instance, viewer)}</div>
 
 <h2>Reset password</h2>
 <form class="card" method="post" action="/admin/users/${name}/password">
