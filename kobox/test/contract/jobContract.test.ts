@@ -34,6 +34,7 @@ describe('job contract', () => {
       'update-blocklists',
       'render-whitelist',
       'render-blocklist-filters',
+      'set-blocklist-enabled',
       'add-user-address',
       'remove-user-address',
       'apply-firewall',

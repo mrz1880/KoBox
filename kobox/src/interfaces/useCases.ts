@@ -17,6 +17,8 @@ import { ImportBlocklistCatalog } from '../application/tracker/ImportBlocklistCa
 import { ApplyIpset } from '../application/tracker/ApplyIpset.js';
 import { ManageUserAddress } from '../application/tracker/ManageUserAddress.js';
 import { MarkTrackerDead } from '../application/tracker/MarkTrackerDead.js';
+import { RebuildBlocklistCache } from '../application/tracker/RebuildBlocklistCache.js';
+import { SetBlocklistEnabled } from '../application/tracker/SetBlocklistEnabled.js';
 import { RenderBlocklistFilters } from '../application/tracker/RenderBlocklistFilters.js';
 import { RenderWhitelist } from '../application/tracker/RenderWhitelist.js';
 import { RenewTrackerCerts } from '../application/tracker/RenewTrackerCerts.js';
@@ -291,6 +293,8 @@ export interface TrackerUseCases {
   readonly updateBlocklists: UpdateBlocklists;
   readonly renderWhitelist: RenderWhitelist;
   readonly renderBlocklistFilters: RenderBlocklistFilters;
+  readonly setBlocklistEnabled: SetBlocklistEnabled;
+  readonly rebuildBlocklistCache: RebuildBlocklistCache;
   readonly applyIpset: ApplyIpset;
   readonly manageUserAddress: ManageUserAddress;
 }
@@ -306,6 +310,8 @@ export function buildTrackerUseCases(deps: TrackerUseCaseDeps): TrackerUseCases 
     updateBlocklists: new UpdateBlocklists(deps),
     renderWhitelist: new RenderWhitelist(deps),
     renderBlocklistFilters: new RenderBlocklistFilters(deps),
+    setBlocklistEnabled: new SetBlocklistEnabled(deps),
+    rebuildBlocklistCache: new RebuildBlocklistCache(deps),
     applyIpset: new ApplyIpset(deps),
     manageUserAddress: new ManageUserAddress(deps),
   };

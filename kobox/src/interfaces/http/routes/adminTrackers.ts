@@ -95,6 +95,42 @@ export function registerAdminTrackerRoutes(
     return redirectWithFlash(reply, '/admin/blocklists', 'Updating blocklists.');
   });
 
+  // one form per row, so a tick and a Save move exactly the list you are
+  // looking at. An unticked checkbox sends nothing, which is the off case.
+  const blocklistToggleSchema = z.object({
+    source: z.enum(['iblocklist', 'personal']),
+    author: z.string().min(1).max(128),
+    name: z.string().min(1).max(128),
+    enabled: z.literal('on').optional(),
+  });
+
+  server.post('/admin/blocklists/enabled', async (request, reply) => {
+    const session = await guards.requireAdminCsrf(request, reply);
+    if (session === undefined) {
+      return;
+    }
+    const parsed = blocklistToggleSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.code(400).send();
+    }
+    const enabled = parsed.data.enabled === 'on';
+    await deps.queue.enqueue(
+      buildJob.setBlocklistEnabled({
+        source: parsed.data.source,
+        author: parsed.data.author,
+        name: parsed.data.name,
+        enabled,
+      }),
+    );
+    return redirectWithFlash(
+      reply,
+      '/admin/blocklists',
+      enabled
+        ? `${parsed.data.name} is going back into the filter, which is rebuilt straight away.`
+        : `${parsed.data.name} is coming out of the filter, which is rebuilt straight away.`,
+    );
+  });
+
   server.post('/admin/blocklists/import-catalog', async (request, reply) => {
     const session = await guards.requireAdminCsrf(request, reply);
     if (session === undefined) {

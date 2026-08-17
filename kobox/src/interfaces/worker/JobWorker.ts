@@ -14,6 +14,7 @@ import { AccountType } from '../../domain/user/AccountType.js';
 import { EmailAddress } from '../../domain/user/EmailAddress.js';
 import { HashedPassword } from '../../domain/user/HashedPassword.js';
 import { ProxyPort } from '../../domain/user/Port.js';
+import { BlocklistSource } from '../../domain/tracker/BlocklistSource.js';
 import { Quota } from '../../domain/user/Quota.js';
 import { Username } from '../../domain/user/Username.js';
 import type {
@@ -335,6 +336,23 @@ export class JobWorker {
         const report = await this.trackers.updateBlocklists.execute({ now: nowStamp() });
         return { blocklistsUpdated: report.ranges !== undefined };
       }
+      // the toggle is only half the job: without the re-render the filter file
+      // keeps the old set until the next scheduled pass, which is exactly the
+      // "disabling does nothing" the operator reported
+      case 'set-blocklist-enabled':
+        await this.trackers.setBlocklistEnabled.execute({
+          source: BlocklistSource.parse(job.payload.source),
+          author: job.payload.author,
+          name: job.payload.name,
+          enabled: job.payload.enabled,
+        });
+        // the merged cache is rebuilt from the per-list caches, then the
+        // filter is re-rendered from it. Without the rebuild the disabled
+        // list's ranges survive, which is the "disabling does nothing" the
+        // operator reported.
+        await this.trackers.rebuildBlocklistCache.execute();
+        await this.trackers.renderBlocklistFilters.execute({});
+        return;
       case 'render-whitelist':
         await this.trackers.renderWhitelist.execute();
         return;

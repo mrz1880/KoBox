@@ -11,3 +11,10 @@ export class InvalidAnnounceUrlError extends Error {
     this.name = 'InvalidAnnounceUrlError';
   }
 }
+
+export class BlocklistNotFoundError extends Error {
+  constructor(author: string, name: string) {
+    super(`no blocklist ${JSON.stringify(author)}/${JSON.stringify(name)}`);
+    this.name = 'BlocklistNotFoundError';
+  }
+}

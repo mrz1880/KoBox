@@ -146,3 +146,46 @@ describe('admin blocklists screen', () => {
     ]);
   });
 });
+
+describe('turning a blocklist on and off', () => {
+  it('should_offer_a_control_per_list_rather_than_a_decorative_chip', async () => {
+    await blocklists.save(
+      Blocklist.create({
+        source: BlocklistSource.parse('personal'),
+        author: 'me',
+        name: 'ads',
+        url: BlocklistUrl.parse('https://lists.example/ads'),
+        subscription: false,
+        enabled: true,
+      }),
+    );
+
+    const response = await world.server.inject({
+      method: 'GET',
+      url: '/admin/blocklists',
+      headers: { cookie: admin.cookie },
+    });
+
+    expect(response.body).toContain('/admin/blocklists/enabled');
+    expect(response.body).toContain('name="enabled" checked');
+  });
+
+  it('should_enqueue_the_toggle_for_one_named_list', async () => {
+    const response = await world.server.inject({
+      method: 'POST',
+      url: '/admin/blocklists/enabled',
+      headers: { cookie: admin.cookie, 'content-type': 'application/x-www-form-urlencoded' },
+      payload: form({
+        _csrf: admin.csrf,
+        source: 'personal',
+        author: 'me',
+        name: 'ads',
+      }),
+    });
+
+    expect(response.statusCode).toBe(303);
+    const job = world.queue.jobs.find((j) => j.type === 'set-blocklist-enabled');
+    // no "enabled" field means an unticked box, which is the off case
+    expect(job?.payload).toMatchObject({ source: 'personal', author: 'me', name: 'ads', enabled: false });
+  });
+});
