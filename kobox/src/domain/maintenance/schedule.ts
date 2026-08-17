@@ -32,6 +32,9 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
   entry('*/2 * * * *', 'poll-debrid-downloads'),
   // files also appear and vanish over SFTP, outside any KoBox event
   entry('*/15 * * * *', 'index-media'),
+  // the portal runs non-root and cannot read another account's quota, so the
+  // privileged worker looks and writes the answer down for it
+  entry('20 * * * *', 'sample-disk-usage'),
   // only the CHECK is scheduled. An admin who has to remember to click never
   // finds out a security update is waiting; an unattended upgrade that restarts
   // daemons at 5am is a different decision, and stays a button.

@@ -726,6 +726,15 @@ program
   });
 
 program
+  .command('sample-disk-usage')
+  .description('record what the disk holds for each member, for the portal to read')
+  .action(async () => {
+    const c = container();
+    await c.useCases.sampleDiskUsage.execute();
+    process.stdout.write('disk usage sampled\n');
+  });
+
+program
   .command('show-usage')
   .description('print per-user usage, fair-use state and recent audit events as JSON')
   .action(async () => {

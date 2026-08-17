@@ -199,6 +199,15 @@ export class JobWorker {
           passwordHash: HashedPassword.parse(job.payload.passwordHash),
         });
         return;
+      case 'set-user-quota':
+        await this.useCases.setUserQuota.execute({
+          username: Username.parse(job.payload.username),
+          quota: Quota.gib(job.payload.quotaGib),
+        });
+        return;
+      case 'sample-disk-usage':
+        await this.useCases.sampleDiskUsage.execute();
+        return;
       case 'suspend-user':
         await this.useCases.suspendUser.execute({
           username: Username.parse(job.payload.username),

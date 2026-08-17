@@ -63,6 +63,7 @@ import { KoboxDatabase } from '../infrastructure/persistence/db.js';
 import { SqliteBlocklistRepository } from '../infrastructure/persistence/SqliteBlocklistRepository.js';
 import { SqliteJobQueue } from '../infrastructure/persistence/SqliteJobQueue.js';
 import { SqliteLoginAttemptsRepository } from '../infrastructure/persistence/SqliteLoginAttemptsRepository.js';
+import { SqliteDiskUsageRepository } from '../infrastructure/persistence/SqliteDiskUsageRepository.js';
 import { SqlitePortalCredentialsRepository } from '../infrastructure/persistence/SqlitePortalCredentialsRepository.js';
 import { SqlitePortalSessionRepository } from '../infrastructure/persistence/SqlitePortalSessionRepository.js';
 import { SqlitePortAllocator } from '../infrastructure/persistence/SqlitePortAllocator.js';
@@ -474,6 +475,7 @@ export interface PortalContainer {
   readonly authenticateApp: AuthenticateApp;
   readonly issueAppToken: IssueAppToken;
   readonly instances: SqliteTorrentInstanceRepository;
+  readonly diskSamples: SqliteDiskUsageRepository;
   readonly destinations: SqliteSyncDestinationRepository;
   readonly transfers: SqliteSyncTransferRepository;
   readonly setDestination: SetSyncDestination;
@@ -532,6 +534,7 @@ export function buildPortalContainer(name: string): PortalContainer {
     // read-only from the portal: it lists a member's folders, the worker is
     // what creates directories and changes a mode
     instances: new SqliteTorrentInstanceRepository(db),
+    diskSamples: new SqliteDiskUsageRepository(db),
     destinations: syncDestinations,
     // read-only from here: the portal shows the queue, the worker moves it
     transfers: new SqliteSyncTransferRepository(db),
@@ -579,6 +582,7 @@ export function buildContainer(name: string): Container {
     repo,
     accounts: new SystemAccountAdapter(runner),
     quota,
+    diskSamples: new SqliteDiskUsageRepository(db),
     sftp: new SftpAdapter(runner),
     services,
     notifications,

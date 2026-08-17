@@ -3,6 +3,8 @@ import { ChangePassword } from '../../../../src/application/user/ChangePassword.
 import { CreateUser } from '../../../../src/application/user/CreateUser.js';
 import { DeleteUser } from '../../../../src/application/user/DeleteUser.js';
 import { ResumeUser } from '../../../../src/application/user/ResumeUser.js';
+import { SampleDiskUsage } from '../../../../src/application/user/SampleDiskUsage.js';
+import { SetUserQuota } from '../../../../src/application/user/SetUserQuota.js';
 import { SuspendUser } from '../../../../src/application/user/SuspendUser.js';
 import {
   RestartRtorrentInstance,
@@ -23,6 +25,7 @@ import { Username } from '../../../../src/domain/user/Username.js';
 import { InMemoryPortalCredentialsRepository } from '../../../../src/infrastructure/persistence/InMemoryPortalCredentialsRepository.js';
 import { InMemoryDebridAccountRepository } from '../../../../src/infrastructure/persistence/InMemoryDebridAccountRepository.js';
 import { InMemoryPortalSessionRepository } from '../../../../src/infrastructure/persistence/InMemoryPortalSessionRepository.js';
+import { InMemoryDiskUsageRepository } from '../../../../src/infrastructure/persistence/InMemoryDiskUsageRepository.js';
 import { InMemoryUserRepository } from '../../../../src/infrastructure/persistence/InMemoryUserRepository.js';
 import { FakeNotifications } from '../../../../src/infrastructure/system/fakes/FakeNotifications.js';
 import { FakeQuota } from '../../../../src/infrastructure/system/fakes/FakeQuota.js';
@@ -118,6 +121,9 @@ interface World {
   changePassword: ChangePassword;
   suspendUser: SuspendUser;
   resumeUser: ResumeUser;
+  setUserQuota: SetUserQuota;
+  sampleDiskUsage: SampleDiskUsage;
+  diskSamples: InMemoryDiskUsageRepository;
 }
 
 let world: World;
@@ -132,6 +138,7 @@ beforeEach(() => {
   const credentials = new InMemoryPortalCredentialsRepository();
   const sessions = new InMemoryPortalSessionRepository();
   const debridAccounts = new InMemoryDebridAccountRepository();
+  const diskSamples = new InMemoryDiskUsageRepository();
   const allocator = new SequentialPortAllocator();
   const clock = (): string => '2026-07-25 10:00:00';
   const deps = {
@@ -145,6 +152,9 @@ beforeEach(() => {
     changePassword: new ChangePassword(deps),
     suspendUser: new SuspendUser(deps),
     resumeUser: new ResumeUser(deps),
+    setUserQuota: new SetUserQuota(deps),
+    sampleDiskUsage: new SampleDiskUsage({ ...deps, samples: diskSamples }),
+    diskSamples,
   };
 });
 
@@ -456,5 +466,55 @@ describe('SuspendUser / ResumeUser', () => {
 
   it('should_reject_suspending_an_unknown_user', async () => {
     await expect(world.suspendUser.execute({ username: alice })).rejects.toThrow(UserNotFoundError);
+  });
+});
+
+describe('SetUserQuota', () => {
+  it('should_change_one_member_allowance_on_the_account_and_on_the_filesystem', async () => {
+    await world.createUser.execute(createUserCommand());
+
+    await world.setUserQuota.execute({ username: alice, quota: Quota.gib(900) });
+
+    expect((await world.repo.findByUsername(alice))?.quota.toGib()).toBe(900);
+    expect(world.quota.quotaOf(alice)?.toGib()).toBe(900);
+  });
+
+  it('should_leave_every_other_member_allowance_untouched', async () => {
+    // the report behind this feature said adding or changing one member updated
+    // everyone. Nothing in the code did that; this is what keeps it that way.
+    const bob = Username.parse('bob');
+    await world.createUser.execute(createUserCommand());
+    await world.createUser.execute({
+      ...createUserCommand(),
+      username: bob,
+      email: EmailAddress.parse('bob@example.org'),
+      quota: Quota.gib(200),
+    });
+
+    await world.setUserQuota.execute({ username: alice, quota: Quota.gib(900) });
+
+    expect((await world.repo.findByUsername(bob))?.quota.toGib()).toBe(200);
+    expect(world.quota.quotaOf(bob)?.toGib()).toBe(200);
+  });
+
+  it('should_refuse_a_member_that_does_not_exist', async () => {
+    await expect(
+      world.setUserQuota.execute({ username: alice, quota: Quota.gib(900) }),
+    ).rejects.toThrow(UserNotFoundError);
+  });
+});
+
+describe('SampleDiskUsage', () => {
+  it('should_record_what_the_disk_actually_holds_for_each_member', async () => {
+    // the portal runs non-root and cannot ask the disk about another account,
+    // so somebody privileged has to look and write the answer down
+    await world.createUser.execute(createUserCommand());
+    world.quota.setUsageForTest(alice, Quota.gib(37));
+
+    await world.sampleDiskUsage.execute();
+
+    const sample = await world.diskSamples.find(alice);
+    expect(sample?.used.toGib()).toBe(37);
+    expect(sample?.sampledAt).toBe('2026-07-25 10:00:00');
   });
 });

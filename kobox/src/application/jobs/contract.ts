@@ -14,6 +14,8 @@ export const JOB_TYPES = [
   'create-user',
   'delete-user',
   'change-password',
+  'set-user-quota',
+  'sample-disk-usage',
   'suspend-user',
   'resume-user',
   'provision-rtorrent',
@@ -129,6 +131,11 @@ export const jobPayloadSchemas = {
     username: usernameField,
     passwordHash: passwordHashField,
   }),
+  // GiB, the unit the operator types and the one the form shows. The domain
+  // turns it into a Quota; the payload stays a plain number so a queued job is
+  // readable months later.
+  'set-user-quota': z.strictObject({ username: usernameField, quotaGib: z.number().int().positive() }),
+  'sample-disk-usage': z.strictObject({}),
   'suspend-user': usernameOnly,
   'resume-user': usernameOnly,
   'provision-rtorrent': usernameOnly,

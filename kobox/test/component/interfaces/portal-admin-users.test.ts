@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
+import { Quota } from '../../../src/domain/user/Quota.js';
 import { Username } from '../../../src/domain/user/Username.js';
 import { buildPortalWorld, form, loginAs, type AgentSession, type PortalWorld } from './portalWorld.js';
 
@@ -256,6 +257,36 @@ describe('admin per-instance settings', () => {
     expect(response.statusCode).toBe(303);
     const job = world.queue.jobs.find((j) => j.type === 'set-sync-disabled');
     expect(job?.payload).toMatchObject({ username: 'alice', disabled: true });
+  });
+
+  it('should_let_an_admin_move_one_member_quota', async () => {
+    const response = await world.server.inject({
+      method: 'POST',
+      url: '/admin/users/alice/quota',
+      headers: { cookie: admin.cookie, 'content-type': 'application/x-www-form-urlencoded' },
+      payload: form({ _csrf: admin.csrf, quotaGib: '900' }),
+    });
+
+    expect(response.statusCode).toBe(303);
+    const job = world.queue.jobs.find((j) => j.type === 'set-user-quota');
+    expect(job?.payload).toMatchObject({ username: 'alice', quotaGib: 900 });
+  });
+
+  it('should_show_the_allowance_and_what_the_disk_actually_holds', async () => {
+    await world.diskSamples.save({
+      username: Username.parse('alice'),
+      used: Quota.gib(103),
+      sampledAt: '2026-08-17 09:00:00',
+    });
+
+    const response = await world.server.inject({
+      method: 'GET',
+      url: '/admin/users/alice',
+      headers: { cookie: admin.cookie },
+    });
+
+    expect(response.body).toContain('/admin/users/alice/quota');
+    expect(response.body).toContain('103');
   });
 
   it('should_offer_the_scripts_control_on_the_member_page', async () => {
