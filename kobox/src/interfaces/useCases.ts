@@ -89,7 +89,7 @@ import { RenderOpenVpn } from '../application/security/RenderOpenVpn.js';
 import { ResolveDynDns } from '../application/security/ResolveDynDns.js';
 import type { SecuritySettings } from '../application/security/settings.js';
 import { ChangePassword } from '../application/user/ChangePassword.js';
-import { CloseNextcloudAccount, ProvisionNextcloudAccount } from '../application/user/ProvisionNextcloudAccount.js';
+import { DeleteNextcloudAccount, ProvisionNextcloudAccount } from '../application/user/ProvisionNextcloudAccount.js';
 import { RemoveSshKey, SetSshKey } from '../application/user/SetSshKey.js';
 import { SampleDiskUsage } from '../application/user/SampleDiskUsage.js';
 import { SetUserQuota } from '../application/user/SetUserQuota.js';
@@ -185,7 +185,7 @@ export interface UseCases {
   readonly setUserQuota: SetUserQuota;
   readonly sampleDiskUsage: SampleDiskUsage;
   readonly provisionNextcloudAccount: ProvisionNextcloudAccount;
-  readonly closeNextcloudAccount: CloseNextcloudAccount;
+  readonly deleteNextcloudAccount: DeleteNextcloudAccount;
   readonly setSshKey: SetSshKey;
   readonly removeSshKey: RemoveSshKey;
   readonly suspendUser: SuspendUser;
@@ -200,7 +200,7 @@ export function buildUseCases(deps: UseCaseDeps): UseCases {
     setUserQuota: new SetUserQuota(deps),
     sampleDiskUsage: new SampleDiskUsage({ ...deps, samples: deps.diskSamples }),
     provisionNextcloudAccount: new ProvisionNextcloudAccount(deps),
-    closeNextcloudAccount: new CloseNextcloudAccount(deps),
+    deleteNextcloudAccount: new DeleteNextcloudAccount(deps),
     setSshKey: new SetSshKey({ ...deps, keys: deps.sshKeys, authorizedKeys: deps.authorizedKeys }),
     removeSshKey: new RemoveSshKey({ ...deps, keys: deps.sshKeys, authorizedKeys: deps.authorizedKeys }),
     suspendUser: new SuspendUser(deps),

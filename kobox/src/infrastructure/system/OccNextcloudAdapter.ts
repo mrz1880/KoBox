@@ -59,8 +59,8 @@ export class OccNextcloudAdapter implements NextcloudPort {
     );
   }
 
-  async disableUser(username: Username): Promise<void> {
-    await runOrThrow(this.runner, this.occ(['user:disable', username.value]));
+  async deleteUser(username: Username): Promise<void> {
+    await runOrThrow(this.runner, this.occ(['user:delete', username.value]));
   }
 
   async setAdmin(username: Username, admin: boolean): Promise<void> {
