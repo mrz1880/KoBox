@@ -60,18 +60,18 @@ produire le dump en lecture seule, `migrate-from-mysb --dry-run` puis revue, `ko
 cible, `--apply`, régénérer (`send-mails`, `render-openvpn`, `renew-tracker-certs`,
 `update-blocklists`), smoke par utilisateur, bascule nginx `:8189`, fenêtre de rollback.
 
-**B. Rendre atteignables les deux réglages par-instance.** `SetAllowPublicTracker` et
-`SetSyncDisabled` existent en use case, sont câblés dans `useCases.ts` et `buildJob.ts`, mais
-**aucune commande CLI ni route portail ne les appelle** : le réglage est inatteignable en l'état.
-`ImportFromMysb` force `allowPublicTracker: false` pour tout le monde, donc un admin qui veut
-vraiment autoriser les trackers publics chez un membre n'a aujourd'hui aucun moyen de le faire.
-Exposer les deux, côté console admin de préférence (c'est là que vivent les décisions par-membre),
-avec la phrase qui dit ce que ça change plutôt que le nom du champ.
+**B. Réglages par-membre atteignables. LIVRÉ (PR #44, 2026-08-17).** `SetAllowPublicTracker` et
+`SetSyncDisabled` existaient en use case, câblés dans `useCases.ts` et `buildJob.ts`, sans aucune
+commande CLI ni route portail pour les appeler : le réglage était inatteignable. Les deux sont
+maintenant sur la fiche du membre dans la console admin, formulés par ce que ça change pour lui
+plutôt que par le nom de la colonne.
 
-Contexte utile : la raison historique d'activer ce bypass a disparu. Un ajout XMLRPC perdait son
-attribut privé/public et se faisait bloquer comme public ; `d.is_private` voyage désormais sur
-l'événement `inserted_new`, donc la règle s'applique pareil quel que soit le chemin d'arrivée. Le
-toggle redevient ce qu'il aurait dû être : un choix délibéré, pas un contournement.
+Deux choses à savoir avant d'y toucher. La raison historique d'activer le bypass trackers publics a
+disparu : un ajout XMLRPC perdait son attribut privé/public et se faisait bloquer comme public,
+`d.is_private` voyage désormais sur l'événement `inserted_new`, donc la règle s'applique pareil
+quel que soit le chemin d'arrivée. Et `syncDisabled` **n'est pas** la synchro KoBox malgré son nom :
+il coupe les scripts personnels du membre (`~/scripts/*.sh`) après un téléchargement, alors que
+chaque dossier suit son propre mode via le scheduler.
 
 **C. Extras en composants d'installation** (scope v1 KEEP, AUDIT §7). Le `COMPONENT_CATALOG`
 compte 23 composants (`apt-sources`, `rtorrent`, `rutorrent`, `nginx`, `portal`, `nanomon`,
@@ -79,8 +79,11 @@ compte 23 composants (`apt-sources`, `rtorrent`, `rutorrent`, `nginx`, `portal`,
 livrés côté portail, mais l'installation reste hors du modèle déclaratif. Les ajouter comme
 composants (vendorés ou liés en iframe comme ruTorrent), avec état déclaratif et E2E.
 
-**D. VPN client NordVPN (#47).** Le profil client sortant, pendant du serveur OpenVPN déjà en
-place. Aucune trace dans le code aujourd'hui.
+**Hors périmètre : le VPN client type NordVPN.** L'issue #47 vient du dépôt MySB d'origine, pas
+d'une demande de l'owner, et se recopiait de brief en brief depuis `docs/AUDIT.md` où elle figure au
+backlog amont non résolu. Retirée du périmètre le 2026-08-17, au même titre que Plex, Tautulli et
+NetData. Ne pas la réintroduire sans demande explicite : `docs/AUDIT.md` la garde comme trace
+historique des issues MySB, ce qui n'en fait pas un engagement.
 
 **Optionnel, si demandé** : lecture live MariaDB pour `MysbSourcePort` (aujourd'hui dump seulement)
 ; réparation Minio ; sortie du pin ruTorrent officiel (process décrit dans `docs/OPS.md`).
