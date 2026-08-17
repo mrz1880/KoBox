@@ -18,6 +18,8 @@ export const JOB_TYPES = [
   'sample-disk-usage',
   'provision-nextcloud-account',
   'apply-mail-relay',
+  'set-ssh-key',
+  'remove-ssh-key',
   'suspend-user',
   'resume-user',
   'provision-rtorrent',
@@ -143,6 +145,10 @@ export const jobPayloadSchemas = {
   'provision-nextcloud-account': usernameOnly,
   // deliberately empty: the relay password never transits the jobs table
   'apply-mail-relay': z.strictObject({}),
+  // the key is public by nature: nothing here is a secret, and the domain
+  // refuses anything that is not a bare key line
+  'set-ssh-key': z.strictObject({ username: usernameField, key: z.string().min(32).max(1024) }),
+  'remove-ssh-key': usernameOnly,
   'suspend-user': usernameOnly,
   'resume-user': usernameOnly,
   'provision-rtorrent': usernameOnly,

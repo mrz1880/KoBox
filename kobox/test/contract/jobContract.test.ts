@@ -14,6 +14,8 @@ describe('job contract', () => {
       'sample-disk-usage',
       'provision-nextcloud-account',
       'apply-mail-relay',
+      'set-ssh-key',
+      'remove-ssh-key',
       'suspend-user',
       'resume-user',
       'provision-rtorrent',

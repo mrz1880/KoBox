@@ -90,6 +90,7 @@ import { ResolveDynDns } from '../application/security/ResolveDynDns.js';
 import type { SecuritySettings } from '../application/security/settings.js';
 import { ChangePassword } from '../application/user/ChangePassword.js';
 import { ProvisionNextcloudAccount } from '../application/user/ProvisionNextcloudAccount.js';
+import { RemoveSshKey, SetSshKey } from '../application/user/SetSshKey.js';
 import { SampleDiskUsage } from '../application/user/SampleDiskUsage.js';
 import { SetUserQuota } from '../application/user/SetUserQuota.js';
 import { CreateUser } from '../application/user/CreateUser.js';
@@ -144,7 +145,9 @@ import type { Password } from '../domain/user/Password.js';
 import type {
   HealthProbePort,
   NotificationPort,
+  AuthorizedKeysPort,
   DiskUsageRepository,
+  SshKeyRepository,
   QuotaPort,
   ServiceControlPort,
   SftpPort,
@@ -160,6 +163,8 @@ export interface UseCaseDeps {
   readonly nextcloud: NextcloudPort;
   readonly outbox: MailOutboxPort;
   readonly newPassword: () => Password;
+  readonly sshKeys: SshKeyRepository;
+  readonly authorizedKeys: AuthorizedKeysPort;
   readonly sftp: SftpPort;
   readonly services: ServiceControlPort;
   readonly notifications: NotificationPort;
@@ -178,6 +183,8 @@ export interface UseCases {
   readonly setUserQuota: SetUserQuota;
   readonly sampleDiskUsage: SampleDiskUsage;
   readonly provisionNextcloudAccount: ProvisionNextcloudAccount;
+  readonly setSshKey: SetSshKey;
+  readonly removeSshKey: RemoveSshKey;
   readonly suspendUser: SuspendUser;
   readonly resumeUser: ResumeUser;
 }
@@ -190,6 +197,8 @@ export function buildUseCases(deps: UseCaseDeps): UseCases {
     setUserQuota: new SetUserQuota(deps),
     sampleDiskUsage: new SampleDiskUsage({ ...deps, samples: deps.diskSamples }),
     provisionNextcloudAccount: new ProvisionNextcloudAccount(deps),
+    setSshKey: new SetSshKey({ ...deps, keys: deps.sshKeys, authorizedKeys: deps.authorizedKeys }),
+    removeSshKey: new RemoveSshKey({ ...deps, keys: deps.sshKeys, authorizedKeys: deps.authorizedKeys }),
     suspendUser: new SuspendUser(deps),
     resumeUser: new ResumeUser(deps),
   };

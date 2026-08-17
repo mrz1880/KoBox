@@ -89,6 +89,14 @@ export const buildJob = {
     return parseJob('provision-nextcloud-account', input);
   },
 
+  setSshKey(input: { username: string; key: string }): Job {
+    return parseJob('set-ssh-key', input);
+  },
+
+  removeSshKey(input: { username: string }): Job {
+    return parseJob('remove-ssh-key', input);
+  },
+
   setUserQuota(input: { username: string; quotaGib: number }): Job {
     return parseJob('set-user-quota', input);
   },
