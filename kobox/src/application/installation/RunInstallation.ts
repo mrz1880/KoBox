@@ -102,9 +102,18 @@ export class RunInstallation {
       try {
         const outcome = await installer.install();
         if (outcome.state === 'skipped') {
-          await deps.registry.markSkipped(spec.name, outcome.reason, deps.now());
-          skipped.push(name);
-          this.deps.onProgress?.(`${name}: skipped — ${outcome.reason}`);
+          // A component skips for lack of CONFIGURATION, not for lack of an
+          // artifact. Since the plan revisits everything, a run that does not
+          // carry a pin would otherwise flip a working component to skipped and
+          // make the registry lie about the box — Health read "no ruTorrent
+          // release pinned" while ruTorrent was installed and serving.
+          if (alreadyInstalled.includes(name)) {
+            this.deps.onProgress?.(`${name}: left installed — ${outcome.reason}`);
+          } else {
+            await deps.registry.markSkipped(spec.name, outcome.reason, deps.now());
+            skipped.push(name);
+            this.deps.onProgress?.(`${name}: skipped — ${outcome.reason}`);
+          }
         } else {
           await deps.registry.markInstalled(
             spec.name,

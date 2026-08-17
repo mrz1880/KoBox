@@ -68,6 +68,9 @@ import { SqlitePortalSessionRepository } from '../infrastructure/persistence/Sql
 import { SqlitePortAllocator } from '../infrastructure/persistence/SqlitePortAllocator.js';
 import { SqliteTorrentInstanceRepository } from '../infrastructure/persistence/SqliteTorrentInstanceRepository.js';
 import { SqliteSyncDestinationRepository } from '../infrastructure/persistence/SqliteSyncDestinationRepository.js';
+import { AuthenticateApp } from '../application/portal/AuthenticateApp.js';
+import { IssueAppToken } from '../application/portal/IssueAppToken.js';
+import { CryptoSessionTokens } from '../infrastructure/system/CryptoSessionTokens.js';
 import { SqliteSyncTransferRepository } from '../infrastructure/persistence/SqliteSyncTransferRepository.js';
 import { RsyncOverSshTransfer } from '../infrastructure/system/RsyncOverSshTransfer.js';
 import { FsLocalFileFacts } from '../infrastructure/system/FsLocalFileFacts.js';
@@ -468,6 +471,8 @@ export interface PortalContainer {
   readonly speedtests: SqliteSpeedtestRepository;
   readonly diagnostics: SqliteDiagnosticsRepository;
   readonly configFiles: FsConfigFileReader;
+  readonly authenticateApp: AuthenticateApp;
+  readonly issueAppToken: IssueAppToken;
   readonly instances: SqliteTorrentInstanceRepository;
   readonly destinations: SqliteSyncDestinationRepository;
   readonly transfers: SqliteSyncTransferRepository;
@@ -488,14 +493,16 @@ export function buildPortalContainer(name: string): PortalContainer {
   const runner = new ExecFileRunner();
   const queue = new SqliteJobQueue(db);
   const debridDownloadRepo = new SqliteDebridDownloadRepository(db);
+  const portalCredentialsRepo = new SqlitePortalCredentialsRepository(db);
+  const portalAttempts = new SqliteLoginAttemptsRepository(db);
   return {
     db,
     logger,
     queue,
     repo: new SqliteUserRepository(db),
-    credentials: new SqlitePortalCredentialsRepository(db),
+    credentials: portalCredentialsRepo,
     sessions: new SqlitePortalSessionRepository(db),
-    loginAttempts: new SqliteLoginAttemptsRepository(db),
+    loginAttempts: portalAttempts,
     hasher: new OpensslPasswordHasher(runner),
     trackerRepo: new SqliteTrackerRepository(db),
     blocklistRepo: new SqliteBlocklistRepository(db),
@@ -507,6 +514,18 @@ export function buildPortalContainer(name: string): PortalContainer {
     speedtests: new SqliteSpeedtestRepository(db),
     // read-only from here: the portal displays captures, the worker makes them
     diagnostics: new SqliteDiagnosticsRepository(db),
+    issueAppToken: new IssueAppToken({
+      credentials: portalCredentialsRepo,
+      tokens: new CryptoSessionTokens(),
+      clock: nowStamp,
+    }),
+    // machines authenticate with a per-member token, never the account password
+    authenticateApp: new AuthenticateApp({
+      credentials: portalCredentialsRepo,
+      attempts: portalAttempts,
+      tokens: new CryptoSessionTokens(),
+      clock: nowStamp,
+    }),
     // world-readable files only, from a closed catalog: no privilege needed,
     // and no job either — a config screen must show what is on disk NOW
     configFiles: new FsConfigFileReader(),

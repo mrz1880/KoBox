@@ -164,6 +164,25 @@ describe('RunInstallation', () => {
     expect(world.installers.get('kobox-core')?.installCalls).toBe(2);
   });
 
+  it('should_not_report_an_installed_component_as_skipped_when_its_pin_is_absent', async () => {
+    // A component skips for lack of configuration, not for lack of an artifact.
+    // Since the plan revisits everything, an install run that does not carry a
+    // pin would otherwise flip a working component from installed to skipped and
+    // make the registry lie about the box: the Health screen said "no ruTorrent
+    // release pinned" while ruTorrent was installed and serving.
+    let pinned = true;
+    stub('bind', () =>
+      pinned ? { state: 'installed' } : { state: 'skipped', reason: 'nothing pinned' },
+    );
+    await runner().execute({ allowNonExt4: false });
+
+    pinned = false;
+    const report = await runner().execute({ allowNonExt4: false });
+
+    expect(report.skipped).not.toContain('bind');
+    expect((await world.registry.get(ComponentName.parse('bind')))?.state.value).toBe('installed');
+  });
+
   it('should_record_skips_and_re_evaluate_them_on_every_run', async () => {
     let bindAvailable = false;
     stub('bind', () =>

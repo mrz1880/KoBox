@@ -299,6 +299,49 @@ exports file. Content is capped at 256 KB and says so when it truncates: the
 per-user nginx map grows with the member list, and nothing should try to paint
 an unbounded file into a browser.
 
+## Getting a torrent onto the box
+
+Three ways in, and the **folder** matters more than the method: it decides where
+the download lands and, if its owner asked for it, whether it is sent on.
+
+1. **ruTorrent** — add a `.torrent` or a magnet, pick a folder.
+2. **A watch directory** — drop a `.torrent` into `~/<member>/rtorrent/watch/<folder>/`
+   over SFTP, NFS or SMB. rTorrent picks it up within seconds, already filed.
+   This is what a *Torrent Blackhole* download client does: Sonarr or Radarr
+   writes the file locally, a script pushes it across.
+3. **A program driving rTorrent directly** — Sonarr and Radarr configured with
+   the **rTorrent** client rather than the blackhole. See below.
+
+Both automation styles are supported on purpose: an operator should not have to
+change how their *arr stack works to move to KoBox.
+
+### Connecting an app (Sonarr, Radarr, a script)
+
+A program has no browser session, so it authenticates with **HTTP Basic**: the
+member's username, and an **app token** they issue from their Account page —
+never their password.
+
+```
+host      <the box>            port 8189, TLS on
+url path  /ru/plugins/httprpc/action.php
+username  <the member>
+password  <the app token>
+```
+
+The token is 32 bytes of CSPRNG. Only its sha256 is stored, so the portal shows
+it **once**, on the page that issued it, and can never show it again — issuing
+another replaces it, and *Throw it away* revokes it everywhere at once. A leaked
+download-client config therefore costs the member a token, not their account.
+
+> **Why not the account password.** MySB accepted it on this endpoint, so a
+> download-client settings file on another machine held credentials that also
+> opened the portal, SFTP and the VPN. The token is revocable on its own and
+> grants nothing but this.
+
+Failed attempts count against the **same lockout as the login form** — a second
+door onto the same accounts must not have a weaker threshold. A member still on
+a temporary password is refused here too, until they have set their own.
+
 ## Sending finished downloads to a member's own machine
 
 **Sending** (member side) has two halves: the folders, and where they go.

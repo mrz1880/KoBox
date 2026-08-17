@@ -22,6 +22,7 @@ export class SqlitePortalCredentialsRepository implements PortalCredentialsPort 
       passwordHash: HashedPassword.parse(row.passwordHash),
       role: row.role,
       mustChangePassword: row.mustChangePassword === 1,
+      ...(row.appTokenHash !== null && { appTokenHash: row.appTokenHash }),
     });
   }
 
@@ -34,6 +35,7 @@ export class SqlitePortalCredentialsRepository implements PortalCredentialsPort 
         passwordHash: credentials.passwordHash.value,
         role: credentials.role,
         mustChangePassword: mustChange,
+        appTokenHash: credentials.appTokenHash ?? null,
         updatedAt: now,
       })
       .onConflictDoUpdate({
@@ -42,6 +44,7 @@ export class SqlitePortalCredentialsRepository implements PortalCredentialsPort 
           passwordHash: credentials.passwordHash.value,
           role: credentials.role,
           mustChangePassword: mustChange,
+          appTokenHash: credentials.appTokenHash ?? null,
           updatedAt: now,
         },
       })

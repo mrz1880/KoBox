@@ -1,0 +1,1 @@
+ALTER TABLE `portal_credentials` ADD `app_token_hash` text;

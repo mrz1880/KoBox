@@ -12,6 +12,10 @@ export interface PortalCredentials {
   // Phase 7: set when a migrated user is given a temporary password — the
   // portal forces a password change before granting access. Defaults to false.
   readonly mustChangePassword?: boolean;
+  // sha256 of the member's app token, when they have issued one. Machines
+  // present it as HTTP Basic; the raw token only ever exists on the page that
+  // showed it once, so a database read never yields a usable credential.
+  readonly appTokenHash?: string;
 }
 
 export interface PortalCredentialsPort {

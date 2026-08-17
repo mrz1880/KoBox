@@ -31,6 +31,8 @@ async function main(): Promise<void> {
     login: new Login(authDeps),
     logout: new Logout(authDeps),
     authenticate: new Authenticate(authDeps),
+    authenticateApp: container.authenticateApp,
+    issueAppToken: container.issueAppToken,
     now: nowStamp,
     logger: container.logger,
     users: container.repo,

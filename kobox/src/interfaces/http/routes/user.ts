@@ -28,6 +28,7 @@ import type {
   DebridKeyEncryptorPort,
 } from '../../../domain/ddl/ports.js';
 import type { PortalCredentialsPort } from '../../../domain/portal/ports.js';
+import type { IssueAppToken } from '../../../application/portal/IssueAppToken.js';
 import { DomainError } from '../../../domain/shared/DomainError.js';
 import type { FairUseRepository } from '../../../domain/security/ports.js';
 import { VPN_VARIANTS, type VpnVariant } from '../../../domain/security/vpn.js';
@@ -145,6 +146,7 @@ export interface UserRoutesDeps {
   readonly queue: JobQueuePort;
   readonly hasher: PasswordHasherPort;
   readonly credentials: PortalCredentialsPort;
+  readonly issueAppToken: IssueAppToken;
   readonly profiles: VpnProfileStorePort;
   readonly downloads: DebridDownloadRepository;
   readonly requestDownload: RequestDebridDownload;
@@ -538,11 +540,48 @@ export function registerUserRoutes(
     return reply.type('text/html').send(
       accessPage(viewerOf(session), {
         username: user.username.value,
+        hasAppToken: (await deps.credentials.find(session.username))?.appTokenHash !== undefined,
         // only shown when the operator configured a reachable name for the box
         ...(sftpHost !== undefined && sftpHost !== '' && { sftpHost }),
         rtorrentPort: user.rtorrentPort.value,
       }),
     );
+  });
+
+  server.post('/access/app-token', async (request, reply) => {
+    const session = await guards.requireCsrf(request, reply);
+    if (session === undefined) {
+      return;
+    }
+    const token = await deps.issueAppToken.execute(session.username);
+    if (token === undefined) {
+      return reply.code(404).send();
+    }
+    const user = await deps.users.findByUsername(session.username);
+    if (user === undefined) {
+      return reply.code(404).send();
+    }
+    const sftpHost = process.env.KOBOX_VPN_REMOTE;
+    // rendered straight into THIS response and nowhere else: only its hash is
+    // stored, so no redirect could show it afterwards
+    return reply.type('text/html').send(
+      accessPage(viewerOf(session), {
+        username: user.username.value,
+        ...(sftpHost !== undefined && sftpHost !== '' && { sftpHost }),
+        rtorrentPort: user.rtorrentPort.value,
+        hasAppToken: true,
+        freshToken: token.reveal(),
+      }),
+    );
+  });
+
+  server.post('/access/app-token/revoke', async (request, reply) => {
+    const session = await guards.requireCsrf(request, reply);
+    if (session === undefined) {
+      return;
+    }
+    await deps.issueAppToken.revoke(session.username);
+    return redirectWithFlash(reply, '/access', 'That token no longer works anywhere.');
   });
 
   server.get('/access/ovpn/:variant', async (request, reply) => {
