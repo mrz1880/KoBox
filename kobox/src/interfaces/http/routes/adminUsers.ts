@@ -4,6 +4,7 @@ import type { JobQueuePort } from '../../../application/jobs/JobQueuePort.js';
 import { USERNAME_PATTERN } from '../../../domain/user/Username.js';
 import { Password } from '../../../domain/user/Password.js';
 import { Username } from '../../../domain/user/Username.js';
+import type { TorrentInstanceRepository } from '../../../domain/torrent/ports.js';
 import type { PasswordHasherPort, UserRepository } from '../../../domain/user/ports.js';
 import { buildJob } from '../../cli/buildJob.js';
 import { flashOf, redirectWithFlash, viewerOf, type Guards } from '../guards.js';
@@ -26,6 +27,7 @@ export interface AdminUsersDeps {
   readonly users: UserRepository;
   readonly queue: JobQueuePort;
   readonly hasher: PasswordHasherPort;
+  readonly instances: TorrentInstanceRepository;
 }
 
 // Every mutation is an enqueue of the same typed jobs the CLI produces; the
@@ -93,9 +95,10 @@ export function registerAdminUserRoutes(
     if (user === undefined) {
       return reply.code(404).type('text/html').send('Not found');
     }
+    const instance = await deps.instances.findByUsername(user.username);
     return reply
       .type('text/html')
-      .send(adminUserDetailPage(user, viewerOf(session), flashOf(request)));
+      .send(adminUserDetailPage(user, viewerOf(session), instance, flashOf(request)));
   });
 
   const lifecycle = [
@@ -120,6 +123,59 @@ export function registerAdminUserRoutes(
     });
   }
 
+  // An unchecked HTML checkbox sends nothing at all, so presence is the value.
+  const checkboxSchema = z.object({ allowed: z.literal('on').optional() });
+
+  server.post('/admin/users/:name/public-trackers', async (request, reply) => {
+    const session = await guards.requireAdminCsrf(request, reply);
+    if (session === undefined) {
+      return;
+    }
+    const params = usernameParamSchema.safeParse(request.params);
+    const parsed = checkboxSchema.safeParse(request.body);
+    if (!params.success || !parsed.success) {
+      return reply.code(400).send();
+    }
+    const allowed = parsed.data.allowed === 'on';
+    await deps.queue.enqueue(
+      buildJob.setAllowPublicTracker({ username: params.data.name, allowed }),
+    );
+    return redirectWithFlash(
+      reply,
+      `/admin/users/${params.data.name}`,
+      allowed
+        ? `${params.data.name} may now add torrents from public trackers.`
+        : `${params.data.name} is back to private trackers only.`,
+    );
+  });
+
+  // Phrased positively for the operator ("run them") while the flag underneath
+  // is negative ("disabled"). The inversion happens once, here.
+  const runScriptsSchema = z.object({ run: z.literal('on').optional() });
+
+  server.post('/admin/users/:name/finish-scripts', async (request, reply) => {
+    const session = await guards.requireAdminCsrf(request, reply);
+    if (session === undefined) {
+      return;
+    }
+    const params = usernameParamSchema.safeParse(request.params);
+    const parsed = runScriptsSchema.safeParse(request.body);
+    if (!params.success || !parsed.success) {
+      return reply.code(400).send();
+    }
+    const run = parsed.data.run === 'on';
+    await deps.queue.enqueue(
+      buildJob.setSyncDisabled({ username: params.data.name, disabled: !run }),
+    );
+    return redirectWithFlash(
+      reply,
+      `/admin/users/${params.data.name}`,
+      run
+        ? `${params.data.name}'s own scripts will run again after a download.`
+        : `${params.data.name}'s own scripts will no longer run after a download.`,
+    );
+  });
+
   server.post('/admin/users/:name/password', async (request, reply) => {
     const session = await guards.requireAdminCsrf(request, reply);
     if (session === undefined) {
@@ -139,7 +195,7 @@ export function registerAdminUserRoutes(
     return redirectWithFlash(
       reply,
       `/admin/users/${params.data.name}`,
-      'Password change under way — it takes a few seconds.',
+      'Password change under way, it takes a few seconds.',
     );
   });
 }
