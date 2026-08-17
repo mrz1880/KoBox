@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm';
 import { DebridDownload } from '../../domain/ddl/DebridDownload.js';
-import { DownloadCategory } from '../../domain/ddl/DownloadCategory.js';
+import { Label } from '../../domain/torrent/Label.js';
 import { DownloadGid } from '../../domain/ddl/DownloadGid.js';
 import { FilehosterLink } from '../../domain/ddl/FilehosterLink.js';
 import type { DebridDownloadRepository } from '../../domain/ddl/ports.js';
@@ -14,7 +14,7 @@ function toDomain(row: Row): DebridDownload {
   return DebridDownload.restore({
     id: row.id,
     username: Username.parse(row.username),
-    category: DownloadCategory.parse(row.category),
+    category: Label.parse(row.category),
     sourceLink: FilehosterLink.parse(row.sourceLink),
     status: row.status,
     ...(row.gid !== null && { gid: DownloadGid.parse(row.gid) }),

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DebridDownload } from '../../../../src/domain/ddl/DebridDownload.js';
-import { DownloadCategory } from '../../../../src/domain/ddl/DownloadCategory.js';
+import { Label } from '../../../../src/domain/torrent/Label.js';
 import { DownloadGid } from '../../../../src/domain/ddl/DownloadGid.js';
 import { FilehosterLink } from '../../../../src/domain/ddl/FilehosterLink.js';
 import { Username } from '../../../../src/domain/user/Username.js';
@@ -11,7 +11,7 @@ const gid = DownloadGid.parse('2089b05ecca3d829');
 
 function aRequest(): DebridDownload {
   return DebridDownload.request(
-    { username: alice, category: DownloadCategory.films, sourceLink: link },
+    { username: alice, category: Label.parse('films'), sourceLink: link },
     '2026-07-26 12:00:00',
   );
 }
@@ -48,7 +48,7 @@ describe('DebridDownload', () => {
     const restored = DebridDownload.restore({
       id: 7,
       username: alice,
-      category: DownloadCategory.series,
+      category: Label.parse('series'),
       sourceLink: link,
       status: 'downloading',
       gid,

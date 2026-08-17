@@ -1,5 +1,5 @@
 import type { Username } from '../user/Username.js';
-import type { DownloadCategory } from './DownloadCategory.js';
+import type { Label } from '../torrent/Label.js';
 import type { DownloadGid } from './DownloadGid.js';
 import type { FilehosterLink } from './FilehosterLink.js';
 
@@ -8,7 +8,7 @@ export type DownloadStatus = 'pending' | 'downloading' | 'done' | 'failed';
 interface DebridDownloadProps {
   readonly id?: number;
   readonly username: Username;
-  readonly category: DownloadCategory;
+  readonly category: Label;
   readonly sourceLink: FilehosterLink;
   readonly status: DownloadStatus;
   readonly gid?: DownloadGid;
@@ -24,7 +24,7 @@ interface DebridDownloadProps {
 export class DebridDownload {
   readonly id?: number;
   readonly username: Username;
-  readonly category: DownloadCategory;
+  readonly category: Label;
   readonly sourceLink: FilehosterLink;
   readonly status: DownloadStatus;
   readonly gid?: DownloadGid;

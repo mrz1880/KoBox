@@ -3,12 +3,12 @@ import { z } from 'zod';
 import type { RequestDebridDownload } from '../../../application/ddl/RequestDebridDownload.js';
 import type { JobQueuePort } from '../../../application/jobs/JobQueuePort.js';
 import type { VpnProfileStorePort } from '../../../application/portal/ports.js';
-import { DownloadCategory } from '../../../domain/ddl/DownloadCategory.js';
+
 import { FilehosterLink } from '../../../domain/ddl/FilehosterLink.js';
 import { DebridApiKey } from '../../../domain/ddl/DebridApiKey.js';
 import { MediaPath, type MediaFile } from '../../../domain/media/MediaFile.js';
 import type { MediaRepository } from '../../../domain/media/ports.js';
-import { Label } from '../../../domain/torrent/Label.js';
+import { LABEL_PATTERN, Label } from '../../../domain/torrent/Label.js';
 import { SyncMode } from '../../../domain/torrent/SyncMode.js';
 import type { TorrentInstanceRepository } from '../../../domain/torrent/ports.js';
 import type { SyncDestinationRepository, SyncTransferRepository } from '../../../domain/sync/ports.js';
@@ -76,7 +76,7 @@ const passwordSchema = z.object({
 
 const downloadSchema = z.object({
   link: z.string().min(1).max(2048),
-  category: z.enum(['films', 'series']),
+  category: z.string().regex(LABEL_PATTERN),
 });
 
 const debridKeySchema = z.object({ apiKey: z.string().min(1).max(256) });
@@ -252,6 +252,15 @@ export function registerUserRoutes(
     return redirectWithFlash(reply, '/password', 'Password change under way — it takes a few seconds.');
   });
 
+  // The folders a member actually has, read from their instance. "Sending" and
+  // "Download a link" must never disagree about what exists.
+  const foldersOf = async (username: Username): Promise<readonly Label[]> => {
+    const instance = await deps.instances.findByUsername(username);
+    return (instance?.watchDirs ?? [])
+      .map((dir) => dir.label)
+      .filter((label): label is Label => label !== undefined);
+  };
+
   server.get('/downloads', async (request, reply) => {
     const session = await guards.requireSession(request, reply);
     if (session === undefined) {
@@ -261,7 +270,7 @@ export function registerUserRoutes(
     const hasKey = await deps.debridAccounts.has(session.username);
     return reply
       .type('text/html')
-      .send(downloadsPage(viewerOf(session), rows, hasKey, flashOf(request)));
+      .send(downloadsPage(viewerOf(session), rows, hasKey, await foldersOf(session.username), flashOf(request)));
   });
 
   server.post('/downloads/debrid-key', async (request, reply) => {
@@ -282,6 +291,7 @@ export function registerUserRoutes(
             viewerOf(session),
             rows,
             hasKey,
+            await foldersOf(session.username),
             undefined,
             "That doesn't look like an AllDebrid API key.",
           ),
@@ -323,6 +333,7 @@ export function registerUserRoutes(
             viewerOf(session),
             rows,
             hasKey,
+            await foldersOf(session.username),
             undefined,
             'Please provide a valid http(s) link and a category.',
           ),
@@ -330,7 +341,7 @@ export function registerUserRoutes(
     }
     await deps.requestDownload.execute({
       username: session.username,
-      category: DownloadCategory.parse(parsed.data.category),
+      category: Label.parse(parsed.data.category),
       link,
     });
     return redirectWithFlash(reply, '/downloads', 'Download started. It will appear in the list below.');

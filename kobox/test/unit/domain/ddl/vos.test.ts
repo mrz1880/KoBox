@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DirectUrl } from '../../../../src/domain/ddl/DirectUrl.js';
-import { DownloadCategory } from '../../../../src/domain/ddl/DownloadCategory.js';
+import { Label } from '../../../../src/domain/torrent/Label.js';
 import { DownloadGid } from '../../../../src/domain/ddl/DownloadGid.js';
 import { FilehosterLink } from '../../../../src/domain/ddl/FilehosterLink.js';
 
@@ -36,19 +36,17 @@ describe('DirectUrl', () => {
   });
 });
 
-describe('DownloadCategory', () => {
+describe('Label', () => {
   it('should_parse_the_known_categories', () => {
-    expect(DownloadCategory.parse('films').value).toBe('films');
-    expect(DownloadCategory.parse('series').value).toBe('series');
+    expect(Label.parse('films').value).toBe('films');
+    expect(Label.parse('series').value).toBe('series');
   });
 
-  it('should_reject_an_unknown_category', () => {
-    expect(() => DownloadCategory.parse('music')).toThrow();
-  });
-
-  it('should_expose_a_shell_and_path_safe_subdir', () => {
-    // the category becomes a directory segment under the user home
-    expect(DownloadCategory.parse('films').subdir).toBe('films');
+  it('should_accept_any_folder_the_member_actually_has', () => {
+    // the closed films|series enum is gone: a member syncs whatever folders
+    // they created, and must be able to download into the same ones
+    expect(Label.parse('Divers').value).toBe('Divers');
+    expect(Label.parse('Documentaires').value).toBe('Documentaires');
   });
 });
 

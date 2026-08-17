@@ -8,7 +8,6 @@ import {
   StartDebridDownload,
 } from '../../../../src/application/ddl/StartDebridDownload.js';
 import { DirectUrl } from '../../../../src/domain/ddl/DirectUrl.js';
-import { DownloadCategory } from '../../../../src/domain/ddl/DownloadCategory.js';
 import { DownloadGid } from '../../../../src/domain/ddl/DownloadGid.js';
 import { FilehosterLink } from '../../../../src/domain/ddl/FilehosterLink.js';
 import { DebridApiKey } from '../../../../src/domain/ddl/DebridApiKey.js';
@@ -20,7 +19,7 @@ import type {
   DownloadPlacementPort,
   DownloadState,
 } from '../../../../src/domain/ddl/ports.js';
-import type { DownloadCategory as Cat } from '../../../../src/domain/ddl/DownloadCategory.js';
+import { Label } from '../../../../src/domain/torrent/Label.js';
 import { Username } from '../../../../src/domain/user/Username.js';
 import { InMemoryDebridDownloadRepository } from '../../../../src/infrastructure/persistence/InMemoryDebridDownloadRepository.js';
 
@@ -62,12 +61,12 @@ class FakeDownloader implements DownloaderPort {
 class FakePlacement implements DownloadPlacementPort {
   readonly placed: { staged: string; username: string }[] = [];
   rejectFor: string | undefined;
-  place(staged: string, username: Username, category: Cat): Promise<string> {
+  place(staged: string, username: Username, category: Label): Promise<string> {
     this.placed.push({ staged, username: username.value });
     if (this.rejectFor === username.value) {
       return Promise.reject(new Error('ENOENT: staged file already gone'));
     }
-    return Promise.resolve(`/home/${username.value}/rtorrent/complete/${category.subdir}/Movie.mkv`);
+    return Promise.resolve(`/home/${username.value}/rtorrent/complete/${category.value}/Movie.mkv`);
   }
 }
 
@@ -120,7 +119,7 @@ describe('RequestDebridDownload', () => {
   it('should_persist_a_pending_row_and_enqueue_a_job', async () => {
     const uc = new RequestDebridDownload({ repo, queue, clock: now });
 
-    const id = await uc.execute({ username: alice, category: DownloadCategory.films, link });
+    const id = await uc.execute({ username: alice, category: Label.parse('films'), link });
 
     const saved = await repo.findById(id);
     expect(saved?.status).toBe('pending');
@@ -137,7 +136,7 @@ describe('StartDebridDownload', () => {
   it('should_unlock_add_to_aria2_and_record_the_gid', async () => {
     const id = await new RequestDebridDownload({ repo, queue, clock: now }).execute({
       username: alice,
-      category: DownloadCategory.films,
+      category: Label.parse('films'),
       link,
     });
 
@@ -155,7 +154,7 @@ describe('StartDebridDownload', () => {
   it('should_mark_the_row_failed_when_the_debrid_unlock_fails', async () => {
     const id = await new RequestDebridDownload({ repo, queue, clock: now }).execute({
       username: alice,
-      category: DownloadCategory.films,
+      category: Label.parse('films'),
       link,
     });
     debrid.failWith = new Error('host not supported');
@@ -171,7 +170,7 @@ describe('StartDebridDownload', () => {
     const bob = Username.parse('bob');
     const id = await new RequestDebridDownload({ repo, queue, clock: now }).execute({
       username: bob,
-      category: DownloadCategory.films,
+      category: Label.parse('films'),
       link,
     });
 
@@ -185,7 +184,7 @@ describe('StartDebridDownload', () => {
     const stranger = Username.parse('nokey');
     const id = await new RequestDebridDownload({ repo, queue, clock: now }).execute({
       username: stranger,
-      category: DownloadCategory.films,
+      category: Label.parse('films'),
       link,
     });
 
@@ -202,7 +201,7 @@ describe('StartDebridDownload', () => {
   it('should_be_idempotent_and_skip_a_non_pending_row', async () => {
     const id = await new RequestDebridDownload({ repo, queue, clock: now }).execute({
       username: alice,
-      category: DownloadCategory.films,
+      category: Label.parse('films'),
       link,
     });
     await start().execute({ downloadId: id }); // -> downloading
@@ -217,7 +216,7 @@ describe('PollDebridDownloads', () => {
   async function anActiveDownload(): Promise<number> {
     const id = await new RequestDebridDownload({ repo, queue, clock: now }).execute({
       username: alice,
-      category: DownloadCategory.films,
+      category: Label.parse('films'),
       link,
     });
     await new StartDebridDownload({
@@ -273,7 +272,7 @@ describe('PollDebridDownloads', () => {
     const aliceId = await anActiveDownload();
     const bobId = await new RequestDebridDownload({ repo, queue, clock: now }).execute({
       username: bob,
-      category: DownloadCategory.series,
+      category: Label.parse('series'),
       link,
     });
     await new StartDebridDownload({
