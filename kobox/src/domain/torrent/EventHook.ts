@@ -19,6 +19,9 @@ export class EventHook {
     '$d.loaded_file=',
     '$d.custom2=',
     '$d.custom1=',
+    // rTorrent's own verdict on the tracker. The only source that exists for
+    // every way a torrent arrives: an XMLRPC add has no .torrent file to read.
+    '$d.is_private=',
   ]);
   static readonly finished = new EventHook('finished', [
     '$d.hash=',

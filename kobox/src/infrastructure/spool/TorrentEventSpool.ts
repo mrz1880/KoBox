@@ -24,7 +24,9 @@ export function ensureSpoolDir(dir: string): void {
   chmodSync(dir, 0o1733);
 }
 
-export type TorrentEventSubmission = Record<string, string>;
+// Values are JSON: rTorrent's d.is_private arrives as a boolean, everything
+// else as a string.
+export type TorrentEventSubmission = Record<string, string | boolean>;
 
 export class TorrentEventSpoolWriter {
   // Monotonic per-process sequence: two submissions in the same millisecond

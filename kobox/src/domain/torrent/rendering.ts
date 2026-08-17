@@ -53,7 +53,7 @@ function homeOf(instance: TorrentInstance): string {
 // entry keeps positional alignment while forwarding nothing (rtorrent's
 // custom2 has no CLI counterpart — the worker does not use it).
 const CLI_FLAGS: Record<string, readonly string[]> = {
-  inserted_new: ['--hash', '--name', '--directory', '--torrent-file', '', '--label'],
+  inserted_new: ['--hash', '--name', '--directory', '--torrent-file', '', '--label', '--is-private'],
   finished: ['--hash', '--base-path', '--directory', '--name', '--torrent-file', '--label'],
   erased: ['--hash', '--name', '--directory'],
 };
