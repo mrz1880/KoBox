@@ -1,4 +1,4 @@
-# KoBox — Brief Phase 8 (cutover prod & backlog v1.1)
+# KoBox, brief Phase 8 (cutover prod & backlog v1.1)
 
 > Prompt de reprise pour une **session Claude Code fraîche**. Les Phases 0-7 sont livrées et
 > mergées : KoBox est fonctionnellement complet, la migration est codée et validée à blanc sur un
