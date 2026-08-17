@@ -593,6 +593,39 @@ exports[`job contract > should_keep_the_wire_contract_stable 1`] = `
     ],
     "type": "object",
   },
+  "set-blocklist-enabled": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "author": {
+        "maxLength": 128,
+        "minLength": 1,
+        "type": "string",
+      },
+      "enabled": {
+        "type": "boolean",
+      },
+      "name": {
+        "maxLength": 128,
+        "minLength": 1,
+        "type": "string",
+      },
+      "source": {
+        "enum": [
+          "iblocklist",
+          "personal",
+        ],
+        "type": "string",
+      },
+    },
+    "required": [
+      "source",
+      "author",
+      "name",
+      "enabled",
+    ],
+    "type": "object",
+  },
   "set-category-sync-mode": {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "additionalProperties": false,

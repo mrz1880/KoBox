@@ -67,6 +67,20 @@ ${flash(message)}
   );
 }
 
+// One form per row. The state used to be a chip you could read and not change,
+// which is the whole complaint: the page reported a decision nobody could make.
+function toggle(list: Blocklist, viewer: Viewer): RawHtml {
+  return html`<form class="inline" method="post" action="/admin/blocklists/enabled">
+  <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
+  <input type="hidden" name="source" value="${list.source.value}">
+  <input type="hidden" name="author" value="${list.author}">
+  <input type="hidden" name="name" value="${list.name}">
+  <label class="check"><input type="checkbox" name="enabled" ${list.enabled ? html`checked` : html``}>
+  in the filter</label>
+  <button type="submit">Save</button>
+</form>`;
+}
+
 export function adminBlocklistsPage(
   blocklists: readonly Blocklist[],
   viewer: Viewer,
@@ -77,7 +91,7 @@ export function adminBlocklistsPage(
   <td>${list.source.value}</td>
   <td>${list.author}</td>
   <td>${list.name}</td>
-  <td>${list.enabled ? html`<span class="chip ok">enabled</span>` : html`<span class="chip">disabled</span>`}</td>
+  <td>${toggle(list, viewer)}</td>
   <td>${list.lastUpdate === undefined
     ? '—'
     : list.lastUpdate.status === 'ok'

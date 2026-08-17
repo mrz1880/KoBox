@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { ImportBlocklistCatalog } from '../../../../src/application/tracker/ImportBlocklistCatalog.js';
+import { RebuildBlocklistCache } from '../../../../src/application/tracker/RebuildBlocklistCache.js';
+import { SetBlocklistEnabled } from '../../../../src/application/tracker/SetBlocklistEnabled.js';
 import { RenderBlocklistFilters } from '../../../../src/application/tracker/RenderBlocklistFilters.js';
 import { UpdateBlocklists } from '../../../../src/application/tracker/UpdateBlocklists.js';
 import { Blocklist } from '../../../../src/domain/tracker/Blocklist.js';
@@ -314,5 +316,44 @@ describe('RenderBlocklistFilters', () => {
     });
 
     expect(report.changedFiles.every((path) => path.includes('/alice/'))).toBe(true);
+  });
+});
+
+describe('SetBlocklistEnabled', () => {
+  it('should_turn_one_list_off_without_touching_the_others', async () => {
+    // the admin page showed enabled/disabled as a read-only chip: the state was
+    // real, it just could not be changed
+    await blocklists.save(personalList('level1', 'https://lists.example/level1'));
+    await blocklists.save(personalList('ads', 'https://lists.example/ads'));
+    const useCase = new SetBlocklistEnabled({ blocklists });
+
+    await useCase.execute({
+      source: BlocklistSource.parse('personal'),
+      author: 'me',
+      name: 'ads',
+      enabled: false,
+    });
+
+    const all = await blocklists.listAll();
+    expect(all.find((list) => list.name === 'ads')?.enabled).toBe(false);
+    expect(all.find((list) => list.name === 'level1')?.enabled).toBe(true);
+  });
+});
+
+describe('RebuildBlocklistCache', () => {
+  it('should_drop_a_disabled_list_from_the_merged_cache_without_downloading_anything', async () => {
+    // the merged cache is what rtorrent's filter is rendered from. Re-rendering
+    // alone would keep a disabled list's ranges; re-downloading every remaining
+    // list to find that out would cost minutes and hundreds of fetches.
+    await blocklists.save(personalList('level1', 'https://lists.example/level1'));
+    await blocklists.save(personalList('ads', 'https://lists.example/ads', false));
+    await cache.writeList('me#level1', ['1.0.0.0-1.0.0.255']);
+    await cache.writeList('me#ads', ['9.9.9.0-9.9.9.255']);
+    const useCase = new RebuildBlocklistCache({ blocklists, cache });
+
+    await useCase.execute();
+
+    expect(await cache.read()).toEqual(['1.0.0.0-1.0.0.255']);
+    expect(download.requestedUrls).toEqual([]);
   });
 });

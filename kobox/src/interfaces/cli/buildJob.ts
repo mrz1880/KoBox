@@ -121,6 +121,15 @@ export const buildJob = {
     return parseJob('render-whitelist', {});
   },
 
+  setBlocklistEnabled(input: {
+    source: string;
+    author: string;
+    name: string;
+    enabled: boolean;
+  }): Job {
+    return parseJob('set-blocklist-enabled', input);
+  },
+
   renderBlocklistFilters(input: { username?: string }): Job {
     return parseJob('render-blocklist-filters', input);
   },
