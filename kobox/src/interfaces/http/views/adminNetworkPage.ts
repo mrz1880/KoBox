@@ -46,7 +46,7 @@ export function adminAddressesPage(
 by default, so an address listed here is what opens it: the firewall accepts it,
 fail2ban stops counting its failures against it, and the NFS shares are offered
 to it. A member with no address here still reaches the portal and ruTorrent over
-the web — this is for the direct connections.</p>
+the web. This is for the direct connections.</p>
 <p class="muted">Use a <strong>DynDNS hostname</strong> when their home address
 changes, which it usually does. KoBox re-resolves it on a schedule and follows it
 without anyone touching the firewall; the last resolved address is shown so you
@@ -146,7 +146,7 @@ rather than cutting them off: <strong>none</strong> is the normal state,
 <strong>alerted</strong> means they have been told, <strong>throttled</strong>
 means their bandwidth is capped until they come back under. Nothing here deletes
 anything or suspends an account.</p>
-<p class="muted">Every decision is recorded below, and every one is reversible —
+<p class="muted">Every decision is recorded below, and every one is reversible:
 a <strong>budget override</strong> raises the limit for a member who has a
 reason, without changing it for anyone else.</p>
 ${flash(message)}

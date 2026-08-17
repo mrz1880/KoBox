@@ -28,7 +28,7 @@ export function adminUsersPage(
     html`<h1>Users</h1>
 <p class="muted">Everyone with an account on the box. Creating one provisions a
 real system account, its own rTorrent instance on its own port, a home directory
-with a quota, and a VPN profile — and mails them a temporary password they are
+with a quota, and a VPN profile, then mails them a temporary password they are
 forced to change on first sign-in. <strong>SCGI</strong> is the port their
 ruTorrent talks to; it is shown because it is what you need when something is
 wrong, and it is preserved if they are ever migrated.</p>

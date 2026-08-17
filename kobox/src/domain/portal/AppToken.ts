@@ -6,7 +6,7 @@ export class InvalidAppTokenError extends DomainError {
   }
 }
 
-// 32 bytes of CSPRNG rendered as hex — the shape SessionTokenPort.generate()
+// 32 bytes of CSPRNG rendered as hex, the shape SessionTokenPort.generate()
 // already produces. Reusing it keeps one generator rather than two.
 const TOKEN_PATTERN = /^[a-f0-9]{64}$/;
 
