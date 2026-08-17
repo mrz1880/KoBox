@@ -63,6 +63,7 @@ import { KoboxDatabase } from '../infrastructure/persistence/db.js';
 import { SqliteBlocklistRepository } from '../infrastructure/persistence/SqliteBlocklistRepository.js';
 import { SqliteJobQueue } from '../infrastructure/persistence/SqliteJobQueue.js';
 import { SqliteLoginAttemptsRepository } from '../infrastructure/persistence/SqliteLoginAttemptsRepository.js';
+import { SqliteSiteSettingsRepository } from '../infrastructure/persistence/SqliteSiteSettingsRepository.js';
 import { SqliteMailRelayRepository } from '../infrastructure/persistence/SqliteMailRelayRepository.js';
 import { SqliteDiskUsageRepository } from '../infrastructure/persistence/SqliteDiskUsageRepository.js';
 import { SqlitePortalCredentialsRepository } from '../infrastructure/persistence/SqlitePortalCredentialsRepository.js';
@@ -270,8 +271,12 @@ export async function buildInstallation(
   const aria2RpcSecret = process.env.KOBOX_ARIA2_RPC_SECRET;
   const ddlStagingDir = process.env.KOBOX_DDL_STAGING;
   const quotaFs = process.env.KOBOX_QUOTA_FS;
-  const leDomain = process.env.KOBOX_LE_DOMAIN;
-  const leEmail = process.env.KOBOX_LE_EMAIL;
+  // What an admin set in the interface wins over the environment: the screen is
+  // the newer, discoverable way to say it, and KOBOX_LE_* stays valid for anyone
+  // who already scripted an install.
+  const site = await new SqliteSiteSettingsRepository(c.db).get();
+  const leDomain = site?.domain ?? process.env.KOBOX_LE_DOMAIN;
+  const leEmail = site?.email ?? process.env.KOBOX_LE_EMAIL;
   const acmeUrl = process.env.KOBOX_ACME_URL;
   const installPki = new EasyRsaPkiAdapter(runner, process.env.KOBOX_VPN_PKI ?? DEFAULT_PKI_DIR);
   const ctx: InstallerContext = {
@@ -478,6 +483,7 @@ export interface PortalContainer {
   readonly instances: SqliteTorrentInstanceRepository;
   readonly diskSamples: SqliteDiskUsageRepository;
   readonly mailRelay: SqliteMailRelayRepository;
+  readonly siteSettings: SqliteSiteSettingsRepository;
   readonly sealer: RsaRemotePasswordCipher;
   readonly destinations: SqliteSyncDestinationRepository;
   readonly transfers: SqliteSyncTransferRepository;
@@ -539,6 +545,7 @@ export function buildPortalContainer(name: string): PortalContainer {
     instances: new SqliteTorrentInstanceRepository(db),
     diskSamples: new SqliteDiskUsageRepository(db),
     mailRelay: new SqliteMailRelayRepository(db),
+    siteSettings: new SqliteSiteSettingsRepository(db),
     sealer: new RsaRemotePasswordCipher(),
     destinations: syncDestinations,
     // read-only from here: the portal shows the queue, the worker moves it

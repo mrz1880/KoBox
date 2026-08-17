@@ -191,6 +191,13 @@ export const fairUsePolicies = sqliteTable('fair_use_policies', {
 // One row per member, overwritten: this is a current reading, not a history.
 // One row (id 1): the SMTP relay this box sends through. The password is
 // sealed with the host public key, so this table never holds a usable secret.
+// One row (id 1): the public FQDN and the contact address for certificates.
+export const siteSettings = sqliteTable('site_settings', {
+  id: integer('id').primaryKey(),
+  domain: text('domain').notNull(),
+  email: text('email').notNull(),
+});
+
 export const mailRelay = sqliteTable('mail_relay', {
   id: integer('id').primaryKey(),
   host: text('host').notNull(),

@@ -202,6 +202,7 @@ const ADMIN_NAV: readonly (readonly [string, string])[] = [
   ['/admin/config', 'Config'],
   ['/admin/mails', 'Mails'],
   ['/admin/mail-relay', 'Mail relay'],
+  ['/admin/domain', 'Domain'],
   ['/monitoring', 'Monitoring'],
   ['/rutorrent', 'ruTorrent'],
 ];

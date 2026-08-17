@@ -30,6 +30,7 @@ import { InMemoryFairUseRepository } from '../../../src/infrastructure/persisten
 import { InMemoryComponentRegistry } from '../../../src/infrastructure/persistence/InMemoryComponentRegistry.js';
 import { InMemorySyncTransferRepository } from '../../../src/infrastructure/persistence/InMemorySyncTransferRepository.js';
 import { InMemorySyncDestinationRepository } from '../../../src/infrastructure/persistence/InMemorySyncDestinationRepository.js';
+import { InMemorySiteSettingsRepository } from '../../../src/infrastructure/persistence/InMemorySiteSettingsRepository.js';
 import { InMemoryMailRelayRepository } from '../../../src/infrastructure/persistence/InMemoryMailRelayRepository.js';
 import { InMemoryDiskUsageRepository } from '../../../src/infrastructure/persistence/InMemoryDiskUsageRepository.js';
 import { InMemoryTorrentInstanceRepository } from '../../../src/infrastructure/persistence/InMemoryTorrentInstanceRepository.js';
@@ -166,6 +167,7 @@ export interface PortalWorld {
   readonly diskSamples: InMemoryDiskUsageRepository;
   readonly components: InMemoryComponentRegistry;
   readonly mailRelay: InMemoryMailRelayRepository;
+  readonly siteSettings: InMemorySiteSettingsRepository;
   readonly destinations: InMemorySyncDestinationRepository;
   readonly transfers: InMemorySyncTransferRepository;
 }
@@ -194,6 +196,7 @@ export async function buildPortalWorld(
   const diskSamples = new InMemoryDiskUsageRepository();
   const components = new InMemoryComponentRegistry();
   const mailRelay = new InMemoryMailRelayRepository();
+  const siteSettings = new InMemorySiteSettingsRepository();
   const destinations = new InMemorySyncDestinationRepository();
   const transfers = new InMemorySyncTransferRepository();
   const authDeps = { users, credentials, sessions, attempts, tokens, hasher };
@@ -225,6 +228,7 @@ export async function buildPortalWorld(
     instances,
     diskSamples,
     mailRelay,
+    siteSettings,
     sealer: new FakeRemoteSealer(),
     destinations,
     transfers,
@@ -264,7 +268,7 @@ export async function buildPortalWorld(
     { username: Username.parse('boss'), passwordHash: GOOD_HASH, role: 'admin' },
     NOW,
   );
-  return { server, users, credentials, sessions, queue, outbox, downloads, debridAccounts, media, fairUse, diagnostics, instances, diskSamples, components, mailRelay, destinations, transfers };
+  return { server, users, credentials, sessions, queue, outbox, downloads, debridAccounts, media, fairUse, diagnostics, instances, diskSamples, components, mailRelay, siteSettings, destinations, transfers };
 }
 
 export interface AgentSession {

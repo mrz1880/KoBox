@@ -544,7 +544,7 @@ class LetsencryptInstaller implements ComponentInstaller {
       return {
         state: 'skipped',
         reason:
-          'no public FQDN configured — set KOBOX_LE_DOMAIN and KOBOX_LE_EMAIL, then re-run kobox install (snakeoil certificate stays)',
+          'no public FQDN configured: set one under Domain in the admin console (or KOBOX_LE_DOMAIN and KOBOX_LE_EMAIL), then re-run kobox install; the self-signed certificate stays until then',
       };
     }
     await packages.ensureInstalled(['certbot']);

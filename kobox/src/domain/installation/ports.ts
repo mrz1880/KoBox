@@ -114,3 +114,17 @@ export interface ComponentRegistry {
   markSkipped(name: ComponentName, reason: string, now: string): Promise<void>;
   reset(name: ComponentName, now: string): Promise<void>;
 }
+
+// The public name this box answers on, and the address certificate notices go
+// to. Persisted rather than read from the environment so an operator can set it
+// without editing a unit file, while KOBOX_LE_DOMAIN keeps working for anyone
+// who already scripted it.
+export interface SiteSettings {
+  readonly domain: string;
+  readonly email: string;
+}
+
+export interface SiteSettingsRepository {
+  get(): Promise<SiteSettings | undefined>;
+  save(settings: SiteSettings): Promise<void>;
+}
