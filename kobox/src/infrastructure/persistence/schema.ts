@@ -286,6 +286,8 @@ export const portalCredentials = sqliteTable('portal_credentials', {
   // present it as HTTP Basic (Radarr/Sonarr driving rTorrent); the raw token
   // only ever exists on the page that showed it once.
   appTokenHash: text('app_token_hash'),
+  // en | fr, null meaning the member never chose and gets English
+  language: text('language'),
   updatedAt: text('updated_at').notNull(),
 });
 

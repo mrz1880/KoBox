@@ -951,3 +951,51 @@ describe('connecting an app', () => {
     expect(response.statusCode).toBe(403);
   });
 });
+
+describe('the language a member reads the portal in', () => {
+  it('should_default_to_english_for_somebody_who_never_chose', async () => {
+    const response = await world.server.inject({
+      method: 'GET',
+      url: '/downloads',
+      headers: { cookie: user.cookie },
+    });
+
+    expect(response.body).toContain('Start download');
+  });
+
+  it('should_show_french_to_a_member_who_asked_for_it', async () => {
+    await world.server.inject({
+      method: 'POST',
+      url: '/access/language',
+      headers: { cookie: user.cookie, 'content-type': 'application/x-www-form-urlencoded' },
+      payload: form({ _csrf: user.csrf, language: 'fr' }),
+    });
+    const french = await loginAs(world, 'alice');
+
+    const response = await world.server.inject({
+      method: 'GET',
+      url: '/downloads',
+      headers: { cookie: french.cookie },
+    });
+
+    expect(response.body).toContain('Lancer le téléchargement');
+    expect(response.body).toContain('<html lang="fr">');
+  });
+
+  it('should_leave_the_other_members_alone', async () => {
+    await world.server.inject({
+      method: 'POST',
+      url: '/access/language',
+      headers: { cookie: user.cookie, 'content-type': 'application/x-www-form-urlencoded' },
+      payload: form({ _csrf: user.csrf, language: 'fr' }),
+    });
+
+    const response = await world.server.inject({
+      method: 'GET',
+      url: '/',
+      headers: { cookie: admin.cookie },
+    });
+
+    expect(response.body).toContain('<html lang="en">');
+  });
+});

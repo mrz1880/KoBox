@@ -3,6 +3,7 @@ import { z } from 'zod';
 import type { Authenticate, AuthenticatedSession } from '../../application/portal/Authenticate.js';
 import { html } from './html.js';
 import { page, type Viewer } from './views/layout.js';
+import { translatorFor } from './views/messages.js';
 
 export const SESSION_COOKIE = 'kobox_session';
 
@@ -40,6 +41,8 @@ export function viewerOf(session: AuthenticatedSession): Viewer {
     username: session.username.value,
     role: session.role,
     csrfToken: session.csrfToken,
+    language: session.language,
+    t: translatorFor(session.language),
   };
 }
 

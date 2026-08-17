@@ -1,5 +1,6 @@
 import type { HashedPassword } from '../user/HashedPassword.js';
 import type { Username } from '../user/Username.js';
+import type { Language } from './Language.js';
 import type { Role } from './Role.js';
 
 // Portal login credentials: the same crypt(3) sha512 hash the system account
@@ -16,6 +17,8 @@ export interface PortalCredentials {
   // present it as HTTP Basic; the raw token only ever exists on the page that
   // showed it once, so a database read never yields a usable credential.
   readonly appTokenHash?: string;
+  // the member's own choice of language; absent means English
+  readonly language?: Language;
 }
 
 export interface PortalCredentialsPort {
