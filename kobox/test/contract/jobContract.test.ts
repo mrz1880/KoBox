@@ -13,6 +13,7 @@ describe('job contract', () => {
       'set-user-quota',
       'sample-disk-usage',
       'provision-nextcloud-account',
+      'close-nextcloud-account',
       'apply-mail-relay',
       'set-ssh-key',
       'remove-ssh-key',

@@ -4,10 +4,18 @@ import type { Password } from '../../domain/user/Password.js';
 import type { UserRepository } from '../../domain/user/ports.js';
 import type { Username } from '../../domain/user/Username.js';
 import type { MailOutboxPort } from '../maintenance/MailOutboxPort.js';
+import { ComponentName } from '../../domain/installation/ComponentName.js';
+import type { ComponentRegistry } from '../../domain/installation/ports.js';
 import { UserNotFoundError } from './errors.js';
+
+async function nextcloudIsInstalled(components: ComponentRegistry): Promise<boolean> {
+  const record = await components.get(ComponentName.parse('nextcloud'));
+  return record?.state.value === 'installed';
+}
 
 interface Deps {
   readonly repo: UserRepository;
+  readonly components: ComponentRegistry;
   readonly credentials: PortalCredentialsPort;
   readonly nextcloud: NextcloudPort;
   readonly outbox: MailOutboxPort;
@@ -43,6 +51,12 @@ export class ProvisionNextcloudAccount {
   constructor(private readonly deps: Deps) {}
 
   async execute(command: { username: Username }): Promise<void> {
+    // the component skips without a pinned archive, so on most boxes there is
+    // nothing to create. Mailing somebody the password of an account that does
+    // not exist would be worse than staying quiet.
+    if (!(await nextcloudIsInstalled(this.deps.components))) {
+      return;
+    }
     const user = await this.deps.repo.findByUsername(command.username);
     if (user === undefined) {
       throw new UserNotFoundError(command.username.value);
@@ -68,5 +82,19 @@ export class ProvisionNextcloudAccount {
       },
       this.deps.clock(),
     );
+  }
+}
+
+// Closing rather than deleting: Nextcloud keeps the member's files until an
+// operator decides otherwise, and a disabled account cannot be signed in to.
+// Deleting a member must not silently delete data on a second system.
+export class CloseNextcloudAccount {
+  constructor(private readonly deps: { readonly components: ComponentRegistry; readonly nextcloud: NextcloudPort }) {}
+
+  async execute(command: { username: Username }): Promise<void> {
+    if (!(await nextcloudIsInstalled(this.deps.components))) {
+      return;
+    }
+    await this.deps.nextcloud.disableUser(command.username);
   }
 }

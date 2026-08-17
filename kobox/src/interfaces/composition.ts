@@ -603,6 +603,7 @@ export function buildContainer(name: string): Container {
     quota,
     diskSamples: new SqliteDiskUsageRepository(db),
     nextcloud: new OccNextcloudAdapter(runner),
+    components: new SqliteComponentRegistry(db),
     outbox,
     newPassword: () => Password.parse(randomBytes(12).toString('base64url')),
     sshKeys: new SqliteSshKeyRepository(db),

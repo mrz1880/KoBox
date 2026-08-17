@@ -99,6 +99,12 @@ export class JobWorker {
       await this.queue.enqueue(parseJob('provision-rtorrent', { username: job.payload.username }));
       // Phase 3 debt #2: client cert issuance rides the same seam
       await this.queue.enqueue(parseJob('provision-vpn-user', { username: job.payload.username }));
+      // Nextcloud rides the same seam as rtorrent and the VPN. Leaving it to a
+      // button meant a member without an account until somebody remembered; the
+      // job itself does nothing when the component is not installed.
+      await this.queue.enqueue(
+        parseJob('provision-nextcloud-account', { username: job.payload.username }),
+      );
       // welcome mail through the durable outbox — never a password in it
       await this.outbox.enqueue(
         {
@@ -124,6 +130,12 @@ export class JobWorker {
       );
     }
     // a user's home appears/disappears with the account: re-render NFS exports
+    if (job.type === 'delete-user') {
+      // an account that outlives its member is a login nobody is watching
+      await this.queue.enqueue(
+        parseJob('close-nextcloud-account', { username: job.payload.username }),
+      );
+    }
     if (job.type === 'create-user' || job.type === 'delete-user') {
       await this.queue.enqueue(parseJob('render-nfs-exports', {}));
     }
@@ -209,6 +221,11 @@ export class JobWorker {
         return;
       case 'apply-mail-relay':
         await this.maintenance.applyMailRelay.execute();
+        return;
+      case 'close-nextcloud-account':
+        await this.useCases.closeNextcloudAccount.execute({
+          username: Username.parse(job.payload.username),
+        });
         return;
       case 'provision-nextcloud-account':
         await this.useCases.provisionNextcloudAccount.execute({

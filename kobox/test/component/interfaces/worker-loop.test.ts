@@ -81,6 +81,8 @@ import {
 import { InMemoryDebridAccountRepository } from '../../../src/infrastructure/persistence/InMemoryDebridAccountRepository.js';
 import { InMemoryDebridDownloadRepository } from '../../../src/infrastructure/persistence/InMemoryDebridDownloadRepository.js';
 import { FakeNextcloud } from '../../../src/infrastructure/system/fakes/FakeNextcloud.js';
+import { InMemoryComponentRegistry } from '../../../src/infrastructure/persistence/InMemoryComponentRegistry.js';
+import { ComponentName } from '../../../src/domain/installation/ComponentName.js';
 
 class InMemoryJobQueue implements JobQueuePort {
   private readonly rows: { id: number; job: Job; status: string; error?: string }[] = [];
@@ -160,6 +162,8 @@ const alice = Username.parse('alice');
 
 interface World {
   queue: InMemoryJobQueue;
+  nextcloud: FakeNextcloud;
+  components: InMemoryComponentRegistry;
   accounts: FakeSystemAccounts;
   services: FakeServiceControl;
   instances: InMemoryTorrentInstanceRepository;
@@ -230,6 +234,9 @@ class ReversibleSealOpener implements RemotePasswordOpenerPort {
 let world: World;
 
 beforeEach(() => {
+  const outbox = new InMemoryMailOutbox();
+  const nextcloud = new FakeNextcloud();
+  const components = new InMemoryComponentRegistry();
   const repo = new InMemoryUserRepository();
   const accounts = new FakeSystemAccounts();
   const quota = new FakeQuota();
@@ -246,8 +253,9 @@ beforeEach(() => {
     accounts,
     quota,
     diskSamples: new InMemoryDiskUsageRepository(),
-    nextcloud: new FakeNextcloud(),
-    outbox: new InMemoryMailOutbox(),
+    nextcloud,
+    components,
+    outbox,
     newPassword: () => Password.parse('nextcloud-generated-pass'),
     sshKeys: new InMemorySshKeyRepository(),
     authorizedKeys: { write: () => Promise.resolve(), clear: () => Promise.resolve() },
@@ -367,7 +375,6 @@ beforeEach(() => {
     },
   });
   const queue = new InMemoryJobQueue();
-  const outbox = new InMemoryMailOutbox();
   const diagnosticsRepo = new InMemoryDiagnosticsRepository();
   const syncDestinations = new InMemorySyncDestinationRepository();
   const syncTransfers = new InMemorySyncTransferRepository();
@@ -421,6 +428,8 @@ beforeEach(() => {
     stagingBase: '/tmp/kobox-ddl-staging',
   });
   world = {
+    nextcloud,
+    components,
     queue,
     accounts,
     services,
@@ -525,6 +534,46 @@ describe('CLI enqueue -> root worker loop (the privilege seam)', () => {
     expect(await world.instances.findByUsername(alice)).toBeDefined();
     expect(world.services.unitContentFor(alice)).toContain('User=alice');
     expect(await world.services.isUserServiceRunning(alice)).toBe(true);
+  });
+
+  it('should_give_a_new_member_their_nextcloud_account_without_anyone_asking', async () => {
+    // rTorrent and the VPN are provisioned on the same seam; leaving Nextcloud
+    // to a button means a member without one until somebody remembers
+    await world.components.markInstalled(ComponentName.parse('nextcloud'), undefined, '2026-08-17 12:00:00');
+    await enqueueCreateAlice();
+
+    await world.worker.drain();
+
+    expect(world.nextcloud.users).toContain('alice');
+    expect(world.nextcloud.mounts.map((m) => m.label)).toEqual([
+      'rTorrent Complete',
+      'rTorrent Torrents',
+      'rTorrent Watch',
+    ]);
+  });
+
+  it('should_do_nothing_at_all_when_nextcloud_is_not_installed', async () => {
+    // the component skips without a pinned archive, and a member must not be
+    // mailed a password for an account that does not exist
+    await enqueueCreateAlice();
+
+    await world.worker.drain();
+
+    expect(world.nextcloud.users).toEqual([]);
+    const mails = await world.outbox.listRecent(10);
+    expect(mails.some((m) => m.subject.includes('Nextcloud'))).toBe(false);
+  });
+
+  it('should_close_the_nextcloud_account_when_the_member_is_deleted', async () => {
+    // an account that outlives its member is a login nobody is watching
+    await world.components.markInstalled(ComponentName.parse('nextcloud'), undefined, '2026-08-17 12:00:00');
+    await enqueueCreateAlice();
+    await world.worker.drain();
+    await world.queue.enqueue(buildJob.deleteUser({ username: 'alice' }));
+
+    await world.worker.drain();
+
+    expect(world.nextcloud.disabled).toContain('alice');
   });
 
   it('should_chain_deprovisioning_after_delete_user', async () => {
