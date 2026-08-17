@@ -6,7 +6,6 @@ import { InMemoryMediaRepository } from '../../../src/infrastructure/persistence
 import { FakeSystemd } from '../../../src/infrastructure/system/fakes/FakeSystemd.js';
 import { InMemorySyncTransferRepository } from '../../../src/infrastructure/persistence/InMemorySyncTransferRepository.js';
 import { InMemorySyncDestinationRepository } from '../../../src/infrastructure/persistence/InMemorySyncDestinationRepository.js';
-import { RemotePassword } from '../../../src/domain/sync/RemotePassword.js';
 import { InMemoryDiagnosticsRepository } from '../../../src/infrastructure/persistence/InMemoryDiagnosticsRepository.js';
 import { InMemorySpeedtestRepository } from '../../../src/infrastructure/persistence/InMemorySpeedtestRepository.js';
 import type { ClaimedJob, JobQueuePort } from '../../../src/application/jobs/JobQueuePort.js';
@@ -41,6 +40,10 @@ import { FakeTrackerCert } from '../../../src/infrastructure/system/fakes/FakeTr
 import { FakeAnnouncerSink } from '../../../src/infrastructure/system/fakes/FakeAnnouncerSink.js';
 import { FakeNotifications } from '../../../src/infrastructure/system/fakes/FakeNotifications.js';
 import { FakeQuota } from '../../../src/infrastructure/system/fakes/FakeQuota.js';
+import { FakeInstallHost } from '../../../src/infrastructure/system/fakes/FakeInstallHost.js';
+import { InMemoryMailRelayRepository } from '../../../src/infrastructure/persistence/InMemoryMailRelayRepository.js';
+import type { RemotePasswordOpenerPort } from '../../../src/domain/sync/ports.js';
+import { RemotePassword } from '../../../src/domain/sync/RemotePassword.js';
 import { FakeRtorrentConfig } from '../../../src/infrastructure/system/fakes/FakeRtorrentConfig.js';
 import { FakeRtorrentControl } from '../../../src/infrastructure/system/fakes/FakeRtorrentControl.js';
 import { FakeServiceControl } from '../../../src/infrastructure/system/fakes/FakeServiceControl.js';
@@ -213,6 +216,15 @@ class NoopBackupHost implements BackupHostPort {
   }
 }
 
+
+// Opens what portalWorld's sealer produces. Reversible on purpose: this suite
+// checks the wiring reaches the opener, not that a real seal is opaque.
+class ReversibleSealOpener implements RemotePasswordOpenerPort {
+  open(sealed: string): Promise<RemotePassword> {
+    return Promise.resolve(RemotePassword.parse(sealed.replace(/^rsealed:/, '')));
+  }
+}
+
 let world: World;
 
 beforeEach(() => {
@@ -380,6 +392,10 @@ beforeEach(() => {
       upgradeAll: () => Promise.resolve('1 upgraded'),
     },
     diagnostics: diagnosticsRepo,
+    mailRelay: new InMemoryMailRelayRepository(),
+    opener: new ReversibleSealOpener(),
+    files: new FakeRtorrentConfig(),
+    installHost: new FakeInstallHost(),
     clock: () => '2026-07-25 10:00:00',
   });
   const ddlUseCases = buildDdlUseCases({

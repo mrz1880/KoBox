@@ -63,6 +63,7 @@ import { KoboxDatabase } from '../infrastructure/persistence/db.js';
 import { SqliteBlocklistRepository } from '../infrastructure/persistence/SqliteBlocklistRepository.js';
 import { SqliteJobQueue } from '../infrastructure/persistence/SqliteJobQueue.js';
 import { SqliteLoginAttemptsRepository } from '../infrastructure/persistence/SqliteLoginAttemptsRepository.js';
+import { SqliteMailRelayRepository } from '../infrastructure/persistence/SqliteMailRelayRepository.js';
 import { SqliteDiskUsageRepository } from '../infrastructure/persistence/SqliteDiskUsageRepository.js';
 import { SqlitePortalCredentialsRepository } from '../infrastructure/persistence/SqlitePortalCredentialsRepository.js';
 import { SqlitePortalSessionRepository } from '../infrastructure/persistence/SqlitePortalSessionRepository.js';
@@ -476,6 +477,8 @@ export interface PortalContainer {
   readonly issueAppToken: IssueAppToken;
   readonly instances: SqliteTorrentInstanceRepository;
   readonly diskSamples: SqliteDiskUsageRepository;
+  readonly mailRelay: SqliteMailRelayRepository;
+  readonly sealer: RsaRemotePasswordCipher;
   readonly destinations: SqliteSyncDestinationRepository;
   readonly transfers: SqliteSyncTransferRepository;
   readonly setDestination: SetSyncDestination;
@@ -535,6 +538,8 @@ export function buildPortalContainer(name: string): PortalContainer {
     // what creates directories and changes a mode
     instances: new SqliteTorrentInstanceRepository(db),
     diskSamples: new SqliteDiskUsageRepository(db),
+    mailRelay: new SqliteMailRelayRepository(db),
+    sealer: new RsaRemotePasswordCipher(),
     destinations: syncDestinations,
     // read-only from here: the portal shows the queue, the worker moves it
     transfers: new SqliteSyncTransferRepository(db),
@@ -688,6 +693,10 @@ export function buildContainer(name: string): Container {
     logs: new JournaldLogAdapter(runner),
     packageUpdates: new AptUpdateAdapter(runner),
     diagnostics: diagnosticsRepo,
+    mailRelay: new SqliteMailRelayRepository(db),
+    opener: new RsaRemotePasswordCipher(),
+    files: new RtorrentConfigAdapter(runner),
+    installHost: new InstallHostAdapter(runner),
     clock: nowStamp,
   });
   // DDL/debrid: debrid accounts are PER-USER — each key is stored sealed and is

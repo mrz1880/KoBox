@@ -189,6 +189,16 @@ export const fairUsePolicies = sqliteTable('fair_use_policies', {
 // Last cumulative meter reading per user — the delta basis for rates.
 // What the disk held for a member the last time the privileged worker looked.
 // One row per member, overwritten: this is a current reading, not a history.
+// One row (id 1): the SMTP relay this box sends through. The password is
+// sealed with the host public key, so this table never holds a usable secret.
+export const mailRelay = sqliteTable('mail_relay', {
+  id: integer('id').primaryKey(),
+  host: text('host').notNull(),
+  port: integer('port').notNull(),
+  user: text('user').notNull(),
+  sealedPassword: text('sealed_password').notNull(),
+});
+
 export const diskSamples = sqliteTable('disk_samples', {
   username: text('username').primaryKey(),
   usedBytes: integer('used_bytes').notNull(),

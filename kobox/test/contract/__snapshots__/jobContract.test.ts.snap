@@ -72,6 +72,12 @@ exports[`job contract > should_keep_the_wire_contract_stable 1`] = `
     "properties": {},
     "type": "object",
   },
+  "apply-mail-relay": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {},
+    "type": "object",
+  },
   "apply-package-updates": {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "additionalProperties": false,

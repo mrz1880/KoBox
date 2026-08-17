@@ -48,6 +48,7 @@ import { RenderRutorrentUsers } from '../application/torrent/RenderRutorrentUser
 import { SetAllowPublicTracker } from '../application/torrent/SetAllowPublicTracker.js';
 import { SetSyncDisabled } from '../application/torrent/SetSyncDisabled.js';
 import type { BackupHostPort } from '../application/maintenance/BackupHostPort.js';
+import type { InstallHostPort } from '../domain/installation/ports.js';
 import type { MailOutboxPort } from '../application/maintenance/MailOutboxPort.js';
 import type { MailTransportPort } from '../application/maintenance/MailTransportPort.js';
 import { RunBackup, type BackupSettings } from '../application/maintenance/RunBackup.js';
@@ -68,6 +69,11 @@ import type {
   SpeedtestPort,
   SpeedtestRepositoryPort,
 } from '../application/maintenance/SpeedtestPort.js';
+import {
+  ApplyStoredMailRelay,
+  ConfigureMailRelay,
+  type MailRelayRepository,
+} from '../application/maintenance/ConfigureMailRelay.js';
 import { SendMails } from '../application/maintenance/SendMails.js';
 import { ApplyFirewall } from '../application/security/ApplyFirewall.js';
 import { DeprovisionVpnUser } from '../application/security/DeprovisionVpnUser.js';
@@ -190,11 +196,16 @@ export interface MaintenanceUseCaseDeps {
   readonly packageUpdates: PackageUpdatePort;
   readonly diagnostics: DiagnosticsRepositoryPort;
   readonly speedtests: SpeedtestRepositoryPort;
+  readonly mailRelay: MailRelayRepository;
+  readonly opener: RemotePasswordOpenerPort;
+  readonly files: ManagedFilesPort;
+  readonly installHost: InstallHostPort;
   readonly clock: () => string;
 }
 
 export interface MaintenanceUseCases {
   readonly sendMails: SendMails;
+  readonly applyMailRelay: ApplyStoredMailRelay;
   readonly runBackup: RunBackup;
   readonly runSpeedtest: RunSpeedtest;
   readonly restartService: RestartService;
@@ -206,6 +217,15 @@ export interface MaintenanceUseCases {
 export function buildMaintenanceUseCases(deps: MaintenanceUseCaseDeps): MaintenanceUseCases {
   return {
     sendMails: new SendMails(deps),
+    applyMailRelay: new ApplyStoredMailRelay({
+      settings: deps.mailRelay,
+      opener: deps.opener,
+      configure: new ConfigureMailRelay({
+        files: deps.files,
+        host: deps.installHost,
+        systemd: deps.systemd,
+      }),
+    }),
     runBackup: new RunBackup({ backupHost: deps.backupHost, settings: deps.backupSettings }),
     restartService: new RestartService({ systemd: deps.systemd }),
     captureServiceLog: new CaptureServiceLog({

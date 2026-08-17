@@ -206,6 +206,9 @@ export class JobWorker {
           quota: Quota.gib(job.payload.quotaGib),
         });
         return;
+      case 'apply-mail-relay':
+        await this.maintenance.applyMailRelay.execute();
+        return;
       case 'sample-disk-usage':
         await this.useCases.sampleDiskUsage.execute();
         return;

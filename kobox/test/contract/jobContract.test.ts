@@ -12,6 +12,7 @@ describe('job contract', () => {
       'change-password',
       'set-user-quota',
       'sample-disk-usage',
+      'apply-mail-relay',
       'suspend-user',
       'resume-user',
       'provision-rtorrent',
