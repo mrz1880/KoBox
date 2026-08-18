@@ -21,6 +21,11 @@ async function sweepSpool(c: Container): Promise<void> {
 
 // The root worker: the only process that both reads the queue and touches
 // infrastructure/system. Runs as a systemd service in production; --once
+// how often the worker asks aria2 where a download is up to. Five seconds is
+// short enough that a bar moves while somebody is looking at it, and long
+// enough that a box with nothing running does one cheap query per five seconds.
+const DEBRID_POLL_INTERVAL_MS = 5_000;
+
 // sweeps the event spool, drains the queue and exits (tests, cron setups).
 async function main(): Promise<void> {
   const once = process.argv.includes('--once');
@@ -49,8 +54,22 @@ async function main(): Promise<void> {
     // filter table from the persisted file, but the nat masquerade lives
     // outside the ruleset (shared table) — reconverge it here.
     await c.queue.enqueue(parseJob('apply-firewall', {}));
+    // A download's progress used to come only from the */2 cron entry, so the
+    // bar moved at best every two minutes and most downloads were long finished
+    // before it moved at all. Cron cannot go below a minute; this loop is
+    // already awake every second, holds the aria2 secret, and the poll is a
+    // single indexed SELECT when nothing is active. The cron entry stays as the
+    // net that catches a worker which was down while something finished.
+    let nextDebridPoll = 0;
     while (!signal.stopping) {
       await sweepSpool(c);
+      if (Date.now() >= nextDebridPoll) {
+        nextDebridPoll = Date.now() + DEBRID_POLL_INTERVAL_MS;
+        await c.ddlUseCases.pollDownloads.execute().catch((error: unknown) => {
+          // one bad poll must not stop the queue from draining
+          c.logger.warn({ err: error }, 'debrid poll failed');
+        });
+      }
       const processed = await c.worker.processNext();
       if (!processed) {
         await sleep(1000);
