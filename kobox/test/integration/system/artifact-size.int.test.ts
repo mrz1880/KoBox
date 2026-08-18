@@ -19,6 +19,7 @@ const DIGEST = createHash('sha256').update(OVERSIZED).digest('hex');
 
 let dir = '';
 let server: ReturnType<typeof createHttpsServer> | undefined;
+let seenUserAgent: string | undefined;
 
 beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), 'kobox-artifact-'));
@@ -41,7 +42,8 @@ async function serve(body: Buffer): Promise<{ url: string; ca: string }> {
   const ca = readFileSync(certPath, 'utf8');
   server = createHttpsServer(
     { key: readFileSync(keyPath), cert: readFileSync(certPath) },
-    (_request, response) => {
+    (request, response) => {
+      seenUserAgent = request.headers['user-agent'];
       response.writeHead(200);
       response.end(body);
     },
@@ -64,5 +66,17 @@ describe('fetching a vendored application release', () => {
     await adapter.fetchVerified(url, DIGEST, dest);
 
     expect(readFileSync(dest).length).toBe(OVERSIZED.length);
+  }, 60_000);
+
+  it('should_tell_the_server_who_is_asking', async () => {
+    // node sends no User-Agent at all, and download.nextcloud.com answers 429
+    // to that. curl from the same box got 200, which is what made this look
+    // like a rate limit we had earned rather than a header we never sent.
+    const { url, ca } = await serve(OVERSIZED);
+    const adapter = new ArtifactFetchAdapter(defaultBodyFetcher({ ca }));
+
+    await adapter.fetchVerified(url, DIGEST, join(dir, 'x.tar.bz2'));
+
+    expect(seenUserAgent ?? '').toMatch(/KoBox/);
   }, 60_000);
 });
