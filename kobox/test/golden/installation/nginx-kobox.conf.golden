@@ -78,9 +78,9 @@ server {
     }
 
     # NanoMon host monitoring (localhost), admin-only through the portal
-    location /internal-media/ {
+    location ~ ^/internal-media/([^/]+)/(.+)$ {
         internal;
-        alias /home/;
+        alias /home/$1/rtorrent/complete/$2;
     }
 
     location /monitoring/ {
