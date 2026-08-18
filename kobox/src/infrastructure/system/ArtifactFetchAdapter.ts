@@ -13,12 +13,20 @@ export class ArtifactFetchError extends Error {
 
 export type HttpsBodyFetcher = (url: string) => Promise<Buffer | undefined>;
 
+// A vendored application release is not a blocklist. The shared helper caps a
+// body at 32 MB so a wedged mirror cannot fill the disk, which is right for a
+// list of ranges and wrong for Nextcloud: its release is 281 MB, so the download
+// was aborted and reported as a plain failure. ruTorrent, NanoMon and librespeed
+// all happened to fit under the smaller cap, which is why nothing showed it.
+const MAX_ARTIFACT_BYTES = 512 * 1024 * 1024;
+
 export function defaultBodyFetcher(options: HttpsDownloadOptions = {}): HttpsBodyFetcher {
+  const withCap: HttpsDownloadOptions = { maxBytes: MAX_ARTIFACT_BYTES, ...options };
   return async (url) => {
-    let response = await httpsGet(url, options);
+    let response = await httpsGet(url, withCap);
     // one https-only redirect hop, like the blocklist downloads
     if (response?.location?.startsWith('https://')) {
-      response = await httpsGet(response.location, options);
+      response = await httpsGet(response.location, withCap);
     }
     return response?.body;
   };

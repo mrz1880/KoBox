@@ -46,6 +46,10 @@ export function decodeP2pDownload(body: Buffer): DownloadedList | undefined {
 export interface HttpsDownloadOptions {
   readonly ca?: string; // test seam: fixture CA for the in-test https server
   readonly timeoutMs?: number; // default 30 s — a wedged mirror must not stall the worker
+  // What the caller is willing to receive. A blocklist that will not stop
+  // arriving must not fill the disk, so the default is deliberately small; an
+  // application release is a different order of size and says so.
+  readonly maxBytes?: number;
 }
 
 interface HttpsResponse {
@@ -76,7 +80,7 @@ export function httpsGet(
       let size = 0;
       response.on('data', (chunk: Buffer) => {
         size += chunk.length;
-        if (size > MAX_BODY_BYTES) {
+        if (size > (options.maxBytes ?? MAX_BODY_BYTES)) {
           request.destroy();
           resolve(undefined);
           return;
