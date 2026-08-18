@@ -1,3 +1,4 @@
+import { DiscardDebridDownload } from '../application/ddl/DiscardDebridDownload.js';
 import { PollDebridDownloads } from '../application/ddl/PollDebridDownloads.js';
 import { RequestDebridDownload } from '../application/ddl/RequestDebridDownload.js';
 import { StartDebridDownload } from '../application/ddl/StartDebridDownload.js';
@@ -456,6 +457,7 @@ export interface DdlUseCases {
   readonly requestDownload: RequestDebridDownload;
   readonly startDownload: StartDebridDownload;
   readonly pollDownloads: PollDebridDownloads;
+  readonly discardDownload: DiscardDebridDownload;
   readonly storeDebridKey: StoreDebridKey;
   readonly clearDebridKey: ClearDebridKey;
 }
@@ -473,6 +475,11 @@ export function buildDdlUseCases(deps: DdlUseCaseDeps): DdlUseCases {
       credentials: deps.credentials,
       downloader: deps.downloader,
       stagingBase: deps.stagingBase,
+    }),
+    discardDownload: new DiscardDebridDownload({
+      repo: deps.repo,
+      downloader: deps.downloader,
+      placement: deps.placement,
     }),
     pollDownloads: new PollDebridDownloads({
       repo: deps.repo,

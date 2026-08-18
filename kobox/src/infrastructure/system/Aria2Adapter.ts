@@ -45,6 +45,28 @@ export class Aria2Adapter implements DownloaderPort {
     }
   }
 
+  // forceRemove, not remove: a download that is paused or already errored must
+  // still leave the queue, and remove() refuses those states.
+  async cancel(gid: DownloadGid): Promise<{ stagedPath?: string }> {
+    const stagedPath = await this.stagedPathOf(gid);
+    await this.call('aria2.forceRemove', [this.token(), gid.value]).catch(() => undefined);
+    // removeDownloadResult forgets the finished/removed entry so a later poll
+    // does not resurrect a row the member asked to be rid of
+    await this.call('aria2.removeDownloadResult', [this.token(), gid.value]).catch(
+      () => undefined,
+    );
+    return stagedPath === undefined ? {} : { stagedPath };
+  }
+
+  private async stagedPathOf(gid: DownloadGid): Promise<string | undefined> {
+    try {
+      const body = await this.call('aria2.tellStatus', [this.token(), gid.value, ['files']]);
+      return aria2StatusResultSchema.parse(body).result.files?.[0]?.path;
+    } catch {
+      return undefined; // aria2 has already forgotten it: nothing to clean
+    }
+  }
+
   async status(gid: DownloadGid): Promise<DownloadState> {
     const body = await this.call('aria2.tellStatus', [
       this.token(),

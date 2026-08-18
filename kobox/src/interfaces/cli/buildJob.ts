@@ -241,6 +241,10 @@ export const buildJob = {
     return parseJob('render-nfs-exports', {});
   },
 
+  discardDebridDownload(input: { username: string; downloadId: number }): Job {
+    return parseJob('discard-debrid-download', input);
+  },
+
   pollDebridDownloads(): Job {
     return parseJob('poll-debrid-downloads', {});
   },

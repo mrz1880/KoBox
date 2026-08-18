@@ -347,11 +347,22 @@ export function registerUserRoutes(
     }
     // scoped by the session's own username: a 404 for somebody else's row says
     // the same thing as a 404 for a row that never existed, which is the point
-    const removed = await deps.downloads.removeForUser(session.username, params.data.id);
-    if (!removed) {
+    // ownership is checked here so somebody else's id answers 404 rather than
+    // silently enqueueing a job that would do nothing
+    const rows = await deps.downloads.listForUser(session.username);
+    if (!rows.some((row) => row.id === params.data.id)) {
       return reply.code(404).send();
     }
-    return redirectWithFlash(reply, '/downloads', 'Removed from your list.');
+    // the portal can neither reach aria2 nor delete from the staging dir, so
+    // the worker does the whole thing: cancel, discard the partial file, drop
+    // the row. Removing the row here would strand the bytes it was writing.
+    await deps.queue.enqueue(
+      buildJob.discardDebridDownload({
+        username: session.username.value,
+        downloadId: params.data.id,
+      }),
+    );
+    return redirectWithFlash(reply, '/downloads', 'Removing it now.');
   });
 
   server.post('/downloads/debrid-key', async (request, reply) => {

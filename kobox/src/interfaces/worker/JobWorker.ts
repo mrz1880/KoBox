@@ -496,6 +496,12 @@ export class JobWorker {
       case 'debrid-download':
         await this.ddl.startDownload.execute({ downloadId: job.payload.downloadId });
         return;
+      case 'discard-debrid-download':
+        await this.ddl.discardDownload.execute({
+          username: Username.parse(job.payload.username),
+          id: job.payload.downloadId,
+        });
+        return;
       case 'poll-debrid-downloads':
         await this.ddl.pollDownloads.execute();
         return;

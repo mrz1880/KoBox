@@ -421,9 +421,13 @@ beforeEach(() => {
     downloader: {
       addUri: () => Promise.reject(new Error('no aria2 in this suite')),
       checkReachable: () => Promise.resolve({ ok: true, detail: 'fake' }),
+      cancel: () => Promise.resolve({}),
       status: () => Promise.reject(new Error('no aria2 in this suite')),
     },
-    placement: { place: () => Promise.reject(new Error('no placement in this suite')) },
+    placement: {
+      place: () => Promise.reject(new Error('no placement in this suite')),
+      discardStaged: () => Promise.resolve(),
+    },
     queue,
     clock: () => '2026-07-25 10:00:00',
     stagingBase: '/tmp/kobox-ddl-staging',
