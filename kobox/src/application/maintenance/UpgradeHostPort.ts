@@ -10,4 +10,9 @@ export interface UpgradeHostPort {
   switchCurrent(link: string, target: string): Promise<void>;
   // systemctl restart kobox-worker, then bounded is-active verification
   restartWorkerAndVerify(): Promise<boolean>;
+  // The portal runs from the same symlink. Restarting only the worker left it
+  // serving the previous release, which on a live box looked like a folder the
+  // portal accepted and the worker then refused. Not a health gate: the worker
+  // is what decides whether to roll back, the portal simply has to follow.
+  restartPortal(): Promise<void>;
 }

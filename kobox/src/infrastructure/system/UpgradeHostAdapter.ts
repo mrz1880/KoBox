@@ -59,6 +59,14 @@ export class UpgradeHostAdapter implements UpgradeHostPort {
     await rename(staging, link);
   }
 
+  async restartPortal(): Promise<void> {
+    // best-effort by design: the worker is the health gate that decides a
+    // rollback. A portal that will not come back is loud on its own, and
+    // failing the upgrade here would strand the box mid-flip.
+    await this.runner.run({ command: 'systemctl', args: ['reset-failed', 'kobox-portal'] });
+    await this.runner.run({ command: 'systemctl', args: ['restart', 'kobox-portal'] });
+  }
+
   async restartWorkerAndVerify(): Promise<boolean> {
     // upgrade + rollback restart the worker in quick succession: clear any
     // tripped start-rate counter first (best-effort; unit may not be failed)

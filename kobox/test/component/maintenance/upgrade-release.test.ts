@@ -149,6 +149,13 @@ class FakeUpgradeHost implements UpgradeHostPort {
     return Promise.resolve();
   }
 
+  readonly portalRestarts: string[] = [];
+
+  restartPortal(): Promise<void> {
+    this.portalRestarts.push('restarted');
+    return Promise.resolve();
+  }
+
   restartWorkerAndVerify(): Promise<boolean> {
     this.restarts += 1;
     if (this.failVerifyOnce) {
@@ -327,5 +334,34 @@ describe('UpgradeRelease', () => {
     const w = world();
 
     await expect(w.upgrade.rollback({ now: NOW })).rejects.toThrow(/previous/);
+  });
+});
+
+describe('the portal after an upgrade', () => {
+  it('should_restart_it_too_rather_than_leave_it_on_the_old_code', async () => {
+    // both units run from /opt/kobox/current. Restarting only the worker left
+    // the portal serving the previous release: on a live box that showed up as
+    // a folder the portal accepted and the worker then refused, with a message
+    // about a rule that no longer existed.
+    const w = world();
+
+    await w.upgrade.execute({ to: 'v2.0.0', now: NOW });
+
+    expect(w.host.portalRestarts).toHaveLength(1);
+  });
+
+  it('should_restart_it_after_a_rollback_as_well', async () => {
+    // a portal left on a release that was rolled back is the same split, the
+    // other way round
+    // a rollback needs something to roll back TO, so two releases first
+    const w = world();
+    await w.upgrade.execute({ to: 'v2.0.0', now: NOW });
+    w.git.refs.set('v3.0.0', 'c'.repeat(40));
+    await w.upgrade.execute({ to: 'v3.0.0', now: '2026-07-25 11:00:00' });
+    w.host.portalRestarts.length = 0;
+
+    await w.upgrade.rollback({ now: '2026-07-25 12:00:00' });
+
+    expect(w.host.portalRestarts).toHaveLength(1);
   });
 });
