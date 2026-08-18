@@ -114,6 +114,8 @@ export class UpgradeRelease {
     const previousRelease = await releases.findByState('current');
     await host.switchCurrent(settings.currentLink, this.packageDir(path));
     if (await host.restartWorkerAndVerify()) {
+      // both units run the switched-to release, or neither does
+      await host.restartPortal();
       if (previousRelease) {
         await releases.setState(previousRelease.id, 'previous', input.now);
       }
@@ -130,6 +132,7 @@ export class UpgradeRelease {
     if (previousTarget !== undefined) {
       await host.switchCurrent(settings.currentLink, previousTarget);
       revertOk = await host.restartWorkerAndVerify();
+      await host.restartPortal();
     }
     await releases.setState(releaseId, 'failed', input.now);
     throw new UpgradeError(
@@ -153,9 +156,12 @@ export class UpgradeRelease {
     await host.switchCurrent(settings.currentLink, this.packageDir(previous.path));
     if (!(await host.restartWorkerAndVerify())) {
       throw new UpgradeError(
-        `worker did not come up on ${previous.ref} after rollback — inspect journalctl -u kobox-worker`,
+        `worker did not come up on ${previous.ref} after rollback: inspect journalctl -u kobox-worker`,
       );
     }
+    // a portal left on the release that was just rolled back is the same split,
+    // the other way round
+    await host.restartPortal();
     await releases.setState(previous.id, 'current', input.now);
     if (current) {
       await releases.setState(current.id, 'previous', input.now);
