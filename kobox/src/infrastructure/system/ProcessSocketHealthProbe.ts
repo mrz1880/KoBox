@@ -7,19 +7,28 @@ import type { CommandRunner } from './CommandRunner.js';
 export class ProcessSocketHealthProbe implements HealthProbePort {
   constructor(private readonly runner: CommandRunner) {}
 
-  // `pgrep -x` compares against comm, and rtorrent renames its main thread to
-  // "rtorrent main". So the exact match found nothing on every box that was
-  // running perfectly, and doctor reported unhealthy for months. A check that
-  // always cries wolf is worse than no check: it teaches people to skip the
-  // output, which is where the real failures are.
+  // Two daemons on the same box answer in opposite ways, and both answers are
+  // real:
+  //   rtorrent  comm "rtorrent main" (it renames its own thread), args "/usr/bin/rtorrent ..."
+  //   systemd   comm "systemd",      args "/sbin/init"
   //
-  // Matching the full command line anchored on the executable path instead: a
-  // member's torrent named "rtorrent" cannot make a dead daemon look alive.
+  // Matching comm alone missed rtorrent, so doctor reported it unhealthy on
+  // every healthy box for months. Matching the command line alone missed init,
+  // which CI caught. So: comm first, then the command line anchored on the
+  // executable path, and healthy if either finds it. The anchor is what keeps a
+  // member's torrent named "rtorrent" from making a dead daemon look alive.
+  //
+  // A check that always cries wolf is worse than no check: it teaches whoever
+  // reads the output to skip that line, which is where the real failure is.
   async checkProcess(processName: string): Promise<HealthCheckResult> {
-    const result = await this.runner.run({
-      command: 'pgrep',
-      args: ['-f', `^(/[^ ]*/)?${processName}( |$)`],
-    });
+    const byComm = await this.runner.run({ command: 'pgrep', args: ['-x', processName] });
+    const result =
+      byComm.exitCode === 0
+        ? byComm
+        : await this.runner.run({
+            command: 'pgrep',
+            args: ['-f', `^(/[^ ]*/)?${processName}( |$)`],
+          });
     return result.exitCode === 0
       ? { name: `process:${processName}`, state: 'healthy' }
       : { name: `process:${processName}`, state: 'unhealthy', detail: 'no such process' };
