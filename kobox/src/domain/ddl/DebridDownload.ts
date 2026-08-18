@@ -13,6 +13,7 @@ interface DebridDownloadProps {
   readonly status: DownloadStatus;
   readonly gid?: DownloadGid;
   readonly filename?: string;
+  readonly percent?: number;
   readonly error?: string;
   readonly createdAt: string;
 }
@@ -29,6 +30,7 @@ export class DebridDownload {
   readonly status: DownloadStatus;
   readonly gid?: DownloadGid;
   readonly filename?: string;
+  readonly percent?: number;
   readonly error?: string;
   readonly createdAt: string;
 
@@ -45,6 +47,9 @@ export class DebridDownload {
     }
     if (props.filename !== undefined) {
       this.filename = props.filename;
+    }
+    if (props.percent !== undefined) {
+      this.percent = props.percent;
     }
     if (props.error !== undefined) {
       this.error = props.error;
@@ -71,6 +76,15 @@ export class DebridDownload {
     return new DebridDownload({ ...this.props(), status: 'downloading', gid });
   }
 
+  // The last reading the poll took. Kept on the row rather than asked of aria2
+  // when a page renders: the portal has no business talking to the engine, and
+  // a member refreshing must not depend on it being up.
+  progressed(percent: number): DebridDownload {
+    return this.percent === percent
+      ? this
+      : new DebridDownload({ ...this.props(), percent });
+  }
+
   completed(filename: string): DebridDownload {
     return new DebridDownload({ ...this.props(), status: 'done', filename });
   }
@@ -88,6 +102,7 @@ export class DebridDownload {
       status: this.status,
       ...(this.gid !== undefined && { gid: this.gid }),
       ...(this.filename !== undefined && { filename: this.filename }),
+      ...(this.percent !== undefined && { percent: this.percent }),
       ...(this.error !== undefined && { error: this.error }),
       createdAt: this.createdAt,
     };

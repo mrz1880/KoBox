@@ -6,6 +6,7 @@ import {
 import type { DirectUrl } from '../../domain/ddl/DirectUrl.js';
 import { DownloadGid } from '../../domain/ddl/DownloadGid.js';
 import type { DownloaderPort, DownloadState } from '../../domain/ddl/ports.js';
+import { DownloadProgress } from '../../domain/ddl/DownloadProgress.js';
 
 export class Aria2Error extends Error {
   constructor(message: string) {
@@ -48,7 +49,7 @@ export class Aria2Adapter implements DownloaderPort {
     const body = await this.call('aria2.tellStatus', [
       this.token(),
       gid.value,
-      ['status', 'files', 'errorMessage'],
+      ['status', 'files', 'errorMessage', 'completedLength', 'totalLength'],
     ]);
     const { result } = aria2StatusResultSchema.parse(body);
     if (result.status === 'complete') {
@@ -61,7 +62,11 @@ export class Aria2Adapter implements DownloaderPort {
         ...(result.errorMessage !== undefined && { message: result.errorMessage }),
       };
     }
-    return { state: 'active' };
+    const progress = DownloadProgress.of(
+      Number(result.completedLength ?? '0'),
+      Number(result.totalLength ?? '0'),
+    );
+    return { state: 'active', ...(progress !== undefined && { progress }) };
   }
 
   private token(): string {

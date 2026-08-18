@@ -78,6 +78,12 @@ form.card, div.card {
 label { display: block; margin: 0.6rem 0 0.15rem; color: var(--muted); font-size: 0.85rem; }
 /* a checkbox reads as a sentence, not as a field: the box sits with its words
    and must escape the full-width rule below */
+/* a thin rail with a filled portion: the number beside it is what people read,
+   the bar is what they glance at */
+.bar { display: inline-block; width: 5.5rem; height: 0.4rem; margin-left: 0.5rem;
+  border-radius: 999px; background: var(--line); overflow: hidden; vertical-align: middle; }
+.bar > span { display: block; height: 100%; background: var(--accent, #4aa3c7); }
+.pct { margin-left: 0.35rem; font-size: 0.8rem; color: var(--muted); }
 label.check { display: flex; align-items: center; gap: 0.5rem; color: var(--ink); font-size: 0.95rem; }
 label.check input { width: auto; margin: 0; }
 input, select {

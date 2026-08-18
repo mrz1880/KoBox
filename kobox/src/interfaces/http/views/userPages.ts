@@ -276,6 +276,19 @@ function debridAccountCard(viewer: Viewer, hasKey: boolean): RawHtml {
 // A finished download shows its file, a running one its source, a failed one the
 // reason. The first two are data and read as mono; a reason is a sentence meant
 // to be read, so it is set as prose with the API code kept scannable beside it.
+// Drawn only when aria2 has actually reported a size. No bar is a truthful
+// "we cannot tell yet"; a bar sitting at zero reads as "started and going
+// nowhere", which is a different and wrong statement.
+function progressBar(download: DebridDownload): RawHtml {
+  if (download.percent === undefined || download.status !== 'downloading') {
+    return html``;
+  }
+  const percent = String(download.percent);
+  return html`<span class="bar" role="progressbar" aria-valuenow="${percent}"
+  aria-valuemin="0" aria-valuemax="100"><span style="width:${percent}%"></span></span>
+<span class="pct">${percent}%</span>`;
+}
+
 function detailCell(download: DebridDownload): RawHtml {
   if (download.filename !== undefined) {
     return html`<span class="path">${download.filename}</span>`;
@@ -327,7 +340,7 @@ export function downloadsPage(
       : downloads.map(
           (download) => html`<tr>
   <td>${download.category.value}</td>
-  <td>${downloadStatusChip(download.status)}</td>
+  <td>${downloadStatusChip(download.status)}${progressBar(download)}</td>
   <td>${detailCell(download)}</td>
   <td class="when">${download.createdAt}</td>
   <td>${download.id === undefined

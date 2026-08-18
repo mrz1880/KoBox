@@ -49,6 +49,10 @@ export class PollDebridDownloads {
       await this.deps.repo.save(download.completed(basename(finalPath)));
     } else if (state.state === 'error') {
       await this.deps.repo.save(download.failed(state.message ?? 'download failed'));
+    } else if (state.progress !== undefined) {
+      // only when aria2 actually knows the size: writing 0% while it does not
+      // would show a bar that has not moved rather than one that cannot yet
+      await this.deps.repo.save(download.progressed(state.progress.percent));
     }
   }
 }
