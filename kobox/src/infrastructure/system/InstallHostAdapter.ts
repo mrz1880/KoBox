@@ -70,11 +70,15 @@ export class InstallHostAdapter implements InstallHostPort {
     return true;
   }
 
-  async extractTarGz(archive: string, destDir: string, layout: ArchiveLayout): Promise<void> {
+  // -a, not -z: the compression is read from the file rather than assumed.
+  // Nextcloud publishes .tar.bz2 and .zip and never .tar.gz, so the gzip-only
+  // form could not open a single real release of it, while the components that
+  // came first happened to ship gzip and hid that.
+  async extractArchive(archive: string, destDir: string, layout: ArchiveLayout): Promise<void> {
     await runOrThrow(this.runner, {
       command: 'tar',
       args: [
-        '-xzf',
+        '-xaf',
         archive,
         '-C',
         destDir,

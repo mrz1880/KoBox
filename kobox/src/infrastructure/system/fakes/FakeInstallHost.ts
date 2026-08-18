@@ -87,7 +87,7 @@ export class FakeInstallHost implements ManagedFilesPort, InstallHostPort, Artif
     return Promise.resolve(true);
   }
 
-  extractTarGz(archive: string, destDir: string, _layout: ArchiveLayout): Promise<void> {
+  extractArchive(archive: string, destDir: string, _layout: ArchiveLayout): Promise<void> {
     this.extracted.push([archive, destDir]);
     return Promise.resolve();
   }
