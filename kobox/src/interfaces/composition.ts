@@ -149,6 +149,7 @@ import {
 } from './useCases.js';
 import type { SecuritySettings } from '../application/security/settings.js';
 import { mergeKoboxEnv, parseEnvFile } from './envSnapshot.js';
+import { artifactPinsFrom } from './artifactPins.js';
 
 function envInt(name: string, fallback: number): number {
   const raw = process.env[name];
@@ -270,12 +271,6 @@ export async function buildInstallation(
 ): Promise<InstallationWiring> {
   const runner = new ExecFileRunner();
   const facts = await new SystemFactsAdapter(runner).gather();
-  const rutorrentUrl = process.env.KOBOX_RUTORRENT_URL;
-  const rutorrentSha256 = process.env.KOBOX_RUTORRENT_SHA256;
-  const nanomonUrl = process.env.KOBOX_NANOMON_URL;
-  const nanomonSha256 = process.env.KOBOX_NANOMON_SHA256;
-  const speedtestUrl = process.env.KOBOX_SPEEDTEST_URL;
-  const speedtestSha256 = process.env.KOBOX_SPEEDTEST_SHA256;
   const aria2RpcSecret = process.env.KOBOX_ARIA2_RPC_SECRET;
   const ddlStagingDir = process.env.KOBOX_DDL_STAGING;
   const quotaFs = process.env.KOBOX_QUOTA_FS;
@@ -313,13 +308,8 @@ export async function buildInstallation(
       currentLink: process.env.KOBOX_CURRENT_LINK ?? DEFAULT_CURRENT_LINK,
       koboxBin: process.env.KOBOX_BIN ?? DEFAULT_KOBOX_BIN,
       manageAptSources: flags.manageAptSources,
-      ...(rutorrentUrl !== undefined && rutorrentUrl !== '' && { rutorrentUrl }),
-      ...(rutorrentSha256 !== undefined &&
-        rutorrentSha256 !== '' && { rutorrentSha256 }),
-      ...(nanomonUrl !== undefined && nanomonUrl !== '' && { nanomonUrl }),
-      ...(nanomonSha256 !== undefined && nanomonSha256 !== '' && { nanomonSha256 }),
-      ...(speedtestUrl !== undefined && speedtestUrl !== '' && { speedtestUrl }),
-      ...(speedtestSha256 !== undefined && speedtestSha256 !== '' && { speedtestSha256 }),
+      // every vendored release's pin, from one tested place
+      ...artifactPinsFrom(process.env),
       ...(aria2RpcSecret !== undefined && aria2RpcSecret !== '' && { aria2RpcSecret }),
       ...(ddlStagingDir !== undefined && ddlStagingDir !== '' && { ddlStagingDir }),
       ...(quotaFs !== undefined && quotaFs !== '' && { quotaFs }),
