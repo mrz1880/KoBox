@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { DebridDownload } from '../../domain/ddl/DebridDownload.js';
 import { Label } from '../../domain/torrent/Label.js';
 import { DownloadGid } from '../../domain/ddl/DownloadGid.js';
@@ -66,6 +66,14 @@ export class SqliteDebridDownloadRepository implements DebridDownloadRepository 
       .where(eq(debridDownloads.status, 'downloading'))
       .all();
     return Promise.resolve(rows.map(toDomain));
+  }
+
+  removeForUser(username: Username, id: number): Promise<boolean> {
+    const result = this.db.orm
+      .delete(debridDownloads)
+      .where(and(eq(debridDownloads.id, id), eq(debridDownloads.username, username.value)))
+      .run();
+    return Promise.resolve(result.changes > 0);
   }
 
   listForUser(username: Username): Promise<readonly DebridDownload[]> {

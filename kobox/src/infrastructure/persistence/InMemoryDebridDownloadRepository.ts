@@ -20,6 +20,15 @@ export class InMemoryDebridDownloadRepository implements DebridDownloadRepositor
     return Promise.resolve([...this.rows.values()].filter((d) => d.status === 'downloading'));
   }
 
+  removeForUser(username: Username, id: number): Promise<boolean> {
+    const found = this.rows.get(id);
+    if (found?.username.equals(username) !== true) {
+      return Promise.resolve(false);
+    }
+    this.rows.delete(id);
+    return Promise.resolve(true);
+  }
+
   listForUser(username: Username): Promise<readonly DebridDownload[]> {
     return Promise.resolve(
       [...this.rows.values()].filter((d) => d.username.value === username.value),
