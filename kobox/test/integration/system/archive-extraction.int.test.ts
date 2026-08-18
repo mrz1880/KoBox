@@ -17,8 +17,20 @@ function makeArchive(dir: string, name: string, flag: string): string {
   return archive;
 }
 
+// bzip2 is not on a Debian 12 minimal, which is exactly why the Nextcloud
+// component installs it. Where it is absent this file cannot even build the
+// fixture, so it says so rather than passing on a machine that proves nothing.
+function hasBzip2(): boolean {
+  try {
+    execFileSync('bzip2', ['--version'], { stdio: 'ignore' });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 describe('extracting a vendored release', () => {
-  it('should_open_the_bzip2_archive_nextcloud_actually_publishes', async () => {
+  it.skipIf(!hasBzip2())('should_open_the_bzip2_archive_nextcloud_actually_publishes', async () => {
     // Nextcloud ships .tar.bz2 and .zip, never .tar.gz. `tar -xzf` refuses the
     // former outright, so the component could never have installed a real
     // release: the E2E only ever exercised its honest skip.
