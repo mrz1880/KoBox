@@ -1063,7 +1063,10 @@ describe("clearing a line from a member's own download list", () => {
     });
 
     expect(response.statusCode).toBe(303);
-    expect(await world.downloads.listForUser(Username.parse('alice'))).toHaveLength(0);
+    // the portal cannot reach aria2 nor the staging directory, so it asks the
+    // worker: removing the row here would strand the bytes aria2 was writing
+    const job = world.queue.jobs.find((j) => j.type === 'discard-debrid-download');
+    expect(job?.payload).toMatchObject({ username: 'alice', downloadId: row?.id });
   });
 
   it('should_refuse_to_touch_a_line_belonging_to_someone_else', async () => {

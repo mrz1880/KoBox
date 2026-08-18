@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { Job } from '../../../../src/application/jobs/contract.js';
 import type { ClaimedJob, JobQueuePort } from '../../../../src/application/jobs/JobQueuePort.js';
+import { DiscardDebridDownload } from '../../../../src/application/ddl/DiscardDebridDownload.js';
 import { PollDebridDownloads } from '../../../../src/application/ddl/PollDebridDownloads.js';
 import { RequestDebridDownload } from '../../../../src/application/ddl/RequestDebridDownload.js';
 import {
@@ -47,6 +48,14 @@ class FakeCredentials implements DebridCredentialsPort {
 }
 
 class FakeDownloader implements DownloaderPort {
+  readonly cancelled: string[] = [];
+  stagedOnCancel: string | undefined = '/var/lib/kobox-aria2/alice/half.mkv';
+
+  cancel(gid: DownloadGid): Promise<{ stagedPath?: string }> {
+    this.cancelled.push(gid.value);
+    return Promise.resolve(this.stagedOnCancel === undefined ? {} : { stagedPath: this.stagedOnCancel });
+  }
+
   checkReachable(): Promise<{ ok: boolean; detail: string }> {
     return Promise.resolve({ ok: true, detail: 'fake' });
   }
@@ -63,6 +72,13 @@ class FakeDownloader implements DownloaderPort {
 }
 
 class FakePlacement implements DownloadPlacementPort {
+  readonly discarded: string[] = [];
+
+  discardStaged(stagedPath: string): Promise<void> {
+    this.discarded.push(stagedPath);
+    return Promise.resolve();
+  }
+
   readonly placed: { staged: string; username: string }[] = [];
   rejectFor: string | undefined;
   place(staged: string, username: Username, category: Label): Promise<string> {
@@ -296,5 +312,54 @@ describe('PollDebridDownloads', () => {
     expect(placement.placed.map((p) => p.username)).toEqual(
       expect.arrayContaining(['alice', 'bob']),
     );
+  });
+});
+
+describe('discarding a download a member no longer wants', () => {
+  async function anStartedDownload(): Promise<number> {
+    const id = await new RequestDebridDownload({ repo, queue, clock: now }).execute({
+      username: alice,
+      category: Label.parse('films'),
+      link,
+    });
+    await new StartDebridDownload({
+      repo, debrid, credentials, downloader, stagingBase: '/var/lib/kobox-aria2',
+    }).execute({ downloadId: id });
+    return id;
+  }
+
+  it('should_stop_aria2_and_throw_away_the_half_downloaded_file', async () => {
+    // removing the row alone left the partial bytes on disk for ever: nothing
+    // referenced them any more, so nothing would ever clean them up
+    const id = await anStartedDownload();
+    const uc = new DiscardDebridDownload({ repo, downloader, placement });
+
+    await uc.execute({ username: alice, id });
+
+    expect(downloader.cancelled).toHaveLength(1);
+    expect(placement.discarded).toEqual(['/var/lib/kobox-aria2/alice/half.mkv']);
+    expect(await repo.findById(id)).toBeUndefined();
+  });
+
+  it('should_never_touch_a_file_that_has_already_been_placed', async () => {
+    // a finished download lives in the member's own folder. Removing the line
+    // tidies their list; it must not delete what they downloaded.
+    const id = await anStartedDownload();
+    downloader.stagedOnCancel = undefined; // aria2 has forgotten it
+    const uc = new DiscardDebridDownload({ repo, downloader, placement });
+
+    await uc.execute({ username: alice, id });
+
+    expect(placement.discarded).toEqual([]);
+  });
+
+  it('should_refuse_to_discard_a_line_belonging_to_someone_else', async () => {
+    const id = await anStartedDownload();
+    const uc = new DiscardDebridDownload({ repo, downloader, placement });
+
+    await uc.execute({ username: Username.parse('bob'), id });
+
+    expect(await repo.findById(id)).toBeDefined();
+    expect(downloader.cancelled).toEqual([]);
   });
 });

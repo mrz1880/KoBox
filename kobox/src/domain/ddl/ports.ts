@@ -32,6 +32,9 @@ export interface DownloaderPort {
   // one KoBox holds: that mismatch cost a live box every debrid download while
   // every port-level probe reported healthy.
   checkReachable(): Promise<{ readonly ok: boolean; readonly detail: string }>;
+  // Stops a download and forgets it. Returns the file it was writing, so the
+  // caller can throw that away too: aria2 leaves the partial bytes behind.
+  cancel(gid: DownloadGid): Promise<{ readonly stagedPath?: string }>;
 }
 
 // Moves a finished download from the aria2 staging dir into the user's
@@ -39,6 +42,11 @@ export interface DownloaderPort {
 // hands ownership to the user. Root-only (the worker). Returns the final path.
 export interface DownloadPlacementPort {
   place(stagedPath: string, username: Username, category: Label): Promise<string>;
+  // Throws away a half-downloaded file. Only ever called with a path aria2
+  // reported for a download it was still holding, which is inside the staging
+  // directory: a file already placed belongs to the member and is never touched
+  // by removing a line from their list.
+  discardStaged(stagedPath: string): Promise<void>;
 }
 
 // Resolves a filehoster link to an unrestricted direct URL, using the key of the

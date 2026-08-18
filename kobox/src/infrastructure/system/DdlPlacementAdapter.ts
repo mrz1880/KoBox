@@ -17,6 +17,13 @@ export class DdlPlacementAdapter implements DownloadPlacementPort {
     private readonly homeBase: string = DEFAULT_HOME_BASE,
   ) {}
 
+  // Best-effort: a file that is already gone is the state we wanted.
+  async discardStaged(stagedPath: string): Promise<void> {
+    await rm(stagedPath, { force: true }).catch(() => undefined);
+    // aria2 writes a .aria2 control file beside it
+    await rm(`${stagedPath}.aria2`, { force: true }).catch(() => undefined);
+  }
+
   async place(
     stagedPath: string,
     username: Username,

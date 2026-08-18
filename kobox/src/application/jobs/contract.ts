@@ -70,6 +70,7 @@ export const JOB_TYPES = [
   'render-nfs-exports',
   'debrid-download',
   'poll-debrid-downloads',
+  'discard-debrid-download',
   'set-debrid-key',
   'clear-debrid-key',
 ] as const;
@@ -240,6 +241,10 @@ export const jobPayloadSchemas = {
   // DDL: resolve+download a submitted link; the poll advances active downloads
   'debrid-download': z.strictObject({ downloadId: z.number().int().positive() }),
   'poll-debrid-downloads': z.strictObject({}),
+  'discard-debrid-download': z.strictObject({
+    username: usernameField,
+    downloadId: z.number().int().positive(),
+  }),
   // per-user debrid account: the payload carries only the SEALED key (base64
   // RSA-OAEP) — the plaintext never reaches a job, a log or this database
   'set-debrid-key': z.strictObject({
