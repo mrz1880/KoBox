@@ -421,6 +421,19 @@ describe.skipIf(!onDebianAsRoot)('E2E: torrent lifecycle with a real rtorrent', 
     expect(row).toBeUndefined(); // native early-exit: no row, no crash, job done
   });
 
+  it('should_let_rtorrent_restart_after_its_blocklist_has_been_rendered', async () => {
+    // the failure this guards against: the member's blocklist directory was
+    // created root:root, so rtorrent crash-looped on "could not open ip filter
+    // file" the first time it restarted, on a box where everything else looked
+    // healthy and the file itself was readable
+    kobox(['render-blocklist-filters', USER]);
+    drainQueue(); // the CLI enqueues; the worker is what writes the files
+    sh('systemctl', ['restart', `rtorrent-${USER}`]);
+    await waitForScgi(30_000);
+
+    expect(sh('systemctl', ['is-active', `rtorrent-${USER}`]).trim()).toBe('active');
+  }, 60_000);
+
   it('should_deprovision_everything_on_delete', () => {
     kobox(['delete-user', USER]);
     drainQueue();
@@ -430,4 +443,5 @@ describe.skipIf(!onDebianAsRoot)('E2E: torrent lifecycle with a real rtorrent', 
     expect(dbRow('SELECT id FROM torrent_instances WHERE username = ?', USER)).toBeUndefined();
     expect(dbRow('SELECT id FROM torrents WHERE username = ?', USER)).toBeUndefined();
   });
+
 });

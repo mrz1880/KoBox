@@ -14,6 +14,29 @@ import { runOrThrow, type CommandRunner } from './CommandRunner.js';
 export class RtorrentConfigAdapter implements RtorrentConfigPort {
   constructor(private readonly runner: CommandRunner) {}
 
+  // mkdir alone leaves a new directory root:root under the process umask, so a
+  // file written 0640 root:<member> sat inside a directory its owner could not
+  // enter. rtorrent then crash-looped on "could not open ip filter file" the
+  // first time it restarted after a blocklist run, with the file itself
+  // perfectly readable.
+  //
+  // Only directories this call creates. An existing one belongs to whoever made
+  // it: taking ownership of a member's home, which is the parent of their
+  // .rtorrent.rc, locks them out of it and stops nginx traversing to their
+  // media. A box already in the broken state is repaired by hand, once.
+  private async ensureParentDir(file: RenderedFile): Promise<void> {
+    const dir = dirname(file.path);
+    if (existsSync(dir)) {
+      return; // a home, a config.d, /etc/kobox: someone else owns their mode
+    }
+    mkdirSync(dir, { recursive: true });
+    if (file.group === 'root') {
+      return; // /etc/kobox and friends: widening these would be the opposite fix
+    }
+    await runOrThrow(this.runner, { command: 'chown', args: [`root:${file.group}`, dir] });
+    await runOrThrow(this.runner, { command: 'chmod', args: ['0750', dir] });
+  }
+
   async apply(files: readonly RenderedFile[]): Promise<readonly string[]> {
     const changed: string[] = [];
     for (const file of files) {
@@ -21,7 +44,7 @@ export class RtorrentConfigAdapter implements RtorrentConfigPort {
       if (existing === file.content) {
         continue;
       }
-      mkdirSync(dirname(file.path), { recursive: true });
+      await this.ensureParentDir(file);
       const temp = `${file.path}.kobox-tmp`;
       // born with the final mode: secrets (sasl_passwd) must never sit
       // world-readable between write and the chmod below
