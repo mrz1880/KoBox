@@ -24,6 +24,11 @@ export interface DownloadState {
 export interface DownloaderPort {
   addUri(url: DirectUrl, dir: string): Promise<DownloadGid>;
   status(gid: DownloadGid): Promise<DownloadState>;
+  // An authenticated round trip. A socket check answers "listening", which
+  // aria2 does even when the secret it was started with no longer matches the
+  // one KoBox holds: that mismatch cost a live box every debrid download while
+  // every port-level probe reported healthy.
+  checkReachable(): Promise<{ readonly ok: boolean; readonly detail: string }>;
 }
 
 // Moves a finished download from the aria2 staging dir into the user's

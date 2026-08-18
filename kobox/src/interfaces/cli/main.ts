@@ -39,6 +39,20 @@ import {
   type Container,
 } from '../composition.js';
 import { buildJob } from './buildJob.js';
+import { readFileSync } from 'node:fs';
+import { loadWorkerEnvInto } from '../envSnapshot.js';
+
+// before anything reads process.env: the CLI runs as root and must see the
+// box's own configuration, not just whatever the operator happened to export
+loadWorkerEnvInto(process.env, readWorkerEnvFile());
+
+function readWorkerEnvFile(): string | undefined {
+  try {
+    return readFileSync('/etc/kobox/worker.env', 'utf8');
+  } catch {
+    return undefined; // not installed yet, or not running as root
+  }
+}
 
 async function readStdin(): Promise<string> {
   let data = '';
@@ -1054,6 +1068,15 @@ program
       checks.push(await c.healthProbe.checkSocket('127.0.0.1', user.scgiPort.value));
     }
     checks.push(await c.healthProbe.checkProcess('rtorrent'));
+    // the credential, not the port: aria2 listens happily with a secret KoBox
+    // no longer holds, and every debrid download then fails while a socket
+    // probe still reports healthy
+    const aria2 = await c.downloader.checkReachable();
+    checks.push({
+      name: 'aria2 rpc',
+      state: aria2.ok ? ('healthy' as const) : ('unhealthy' as const),
+      detail: aria2.detail,
+    });
     const healthy = checks.every((check) => check.state === 'healthy');
     process.stdout.write(`${JSON.stringify({ healthy, checks }, null, 2)}\n`);
     c.db.close();
