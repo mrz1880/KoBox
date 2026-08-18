@@ -224,14 +224,19 @@ describe('ProcessSocketHealthProbe', () => {
     expect(result.state).toBe('unhealthy');
   });
 
-  it('should_check_processes_with_pgrep_exact_match', async () => {
+  // This used to assert `pgrep -x`, which is the bug rather than the contract:
+  // -x compares against comm, and rtorrent renames its main thread to
+  // "rtorrent main", so doctor reported unhealthy on every healthy box. The
+  // test is replaced rather than relaxed, and what it pins now is that nothing
+  // is running, not how the question was phrased.
+  it('should_report_unhealthy_when_the_daemon_really_is_absent', async () => {
     const runner = new RecordingRunner();
     runner.onCommand('pgrep', { exitCode: 1 });
     const probe = new ProcessSocketHealthProbe(runner);
 
     const result = await probe.checkProcess('rtorrent');
 
-    expect(runner.argvOf('pgrep')).toEqual(['-x', 'rtorrent']);
     expect(result.state).toBe('unhealthy');
+    expect(result.detail).toBe('no such process');
   });
 });
