@@ -11,7 +11,12 @@ export class ArtifactFetchError extends Error {
   }
 }
 
-export type HttpsBodyFetcher = (url: string) => Promise<Buffer | undefined>;
+// Either the bytes, or why not. The previous shape was `Buffer | undefined`,
+// which told the caller nothing: "download failed" was the message for a rate
+// limit, a 404, a TLS error and a body over the cap alike. Three install
+// attempts went into guessing which one it was; it was a 429.
+export type FetchOutcome = { readonly body: Buffer } | { readonly failure: string };
+export type HttpsBodyFetcher = (url: string) => Promise<FetchOutcome>;
 
 // A vendored application release is not a blocklist. The shared helper caps a
 // body at 32 MB so a wedged mirror cannot fill the disk, which is right for a
@@ -28,7 +33,13 @@ export function defaultBodyFetcher(options: HttpsDownloadOptions = {}): HttpsBod
     if (response?.location?.startsWith('https://')) {
       response = await httpsGet(response.location, withCap);
     }
-    return response?.body;
+    if (response === undefined) {
+      return { failure: 'no response: connection error, timeout, or a body over the size cap' };
+    }
+    if (response.body === undefined) {
+      return { failure: `server answered ${String(response.status)}` };
+    }
+    return { body: response.body };
   };
 }
 
@@ -42,10 +53,11 @@ export class ArtifactFetchAdapter implements ArtifactFetchPort {
     if (!url.startsWith('https://')) {
       throw new ArtifactFetchError(`refusing non-https artifact url ${url}`);
     }
-    const body = await this.fetcher(url);
-    if (body === undefined) {
-      throw new ArtifactFetchError(`download failed: ${url}`);
+    const outcome = await this.fetcher(url);
+    if ('failure' in outcome) {
+      throw new ArtifactFetchError(`download failed: ${url}: ${outcome.failure}`);
     }
+    const { body } = outcome;
     const digest = createHash('sha256').update(body).digest('hex');
     if (digest !== sha256.toLowerCase()) {
       throw new ArtifactFetchError(

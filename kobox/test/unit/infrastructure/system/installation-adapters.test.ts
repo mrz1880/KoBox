@@ -151,7 +151,7 @@ describe('ArtifactFetchAdapter', () => {
   const goodSha = createHash('sha256').update(body).digest('hex');
 
   it('should_write_the_artifact_only_after_the_digest_matches', async () => {
-    const adapter = new ArtifactFetchAdapter(() => Promise.resolve(body));
+    const adapter = new ArtifactFetchAdapter(() => Promise.resolve({ body }));
     const dest = destPath();
 
     await adapter.fetchVerified('https://releases.example.net/rutorrent.tar.gz', goodSha, dest);
@@ -190,7 +190,7 @@ describe('ArtifactFetchAdapter', () => {
       expect(child.pid, 'the fixture binary did not start').toBeGreaterThan(0);
       expect(child.exitCode).toBeNull();
 
-      const adapter = new ArtifactFetchAdapter(() => Promise.resolve(body));
+      const adapter = new ArtifactFetchAdapter(() => Promise.resolve({ body }));
       await adapter.fetchVerified('https://releases.example.net/nanomon', goodSha, dest);
 
       expect(readFileSync(dest)).toEqual(body);
@@ -201,7 +201,7 @@ describe('ArtifactFetchAdapter', () => {
   });
 
   it('should_throw_and_leave_nothing_behind_on_a_digest_mismatch', async () => {
-    const adapter = new ArtifactFetchAdapter(() => Promise.resolve(body));
+    const adapter = new ArtifactFetchAdapter(() => Promise.resolve({ body }));
     const dest = destPath();
 
     await expect(
@@ -210,15 +210,29 @@ describe('ArtifactFetchAdapter', () => {
     expect(existsSync(dest)).toBe(false);
   });
 
-  it('should_throw_when_the_download_fails', async () => {
-    const adapter = new ArtifactFetchAdapter(() => Promise.resolve(undefined));
+  it('should_say_what_the_server_answered_rather_than_just_failing', async () => {
+    // three install attempts were spent guessing at "download failed": it says
+    // the same thing for a rate limit, a 404, a TLS error and a body larger
+    // than the cap. The one that was actually happening was a 429.
+    const adapter = new ArtifactFetchAdapter(() =>
+      Promise.resolve({ failure: 'server answered 429' }),
+    );
+
     await expect(
       adapter.fetchVerified('https://releases.example.net/x.tar.gz', goodSha, destPath()),
-    ).rejects.toThrow(ArtifactFetchError);
+    ).rejects.toThrow(/429/);
+  });
+
+  it('should_still_name_the_url_it_could_not_get', async () => {
+    const adapter = new ArtifactFetchAdapter(() => Promise.resolve({ failure: 'connection reset' }));
+
+    await expect(
+      adapter.fetchVerified('https://releases.example.net/x.tar.gz', goodSha, destPath()),
+    ).rejects.toThrow(/releases\.example\.net/);
   });
 
   it('should_refuse_non_https_urls', async () => {
-    const adapter = new ArtifactFetchAdapter(() => Promise.resolve(body));
+    const adapter = new ArtifactFetchAdapter(() => Promise.resolve({ body }));
     await expect(
       adapter.fetchVerified('http://releases.example.net/x.tar.gz', goodSha, destPath()),
     ).rejects.toThrow(ArtifactFetchError);
