@@ -174,7 +174,7 @@ const HTPASSWD = '/etc/nginx/kobox.htpasswd';
 const NEXTCLOUD_DIR = '/var/www/nextcloud';
 const NEXTCLOUD_DATA = '/var/lib/nextcloud/data';
 const NEXTCLOUD_MARKER = `${NEXTCLOUD_DIR}/.kobox-artifact-sha256`;
-const NEXTCLOUD_ARCHIVE = '/var/tmp/kobox/nextcloud.tar.gz';
+const NEXTCLOUD_ARCHIVE = '/var/tmp/kobox/nextcloud.tar.bz2';
 const RUTORRENT_DIR = '/var/www/rutorrent';
 const PHP_FPM_UNIT = 'php8.2-fpm';
 const RUTORRENT_MARKER = `${RUTORRENT_DIR}/.kobox-artifact-sha256`;
@@ -432,7 +432,7 @@ class RutorrentInstaller implements ComponentInstaller {
     if (marker?.trim() !== install.rutorrentSha256) {
       await artifacts.fetchVerified(install.rutorrentUrl, install.rutorrentSha256, RUTORRENT_ARCHIVE);
       await host.ensureDir(RUTORRENT_DIR, '0755');
-      await host.extractTarGz(RUTORRENT_ARCHIVE, RUTORRENT_DIR, 'inside-one-directory');
+      await host.extractArchive(RUTORRENT_ARCHIVE, RUTORRENT_DIR, 'inside-one-directory');
       await files.apply([
         {
           path: RUTORRENT_MARKER,
@@ -497,7 +497,7 @@ class NextcloudInstaller implements ComponentInstaller {
         NEXTCLOUD_ARCHIVE,
       );
       await host.ensureDir(NEXTCLOUD_DIR, '0755');
-      await host.extractTarGz(NEXTCLOUD_ARCHIVE, NEXTCLOUD_DIR, 'inside-one-directory');
+      await host.extractArchive(NEXTCLOUD_ARCHIVE, NEXTCLOUD_DIR, 'inside-one-directory');
       await files.apply([
         {
           path: NEXTCLOUD_MARKER,
@@ -1004,7 +1004,7 @@ class SpeedtestInstaller implements ComponentInstaller {
       SPEEDTEST_ARCHIVE,
     );
     await host.ensureDir(SPEEDTEST_DIR, '0755');
-    await host.extractTarGz(SPEEDTEST_ARCHIVE, SPEEDTEST_DIR, 'files-at-the-top');
+    await host.extractArchive(SPEEDTEST_ARCHIVE, SPEEDTEST_DIR, 'files-at-the-top');
     await host.setOwnership(SPEEDTEST_BIN, 'root', 'root', '0755');
     await host.ensureFile({
       path: SPEEDTEST_MARKER,

@@ -66,7 +66,9 @@ export interface InstallHostPort {
   ensureFile(file: RenderedFile): Promise<boolean>;
   // creates the symlink only when absent; returns true when it was created
   ensureSymlink(linkPath: string, target: string): Promise<boolean>;
-  extractTarGz(archive: string, destDir: string, layout: ArchiveLayout): Promise<void>;
+  // any tar the host can read: gzip, bzip2, xz. The vendored releases do not
+  // agree on a compression, and assuming one silently excluded a component.
+  extractArchive(archive: string, destDir: string, layout: ArchiveLayout): Promise<void>;
   applySysctl(): Promise<void>;
   postconf(settings: Readonly<Record<string, string>>): Promise<void>;
   postmap(path: string): Promise<void>;
