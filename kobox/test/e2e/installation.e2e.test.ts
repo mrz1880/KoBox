@@ -392,13 +392,23 @@ describe.skipIf(!onDebianAsRoot)('E2E: fresh Debian 12 -> bootstrap -> full stac
   );
 
   it('should_install_the_command_its_own_cron_entries_call', () => {
-    // every scheduled job on a real box invoked /usr/local/bin/kobox, and
+    // Every scheduled job on a real box invoked /usr/local/bin/kobox and
     // nothing created it, so all of them silently did nothing: no mail flush,
     // no blocklist update, no backup, no certificate renewal, no debrid poll.
-    // This suite hid it by pointing KOBOX_BIN at a command it built itself, so
-    // the assertion here is deliberately about the DEFAULT path.
-    expect(existsSync('/usr/local/bin/kobox')).toBe(true);
-    expect(sh('/usr/local/bin/kobox', ['--help']).length).toBeGreaterThan(0);
+    //
+    // The assertion is about the command the cron file NAMES, not about a
+    // fixed path: this suite points KOBOX_BIN at a command of its own, and an
+    // assertion on the default path would only be testing that override. What
+    // production lacked was an entry pointing at something that exists.
+    const command = readFileSync('/etc/cron.d/kobox', 'utf8')
+      .split('\n')
+      .filter((line) => line !== '' && !line.startsWith('#') && !/^[A-Z]+=/.test(line))
+      .map((line) => line.split(' ')[6])
+      .find((c) => c !== undefined);
+
+    expect(command).toBeDefined();
+    expect(existsSync(command ?? '')).toBe(true);
+    expect(sh(command ?? '', ['--help']).length).toBeGreaterThan(0);
   }, 30_000);
 
   it('should_uninstall_reversibly_without_touching_user_data', () => {
