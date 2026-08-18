@@ -491,9 +491,14 @@ export function renderNginxVhost(settings: NginxVhostSettings): RenderedFile {
       // X-Accel-Redirect the portal emits after checking the session and that
       // the file belongs to that user. nginx handles range requests, so seeking
       // in a video works without the portal ever touching disk.
-      '    location /internal-media/ {',
+      // The path the portal sends is relative to the member's complete/ dir,
+      // which is what the media index stores. Aliasing straight to /home/ sent
+      // nginx to /home/<member>/films/... and every download 404ed: the portal
+      // answers 200 with a header, so no test that stops at the portal could
+      // ever see it.
+      '    location ~ ^/internal-media/([^/]+)/(.+)$ {',
       '        internal;',
-      '        alias /home/;',
+      '        alias /home/$1/rtorrent/complete/$2;',
       '    }',
       '',
       '    location /monitoring/ {',

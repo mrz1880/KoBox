@@ -264,6 +264,7 @@ describe.skipIf(!onDebianAsRoot)('E2E: fresh Debian 12 -> bootstrap -> full stac
     expect(readFileSync('/var/www/rutorrent/index.html', 'utf8')).toContain('ruTorrent fixture');
   });
 
+
   it('should_have_converged_the_phase_1_3_desired_state_in_strict_mode', () => {
     // firewall: applied AND persisted (the Phase 3 debt)
     expect(existsSync('/etc/kobox/firewall.rules')).toBe(true);
@@ -298,6 +299,7 @@ describe.skipIf(!onDebianAsRoot)('E2E: fresh Debian 12 -> bootstrap -> full stac
     },
     240_000,
   );
+
 
   it('should_have_installed_what_carries_a_download_to_a_members_own_machine', () => {
     // rsync and sshpass are not decoration: without them the transfer adapter
