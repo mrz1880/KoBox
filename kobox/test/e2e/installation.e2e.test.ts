@@ -391,6 +391,16 @@ describe.skipIf(!onDebianAsRoot)('E2E: fresh Debian 12 -> bootstrap -> full stac
     INSTALL_TIMEOUT_MS,
   );
 
+  it('should_install_the_command_its_own_cron_entries_call', () => {
+    // every scheduled job on a real box invoked /usr/local/bin/kobox, and
+    // nothing created it, so all of them silently did nothing: no mail flush,
+    // no blocklist update, no backup, no certificate renewal, no debrid poll.
+    // This suite hid it by pointing KOBOX_BIN at a command it built itself, so
+    // the assertion here is deliberately about the DEFAULT path.
+    expect(existsSync('/usr/local/bin/kobox')).toBe(true);
+    expect(sh('/usr/local/bin/kobox', ['--help']).length).toBeGreaterThan(0);
+  }, 30_000);
+
   it('should_uninstall_reversibly_without_touching_user_data', () => {
     const output = kobox(['uninstall', '--yes']);
     expect(output).toContain('kobox-core');

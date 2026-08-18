@@ -34,7 +34,7 @@ import {
   renderWorkerUnit,
   type NginxVhostSettings,
 } from '../../domain/installation/rendering.js';
-import { renderCronFile } from '../../domain/maintenance/rendering.js';
+import { renderCronFile, renderKoboxCommand } from '../../domain/maintenance/rendering.js';
 import type { DebridKeyPairPort } from '../../domain/ddl/ports.js';
 import type { IpsetPort } from '../../domain/tracker/ports.js';
 import type { VpnPkiPort, VpnPkiProvisionPort } from '../../domain/security/ports.js';
@@ -229,6 +229,11 @@ class KoboxCoreInstaller implements ComponentInstaller {
     // upgrades never orphan a stored key
     await this.ctx.debridKeys.ensurePair();
     await files.apply([
+      renderKoboxCommand({
+        nodeBin: install.nodeBin,
+        currentLink: install.currentLink,
+        koboxBin: install.koboxBin,
+      }),
       renderWorkerEnv(install.workerEnv),
       renderWorkerUnit({
         nodeBin: install.nodeBin,
