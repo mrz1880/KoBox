@@ -1041,3 +1041,48 @@ describe("a member's own SSH key", () => {
     expect(job?.payload).toMatchObject({ username: 'alice' });
   });
 });
+
+describe("clearing a line from a member's own download list", () => {
+  it('should_let_them_remove_one_that_never_went_anywhere', async () => {
+    // a job that failed before touching the row leaves it pending forever, and
+    // the list is the member's own: they must be able to tidy it
+    await world.server.inject({
+      method: 'POST',
+      url: '/downloads',
+      headers: { cookie: user.cookie, 'content-type': 'application/x-www-form-urlencoded' },
+      payload: form({ _csrf: user.csrf, link: 'https://1fichier.example/abc', category: 'films' }),
+    });
+    const [row] = await world.downloads.listForUser(Username.parse('alice'));
+
+    const response = await world.server.inject({
+      method: 'POST',
+      url: `/downloads/${String(row?.id ?? 0)}/remove`,
+      headers: { cookie: user.cookie, 'content-type': 'application/x-www-form-urlencoded' },
+      payload: form({ _csrf: user.csrf }),
+    });
+
+    expect(response.statusCode).toBe(303);
+    expect(await world.downloads.listForUser(Username.parse('alice'))).toHaveLength(0);
+  });
+
+  it('should_refuse_to_touch_a_line_belonging_to_someone_else', async () => {
+    // ownership is the whole guard here: an id is guessable
+    await world.server.inject({
+      method: 'POST',
+      url: '/downloads',
+      headers: { cookie: user.cookie, 'content-type': 'application/x-www-form-urlencoded' },
+      payload: form({ _csrf: user.csrf, link: 'https://1fichier.example/abc', category: 'films' }),
+    });
+    const [row] = await world.downloads.listForUser(Username.parse('alice'));
+
+    const response = await world.server.inject({
+      method: 'POST',
+      url: `/downloads/${String(row?.id ?? 0)}/remove`,
+      headers: { cookie: admin.cookie, 'content-type': 'application/x-www-form-urlencoded' },
+      payload: form({ _csrf: admin.csrf }),
+    });
+
+    expect(response.statusCode).toBe(404);
+    expect(await world.downloads.listForUser(Username.parse('alice'))).toHaveLength(1);
+  });
+});

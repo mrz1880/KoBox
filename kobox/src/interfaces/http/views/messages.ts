@@ -32,6 +32,7 @@ const FR: Readonly<Record<string, string>> = {
   Status: 'État',
   Detail: 'Détail',
   Requested: 'Demandé',
+  Remove: 'Retirer',
   'Nothing here yet. Submit a link above to start.':
     'Rien pour l’instant. Collez un lien ci-dessus pour commencer.',
 

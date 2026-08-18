@@ -330,6 +330,12 @@ export function downloadsPage(
   <td>${downloadStatusChip(download.status)}</td>
   <td>${detailCell(download)}</td>
   <td class="when">${download.createdAt}</td>
+  <td>${download.id === undefined
+      ? html``
+      : html`<form class="inline" method="post" action="/downloads/${String(download.id)}/remove">
+    <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
+    <button type="submit" class="ghost">${viewer.t('Remove')}</button>
+  </form>`}</td>
 </tr>`,
         );
   return page(
@@ -348,7 +354,7 @@ ${debridAccountCard(viewer, hasKey)}
   <button type="submit">${viewer.t('Start download')}</button>
 </form>
 <table>
-  <thead><tr><th>${viewer.t('Folder')}</th><th>${viewer.t('Status')}</th><th>${viewer.t('Detail')}</th><th>${viewer.t('Requested')}</th></tr></thead>
+  <thead><tr><th>${viewer.t('Folder')}</th><th>${viewer.t('Status')}</th><th>${viewer.t('Detail')}</th><th>${viewer.t('Requested')}</th><th></th></tr></thead>
   <tbody>${rows}</tbody>
 </table>`,
     viewer,

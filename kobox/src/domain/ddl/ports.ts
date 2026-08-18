@@ -84,4 +84,7 @@ export interface DebridDownloadRepository {
   // the poll loop's work list: everything still downloading
   listActive(): Promise<readonly DebridDownload[]>;
   listForUser(username: Username): Promise<readonly DebridDownload[]>;
+  // the member tidying their own list. Scoped by username on purpose: an id is
+  // guessable, and this is the only thing standing between two members.
+  removeForUser(username: Username, id: number): Promise<boolean>;
 }

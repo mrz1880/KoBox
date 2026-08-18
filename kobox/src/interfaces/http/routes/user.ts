@@ -334,6 +334,26 @@ export function registerUserRoutes(
       );
   });
 
+  const downloadIdSchema = z.object({ id: z.coerce.number().int().positive() });
+
+  server.post('/downloads/:id/remove', async (request, reply) => {
+    const session = await guards.requireCsrf(request, reply);
+    if (session === undefined) {
+      return;
+    }
+    const params = downloadIdSchema.safeParse(request.params);
+    if (!params.success) {
+      return reply.code(400).send();
+    }
+    // scoped by the session's own username: a 404 for somebody else's row says
+    // the same thing as a 404 for a row that never existed, which is the point
+    const removed = await deps.downloads.removeForUser(session.username, params.data.id);
+    if (!removed) {
+      return reply.code(404).send();
+    }
+    return redirectWithFlash(reply, '/downloads', 'Removed from your list.');
+  });
+
   server.post('/downloads/debrid-key', async (request, reply) => {
     const session = await guards.requireCsrf(request, reply);
     if (session === undefined) {
