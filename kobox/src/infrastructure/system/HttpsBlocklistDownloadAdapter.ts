@@ -62,12 +62,24 @@ interface HttpsResponse {
 // connection and stalls (the classic dying-mirror failure) is cut off.
 // Exported for the installation ArtifactFetchAdapter (same verified-download
 // discipline, different consumer).
+// node sends no User-Agent at all, and download.nextcloud.com answers 429 to a
+// request without one. curl from the same box got 200, which made this look
+// like a rate limit we had earned rather than a header we never sent. Saying
+// who we are is also the polite thing to do to a mirror we did not pay for.
+// no url in it: this repository is public and the pre-commit guard keeps the
+// owner's account name out of the source, which is right. A bare product token
+// is what the server wants anyway.
+const USER_AGENT = 'KoBox/1.0';
+
 export function httpsGet(
   url: string,
   options: HttpsDownloadOptions,
 ): Promise<HttpsResponse | undefined> {
   return new Promise((resolve) => {
-    const requestOptions: RequestOptions = options.ca === undefined ? {} : { ca: options.ca };
+    const requestOptions: RequestOptions = {
+      headers: { 'user-agent': USER_AGENT },
+      ...(options.ca === undefined ? {} : { ca: options.ca }),
+    };
     const request = get(url, requestOptions, (response) => {
       const status = response.statusCode ?? 0;
       const location = response.headers.location;
