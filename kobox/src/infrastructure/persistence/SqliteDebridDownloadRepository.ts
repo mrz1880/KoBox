@@ -19,6 +19,7 @@ function toDomain(row: Row): DebridDownload {
     status: row.status,
     ...(row.gid !== null && { gid: DownloadGid.parse(row.gid) }),
     ...(row.filename !== null && { filename: row.filename }),
+    ...(row.percent !== null && { percent: row.percent }),
     ...(row.error !== null && { error: row.error }),
     createdAt: row.createdAt,
   });
@@ -35,6 +36,7 @@ export class SqliteDebridDownloadRepository implements DebridDownloadRepository 
       status: download.status,
       gid: download.gid?.value ?? null,
       filename: download.filename ?? null,
+      percent: download.percent ?? null,
       error: download.error ?? null,
       createdAt: download.createdAt,
     };

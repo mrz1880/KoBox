@@ -475,6 +475,10 @@ class NextcloudInstaller implements ComponentInstaller {
       };
     }
     await packages.ensureInstalled([
+      // Nextcloud ships .tar.bz2 and Debian 12 minimal has no bzip2, so tar
+      // cannot open the release without this. Nothing else KoBox vendors needs
+      // it, which is why it was missing.
+      'bzip2',
       'php-fpm',
       'php-cli',
       'php-sqlite3',

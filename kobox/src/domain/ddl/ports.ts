@@ -2,6 +2,7 @@ import type { Username } from '../user/Username.js';
 import type { DebridApiKey } from './DebridApiKey.js';
 import type { DebridDownload } from './DebridDownload.js';
 import type { Label } from '../torrent/Label.js';
+import type { DownloadProgress } from './DownloadProgress.js';
 import type { DirectUrl } from './DirectUrl.js';
 import type { DownloadGid } from './DownloadGid.js';
 import type { FilehosterLink } from './FilehosterLink.js';
@@ -17,6 +18,8 @@ export interface DownloadState {
   readonly state: DownloadRunState;
   readonly filePath?: string;
   readonly message?: string;
+  // absent while the size is unknown, which is not the same as zero
+  readonly progress?: DownloadProgress;
 }
 
 // The download engine (aria2). Fetches a direct URL into a staging dir and

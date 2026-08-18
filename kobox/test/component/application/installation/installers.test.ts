@@ -869,6 +869,19 @@ describe('nextcloud installer', () => {
     }
   });
 
+  it('should_install_the_decompressor_its_own_release_needs', async () => {
+    // Nextcloud ships .tar.bz2 and Debian 12 minimal has no bzip2, so without
+    // this the extraction fails on a fresh box with "bzip2: not found". Nothing
+    // else KoBox vendors needs it, which is how it went unnoticed.
+    const pinned = buildWorld({
+      nextcloud: { url: 'https://example.net/nc.tar.bz2', sha256: 'd'.repeat(64), adminPassword: 'chosen-by-the-operator' },
+    });
+
+    await installer(pinned, 'nextcloud').install();
+
+    expect(pinned.packages.installed).toContain('bzip2');
+  });
+
   it('should_keep_the_data_directory_out_of_the_web_root', async () => {
     const pinned = buildWorld({
       nextcloud: { url: 'https://example.net/nc.tar.gz', sha256: 'd'.repeat(64), adminPassword: 'chosen-by-the-operator' },

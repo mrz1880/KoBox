@@ -1,0 +1,1 @@
+ALTER TABLE `debrid_downloads` ADD `percent` integer;

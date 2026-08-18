@@ -7,6 +7,7 @@ import { SyncTransfer } from '../../../src/domain/sync/SyncTransfer.js';
 import { MediaPath } from '../../../src/domain/media/MediaFile.js';
 import type { VpnVariant } from '../../../src/domain/security/vpn.js';
 import type { VpnProfileStorePort } from '../../../src/application/portal/ports.js';
+import { DownloadGid } from '../../../src/domain/ddl/DownloadGid.js';
 import {
   buildPortalWorld,
   form,
@@ -1084,5 +1085,48 @@ describe("clearing a line from a member's own download list", () => {
 
     expect(response.statusCode).toBe(404);
     expect(await world.downloads.listForUser(Username.parse('alice'))).toHaveLength(1);
+  });
+});
+
+describe('how far along a running download is', () => {
+  it('should_show_the_reading_the_poll_took', async () => {
+    await world.server.inject({
+      method: 'POST',
+      url: '/downloads',
+      headers: { cookie: user.cookie, 'content-type': 'application/x-www-form-urlencoded' },
+      payload: form({ _csrf: user.csrf, link: 'https://1fichier.example/abc', category: 'films' }),
+    });
+    const [row] = await world.downloads.listForUser(Username.parse('alice'));
+    if (row === undefined) {
+      throw new Error('the submission should have made a row');
+    }
+    await world.downloads.save(row.startedWith(DownloadGid.parse('2089b05ecca3d829')).progressed(42));
+
+    const response = await world.server.inject({
+      method: 'GET',
+      url: '/downloads',
+      headers: { cookie: user.cookie },
+    });
+
+    expect(response.body).toContain('42%');
+  });
+
+  it('should_show_no_bar_at_all_while_the_size_is_unknown', async () => {
+    // a bar stuck at 0 reads as "started and going nowhere"; the truth is that
+    // aria2 has not seen the headers yet
+    await world.server.inject({
+      method: 'POST',
+      url: '/downloads',
+      headers: { cookie: user.cookie, 'content-type': 'application/x-www-form-urlencoded' },
+      payload: form({ _csrf: user.csrf, link: 'https://1fichier.example/abc', category: 'films' }),
+    });
+
+    const response = await world.server.inject({
+      method: 'GET',
+      url: '/downloads',
+      headers: { cookie: user.cookie },
+    });
+
+    expect(response.body).not.toContain('class="bar"');
   });
 });

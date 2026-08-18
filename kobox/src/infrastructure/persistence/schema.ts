@@ -386,6 +386,8 @@ export const debridDownloads = sqliteTable(
     // free text validated by Label, not a closed enum: the member's own
     // folders are what a download is routed into, and they are not two
     category: text('category').notNull(),
+    // last reading from aria2; null while the size was still unknown
+    percent: integer('percent'),
     sourceLink: text('source_link').notNull(),
     status: text('status', { enum: ['pending', 'downloading', 'done', 'failed'] })
       .notNull()
