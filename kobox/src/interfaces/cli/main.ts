@@ -314,6 +314,25 @@ program
     await done(c, `job ${String(id)} enqueued: add-watch-dir ${username.value} ${label.value}`);
   });
 
+program
+  .command('provision-nextcloud-account')
+  .argument('<username>')
+  .description("give a member their Nextcloud account and their three rTorrent folders")
+  .action(async (rawUser: string) => {
+    const { direct } = program.opts<GlobalOptions>();
+    const username = Username.parse(rawUser);
+    const c = container();
+    if (direct) {
+      await c.useCases.provisionNextcloudAccount.execute({ username });
+      await done(c, `nextcloud account provisioned for ${username.value}`);
+      return;
+    }
+    const id = await c.queue.enqueue(
+      buildJob.provisionNextcloudAccount({ username: username.value }),
+    );
+    await done(c, `job ${String(id)} enqueued: provision-nextcloud-account ${username.value}`);
+  });
+
 function flagCommand(
   name: 'set-sync-disabled' | 'set-allow-public-tracker',
   description: string,
