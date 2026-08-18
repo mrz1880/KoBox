@@ -420,6 +420,7 @@ beforeEach(() => {
     credentials: { forUser: () => Promise.resolve(undefined) },
     downloader: {
       addUri: () => Promise.reject(new Error('no aria2 in this suite')),
+      checkReachable: () => Promise.resolve({ ok: true, detail: 'fake' }),
       status: () => Promise.reject(new Error('no aria2 in this suite')),
     },
     placement: { place: () => Promise.reject(new Error('no placement in this suite')) },

@@ -47,6 +47,10 @@ class FakeCredentials implements DebridCredentialsPort {
 }
 
 class FakeDownloader implements DownloaderPort {
+  checkReachable(): Promise<{ ok: boolean; detail: string }> {
+    return Promise.resolve({ ok: true, detail: 'fake' });
+  }
+
   readonly added: { url: string; dir: string }[] = [];
   state: DownloadState = { state: 'active' };
   addUri(url: DirectUrl, dir: string): Promise<DownloadGid> {

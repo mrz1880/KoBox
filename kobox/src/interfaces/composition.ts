@@ -1,4 +1,5 @@
 import { randomBytes } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { parseJob } from '../application/jobs/contract.js';
 import { ImportFromMysb } from '../application/migration/ImportFromMysb.js';
@@ -147,6 +148,7 @@ import {
   type UseCases,
 } from './useCases.js';
 import type { SecuritySettings } from '../application/security/settings.js';
+import { mergeKoboxEnv, parseEnvFile } from './envSnapshot.js';
 
 function envInt(name: string, fallback: number): number {
   const raw = process.env[name];
@@ -236,6 +238,8 @@ export function backupSettings(): BackupSettings {
 // Snapshot of the KOBOX_* environment at install time: rendered into
 // /etc/kobox/worker.env (0600) so the systemd worker sees the same
 // configuration the installer was launched with.
+const WORKER_ENV_PATH = '/etc/kobox/worker.env';
+
 export function koboxEnvSnapshot(): ReadonlyMap<string, string> {
   const snapshot = new Map<string, string>();
   for (const [key, value] of Object.entries(process.env)) {
@@ -329,7 +333,12 @@ export async function buildInstallation(
             ...(acmeUrl !== undefined && acmeUrl !== '' && { acmeUrl }),
           },
         }),
-      workerEnv: koboxEnvSnapshot(),
+      // merged with what a previous install wrote, so re-running from a plain
+      // shell converges rather than wiping the box's configuration
+      workerEnv: mergeKoboxEnv(
+        parseEnvFile(await readFile(WORKER_ENV_PATH, 'utf8').catch(() => undefined)),
+        koboxEnvSnapshot(),
+      ),
     },
   };
   const installers = buildInstallers(ctx);
@@ -424,6 +433,7 @@ export interface Container {
   readonly maintenanceUseCases: MaintenanceUseCases;
   readonly outbox: SqliteMailOutbox;
   readonly ddlUseCases: DdlUseCases;
+  readonly downloader: Aria2Adapter;
   readonly syncUseCases: SyncUseCases;
   readonly setDestination: SetSyncDestination;
   readonly speedtestRepo: SqliteSpeedtestRepository;
@@ -728,6 +738,10 @@ export function buildContainer(name: string): Container {
     process.env.KOBOX_DEBRID_PUBLIC_KEY ?? DEFAULT_DEBRID_PUBLIC_KEY,
     process.env.KOBOX_DEBRID_PRIVATE_KEY ?? DEFAULT_DEBRID_PRIVATE_KEY,
   );
+  const downloader = new Aria2Adapter(
+    process.env.KOBOX_ARIA2_RPC_URL ?? DEFAULT_ARIA2_RPC_URL,
+    process.env.KOBOX_ARIA2_RPC_SECRET ?? '',
+  );
   const ddlUseCases = buildDdlUseCases({
     repo: debridDownloadRepo,
     accounts: debridAccountRepo,
@@ -735,10 +749,7 @@ export function buildContainer(name: string): Container {
       process.env.KOBOX_ALLDEBRID_BASE_URL ?? DEFAULT_ALLDEBRID_BASE_URL,
     ),
     credentials: new StoredDebridCredentials(debridAccountRepo, debridCipher),
-    downloader: new Aria2Adapter(
-      process.env.KOBOX_ARIA2_RPC_URL ?? DEFAULT_ARIA2_RPC_URL,
-      process.env.KOBOX_ARIA2_RPC_SECRET ?? '',
-    ),
+    downloader,
     placement: new DdlPlacementAdapter(runner),
     queue,
     clock: nowStamp,
@@ -788,6 +799,7 @@ export function buildContainer(name: string): Container {
       syncUseCases,
     ),
     ddlUseCases,
+    downloader,
     speedtestRepo,
     diagnosticsRepo,
     mediaRepo,

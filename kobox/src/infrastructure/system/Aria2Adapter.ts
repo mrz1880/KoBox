@@ -35,6 +35,15 @@ export class Aria2Adapter implements DownloaderPort {
     return DownloadGid.parse(aria2GidResultSchema.parse(body).result);
   }
 
+  async checkReachable(): Promise<{ ok: boolean; detail: string }> {
+    try {
+      await this.call('aria2.getVersion', [this.token()]);
+      return { ok: true, detail: 'aria2 answered an authenticated call' };
+    } catch (error) {
+      return { ok: false, detail: error instanceof Error ? error.message : String(error) };
+    }
+  }
+
   async status(gid: DownloadGid): Promise<DownloadState> {
     const body = await this.call('aria2.tellStatus', [
       this.token(),
