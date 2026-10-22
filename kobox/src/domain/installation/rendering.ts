@@ -442,8 +442,8 @@ export function renderNginxVhost(settings: NginxVhostSettings): RenderedFile {
       '}',
       '',
       'server {',
-      // nginx 1.22 (Debian 12) syntax — `http2 on;` only exists from 1.25
-      `    listen ${String(settings.portalPort)} ssl http2;`,
+      `    listen ${String(settings.portalPort)} ssl;`,
+      '    http2 on;',
       `    server_name ${le ? le.domain : '_'};`,
       ...certLines,
       '',

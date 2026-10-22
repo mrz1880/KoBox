@@ -64,6 +64,15 @@ describe('installation rendering', () => {
     expect(conf).toContain('index index.html index.php;');
   });
 
+  it('should_turn_http2_on_with_the_directive_nginx_1_26_expects', () => {
+    // `listen ... http2` is deprecated since nginx 1.25 and warns on every reload
+    const conf = renderNginxVhost({ portalPort: 8189 }).content;
+
+    expect(conf).toContain('listen 8189 ssl;');
+    expect(conf).toContain('http2 on;');
+    expect(conf).not.toContain('ssl http2;');
+  });
+
   it('should_hand_php_to_the_php_fpm_of_the_target_release', () => {
     const socket = 'fastcgi_pass unix:/run/php/php8.4-fpm.sock;';
 
