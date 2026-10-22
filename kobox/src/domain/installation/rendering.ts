@@ -1,3 +1,4 @@
+import { PHP_FPM } from './platform.js';
 import { DomainError } from '../shared/DomainError.js';
 import type { RenderedFile } from '../shared/files.js';
 
@@ -479,7 +480,7 @@ export function renderNginxVhost(settings: NginxVhostSettings): RenderedFile {
       '        include fastcgi_params;',
       '        fastcgi_param SCRIPT_FILENAME /var/www/rutorrent/$1;',
       '        fastcgi_param REMOTE_USER $kobox_user;',
-      '        fastcgi_pass unix:/run/php/php8.2-fpm.sock;',
+      `        fastcgi_pass unix:${PHP_FPM.socket};`,
       '    }',
       '',
       '    # per-user SCGI mounts (/RPC-<USER>), each gated to its owner or an admin',
@@ -661,7 +662,7 @@ export function renderNextcloudSite(): RenderedFile {
       '    location ~ \\.php$ {',
       '        include fastcgi_params;',
       '        fastcgi_param SCRIPT_FILENAME $request_filename;',
-      '        fastcgi_pass unix:/run/php/php8.2-fpm.sock;',
+      `        fastcgi_pass unix:${PHP_FPM.socket};`,
       '    }',
       '}',
       '',

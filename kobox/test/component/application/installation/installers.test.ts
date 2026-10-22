@@ -694,7 +694,7 @@ describe('rutorrent installer', () => {
     // install, where /ru/ answered 403 until php-fpm was started by hand.
     await installer(world, 'rutorrent').install();
 
-    expect(world.systemd.log).toContain('enable-now php8.2-fpm');
+    expect(world.systemd.log).toContain('enable-now php8.4-fpm');
   });
 
   it('should_fetch_verify_extract_once_and_render_the_global_config', async () => {

@@ -14,6 +14,7 @@ import {
   renderAria2Conf,
   renderAria2Unit,
   renderNanomonUnit,
+  renderNextcloudSite,
   renderNginxVhost,
   isWorkerOnlyEnv,
   renderPortalEnv,
@@ -61,6 +62,13 @@ describe('installation rendering', () => {
     const conf = renderNginxVhost({ portalPort: 8189 }).content;
 
     expect(conf).toContain('index index.html index.php;');
+  });
+
+  it('should_hand_php_to_the_php_fpm_of_the_target_release', () => {
+    const socket = 'fastcgi_pass unix:/run/php/php8.4-fpm.sock;';
+
+    expect(renderNginxVhost({ portalPort: 8189 }).content).toContain(socket);
+    expect(renderNextcloudSite().content).toContain(socket);
   });
 
   it('should_refuse_rutorrents_private_directories_before_any_other_ru_location', () => {
