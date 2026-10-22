@@ -250,6 +250,14 @@ describe.skipIf(!onDebianAsRoot)('E2E: fresh Debian 12 -> bootstrap -> full stac
     // /ru is now gated by the portal session (auth_request), not Basic Auth
     expect(code).toBe('401');
 
+    // ruTorrent's private trees are refused outright, by the real nginx: a 403
+    // before any session check, where the rest of /ru answers 401
+    for (const dir of ['share', 'conf', 'tests']) {
+      const denied = sh('curl', ['-ks', '-o', '/dev/null', '-w', '%{http_code}',
+        `https://127.0.0.1:8189/ru/${dir}/anything.php`]).trim();
+      expect(denied).toBe('403');
+    }
+
     // least privilege, proven on the RUNNING process: the root worker holds the
     // secret, the non-root portal's own env file and /proc/<pid>/environ do not
     expect(readFileSync('/etc/kobox/worker.env', 'utf8')).toContain(PORTAL_FORBIDDEN_SECRET);
