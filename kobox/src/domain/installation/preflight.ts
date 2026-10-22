@@ -1,3 +1,4 @@
+import { DEBIAN_RELEASE } from './platform.js';
 import type { SystemFacts } from './ports.js';
 
 export type PreflightCheck = 'os' | 'root' | 'arch' | 'filesystem' | 'network';
@@ -21,10 +22,10 @@ export function evaluatePreflight(
   options: PreflightOptions,
 ): readonly PreflightFailure[] {
   const failures: PreflightFailure[] = [];
-  if (facts.osId !== 'debian' || facts.osVersionId !== '12') {
+  if (facts.osId !== 'debian' || facts.osVersionId !== DEBIAN_RELEASE.versionId) {
     failures.push({
       check: 'os',
-      message: `KoBox targets Debian 12 (bookworm); found ${facts.osId} ${facts.osVersionId}`,
+      message: `KoBox targets Debian ${DEBIAN_RELEASE.versionId} (${DEBIAN_RELEASE.codename}); found ${facts.osId} ${facts.osVersionId}`,
     });
   }
   if (facts.euid !== 0) {
