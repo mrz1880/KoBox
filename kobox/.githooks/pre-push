@@ -15,4 +15,4 @@ pnpm coverage
 echo "[pre-push] build"
 pnpm build
 
-echo "[pre-push] OK — integration/e2e (Debian 12 container) run in CI on the PR"
+echo "[pre-push] OK, integration/e2e (Debian 13 container) run in CI on the PR"
