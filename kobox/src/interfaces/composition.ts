@@ -620,8 +620,8 @@ export function buildContainer(name: string): Container {
   const queue = new SqliteJobQueue(db);
   const networkServices = new NetworkServiceAdapter(runner, logger, {
     // post-install contract: absent units are breakage, except components
-    // kobox install honestly skips (dnscrypt-proxy is not packaged for
-    // Debian 12)
+    // kobox install honestly skips (dnscrypt-proxy where Debian does not
+    // package it)
     strict: process.env.KOBOX_STRICT_SERVICES === '1',
     tolerateAbsent: ['dnscrypt-proxy'],
   });

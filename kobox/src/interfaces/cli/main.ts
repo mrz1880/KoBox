@@ -890,7 +890,7 @@ program
 program
   .command('install')
   .option('--allow-non-ext4', 'proceed on a non-ext4 root filesystem (containers/VMs)')
-  .option('--manage-apt-sources', 'let KoBox own /etc/apt/sources.list (canonical Debian 12)')
+  .option('--manage-apt-sources', 'let KoBox own the apt sources (canonical deb822 for the target Debian release)')
   .description('install the KoBox stack on this host (direct root execution, resumable)')
   .action(async (options: Record<string, boolean | undefined>) => {
     const c = container();

@@ -398,7 +398,8 @@ class RtorrentInstaller implements ComponentInstaller {
   constructor(private readonly ctx: InstallerContext) {}
 
   async install(): Promise<InstallOutcome> {
-    // Debian 12 ships rtorrent 0.9.8 — prod parity without build-from-source
+    // Debian ships rtorrent 0.9.8 (bookworm and trixie alike): prod parity
+    // without building from source
     // (Annexe B #95: pinned packaging over fragile compilation)
     //
     // rsync and sshpass ride along: they are what carries a finished download to
@@ -482,7 +483,7 @@ class NextcloudInstaller implements ComponentInstaller {
       };
     }
     await packages.ensureInstalled([
-      // Nextcloud ships .tar.bz2 and Debian 12 minimal has no bzip2, so tar
+      // Nextcloud ships .tar.bz2 and a minimal Debian has no bzip2, so tar
       // cannot open the release without this. Nothing else KoBox vendors needs
       // it, which is why it was missing.
       'bzip2',
@@ -590,12 +591,12 @@ class DnscryptInstaller implements ComponentInstaller {
   async install(): Promise<InstallOutcome> {
     const { packages, host, systemd, files } = this.ctx;
     if (!(await packages.isAvailable('dnscrypt-proxy'))) {
-      // bookworm dropped dnscrypt-proxy (nor in backports); bind renders
-      // direct recursion instead — DNS-privacy alternative is a Phase 5 call
+      // bookworm dropped dnscrypt-proxy, trixie packages it again; where it is
+      // missing, bind renders direct recursion instead
       return {
         state: 'skipped',
         reason:
-          'dnscrypt-proxy is not packaged for Debian 12 (bookworm, incl. backports); bind falls back to direct recursion — DNS-privacy alternative deferred to Phase 5',
+          'dnscrypt-proxy is not packaged on this Debian release; bind falls back to direct recursion',
       };
     }
     await packages.ensureInstalled(['dnscrypt-proxy']);
@@ -722,7 +723,7 @@ class SchedulerInstaller implements ComponentInstaller {
 
   async install(): Promise<InstallOutcome> {
     const { packages, files, systemd, install } = this.ctx;
-    // cron ships active on Debian 12; ensureInstalled is a fast no-op then
+    // cron ships active on Debian; ensureInstalled is a fast no-op then
     await packages.ensureInstalled(['cron']);
     await files.apply([renderCronFile({ koboxBin: install.koboxBin })]);
     await systemd.enable('cron', { now: true });

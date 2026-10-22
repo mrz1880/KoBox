@@ -9,7 +9,7 @@ const RELOAD_TIMEOUT_MS = 15_000;
 export interface NetworkServiceOptions {
   // strict = post-install contract (KOBOX_STRICT_SERVICES=1): an absent unit
   // is breakage, not tolerance. tolerateAbsent lists the components honestly
-  // skipped by kobox install (dnscrypt-proxy on Debian 12).
+  // skipped by kobox install (dnscrypt-proxy where Debian does not package it).
   readonly strict: boolean;
   readonly tolerateAbsent: readonly string[];
 }

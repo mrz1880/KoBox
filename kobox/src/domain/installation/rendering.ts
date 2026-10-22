@@ -759,8 +759,8 @@ export function renderBindLocal(): RenderedFile {
 }
 
 export interface BindOptionsSettings {
-  // false where Debian does not package dnscrypt-proxy (bookworm dropped
-  // it): bind recurses directly — forward-only to a dead port would take the
+  // false where Debian does not package dnscrypt-proxy (bookworm dropped it):
+  // bind recurses directly, since forward-only to a dead port would take the
   // whole box's DNS down
   readonly dnscryptForwarder: boolean;
 }
