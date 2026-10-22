@@ -1,4 +1,4 @@
-import { PHP_FPM } from './platform.js';
+import { DEBIAN_RELEASE, PHP_FPM } from './platform.js';
 import { DomainError } from '../shared/DomainError.js';
 import type { RenderedFile } from '../shared/files.js';
 
@@ -349,22 +349,45 @@ export function renderSysctlTweaks(): RenderedFile {
   };
 }
 
-// Canonical Debian 12 sources. Rendered ONLY behind --manage-apt-sources:
-// clobbering an operator-edited sources.list silently is legacy §5.2.
-export function renderAptSources(): RenderedFile {
-  return {
-    path: '/etc/apt/sources.list',
-    content: [
-      MANAGED_HEADER,
-      'deb http://deb.debian.org/debian bookworm main contrib non-free-firmware',
-      'deb http://deb.debian.org/debian bookworm-updates main contrib non-free-firmware',
-      'deb http://security.debian.org/debian-security bookworm-security main contrib non-free-firmware',
-      '',
-    ].join('\n'),
-    mode: '0644',
-    owner: 'root',
-    group: 'root',
-  };
+// Canonical apt sources for the target release, in the deb822 format trixie
+// ships. Rendered ONLY behind --manage-apt-sources: clobbering an
+// operator-edited source silently is legacy §5.2. The legacy sources.list is
+// emptied of its entries, because a box upgraded in place still lists the
+// previous release there and apt would read every suite twice.
+export function renderAptSources(): readonly RenderedFile[] {
+  const { codename } = DEBIAN_RELEASE;
+  const stanza = (uri: string, suites: string): string =>
+    [
+      'Types: deb',
+      `URIs: ${uri}`,
+      `Suites: ${suites}`,
+      'Components: main contrib non-free-firmware',
+      'Signed-By: /usr/share/keyrings/debian-archive-keyring.pgp',
+    ].join('\n');
+  return [
+    {
+      path: '/etc/apt/sources.list.d/debian.sources',
+      content: [
+        MANAGED_HEADER,
+        stanza('http://deb.debian.org/debian', `${codename} ${codename}-updates`),
+        '',
+        stanza('http://deb.debian.org/debian-security', `${codename}-security`),
+        '',
+      ].join('\n'),
+      mode: '0644',
+      owner: 'root',
+      group: 'root',
+    },
+    {
+      path: '/etc/apt/sources.list',
+      content: [MANAGED_HEADER, '# Sources live in /etc/apt/sources.list.d/debian.sources.', ''].join(
+        '\n',
+      ),
+      mode: '0644',
+      owner: 'root',
+      group: 'root',
+    },
+  ];
 }
 
 export interface NginxVhostSettings {
