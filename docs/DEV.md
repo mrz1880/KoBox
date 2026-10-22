@@ -6,7 +6,7 @@ est le legacy MySB : **on n'y touche pas** (stratégie strangler, cf. `docs/AUDI
 ## Prérequis
 
 - Node ≥ 24 + pnpm (`corepack enable pnpm`)
-- Docker Desktop (pour les tests d'intégration système et l'E2E Debian 12)
+- Docker Desktop (pour les tests d'intégration système et l'E2E Debian 13)
 
 ## Boucle rapide (sur le Mac, sans Docker)
 
@@ -42,7 +42,7 @@ de messages d'erreur, bornes de regex des VOs) — on peut soit blinder un fichi
 désactiver le mutateur `StringLiteral` pour réduire le bruit. C'est un outil **on-demand** (trop
 lourd pour la CI GitHub Free / le hook pre-push) : à jouer avant un refactor ou pour blinder un module.
 
-## Conteneur Debian 12 (adapters réels + E2E)
+## Conteneur Debian 13 (adapters réels + E2E)
 
 ```bash
 cd kobox
