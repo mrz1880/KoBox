@@ -551,7 +551,7 @@ class BindInstaller implements ComponentInstaller {
 
   async install(): Promise<InstallOutcome> {
     const { packages, host, systemd, checks } = this.ctx;
-    await packages.ensureInstalled(['bind9', 'bind9utils']);
+    await packages.ensureInstalled(['bind9', 'bind9-utils']);
     // seed only: render-whitelist owns the real zone content
     await host.ensureFile({
       path: ZONES_SEED,
