@@ -126,9 +126,9 @@ file. Revert by restoring `resolv.conf.orig`.
 default for a moving upstream. To (re)pin:
 
 ```
-curl -fsSLo /tmp/rutorrent.tar.gz https://github.com/Novik/ruTorrent/archive/refs/tags/v5.2.11.tar.gz
+curl -fsSLo /tmp/rutorrent.tar.gz https://github.com/Novik/ruTorrent/archive/refs/tags/v5.3.18.tar.gz
 sha256sum /tmp/rutorrent.tar.gz
-export KOBOX_RUTORRENT_URL=https://github.com/Novik/ruTorrent/archive/refs/tags/v5.2.11.tar.gz
+export KOBOX_RUTORRENT_URL=https://github.com/Novik/ruTorrent/archive/refs/tags/v5.3.18.tar.gz
 export KOBOX_RUTORRENT_SHA256=<the sum>
 kobox install        # re-vendors when the sha differs from the installed marker
 ```
@@ -457,9 +457,9 @@ checksum-verified like ruTorrent and NanoMon. The upstream release is a tarball
 honest skip, and the admin screen says what to set:
 
 ```
-# v1.0.13, linux amd64 — verified 2026-07-31
-export KOBOX_SPEEDTEST_URL=https://github.com/librespeed/speedtest-cli/releases/download/v1.0.13/librespeed-cli_1.0.13_linux_amd64.tar.gz
-export KOBOX_SPEEDTEST_SHA256=33f2278a6ae16e83dc80f38a16aa8689b0b315530ce30ccb6de7968a2bf7527a
+# v1.0.14, linux amd64, verified 2026-10-22
+export KOBOX_SPEEDTEST_URL=https://github.com/librespeed/speedtest-cli/releases/download/v1.0.14/librespeed-cli_1.0.14_linux_amd64.tar.gz
+export KOBOX_SPEEDTEST_SHA256=89800767ac14085c78a20847ebea23340f6c14a78de0a15c2ac7db8b565c961f
 kobox install
 ```
 
@@ -488,9 +488,9 @@ systemd unit health), run non-root and bound to loopback; nginx proxies
 installs only from a pinned, verified binary — unset = honest skip. To pin:
 
 ```
-# v0.3.2, linux x86_64 static musl — verified 2026-08-16
-export KOBOX_NANOMON_URL=https://github.com/mrz1880/nanomon/releases/download/v0.3.2/nanomon-x86_64-unknown-linux-musl
-export KOBOX_NANOMON_SHA256=dd6722aa734ec4bab34da4c39e9dd8eae2eddfe32f64fb0c897ab492ffb73e1d
+# v0.5.0, linux x86_64 static musl, verified 2026-10-22
+export KOBOX_NANOMON_URL=https://github.com/mrz1880/nanomon/releases/download/v0.5.0/nanomon-x86_64-unknown-linux-musl
+export KOBOX_NANOMON_SHA256=5634f55dde5d313e81d9c0d1d6808b5180e888950d4ded3a4947c96606803bc7
 kobox install        # re-vendors when the sha differs from the installed marker
 ```
 
