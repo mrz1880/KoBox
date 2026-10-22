@@ -298,6 +298,14 @@ describe('installation rendering', () => {
     expectGolden('rutorrent-config.php.golden', file.content);
   });
 
+  it('should_keep_rutorrent_profiles_outside_the_served_tree', () => {
+    // ruTorrent's own advice: the nginx deny is one guard, a profile path no
+    // web server can reach is the one nothing else has to be right for.
+    const file = renderRutorrentConfig();
+
+    expect(file.content).toContain("$profilePath = '/var/lib/rutorrent';");
+  });
+
   it('should_render_nfs_exports_per_user_and_trusted_address_golden', () => {
     const file = renderNfsExports([
       { username: 'alice', ips: ['203.0.113.9', '198.51.100.7'] },

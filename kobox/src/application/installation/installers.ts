@@ -26,6 +26,7 @@ import {
   renderPortalUnit,
   renderNextcloudSite,
   renderRutorrentConfig,
+  RUTORRENT_PROFILE_DIR,
   renderShellinaboxDefault,
   renderSmbConf,
   renderSshdDropin,
@@ -448,6 +449,8 @@ class RutorrentInstaller implements ComponentInstaller {
         },
       ]);
     }
+    await host.ensureDir(RUTORRENT_PROFILE_DIR, '0750');
+    await host.chown(RUTORRENT_PROFILE_DIR, 'www-data', 'www-data');
     await files.apply([renderRutorrentConfig()]);
     return installed();
   }
