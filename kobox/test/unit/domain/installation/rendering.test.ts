@@ -63,6 +63,18 @@ describe('installation rendering', () => {
     expect(conf).toContain('index index.html index.php;');
   });
 
+  it('should_refuse_rutorrents_private_directories_before_any_other_ru_location', () => {
+    // share/ holds every member's profile (uploaded .torrent files carry
+    // private-tracker passkeys), conf/ the per-user wiring, tests/ dev code.
+    // Served by the /ru/ alias, any logged-in member could read another's.
+    // The deny must precede the .php regex: nginx keeps the first regex match.
+    const conf = renderNginxVhost({ portalPort: 8189 }).content;
+    const deny = 'location ~ ^/ru/(share|conf|tests)/ {\n        deny all;\n    }';
+
+    expect(conf).toContain(deny);
+    expect(conf.indexOf(deny)).toBeLessThan(conf.indexOf('location ~ ^/ru/(.+\\.php)$'));
+  });
+
 
   it('should_render_the_portal_systemd_unit_golden', () => {
     const file = renderPortalUnit({

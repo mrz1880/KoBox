@@ -58,6 +58,10 @@ server {
         index index.html index.php;
     }
 
+    location ~ ^/ru/(share|conf|tests)/ {
+        deny all;
+    }
+
     location ~ ^/ru/(.+\.php)$ {
         auth_request /internal/auth;
         auth_request_set $kobox_user $upstream_http_x_kobox_user;

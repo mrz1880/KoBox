@@ -466,6 +466,13 @@ export function renderNginxVhost(settings: NginxVhostSettings): RenderedFile {
       '        index index.html index.php;',
       '    }',
       '',
+      // share/ holds every member's profile (uploaded .torrent files carry
+      // private-tracker passkeys), conf/ the per-user wiring, tests/ dev code.
+      // Listed before the .php regex: nginx keeps the first regex that matches.
+      '    location ~ ^/ru/(share|conf|tests)/ {',
+      '        deny all;',
+      '    }',
+      '',
       '    location ~ ^/ru/(.+\\.php)$ {',
       '        auth_request /internal/auth;',
       '        auth_request_set $kobox_user $upstream_http_x_kobox_user;',
