@@ -107,9 +107,12 @@ pgl was never packaged for Debian 12; KoBox replaces it (decision 2026-07-25):
 
 ## DNS: switching the box to its local resolver
 
-`kobox install` never touches `/etc/resolv.conf` (the legacy clobbered it —
-AUDIT §5.2). bind listens on 127.0.0.1 with the KoBox blacklist zones. To make
-the box itself use it, opt in deliberately:
+`kobox install` never touches `/etc/resolv.conf` (the legacy clobbered it,
+AUDIT §5.2). bind listens on 127.0.0.1 with the KoBox blacklist zones and
+forwards to `dnscrypt-proxy` on 127.0.0.1:52, which Debian 13 packages again,
+so queries leave the box encrypted. Where dnscrypt-proxy is not packaged, the
+component reports `skipped` and bind recurses directly. To make the box itself
+use bind, opt in deliberately:
 
 ```
 echo 'nameserver 127.0.0.1' > /etc/resolv.conf.kobox
@@ -135,6 +138,30 @@ kobox install        # re-vendors when the sha differs from the installed marker
 
 Upgrading ruTorrent later = the same three lines with the new tag inside a
 `kobox upgrade`d release, or standalone via `kobox install`.
+
+## Pinning Nextcloud
+
+Like ruTorrent, `nextcloud` installs only from a pinned, verified archive, and
+it also needs the password of its own admin account. Without both, the
+component reports `skipped` and says which one is missing.
+
+```
+# 35.0.2, verified 2026-10-22 against the published .sha256
+export KOBOX_NEXTCLOUD_URL=https://download.nextcloud.com/server/releases/nextcloud-35.0.2.tar.bz2
+export KOBOX_NEXTCLOUD_SHA256=dfc7955eaec5621de90e031d10f76006173b3f3e31d5d6e174821d1da14f162d
+export KOBOX_NEXTCLOUD_ADMIN_PASSWORD=$(openssl rand -base64 24)
+kobox install
+```
+
+Nextcloud 35 needs PHP 8.3 or later; Debian 13 ships 8.4. The admin password
+is a secret: it reaches the worker's environment only, never the portal's.
+
+Members get their account on demand, with their three rTorrent folders
+mounted (dropping a `.torrent` into Watch starts the download):
+
+```
+kobox provision-nextcloud-account alice
+```
 
 ## My media (the Cakebox successor)
 

@@ -160,7 +160,7 @@ Nothing has been written yet.
 
 ## 4. Install KoBox on the target
 
-On the fresh target (a clean Debian 12 box, or beside MySB):
+On the fresh target (a clean Debian 13 box, or beside MySB):
 
 ```sh
 kobox install
