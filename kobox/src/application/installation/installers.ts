@@ -1,3 +1,4 @@
+import { PHP_FPM } from '../../domain/installation/platform.js';
 import type { NextcloudPort } from '../../domain/installation/NextcloudPort.js';
 import type { ComponentNameValue } from '../../domain/installation/ComponentName.js';
 import type {
@@ -177,7 +178,6 @@ const NEXTCLOUD_DATA = '/var/lib/nextcloud/data';
 const NEXTCLOUD_MARKER = `${NEXTCLOUD_DIR}/.kobox-artifact-sha256`;
 const NEXTCLOUD_ARCHIVE = '/var/tmp/kobox/nextcloud.tar.bz2';
 const RUTORRENT_DIR = '/var/www/rutorrent';
-const PHP_FPM_UNIT = 'php8.2-fpm';
 const RUTORRENT_MARKER = `${RUTORRENT_DIR}/.kobox-artifact-sha256`;
 const RUTORRENT_ARCHIVE = '/var/tmp/kobox/rutorrent.tar.gz';
 const NANOMON_BIN = '/usr/local/bin/nanomon';
@@ -432,8 +432,7 @@ class RutorrentInstaller implements ComponentInstaller {
     // ruTorrent IS a PHP application: without the pool running, nginx answers
     // 403 on the very first visit. apt enables the unit but does not start it,
     // so `now` is what makes ruTorrent work today rather than after a reboot.
-    // Debian 12 ships PHP 8.2, which is the platform KoBox targets.
-    await systemd.enable(PHP_FPM_UNIT, { now: true });
+    await systemd.enable(PHP_FPM.unit, { now: true });
     const marker = await host.readFile(RUTORRENT_MARKER);
     if (marker?.trim() !== install.rutorrentSha256) {
       await artifacts.fetchVerified(install.rutorrentUrl, install.rutorrentSha256, RUTORRENT_ARCHIVE);
@@ -500,7 +499,7 @@ class NextcloudInstaller implements ComponentInstaller {
       'php-gmp',
       'unzip',
     ]);
-    await systemd.enable(PHP_FPM_UNIT, { now: true });
+    await systemd.enable(PHP_FPM.unit, { now: true });
     const marker = await host.readFile(NEXTCLOUD_MARKER);
     if (marker?.trim() !== install.nextcloudSha256) {
       await artifacts.fetchVerified(
