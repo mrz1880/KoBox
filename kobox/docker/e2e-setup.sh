@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Prepares a fresh Debian 12 container for the E2E runs.
+# Prepares a fresh Debian 13 container for the E2E runs.
 # Idempotent: safe to run more than once.
 set -euo pipefail
 

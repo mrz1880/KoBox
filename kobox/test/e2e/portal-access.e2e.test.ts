@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-// Portal & Access E2E on a fresh Debian 12: real CLI enqueue -> real root
+// Portal & Access E2E on a fresh Debian 13: real CLI enqueue -> real root
 // worker -> real accounts, and the real SSR portal (non-root HTTP) driven over
 // HTTP with a cookie jar. Requires: pnpm build, root, systemd (make e2e).
 

@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { beforeAll, describe, expect, it } from 'vitest';
 
-// Full privilege-seam E2E on a fresh Debian 12: real CLI (unprivileged path:
+// Full privilege-seam E2E on a fresh Debian 13: real CLI (unprivileged path:
 // enqueue) -> real root worker -> real useradd/chpasswd/gpasswd/systemctl.
 // Requires: pnpm build, root, systemd (make e2e runs it inside the container).
 

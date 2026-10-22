@@ -33,14 +33,14 @@ jobs:
       - run: pnpm coverage
       - run: pnpm build
 
-  debian12:
-    name: integration + e2e (Debian 12 privileged)
+  debian13:
+    name: integration + e2e (Debian 13 privileged)
     runs-on: ubuntu-latest
     timeout-minutes: 20
     if: github.event_name == 'pull_request'
     steps:
       - uses: actions/checkout@v4
-      - name: Build Debian 12 systemd image
+      - name: Build Debian 13 systemd image
         run: docker compose -f docker/docker-compose.yml build
       - name: Boot container
         run: |

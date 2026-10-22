@@ -8,7 +8,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { renderAria2Conf, renderAria2Unit } from '../../src/domain/installation/rendering.js';
 import { FsDebridKeyPair } from '../../src/infrastructure/system/FsDebridKeyPair.js';
 
-// Full DDL/debrid E2E on a fresh Debian 12 with a REAL aria2c daemon started
+// Full DDL/debrid E2E on a fresh Debian 13 with a REAL aria2c daemon started
 // from the REAL rendered unit + config (the kobox-aria2 non-root account, RPC
 // on loopback with a config-borne secret). A local stub stands in for AllDebrid
 // (unreachable in CI) and for the filehoster: the flow is

@@ -486,7 +486,7 @@ describe('dnscrypt installer', () => {
   });
 
   it('should_skip_honestly_where_debian_does_not_package_it', async () => {
-    // bookworm dropped dnscrypt-proxy (not even in backports)
+    // bookworm dropped dnscrypt-proxy (not even in backports); trixie has it
     world.packages.markUnavailable('dnscrypt-proxy');
 
     const outcome = await installer(world, 'dnscrypt').install();
@@ -893,7 +893,7 @@ describe('nextcloud installer', () => {
   });
 
   it('should_install_the_decompressor_its_own_release_needs', async () => {
-    // Nextcloud ships .tar.bz2 and Debian 12 minimal has no bzip2, so without
+    // Nextcloud ships .tar.bz2 and a minimal Debian has no bzip2, so without
     // this the extraction fails on a fresh box with "bzip2: not found". Nothing
     // else KoBox vendors needs it, which is how it went unnoticed.
     const pinned = buildWorld({

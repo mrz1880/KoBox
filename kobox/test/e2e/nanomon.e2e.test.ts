@@ -4,7 +4,7 @@ import { setTimeout as sleep } from 'node:timers/promises';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { renderNanomonUnit } from '../../src/domain/installation/rendering.js';
 
-// Monitoring E2E on a fresh Debian 12: the REAL rendered kobox-nanomon.service
+// Monitoring E2E on a fresh Debian 13: the REAL rendered kobox-nanomon.service
 // starts a binary as the dedicated non-root account, bound to loopback. A stub
 // HTTP server stands in for the Rust binary — KoBox owns the wiring (unit, user,
 // loopback), not NanoMon's internals (which NanoMon's own tests cover), exactly

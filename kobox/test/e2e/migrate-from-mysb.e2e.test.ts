@@ -7,7 +7,7 @@ import Database from 'better-sqlite3';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { buildDump } from '../fixtures/migration/buildDump.js';
 
-// Migration & Cutover E2E on a fresh Debian 12: a frozen MySB dump ->
+// Migration & Cutover E2E on a fresh Debian 13: a frozen MySB dump ->
 // `kobox migrate-from-mysb --apply` -> real root worker provisions the user ->
 // the imported user gets their temporary password by mail, is forced to reset
 // it, then reaches ruTorrent and downloads their .ovpn. Requires root+systemd
