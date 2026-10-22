@@ -414,6 +414,14 @@ describe('vendored extras installers', () => {
 });
 
 describe('bind installer', () => {
+  it('should_ask_for_the_bind_tools_under_their_trixie_package_name', async () => {
+    // trixie dropped the bind9utils transitional package: asking for it fails
+    // the whole install
+    await installer(world, 'bind').install();
+
+    expect(world.packages.installed).toContain('bind9-utils');
+  });
+
   it('should_restore_the_previous_stock_config_when_named_checkconf_fails', async () => {
     await world.host.apply([
       {
