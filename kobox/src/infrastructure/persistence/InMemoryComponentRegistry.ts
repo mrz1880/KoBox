@@ -35,20 +35,17 @@ export class InMemoryComponentRegistry implements ComponentRegistry {
     return Promise.resolve();
   }
 
-  markFailed(name: ComponentName, reason: string, now: string): Promise<void> {
-    void now;
+  markFailed(name: ComponentName, reason: string, _now: string): Promise<void> {
     this.records.set(name.value, { name, state: InstallState.parse('failed'), reason });
     return Promise.resolve();
   }
 
-  markSkipped(name: ComponentName, reason: string, now: string): Promise<void> {
-    void now;
+  markSkipped(name: ComponentName, reason: string, _now: string): Promise<void> {
     this.records.set(name.value, { name, state: InstallState.parse('skipped'), reason });
     return Promise.resolve();
   }
 
-  reset(name: ComponentName, now: string): Promise<void> {
-    void now;
+  reset(name: ComponentName, _now: string): Promise<void> {
     this.records.set(name.value, { name, state: InstallState.parse('to_install') });
     return Promise.resolve();
   }
