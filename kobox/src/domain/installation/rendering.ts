@@ -691,6 +691,10 @@ export function renderCertbotDeployHook(): RenderedFile {
   };
 }
 
+// Where ruTorrent keeps every member's profile (settings, uploaded .torrent
+// files). Out of the /var/www tree on purpose: no web server can serve it.
+export const RUTORRENT_PROFILE_DIR = '/var/lib/rutorrent';
+
 // Global ruTorrent settings only — per-user profiles and their SCGI wiring
 // belong to the portal/auth slice (Phase 6).
 export function renderRutorrentConfig(): RenderedFile {
@@ -700,6 +704,7 @@ export function renderRutorrentConfig(): RenderedFile {
       '<?php',
       '// KoBox-managed — DO NOT EDIT (rendered declaratively).',
       "$topDirectory = '/home';",
+      `$profilePath = '${RUTORRENT_PROFILE_DIR}';`,
       "$scgi_port = 5000;",
       "$scgi_host = '127.0.0.1';",
       "$XMLRPCMountPoint = '/RPC2';",

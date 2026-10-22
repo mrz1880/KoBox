@@ -710,6 +710,19 @@ describe('rutorrent installer', () => {
 
     expect(world.host.fetched).toHaveLength(1); // marker matched, no re-download
   });
+
+  it('should_give_php_a_private_profile_directory_outside_the_web_root', async () => {
+    // php-fpm runs as www-data and writes every member's settings and uploaded
+    // torrents there; nobody else needs to list it.
+    await installer(world, 'rutorrent').install();
+
+    expect(world.host.dirs.get('/var/lib/rutorrent')).toBe('0750');
+    expect(world.host.chowned).toContainEqual({
+      path: '/var/lib/rutorrent',
+      owner: 'www-data',
+      group: 'www-data',
+    });
+  });
 });
 
 describe('nanomon installer', () => {
