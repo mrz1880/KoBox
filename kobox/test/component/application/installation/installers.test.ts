@@ -19,7 +19,7 @@ import { FakeNextcloud } from '../../../../src/infrastructure/system/fakes/FakeN
 
 const healthyFacts: SystemFacts = {
   osId: 'debian',
-  osVersionId: '12',
+  osVersionId: '13',
   arch: 'amd64',
   euid: 0,
   rootFsType: 'ext4',

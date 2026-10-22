@@ -14,7 +14,7 @@ import { FakePackages } from '../../../../src/infrastructure/system/fakes/FakePa
 
 const healthyFacts: SystemFacts = {
   osId: 'debian',
-  osVersionId: '12',
+  osVersionId: '13',
   arch: 'amd64',
   euid: 0,
   rootFsType: 'ext4',

@@ -4,7 +4,7 @@ import type { SystemFacts } from '../../../../src/domain/installation/ports.js';
 
 const healthyBox: SystemFacts = {
   osId: 'debian',
-  osVersionId: '12',
+  osVersionId: '13',
   arch: 'amd64',
   euid: 0,
   rootFsType: 'ext4',
@@ -13,7 +13,7 @@ const healthyBox: SystemFacts = {
 };
 
 describe('evaluatePreflight', () => {
-  it('should_pass_on_a_healthy_debian_12_root_box', () => {
+  it('should_pass_on_a_healthy_debian_13_root_box', () => {
     expect(evaluatePreflight(healthyBox, { allowNonExt4: false })).toEqual([]);
   });
 
@@ -29,6 +29,18 @@ describe('evaluatePreflight', () => {
       { allowNonExt4: false },
     );
     expect(debian11.some((f) => f.check === 'os')).toBe(true);
+  });
+
+  it('should_refuse_debian_12_now_that_kobox_targets_trixie', () => {
+    const failures = evaluatePreflight(
+      { ...healthyBox, osVersionId: '12' },
+      { allowNonExt4: false },
+    );
+
+    expect(failures).toContainEqual({
+      check: 'os',
+      message: 'KoBox targets Debian 13 (trixie); found debian 12',
+    });
   });
 
   it('should_fail_when_not_root', () => {
