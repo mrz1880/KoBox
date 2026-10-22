@@ -270,13 +270,13 @@ class AptSourcesInstaller implements ComponentInstaller {
     if (!this.ctx.install.manageAptSources) {
       return { state: 'skipped', reason: 'operator-managed sources (--manage-apt-sources to opt in)' };
     }
-    await this.ctx.files.apply([renderAptSources()]);
+    await this.ctx.files.apply(renderAptSources());
     await this.ctx.packages.refresh();
     return installed();
   }
 
   async uninstall(): Promise<void> {
-    // sources.list stays: removing the package index source would strand apt
+    // the sources stay: removing the package index source would strand apt
   }
 }
 

@@ -619,7 +619,9 @@ describe('apt-sources installer', () => {
     const outcome = await installer(opted, 'apt-sources').install();
 
     expect(outcome.state).toBe('installed');
-    expect(opted.host.contentAt('/etc/apt/sources.list')).toContain('bookworm-security');
+    expect(opted.host.contentAt('/etc/apt/sources.list.d/debian.sources')).toContain(
+      'trixie-security',
+    );
     expect(opted.packages.refreshCount).toBe(1);
   });
 });

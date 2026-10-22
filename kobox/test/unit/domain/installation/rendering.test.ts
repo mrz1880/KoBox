@@ -213,11 +213,22 @@ describe('installation rendering', () => {
     expectGolden('sysctl.d-90-kobox.conf.golden', file.content);
   });
 
-  it('should_render_canonical_debian_12_apt_sources', () => {
-    const file = renderAptSources();
-    expect(file.path).toBe('/etc/apt/sources.list');
-    expect(file.content).toContain('bookworm-security');
-    expectGolden('sources.list.golden', file.content);
+  it('should_render_the_trixie_apt_sources_in_deb822', () => {
+    const sources = renderAptSources().find(
+      (file) => file.path === '/etc/apt/sources.list.d/debian.sources',
+    );
+
+    expect(sources?.content).toContain('Suites: trixie trixie-updates');
+    expect(sources?.content).toContain('Suites: trixie-security');
+    expectGolden('debian.sources.golden', sources?.content ?? '');
+  });
+
+  it('should_empty_the_legacy_sources_list_so_apt_never_sees_a_suite_twice', () => {
+    // a box upgraded in place still lists the previous release there
+    const legacy = renderAptSources().find((file) => file.path === '/etc/apt/sources.list');
+
+    expect(legacy?.content).not.toMatch(/^deb /m);
+    expectGolden('sources.list.golden', legacy?.content ?? '');
   });
 
   it('should_render_a_session_authed_nginx_vhost_golden', () => {
