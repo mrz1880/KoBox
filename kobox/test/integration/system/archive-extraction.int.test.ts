@@ -17,7 +17,7 @@ function makeArchive(dir: string, name: string, flag: string): string {
   return archive;
 }
 
-// bzip2 is not on a Debian 12 minimal, which is exactly why the Nextcloud
+// bzip2 is not on a minimal Debian, which is exactly why the Nextcloud
 // component installs it. Where it is absent this file cannot even build the
 // fixture, so it says so rather than passing on a machine that proves nothing.
 function hasBzip2(): boolean {

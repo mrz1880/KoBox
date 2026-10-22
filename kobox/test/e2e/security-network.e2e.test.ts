@@ -7,7 +7,7 @@ import { promisify } from 'node:util';
 import Database from 'better-sqlite3';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-// Phase 3 E2E on a fresh Debian 12: the user-h scenario end-to-end. A real
+// Phase 3 E2E on a fresh Debian 13: the user-h scenario end-to-end. A real
 // default-deny firewall applies WITHOUT locking us out, a DynDNS change
 // refreshes whitelist + firewall + fail2ban together, a valid-key SSH flood
 // (invisible to stock fail2ban) walks the graduated ladder: ntfy alert ->

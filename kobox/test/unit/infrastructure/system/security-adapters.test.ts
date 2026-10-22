@@ -292,7 +292,7 @@ describe('NetworkServiceAdapter', () => {
     });
 
     await expect(adapter.reloadFail2ban()).rejects.toThrow('strict');
-    // dnscrypt-proxy is skipped on Debian 12 (not packaged): tolerated even
+    // dnscrypt-proxy is skipped where Debian does not package it: tolerated even
     // in strict; named alone is still breakage
     await expect(adapter.reloadDns()).rejects.toThrow('strict');
   });

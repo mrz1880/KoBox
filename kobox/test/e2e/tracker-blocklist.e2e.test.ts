@@ -19,7 +19,7 @@ import Database from 'better-sqlite3';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { aTorrentFile } from '../builders/TorrentFileBuilder.js';
 
-// Full Phase 2 E2E on a fresh Debian 12: a real torrent insert discovers the
+// Full Phase 2 E2E on a fresh Debian 13: a real torrent insert discovers the
 // tracker, a REAL openssl fetches its certificate from a local TLS fixture,
 // the whitelist files render idempotently, verified blocklists flow into a
 // per-user ipv4 filter that a REAL rtorrent parses. No outbound network.

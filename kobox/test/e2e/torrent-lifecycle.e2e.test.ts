@@ -7,7 +7,7 @@ import Database from 'better-sqlite3';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { aTorrentFile } from '../builders/TorrentFileBuilder.js';
 
-// Full Phase 1 E2E on a fresh Debian 12 with a REAL rtorrent:
+// Full Phase 1 E2E on a fresh Debian 13 with a REAL rtorrent:
 // provision -> config validated by rtorrent itself -> declarative re-render
 // -> event shims -> spool -> root worker -> DB flags respected.
 // Requires: pnpm build, root, systemd, rtorrent (make e2e runs it).

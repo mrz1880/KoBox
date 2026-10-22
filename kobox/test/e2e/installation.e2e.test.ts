@@ -1,6 +1,7 @@
 import { execFile, execFileSync, type ExecFileSyncOptions } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { Resolver } from 'node:dns/promises';
 import { createServer as createHttpsServer, type Server } from 'node:https';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -8,7 +9,7 @@ import { promisify } from 'node:util';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { ConfigDocument } from '../../src/domain/installation/ConfigDocument.js';
 
-// The Phase 4 product: a fresh Debian 12 container becomes a full KoBox box
+// The Phase 4 product: a fresh Debian 13 container becomes a full KoBox box
 // through bootstrap/install.sh alone, then `create user -> everything works`
 // through the INSTALLED systemd worker (not --once). apt talks to the real
 // mirrors (the sanctioned network path); the ruTorrent artifact comes from a
@@ -96,7 +97,7 @@ function buildArtifactTarball(): Buffer {
   return readFileSync(tarPath);
 }
 
-describe.skipIf(!onDebianAsRoot)('E2E: fresh Debian 12 -> bootstrap -> full stack', () => {
+describe.skipIf(!onDebianAsRoot)('E2E: fresh Debian 13 -> bootstrap -> full stack', () => {
   beforeAll(async () => {
     // NOT under /tmp: the portal unit runs ProtectSystem=strict, whose only
     // writable path is /var/lib/kobox. A unique subdir of it keeps this suite
@@ -203,21 +204,28 @@ describe.skipIf(!onDebianAsRoot)('E2E: fresh Debian 12 -> bootstrap -> full stac
       }
       // pgl is retired (Phase 5): no registry row at all
       expect(byName.has('pgl')).toBe(false);
-      // the Debian 12 packaging reality, honestly recorded
-      expect(byName.get('dnscrypt')?.state).toBe('skipped');
-      expect(byName.get('dnscrypt')?.reason).toContain('not packaged');
+      // trixie packages dnscrypt-proxy again (bookworm did not)
+      expect(byName.get('dnscrypt')?.state).toBe('installed');
       expect(byName.get('apt-sources')?.state).toBe('skipped'); // flag not passed
     },
     INSTALL_TIMEOUT_MS,
   );
 
+  it('should_resolve_names_through_bind_and_its_dnscrypt_forwarder', async () => {
+    // bind forwards only to dnscrypt-proxy: if that hop were dead, the whole
+    // box would lose DNS while every unit still reported active
+    const resolver = new Resolver({ timeout: 10_000, tries: 2 });
+    resolver.setServers(['127.0.0.1']);
+
+    expect((await resolver.resolve4('deb.debian.org')).length).toBeGreaterThan(0);
+  });
+
   it('should_leave_the_expected_units_running_and_configs_valid', () => {
-    for (const unit of ['nginx', 'named', 'postfix', 'kobox-worker']) {
+    for (const unit of ['nginx', 'named', 'postfix', 'kobox-worker', 'dnscrypt-proxy']) {
       expect(isActive(unit), unit).toBe(true);
     }
     // Phase 6: the portal is part of the installed stack
     expect(isEnabled('kobox-portal')).toBe(true);
-    // bind resolves directly (dnscrypt is not packaged for Debian 12)
     expect(sh('named-checkconf', [])).toBe('');
     expect(isEnabled('kobox-firewall')).toBe(true);
     expect(isEnabled('fail2ban')).toBe(true);

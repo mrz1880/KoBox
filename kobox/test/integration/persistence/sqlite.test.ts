@@ -680,7 +680,7 @@ describe('SqliteComponentRegistry', () => {
     const registry = new SqliteComponentRegistry(db);
     const dnscrypt = ComponentName.parse('dnscrypt');
 
-    await registry.markSkipped(dnscrypt, 'dnscrypt-proxy not packaged for Debian 12', now);
+    await registry.markSkipped(dnscrypt, 'dnscrypt-proxy not packaged on this Debian release', now);
     expect((await registry.get(dnscrypt))?.state.value).toBe('skipped');
 
     await registry.reset(dnscrypt, '2026-07-24 13:00:00');

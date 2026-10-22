@@ -403,7 +403,7 @@ describe('installation rendering', () => {
   });
 
   it('should_render_bind_with_direct_recursion_when_dnscrypt_is_unavailable', () => {
-    // dnscrypt-proxy is not packaged for Debian 12: bind must still resolve
+    // where Debian does not package dnscrypt-proxy, bind must still resolve
     // (forward-only to a dead port would break the whole box's DNS)
     const options = renderBindOptions({ dnscryptForwarder: false });
     expect(options.content).not.toContain('forward only');

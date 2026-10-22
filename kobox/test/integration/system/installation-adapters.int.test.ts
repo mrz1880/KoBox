@@ -2,6 +2,7 @@ import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
+import { DEBIAN_RELEASE } from '../../../src/domain/installation/platform.js';
 import { renderSshdDropin } from '../../../src/domain/installation/rendering.js';
 import { Username } from '../../../src/domain/user/Username.js';
 import { AptPackageAdapter } from '../../../src/infrastructure/system/AptPackageAdapter.js';
@@ -19,11 +20,11 @@ const inContainerAsRoot =
 const runner = new ExecFileRunner();
 
 describe.runIf(inContainerAsRoot)('SystemFactsAdapter (real host)', () => {
-  it('should_report_the_container_debian_12_facts', async () => {
+  it('should_report_the_facts_of_a_container_on_the_target_release', async () => {
     const facts = await new SystemFactsAdapter(runner).gather();
 
     expect(facts.osId).toBe('debian');
-    expect(facts.osVersionId).toBe('12');
+    expect(facts.osVersionId).toBe(DEBIAN_RELEASE.versionId);
     expect(['amd64', 'arm64']).toContain(facts.arch);
     expect(facts.euid).toBe(0);
     expect(facts.rootFsType.length).toBeGreaterThan(0);
@@ -48,7 +49,7 @@ describe.runIf(inContainerAsRoot)('AptPackageAdapter (real apt)', () => {
     expect(Date.now() - start).toBeLessThan(2_000);
 
     expect(await apt.isAvailable('rtorrent')).toBe(true);
-    expect(await apt.isAvailable('pgld')).toBe(false); // the Debian 12 reality
+    expect(await apt.isAvailable('pgld')).toBe(false); // never packaged by Debian
   }, 120_000);
 });
 
