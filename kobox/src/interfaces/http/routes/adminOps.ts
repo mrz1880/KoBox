@@ -9,7 +9,8 @@ import type {
   ServiceLogSnapshot,
 } from '../../../application/maintenance/DiagnosticsPort.js';
 import type { JobQueuePort } from '../../../application/jobs/JobQueuePort.js';
-import type { HealthCheckResult, HealthProbePort, UserRepository } from '../../../domain/user/ports.js';
+import type { HealthProbePort, UserRepository } from '../../../domain/user/ports.js';
+import { ProbeSeedboxHealth } from '../../../application/user/ProbeSeedboxHealth.js';
 import { z } from 'zod';
 import { LoggableService, ManagedService } from '../../../domain/maintenance/ManagedService.js';
 import { ConfigDocument } from '../../../domain/installation/ConfigDocument.js';
@@ -42,6 +43,7 @@ export function registerAdminOpsRoutes(
   deps: AdminOpsDeps,
   guards: Guards,
 ): void {
+  const probeHealth = new ProbeSeedboxHealth({ repo: deps.users, health: deps.health });
   // Admin-only frame around the NanoMon dashboard; nginx separately gates the
   // /monitoring/ proxy on the same admin auth_request.
   server.get('/monitoring', async (request, reply) => {
@@ -63,14 +65,8 @@ export function registerAdminOpsRoutes(
     if (session === undefined) {
       return;
     }
-    // real probes, mirroring `kobox doctor`: rtorrent process + each active
-    // user's SCGI socket (systemd "active" is not proof — AUDIT §3.7)
-    const probes: HealthCheckResult[] = [await deps.health.checkProcess('rtorrent')];
-    for (const user of await deps.users.listAll()) {
-      if (!user.status.isSuspended()) {
-        probes.push(await deps.health.checkSocket('127.0.0.1', user.scgiPort.value));
-      }
-    }
+    // the same probes `kobox doctor` reports
+    const probes = await probeHealth.execute();
     const [components, releases, measurements] = await Promise.all([
       deps.components.list(),
       deps.releases.list(),

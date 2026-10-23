@@ -23,6 +23,7 @@ import { Quota } from '../../domain/user/Quota.js';
 import { Username } from '../../domain/user/Username.js';
 import { ConfigureMailRelay } from '../../application/maintenance/ConfigureMailRelay.js';
 import { RestoreBackup } from '../../application/maintenance/RestoreBackup.js';
+import { ProbeSeedboxHealth } from '../../application/user/ProbeSeedboxHealth.js';
 import { BackupHostAdapter } from '../../infrastructure/system/BackupHostAdapter.js';
 import { ExecFileRunner, runOrThrow } from '../../infrastructure/system/CommandRunner.js';
 import { InstallHostAdapter } from '../../infrastructure/system/InstallHostAdapter.js';
@@ -1080,13 +1081,7 @@ program
   .description('run health probes and print JSON results')
   .action(async () => {
     const c = container();
-    const users = await c.repo.listAll();
-    const checks = [];
-    // suspended users' services are down on purpose — do not probe them
-    for (const user of users.filter((u) => !u.status.isSuspended())) {
-      checks.push(await c.healthProbe.checkSocket('127.0.0.1', user.scgiPort.value));
-    }
-    checks.push(await c.healthProbe.checkProcess('rtorrent'));
+    const checks = await new ProbeSeedboxHealth({ repo: c.repo, health: c.healthProbe }).execute();
     // the credential, not the port: aria2 listens happily with a secret KoBox
     // no longer holds, and every debrid download then fails while a socket
     // probe still reports healthy
