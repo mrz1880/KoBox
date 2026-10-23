@@ -864,8 +864,13 @@ class PostfixInstaller implements ComponentInstaller {
     await host.postconf({
       inet_interfaces: 'loopback-only',
       mynetworks: '127.0.0.0/8 [::1]/128',
+      // a router can advertise an IPv6 default route to a box with no global
+      // IPv6 address; IPv6 stays a fallback, it just no longer goes first
+      smtp_address_preference: 'ipv4',
     });
     await systemd.enable('postfix', { now: true });
+    // postconf edits main.cf only: a running postfix keeps the old values
+    await systemd.reloadOrRestart('postfix');
     return installed(await packages.installedVersion('postfix'));
   }
 

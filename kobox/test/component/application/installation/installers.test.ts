@@ -702,6 +702,17 @@ describe('postfix installer', () => {
     expect(world.host.postconfSettings.inet_interfaces).toBe('loopback-only');
     expect(world.systemd.log).toContain('enable-now postfix');
   });
+
+  it('should_try_ipv4_first_and_apply_it_to_a_running_postfix', async () => {
+    // a provider router can advertise an IPv6 default route to a box with no
+    // global IPv6 address: every relayed mail on the first production box
+    // waited 30 s on a timed-out IPv6 connect before falling back to IPv4
+    await installer(world, 'postfix').install();
+
+    expect(world.host.postconfSettings.smtp_address_preference).toBe('ipv4');
+    // postconf edits main.cf only; a postfix already running keeps the old values
+    expect(world.systemd.log).toContain('reload-or-restart postfix');
+  });
 });
 
 describe('quota installer', () => {
