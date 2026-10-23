@@ -221,7 +221,12 @@ class KoboxCoreInstaller implements ComponentInstaller {
     // `kobox install`, before this line runs — so it lands root:root 0644 and
     // the non-root portal restart-loops on "attempt to write a readonly
     // database". setgid gives new files the right GROUP, never the write bit.
-    await host.setOwnership(install.dbPath, 'root', PORTAL_GROUP, '0660');
+    // SQLite made the -wal and -shm files at the same moment, copying that
+    // 0644, and the worker keeps them open so they are never made again. They
+    // exist here: this process holds the database open in WAL mode.
+    for (const path of [install.dbPath, `${install.dbPath}-wal`, `${install.dbPath}-shm`]) {
+      await host.setOwnership(path, 'root', PORTAL_GROUP, '0660');
+    }
     await host.ensureDir('/var/spool/kobox/events', '1733');
     // first install: current -> the tree the installer runs from; upgrades
     // own the link afterwards (ensureSymlink never overwrites an existing one)

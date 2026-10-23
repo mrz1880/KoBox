@@ -201,6 +201,17 @@ describe('kobox-core installer', () => {
       group: 'kobox-portal',
       mode: '0660',
     });
+    // Same trap one level down, seen on the first production box: SQLite made
+    // the -wal and -shm files alongside, copying the 0644 the database had
+    // then, and the worker keeps them open so they are never made again. The
+    // portal writes the shared-memory index on every read.
+    for (const sidecar of ['-wal', '-shm']) {
+      expect(world.host.ownership.get(`/var/lib/kobox/kobox.db${sidecar}`)).toEqual({
+        owner: 'root',
+        group: 'kobox-portal',
+        mode: '0660',
+      });
+    }
     expect(world.host.dirs.get('/var/spool/kobox/events')).toBe('1733');
     // the unit executes THROUGH the current symlink: upgrades flip the link,
     // never the unit (§5.6 versioned releases)
