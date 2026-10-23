@@ -24,7 +24,8 @@ import type { ConfigDocument } from '../../../src/domain/installation/ConfigDocu
 import type { RemotePasswordSealerPort } from '../../../src/domain/sync/ports.js';
 import type { RemotePassword } from '../../../src/domain/sync/RemotePassword.js';
 import { SetSyncDestination } from '../../../src/application/sync/SetSyncDestination.js';
-import type { HealthCheckResult, HealthProbePort, PasswordHasherPort } from '../../../src/domain/user/ports.js';
+import type { PasswordHasherPort } from '../../../src/domain/user/ports.js';
+import { FakeHealthProbe } from '../../../src/infrastructure/system/fakes/FakeHealthProbe.js';
 import { InMemoryBlocklistRepository } from '../../../src/infrastructure/persistence/InMemoryBlocklistRepository.js';
 import { InMemoryFairUseRepository } from '../../../src/infrastructure/persistence/InMemoryFairUseRepository.js';
 import { InMemoryComponentRegistry } from '../../../src/infrastructure/persistence/InMemoryComponentRegistry.js';
@@ -57,16 +58,6 @@ import { UserBuilder } from '../../builders/UserBuilder.js';
 
 export const NOW = '2026-07-25 10:00:00';
 
-// A stub probe: everything healthy unless a test swaps in its own.
-class AllHealthyProbe implements HealthProbePort {
-  checkProcess(processName: string): Promise<HealthCheckResult> {
-    return Promise.resolve({ name: processName, state: 'healthy' });
-  }
-
-  checkSocket(host: string, port: number): Promise<HealthCheckResult> {
-    return Promise.resolve({ name: `${host}:${port}`, state: 'healthy' });
-  }
-}
 // Only the scheduler exists on this fake box; every other catalogued file is
 // absent, which is exactly the "component not installed" case.
 class OneFileOnDisk implements ConfigFileReaderPort {
@@ -223,7 +214,8 @@ export async function buildPortalWorld(
     addresses: new InMemoryUserAddressRepository(),
     bindings: new InMemoryUserAddressRepository(),
     fairUse,
-    health: new AllHealthyProbe(),
+    // everything healthy unless a test swaps in its own probe
+    health: new FakeHealthProbe(),
     components,
     speedtests: new InMemorySpeedtestRepository(),
     diagnostics,

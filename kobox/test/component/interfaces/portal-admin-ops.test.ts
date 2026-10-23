@@ -1,38 +1,10 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import type { HealthCheckResult, HealthProbePort } from '../../../src/domain/user/ports.js';
 import { ComponentName } from '../../../src/domain/installation/ComponentName.js';
 import { Version } from '../../../src/domain/installation/Version.js';
 import { InMemoryComponentRegistry } from '../../../src/infrastructure/persistence/InMemoryComponentRegistry.js';
 import { InMemoryReleaseRepository } from '../../../src/infrastructure/persistence/InMemoryReleaseRepository.js';
+import { FakeHealthProbe } from '../../../src/infrastructure/system/fakes/FakeHealthProbe.js';
 import { buildPortalWorld, form, loginAs, type AgentSession, type PortalWorld } from './portalWorld.js';
-
-// Fake probe: healthy unless a name/port is registered as down.
-class FakeHealthProbe implements HealthProbePort {
-  private readonly downProcesses = new Set<string>();
-  private readonly downPorts = new Set<number>();
-
-  markProcessDown(name: string): void {
-    this.downProcesses.add(name);
-  }
-
-  markPortDown(port: number): void {
-    this.downPorts.add(port);
-  }
-
-  checkProcess(processName: string): Promise<HealthCheckResult> {
-    return Promise.resolve({
-      name: processName,
-      state: this.downProcesses.has(processName) ? 'unhealthy' : 'healthy',
-    });
-  }
-
-  checkSocket(host: string, port: number): Promise<HealthCheckResult> {
-    return Promise.resolve({
-      name: `${host}:${port}`,
-      state: this.downPorts.has(port) ? 'unhealthy' : 'healthy',
-    });
-  }
-}
 
 let world: PortalWorld;
 let admin: AgentSession;
