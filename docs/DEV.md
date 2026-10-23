@@ -171,3 +171,20 @@ multipass shell kobox-test
 1. **Jamais** de test contre la seedbox de prod (`HANDOFF.md`).
 2. Le legacy (`install/ web/ inc/ bin/ scripts/ templates/ upgrade/`) est en lecture seule.
 3. `pnpm lint` interdit `any` ; le domaine n'importe ni Drizzle, ni pino, ni node:*.
+
+## Publier une version
+
+Une version est un tag `vX.Y.Z` posé sur un commit de `main` : une box le déploie depuis les
+sources (`kobox upgrade --to vX.Y.Z`, cf. `docs/OPS.md`), il n'y a aucun artefact à builder.
+
+```bash
+git fetch && git switch main && git pull
+git tag -a v1.2.0 -m "KoBox v1.2.0"
+git push origin v1.2.0
+```
+
+- Le hook `pre-push` refuse le tag si son commit n'est pas sur `origin/main`, ou si aucun run
+  `kobox-ci` vert n'a testé le même code `kobox/` (un merge dont la CI tourne encore est refusé :
+  attendre le vert, puis repousser). Il lit les runs via `gh`, qui doit être authentifié.
+- Le workflow `kobox-release` crée alors la GitHub Release, avec les notes générées depuis le tag
+  `v*` précédent (jamais depuis un `archive/*` hérité de MySB).
