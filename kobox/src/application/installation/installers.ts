@@ -18,6 +18,7 @@ import {
   renderCertbotDeployHook,
   renderBindOptions,
   renderDnscryptConfig,
+  renderDnscryptSocketDropIn,
   renderFirewallBootUnit,
   renderNginxVhost,
   renderAria2Conf,
@@ -605,9 +606,6 @@ class DnscryptInstaller implements ComponentInstaller {
       };
     }
     await packages.ensureInstalled(['dnscrypt-proxy']);
-    // Debian socket-activation hijacks the listen address — the rendered
-    // toml owns 127.0.0.1:52, so the socket unit must go
-    await systemd.disable('dnscrypt-proxy.socket', { now: true });
     await host.ensureFile({
       path: BLOCKED_NAMES_SEED,
       content: '',
@@ -615,9 +613,17 @@ class DnscryptInstaller implements ComponentInstaller {
       owner: 'root',
       group: 'root',
     });
-    const changed = await files.apply([renderDnscryptConfig()]);
+    const socketChanged = await files.apply([renderDnscryptSocketDropIn()]);
+    if (socketChanged.length > 0) {
+      // a socket cannot be rebound under its running service
+      await systemd.stop('dnscrypt-proxy');
+      await systemd.daemonReload();
+      await systemd.reloadOrRestart('dnscrypt-proxy.socket');
+    }
+    const configChanged = await files.apply([renderDnscryptConfig()]);
+    await systemd.enable('dnscrypt-proxy.socket', { now: true });
     await systemd.enable('dnscrypt-proxy', { now: true });
-    if (changed.length > 0) {
+    if (configChanged.length > 0) {
       await systemd.reloadOrRestart('dnscrypt-proxy');
     }
     return installed(await packages.installedVersion('dnscrypt-proxy'));

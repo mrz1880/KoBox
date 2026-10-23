@@ -766,12 +766,15 @@ export interface BindOptionsSettings {
   readonly dnscryptForwarder: boolean;
 }
 
+// Where bind forwards and where dnscrypt-proxy listens: one address, two configs.
+const DNSCRYPT_LISTEN = { host: '127.0.0.1', port: 52 } as const;
+
 export function renderBindOptions(settings: BindOptionsSettings): RenderedFile {
   const resolution = settings.dnscryptForwarder
     ? [
         '    forward only;',
         '    // dnscrypt-proxy validates DNSSEC upstream (require_dnssec)',
-        '    forwarders { 127.0.0.1 port 52; };',
+        `    forwarders { ${DNSCRYPT_LISTEN.host} port ${String(DNSCRYPT_LISTEN.port)}; };`,
         '    dnssec-validation no;',
       ]
     : ['    dnssec-validation auto;'];
@@ -795,6 +798,27 @@ export function renderBindOptions(settings: BindOptionsSettings): RenderedFile {
   };
 }
 
+// trixie runs dnscrypt-proxy as _dnscrypt-proxy, which may not bind below
+// 1024, and its unit Requires= the socket: systemd binds as root and hands the
+// listener over. The empty assignments clear Debian's 127.0.2.1:53 first.
+export function renderDnscryptSocketDropIn(): RenderedFile {
+  return {
+    path: '/etc/systemd/system/dnscrypt-proxy.socket.d/90-kobox.conf',
+    content: [
+      '# KoBox-managed — DO NOT EDIT (rendered declaratively).',
+      '[Socket]',
+      'ListenStream=',
+      'ListenDatagram=',
+      `ListenStream=${DNSCRYPT_LISTEN.host}:${String(DNSCRYPT_LISTEN.port)}`,
+      `ListenDatagram=${DNSCRYPT_LISTEN.host}:${String(DNSCRYPT_LISTEN.port)}`,
+      '',
+    ].join('\n'),
+    mode: '0644',
+    owner: 'root',
+    group: 'root',
+  };
+}
+
 // Static cloudflare stamp instead of the public-resolvers list: the service
 // starts without fetching anything (deterministic in containers/CI).
 export function renderDnscryptConfig(): RenderedFile {
@@ -802,7 +826,8 @@ export function renderDnscryptConfig(): RenderedFile {
     path: '/etc/dnscrypt-proxy/dnscrypt-proxy.toml',
     content: [
       '# KoBox-managed — DO NOT EDIT (rendered declaratively).',
-      "listen_addresses = ['127.0.0.1:52']",
+      // socket activation: systemd binds the port and hands it over
+      'listen_addresses = []',
       "server_names = ['cloudflare']",
       'require_dnssec = true',
       'require_nolog = true',

@@ -9,6 +9,7 @@ import {
   renderBindOptions,
   renderCertbotDeployHook,
   renderDnscryptConfig,
+  renderDnscryptSocketDropIn,
   renderFirewallBootUnit,
   renderNfsExports,
   renderAria2Conf,
@@ -411,11 +412,19 @@ describe('installation rendering', () => {
     expectGolden('named.conf.options-direct.golden', options.content);
   });
 
-  it('should_render_dnscrypt_listening_on_52_with_the_phase2_blocked_names_file', () => {
+  it('should_render_dnscrypt_for_socket_activation_with_the_phase2_blocked_names_file', () => {
     const file = renderDnscryptConfig();
     expect(file.path).toBe('/etc/dnscrypt-proxy/dnscrypt-proxy.toml');
-    expect(file.content).toContain("listen_addresses = ['127.0.0.1:52']");
+    // systemd binds the port: listeners of its own would fail as non-root
+    expect(file.content).toContain('listen_addresses = []');
     expect(file.content).toContain("blocked_names_file = '/etc/dnscrypt-proxy/blocked-names.txt'");
     expectGolden('dnscrypt-proxy.toml.golden', file.content);
+  });
+
+  it('should_bind_the_dnscrypt_socket_where_bind_forwards', () => {
+    const file = renderDnscryptSocketDropIn();
+    expect(file.path).toBe('/etc/systemd/system/dnscrypt-proxy.socket.d/90-kobox.conf');
+    expect(file.content).toContain('ListenDatagram=127.0.0.1:52');
+    expectGolden('dnscrypt-proxy.socket.dropin.golden', file.content);
   });
 });

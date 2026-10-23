@@ -107,6 +107,11 @@ describe.skipIf(!onDebianAsRoot)('E2E: fresh Debian 13 -> bootstrap -> full stac
     const dir = mkdtempSync('/var/lib/kobox/e2e-install-');
     fixtureDir = mkdtempSync(join(tmpdir(), 'kobox-install-fixtures-'));
     execFileSync('bash', ['docker/e2e-setup.sh']);
+    // Docker lets unprivileged processes bind any port inside a container; a
+    // real box reserves the ones below 1024 for root. Under Docker's 0, a
+    // service dropping root to listen on 127.0.0.1:52 passed here and died on
+    // the first production box with "bind: permission denied".
+    execFileSync('sysctl', ['-w', 'net.ipv4.ip_unprivileged_port_start=1024']);
 
     const tarball = buildArtifactTarball();
     artifactSha = createHash('sha256').update(tarball).digest('hex');
