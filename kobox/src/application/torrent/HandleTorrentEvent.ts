@@ -151,10 +151,6 @@ export class HandleTorrentEvent {
     await this.notifyRemoval(command.username, torrent.name);
   }
 
-  // A torrent that vanishes without a word reads as a bug on KoBox's side. The
-  // removal was already right; saying so is what was missing. Best-effort like
-  // the stop above: a mail that cannot be queued must not fail the event, and
-  // the rejection is already recorded either way.
   // What another member already finished can be put where this member's
   // rtorrent expects it, so the torrent hash-checks and seeds instead of pulling
   // down bytes the box already holds. Best-effort: a failed copy costs a
@@ -180,6 +176,10 @@ export class HandleTorrentEvent {
     }
   }
 
+  // A torrent that vanishes without a word reads as a bug on KoBox's side. The
+  // removal was already right; saying so is what was missing. Best-effort like
+  // the stop above: a mail that cannot be queued must not fail the event, and
+  // the rejection is already recorded either way.
   private async notifyRemoval(username: Username, name: string): Promise<void> {
     try {
       const user = await this.deps.users.findByUsername(username);
