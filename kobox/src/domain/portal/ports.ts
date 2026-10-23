@@ -29,7 +29,7 @@ export interface PortalCredentialsPort {
 
 // Server-side session row. `id` is the sha256 hex of the bearer token — the
 // raw token only ever lives in the user's cookie, so a DB read never yields a
-// usable session (anti-AUDIT §5.5 "sessions en clair").
+// usable session (the legacy kept its sessions in clear).
 export interface PortalSessionRecord {
   readonly id: string;
   readonly username: Username;

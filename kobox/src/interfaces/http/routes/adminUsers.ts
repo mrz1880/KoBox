@@ -36,7 +36,7 @@ export interface AdminUsersDeps {
 }
 
 // Every mutation is an enqueue of the same typed jobs the CLI produces; the
-// portal holds no privileged port (AUDIT §3.5).
+// portal holds no privileged port.
 // What each action is called from the operator's side, rather than the job type
 // name that happens to implement it.
 const ACTION_WORDS: Readonly<Record<string, string>> = {

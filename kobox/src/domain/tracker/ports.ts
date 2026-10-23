@@ -96,7 +96,7 @@ export interface TrackerNotificationPort {
   notify(event: TrackerEvent): Promise<void>;
 }
 
-// Partnership seam with the Security context (AUDIT §2): Phase 2 renders the
+// Partnership seam with the Security context: Phase 2 renders the
 // files; reloading the services is best-effort until Phase 3 owns them.
 export interface NetworkServiceReloadPort {
   reloadDns(): Promise<void>;

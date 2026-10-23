@@ -1,4 +1,4 @@
-// Backup naming and TTL rotation (Backup-Manager parity, AUDIT §1.7) as pure
+// Backup naming and TTL rotation (Backup-Manager parity) as pure
 // decisions: infrastructure lists directories and deletes what this returns.
 
 const STAMP_PATTERN = /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$/;

@@ -19,7 +19,7 @@ export interface CommandResult {
 }
 
 // Argv-only by type: there is no API to pass a shell string, which removes the
-// legacy `bash -c "... ${var} ..."` injection class wholesale (AUDIT §5.1).
+// legacy `bash -c "... ${var} ..."` injection class wholesale.
 export interface CommandRunner {
   run(request: CommandRequest): Promise<CommandResult>;
 }

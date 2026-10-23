@@ -1,4 +1,4 @@
-// Retry ladder for the durable mail outbox (AUDIT §1.7: the legacy `mails`
+// Retry ladder for the durable mail outbox (the legacy `mails`
 // queue flushed by SendMails.bsh every 5 minutes, now with typed backoff).
 // Index n-1 = delay applied after the nth failed attempt; past the ladder the
 // mail is dead (`failed`) and stays visible for the operator.

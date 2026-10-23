@@ -5,7 +5,7 @@ import { homeOf } from '../user/homeDirectory.js';
 
 // Pure, deterministic renders of the whole desired state of each network
 // file. The legacy built these with appended `echo`/`sed -i` passes over live
-// files (AUDIT §5.2); here content is a function of the domain state only.
+// files; here content is a function of the domain state only.
 
 const ROOT_FILE = { mode: '0644', owner: 'root', group: 'root' } as const;
 

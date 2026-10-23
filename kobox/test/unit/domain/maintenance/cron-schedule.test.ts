@@ -61,7 +61,7 @@ describe('CronSchedule', () => {
 
 describe('SCHEDULED_JOBS', () => {
   it('should_cover_the_legacy_cron_parity_table', () => {
-    // PROD-INSPECTION §2 → AUDIT §1.7: each surviving legacy entry maps to a
+    // Legacy root cron: each surviving legacy entry maps to a
     // typed-job CLI command; watchdog/self-update entries die by design.
     const bySubcommand = new Map(SCHEDULED_JOBS.map((entry) => [entry.command, entry]));
     expect(bySubcommand.get('resolve-dyndns')?.schedule.value).toBe('*/5 * * * *');

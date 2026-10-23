@@ -9,7 +9,7 @@ function isEnoent(error: unknown): boolean {
   return (error as NodeJS.ErrnoException).code === 'ENOENT';
 }
 
-// The definitive closure of AUDIT §5.1: the legacy ran
+// Closes the legacy shell injection for good: the legacy ran
 //   timeout 10 bash -c "openssl s_client -connect ${Tracker}:${port} ..."
 // with ${Tracker} straight from the DB. Here the host is a TrackerHost (shell-
 // safe by construction) and reaches openssl as a discrete argv element — there

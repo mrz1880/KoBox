@@ -100,7 +100,7 @@ describe('installation rendering', () => {
       portalMain: '/opt/kobox/current/kobox/dist/interfaces/http/main.js',
     });
     expect(file.path).toBe('/etc/systemd/system/kobox-portal.service');
-    // runs non-root under the portal identity (AUDIT §3.5)
+    // runs non-root under the portal identity
     expect(file.content).toContain('User=kobox-portal');
     expect(file.content).toContain('Group=kobox-portal');
     // journald identifier the fail2ban portal jail keys on
