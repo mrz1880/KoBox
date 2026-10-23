@@ -1,0 +1,6 @@
+# KoBox-managed — DO NOT EDIT (rendered declaratively).
+[Socket]
+ListenStream=
+ListenDatagram=
+ListenStream=127.0.0.1:52
+ListenDatagram=127.0.0.1:52

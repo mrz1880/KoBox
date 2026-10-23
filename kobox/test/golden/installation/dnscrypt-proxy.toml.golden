@@ -1,5 +1,5 @@
 # KoBox-managed — DO NOT EDIT (rendered declaratively).
-listen_addresses = ['127.0.0.1:52']
+listen_addresses = []
 server_names = ['cloudflare']
 require_dnssec = true
 require_nolog = true

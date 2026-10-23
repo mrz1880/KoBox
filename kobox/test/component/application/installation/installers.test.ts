@@ -486,14 +486,43 @@ describe('bind installer', () => {
 });
 
 describe('dnscrypt installer', () => {
-  it('should_disable_socket_activation_and_own_the_toml', async () => {
+  it('should_let_systemd_hold_the_privileged_port_and_hand_it_over', async () => {
+    // trixie runs dnscrypt-proxy as _dnscrypt-proxy, which may not bind a port
+    // below 1024, and its unit Requires= the socket anyway. Disabling the
+    // socket to listen ourselves died with "bind: permission denied" on the
+    // first production box: systemd binds 127.0.0.1:52 as root instead.
     await installer(world, 'dnscrypt').install();
 
-    expect(world.systemd.log).toContain('disable-now dnscrypt-proxy.socket');
+    const dropIn = world.host.contentAt('/etc/systemd/system/dnscrypt-proxy.socket.d/90-kobox.conf');
+    // the empty assignments clear Debian's 127.0.2.1:53 before adding ours
+    expect(dropIn).toContain('ListenStream=\nListenDatagram=\n');
+    expect(dropIn).toContain('ListenStream=127.0.0.1:52');
+    expect(dropIn).toContain('ListenDatagram=127.0.0.1:52');
+    // socket activation: dnscrypt-proxy must not open listeners of its own
     expect(world.host.contentAt('/etc/dnscrypt-proxy/dnscrypt-proxy.toml')).toContain(
-      "listen_addresses = ['127.0.0.1:52']",
+      'listen_addresses = []',
     );
+    expect(world.systemd.log).not.toContain('disable-now dnscrypt-proxy.socket');
+    expect(world.systemd.log).toContain('enable-now dnscrypt-proxy.socket');
     expect(world.systemd.log).toContain('enable-now dnscrypt-proxy');
+  });
+
+  it('should_rebind_the_socket_only_when_its_address_changed', async () => {
+    // a socket cannot be restarted under its running service: stop, rebind, start
+    await installer(world, 'dnscrypt').install();
+    const firstRun = world.systemd.log.length;
+
+    await installer(world, 'dnscrypt').install();
+
+    const first = world.systemd.log.slice(0, firstRun);
+    const at = (entry: string): number => first.indexOf(entry);
+    expect(at('stop dnscrypt-proxy')).toBeGreaterThanOrEqual(0);
+    expect(at('stop dnscrypt-proxy')).toBeLessThan(at('reload-or-restart dnscrypt-proxy.socket'));
+    expect(at('daemon-reload')).toBeLessThan(at('reload-or-restart dnscrypt-proxy.socket'));
+    expect(at('reload-or-restart dnscrypt-proxy.socket')).toBeLessThan(
+      at('enable-now dnscrypt-proxy'),
+    );
+    expect(world.systemd.log.slice(firstRun)).not.toContain('reload-or-restart dnscrypt-proxy.socket');
   });
 
   it('should_skip_honestly_where_debian_does_not_package_it', async () => {
