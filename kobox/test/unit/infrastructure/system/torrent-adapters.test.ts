@@ -133,28 +133,56 @@ describe('RtorrentConfigAdapter', () => {
 });
 
 describe('WatchDirAdapter', () => {
-  it('should_ensure_the_layout_with_install_argv_only', async () => {
+  it('should_give_the_tree_to_the_member_group_alone', async () => {
+    // The shared kobox-users group let any member write into another member's
+    // watch folder and list their downloads. The member's own group, with the
+    // web server added to it, keeps other members out and lets nginx,
+    // ruTorrent and Nextcloud in.
     const runner = new RecordingRunner();
     const adapter = new WatchDirAdapter(runner);
 
     await adapter.ensureLayout(alice, [WatchDir.root(), WatchDir.labeled(Label.parse('films'))]);
 
     const lines = runner.lines();
-    expect(lines).toContain(
-      'install -d -o alice -g kobox-users -m 0755 /home/alice/rtorrent',
-    );
-    expect(lines).toContain(
-      'install -d -o alice -g kobox-users -m 0755 /home/alice/rtorrent/config.d',
-    );
-    expect(lines).toContain(
-      'install -d -o alice -g kobox-users -m 0775 /home/alice/rtorrent/watch/films',
-    );
-    expect(lines).toContain(
-      'install -d -o alice -g kobox-users -m 0755 /home/alice/rtorrent/complete/films',
-    );
-    expect(lines).toContain(
-      'install -d -o alice -g kobox-users -m 0755 /home/alice/rtorrent/torrents/films',
-    );
+    for (const path of ['rtorrent', 'rtorrent/config.d', 'rtorrent/complete/films', 'rtorrent/torrents/films']) {
+      expect(lines).toContain(`install -d -o alice -g alice -m 0750 /home/alice/${path}`);
+    }
+    // setgid: a file the web server drops keeps the member's group
+    expect(lines).toContain('install -d -o alice -g alice -m 2770 /home/alice/rtorrent/watch/films');
+    expect(lines.join('\n')).not.toContain('kobox-users');
+  });
+
+  it('should_let_the_web_server_into_a_new_member_group_and_reload_it', async () => {
+    const runner = new RecordingRunner();
+    runner.onCommand('id', { stdout: 'www-data bob\n' });
+
+    await new WatchDirAdapter(runner).ensureLayout(alice, [WatchDir.root()]);
+
+    const lines = runner.lines();
+    expect(lines).toContain('usermod -aG alice www-data');
+    // a running process keeps the groups it started with
+    expect(lines).toContain('systemctl try-reload-or-restart nginx');
+    expect(lines).toContain('systemctl try-reload-or-restart php8.4-fpm');
+  });
+
+  it('should_not_fail_where_the_web_services_are_not_installed', async () => {
+    // a box without Nextcloud's PHP, or a test container without nginx:
+    // systemctl answers 5 (no such unit), and there is nothing to reload
+    const runner = new RecordingRunner();
+    runner.onCommand('systemctl', { exitCode: 5, stderr: 'Unit nginx.service not found.' });
+
+    await expect(
+      new WatchDirAdapter(runner).ensureLayout(alice, [WatchDir.root()]),
+    ).resolves.toBeUndefined();
+  });
+
+  it('should_leave_the_web_server_alone_when_it_is_already_in_the_group', async () => {
+    const runner = new RecordingRunner();
+    runner.onCommand('id', { stdout: 'www-data alice bob\n' });
+
+    await new WatchDirAdapter(runner).ensureLayout(alice, [WatchDir.root()]);
+
+    expect(runner.lines().filter((line) => /^(usermod|systemctl)/.test(line))).toEqual([]);
   });
 });
 
