@@ -59,6 +59,10 @@ export class ConfigureMailRelay {
     ]);
     await this.deps.host.postmap(SASL_PASSWD);
     await this.deps.host.postconf({
+      // the box is installed "Local only", which points both transports at
+      // error: a relayhost alone still bounces every outgoing message
+      default_transport: 'smtp',
+      relay_transport: 'relay',
       relayhost: relay,
       smtp_sasl_auth_enable: 'yes',
       smtp_sasl_password_maps: `hash:${SASL_PASSWD}`,

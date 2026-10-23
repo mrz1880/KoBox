@@ -50,6 +50,20 @@ describe('ConfigureMailRelay', () => {
     expect(systemd.log).toContain('reload-or-restart postfix');
   });
 
+  it('should_let_mail_leave_a_box_installed_as_local_only', async () => {
+    // the postfix component preseeds "Local only", which sets both transports
+    // to error: with only relayhost set, the first production box bounced
+    // every message locally (relay=none, dsn=5.0.0) and never reached Gmail
+    const { host, configure } = world();
+
+    await configure.execute(INPUT);
+
+    expect(host.postconfSettings).toMatchObject({
+      default_transport: 'smtp',
+      relay_transport: 'relay',
+    });
+  });
+
   it('should_reject_a_relay_host_that_is_not_a_safe_fqdn', async () => {
     const { configure } = world();
 
