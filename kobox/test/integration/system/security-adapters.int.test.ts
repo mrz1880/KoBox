@@ -6,8 +6,8 @@ import { Bandwidth } from '../../../src/domain/security/Bandwidth.js';
 import { Cidr } from '../../../src/domain/security/Cidr.js';
 import { FirewallPolicy } from '../../../src/domain/security/FirewallPolicy.js';
 import { renderFail2banJails, renderFirewallRules, renderPortalLoginFilter, renderPublickeyFloodFilter } from '../../../src/domain/security/rendering.js';
-import type { HealthCheckResult, HealthProbePort } from '../../../src/domain/user/ports.js';
 import { Username } from '../../../src/domain/user/Username.js';
+import { FakeHealthProbe } from '../../../src/infrastructure/system/fakes/FakeHealthProbe.js';
 import { ExecFileRunner } from '../../../src/infrastructure/system/CommandRunner.js';
 import { IptablesRestoreAdapter } from '../../../src/infrastructure/system/IptablesRestoreAdapter.js';
 import { IptablesUsageMeterAdapter } from '../../../src/infrastructure/system/IptablesUsageMeterAdapter.js';
@@ -51,16 +51,6 @@ function testPolicy(): FirewallPolicy {
       },
     ],
   });
-}
-
-class FailingProbe implements HealthProbePort {
-  checkProcess(name: string): Promise<HealthCheckResult> {
-    return Promise.resolve({ name, state: 'unhealthy' });
-  }
-
-  checkSocket(host: string, port: number): Promise<HealthCheckResult> {
-    return Promise.resolve({ name: `${host}:${String(port)}`, state: 'unhealthy' });
-  }
 }
 
 describe.skipIf(!inContainerAsRoot)('security adapters against the real container', () => {
@@ -120,10 +110,12 @@ describe.skipIf(!inContainerAsRoot)('security adapters against the real containe
 
   it('should_roll_back_to_the_snapshot_when_the_lifeline_probe_fails', async () => {
     const before = execFileSync('iptables-save', { encoding: 'utf8' });
+    const lifelineDown = new FakeHealthProbe();
+    lifelineDown.markSocketDown('127.0.0.1', SSH_PROBE_PORT);
     const adapter = new IptablesRestoreAdapter(
       runner,
       new RtorrentConfigAdapter(runner),
-      new FailingProbe(),
+      lifelineDown,
       SSH_PROBE_PORT,
     );
     const changed = FirewallPolicy.create({ ...settings, portalPort: 8190, users: [] });
