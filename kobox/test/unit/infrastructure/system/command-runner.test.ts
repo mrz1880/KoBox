@@ -1,3 +1,6 @@
+import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { ExecFileRunner } from '../../../../src/infrastructure/system/CommandRunner.js';
 
@@ -15,6 +18,22 @@ describe('ExecFileRunner', () => {
 
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe('reached-the-child');
+  });
+
+  it('should_run_the_child_in_the_requested_directory', async () => {
+    // corepack picks the pnpm version from the working directory, not --dir
+    const dir = realpathSync(mkdtempSync(join(tmpdir(), 'kobox-cwd-')));
+    try {
+      const result = await new ExecFileRunner().run({
+        command: process.execPath,
+        args: ['-e', 'process.stdout.write(process.cwd())'],
+        cwd: dir,
+      });
+
+      expect(result.stdout).toBe(dir);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   it('should_keep_the_parent_environment_visible_under_an_overlay', async () => {

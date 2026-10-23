@@ -8,6 +8,8 @@ export interface CommandRequest {
   // Overlay merged over process.env (apt wants DEBIAN_FRONTEND, easy-rsa its
   // EASYRSA_* family). Still argv-only: no shell is ever involved.
   readonly env?: Readonly<Record<string, string>>;
+  // working directory of the child; the parent's when absent
+  readonly cwd?: string;
 }
 
 export interface CommandResult {
@@ -54,6 +56,7 @@ export class ExecFileRunner implements CommandRunner {
           encoding: 'utf8',
           timeout: request.timeoutMs ?? 60_000,
           ...(request.env !== undefined && { env: { ...process.env, ...request.env } }),
+          ...(request.cwd !== undefined && { cwd: request.cwd }),
         },
         (error, stdout, stderr) => {
           if (error && typeof error.code !== 'number') {

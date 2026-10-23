@@ -20,15 +20,19 @@ export class UpgradeHostAdapter implements UpgradeHostPort {
   ) {}
 
   async buildRelease(path: string): Promise<void> {
-    // pnpm --dir keeps the call argv-only; exit codes propagate (§5.6)
+    // from INSIDE the tree, not --dir: corepack resolves the pnpm version from
+    // the working directory, and from anywhere else it fetches the latest pnpm,
+    // which then refuses the release's pinned packageManager (§5.6)
     await runOrThrow(this.runner, {
       command: 'pnpm',
-      args: ['--dir', path, 'install', '--frozen-lockfile', '--prod=false'],
+      args: ['install', '--frozen-lockfile', '--prod=false'],
+      cwd: path,
       timeoutMs: INSTALL_TIMEOUT_MS,
     });
     await runOrThrow(this.runner, {
       command: 'pnpm',
-      args: ['--dir', path, 'build'],
+      args: ['build'],
+      cwd: path,
       timeoutMs: BUILD_TIMEOUT_MS,
     });
   }
