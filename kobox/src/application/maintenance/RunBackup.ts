@@ -27,7 +27,7 @@ function archiveName(dir: string): string {
   return `${dir.replaceAll('/', '-').replace(/^-/, '')}.tar.gz`;
 }
 
-// Backup-Manager parity (AUDIT §1.7): online SQLite dump + config archives
+// Backup-Manager parity: online SQLite dump + config archives
 // under a 0700 stamp directory, then TTL rotation. Restore is RestoreBackup.
 export class RunBackup {
   constructor(private readonly deps: RunBackupDeps) {}

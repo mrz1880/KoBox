@@ -998,7 +998,7 @@ program
   .description('set a user Samba password (read from stdin; direct root, never in the DB or a job)')
   .action(async (username: string) => {
     // no container: the secret goes straight to smbpasswd via stdin and never
-    // touches the database or a job payload (AUDIT §5.5)
+    // touches the database or a job payload
     const password = await readStdin();
     const name = Username.parse(username).value;
     const runner = new ExecFileRunner();

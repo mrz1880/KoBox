@@ -4,7 +4,7 @@ import { LABEL_PATTERN } from '../../domain/torrent/Label.js';
 import { IPV4_PATTERN } from '../../domain/shared/IpAddress.js';
 import { USERNAME_PATTERN } from '../../domain/user/Username.js';
 
-// The import boundary (AUDIT §"parse at the edge"): every legacy row is
+// The import boundary (parse at the edge): every legacy row is
 // validated here into a camelCase DTO before any Value Object is constructed.
 // The DTOs stay primitive; the domain mappers (domain/migration) are the
 // authoritative gate that turns them into VOs.

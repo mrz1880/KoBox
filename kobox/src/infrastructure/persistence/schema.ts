@@ -231,7 +231,7 @@ export const usageSamples = sqliteTable('usage_samples', {
   sampledAt: text('sampled_at').notNull(),
 });
 
-// Durable mail outbox (legacy `mails` queue, AUDIT §1.7): notifications land
+// Durable mail outbox (legacy `mails` queue): notifications land
 // here and the scheduled send-mails job flushes them with typed backoff —
 // a relay outage delays mail instead of losing it.
 export const mails = sqliteTable(
@@ -282,7 +282,7 @@ export const jobs = sqliteTable('jobs', {
 
 // Portal login credentials (Phase 6): the same crypt sha512 hash the system
 // account gets, written by the root worker on create-user/change-password.
-// Replaces the shared nginx Basic Auth of the legacy portal (AUDIT §5.5).
+// Replaces the shared nginx Basic Auth of the legacy portal.
 export const portalCredentials = sqliteTable('portal_credentials', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   username: text('username').notNull().unique(),

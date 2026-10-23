@@ -14,7 +14,7 @@ function entry(schedule: string, command: string): ScheduledJob {
   return { schedule: CronSchedule.parse(schedule), command };
 }
 
-// Functional parity with the legacy 26-line root cron (PROD-INSPECTION §2).
+// Functional parity with the legacy 26-line root cron.
 // Every entry ENQUEUES a typed job (kobox <subcommand>); the root worker
 // stays the only privileged executor. Entries the legacy needed but KoBox
 // does not: per-user rtorrent status + dnscrypt check (systemd Restart=),

@@ -14,7 +14,7 @@ function nowStamp(): string {
 }
 
 // The portal process: non-root, no privileged adapters in reach — it reads
-// repositories and enqueues typed jobs, nothing else (AUDIT §3.5).
+// repositories and enqueues typed jobs, nothing else.
 async function main(): Promise<void> {
   // the portal's own wiring: no JobWorker, no privileged adapter is even built
   const container = buildPortalContainer('kobox-portal');

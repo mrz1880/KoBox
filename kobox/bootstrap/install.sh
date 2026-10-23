@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# KoBox bootstrap — the ONLY bash a human runs on the box (AUDIT §3.6).
+# KoBox bootstrap: the ONLY bash a human runs on the box.
 # Minimal pre-checks, Node LTS, sources, then hand off to the tested CLI:
 #   curl -fsSL https://raw.githubusercontent.com/<owner>/KoBox/main/kobox/bootstrap/install.sh | bash
 # Env: KOBOX_SRC (existing checkout, skips clone), KOBOX_REPO (clone URL),

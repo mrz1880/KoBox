@@ -4,7 +4,7 @@ import type { Role } from '../../../domain/portal/Role.js';
 import { html, raw, type RawHtml } from '../html.js';
 
 // One sober stylesheet, no build step, no external assets. Light/dark via
-// prefers-color-scheme; mono for telemetry values (UI-AUDIT direction).
+// prefers-color-scheme; mono for telemetry values.
 const STYLES = `
 :root {
   --bg: #efebe2; --panel: #fbfaf6; --line: #d8d2c4; --ink: #1b242e;
@@ -128,7 +128,7 @@ form.inline { display: inline; } form.inline button { margin: 0; padding: 0.2rem
   font-size: 0.85rem; overflow-wrap: anywhere;
 }
 
-/* --- Signal strip: the console signature (UI-AUDIT §2) -------------------
+/* --- Signal strip: the console signature ---------------------------------
    Each user reads as a mixing-desk channel: a state LED, a segmented VU of
    egress against their fair-use budget, then the numbers. Segments (not a
    smooth bar) are the deliberate cue — a bar that runs into the peak zone is

@@ -3,7 +3,7 @@ import type { FormattedEvent, NotificationChannel } from './formatEvent.js';
 
 // The durable email channel: notifications land in the mails table and the
 // scheduled send-mails job flushes them — a relay outage delays alerts
-// instead of dropping them (AUDIT §1.7 outbox).
+// instead of dropping them.
 export class OutboxEmailChannel implements NotificationChannel {
   constructor(
     private readonly outbox: MailOutboxPort,

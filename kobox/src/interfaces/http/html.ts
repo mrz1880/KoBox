@@ -1,6 +1,6 @@
 // Tiny auto-escaping HTML template. Every interpolated value is escaped
 // unless explicitly wrapped in raw() — the structural answer to the legacy
-// portal's string-concatenated PHP/HTML (AUDIT §5.5).
+// portal's string-concatenated PHP/HTML.
 
 const ESCAPES: Readonly<Record<string, string>> = {
   '&': '&amp;',

@@ -50,7 +50,7 @@ export interface PortalUnitSettings {
 
 // The SSR portal (Phase 6): runs NON-ROOT under the kobox-portal identity — it
 // only reads repositories and enqueues typed jobs, never touching a privileged
-// adapter (AUDIT §3.5). SyslogIdentifier keys the fail2ban portal jail.
+// adapter. SyslogIdentifier keys the fail2ban portal jail.
 export function renderPortalUnit(settings: PortalUnitSettings): RenderedFile {
   return {
     path: '/etc/systemd/system/kobox-portal.service',

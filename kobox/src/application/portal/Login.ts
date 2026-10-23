@@ -40,7 +40,7 @@ interface Deps {
   readonly hasher: PasswordHasherPort;
 }
 
-// The application replacement for the legacy shared Basic Auth (AUDIT §5.5):
+// The application replacement for the legacy shared Basic Auth:
 // per-user verification, timed lockout, server-side session, CSRF secret.
 export class Login {
   constructor(private readonly deps: Deps) {}
