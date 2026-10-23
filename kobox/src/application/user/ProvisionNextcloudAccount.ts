@@ -9,7 +9,7 @@ import type { ComponentRegistry } from '../../domain/installation/ports.js';
 import { UserNotFoundError } from './errors.js';
 import { homeOf } from '../../domain/user/homeDirectory.js';
 
-async function nextcloudIsInstalled(components: ComponentRegistry): Promise<boolean> {
+export async function nextcloudIsInstalled(components: ComponentRegistry): Promise<boolean> {
   const record = await components.get(ComponentName.parse('nextcloud'));
   return record?.state.value === 'installed';
 }
