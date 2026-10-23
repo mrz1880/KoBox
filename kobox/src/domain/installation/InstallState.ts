@@ -1,11 +1,11 @@
 import { DomainError } from '../shared/DomainError.js';
 
 // to_install: never attempted (or reset by uninstall); failed: attempted and
-// broken; skipped: deliberately not installable here (pgl on Debian 12, no
-// ruTorrent pin). Everything but installed stays pending: failures re-run
-// without redoing the rest (anti-#122), and skips are re-evaluated every run
-// (cheap, idempotent) so a fixed cause recovers by plain re-run — never DB
-// surgery.
+// broken; skipped: deliberately not installable here (a vendored component
+// without its pin, such as ruTorrent). Everything but installed stays
+// pending: failures re-run without redoing the rest (anti-#122), and skips
+// are re-evaluated every run (cheap, idempotent) so a fixed cause recovers by
+// plain re-run, never by DB surgery.
 export const INSTALL_STATES = ['to_install', 'installed', 'failed', 'skipped'] as const;
 
 export type InstallStateValue = (typeof INSTALL_STATES)[number];
