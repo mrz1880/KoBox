@@ -46,6 +46,20 @@ export async function runOrThrow(
   return result;
 }
 
+// For commands whose non-zero exit can mean the state we want already holds
+// (groupdel on a group already gone, a reload of a unit that is not installed).
+export async function runAllowing(
+  runner: CommandRunner,
+  request: CommandRequest,
+  okExitCodes: readonly number[],
+): Promise<CommandResult> {
+  const result = await runner.run(request);
+  if (result.exitCode !== 0 && !okExitCodes.includes(result.exitCode)) {
+    throw new CommandFailedError(request, result);
+  }
+  return result;
+}
+
 export class ExecFileRunner implements CommandRunner {
   run(request: CommandRequest): Promise<CommandResult> {
     return new Promise((resolve, reject) => {
