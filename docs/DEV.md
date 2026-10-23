@@ -57,6 +57,9 @@ make e2e-full  # tout depuis zéro comme la CI (up, install, test-int, e2e), pui
 
 L'E2E de la CI ne tourne que sur les pull requests : joue-le en local avant de pousser.
 
+- Chaque checkout a son propre projet compose (`kobox-<dossier du checkout>`, dérivé par le
+  Makefile) : `make up` ou `make down` dans un worktree ne touche pas aux conteneurs d'un autre.
+  Passe toujours par `make` : un `docker compose` lancé à la main ignore ce nom de projet.
 - Le repo est monté dans le conteneur ; `kobox/node_modules` est masqué par un volume (les
   modules natifs macOS et linux ne sont pas interchangeables).
 - La DB vit dans `/var/lib/kobox/kobox.db` (`KOBOX_DB` pour la déplacer).

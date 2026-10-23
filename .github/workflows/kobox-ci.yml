@@ -40,18 +40,14 @@ jobs:
     if: github.event_name == 'pull_request'
     steps:
       - uses: actions/checkout@v4
-      - name: Build Debian 13 systemd image
-        run: docker compose -f docker/docker-compose.yml build
-      - name: Boot container
-        run: |
-          docker compose -f docker/docker-compose.yml up -d
-          docker/wait-for-systemd.sh
-      - name: Install dependencies in container
-        run: docker exec kobox-dev bash -lc 'cd /opt/KoBox/kobox && corepack enable pnpm && pnpm install --frozen-lockfile'
+      # The steps go through the Makefile, as in local runs: one definition of
+      # each command, and the compose project name the Makefile derives.
+      - name: Build and boot the Debian 13 systemd container
+        run: make up
       - name: Integration tests (real system adapters)
-        run: docker exec kobox-dev bash -lc 'cd /opt/KoBox/kobox && pnpm test:int'
+        run: make test-int
       - name: E2E (create -> suspend -> resume -> delete)
-        run: docker exec kobox-dev bash -lc 'cd /opt/KoBox/kobox && pnpm build && pnpm test:e2e'
+        run: make e2e
       - name: Teardown
         if: always()
-        run: docker compose -f docker/docker-compose.yml down -v
+        run: make down
