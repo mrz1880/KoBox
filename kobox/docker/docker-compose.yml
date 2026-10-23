@@ -1,7 +1,6 @@
 services:
   kobox-dev:
     build: .
-    container_name: kobox-dev
     privileged: true
     # systemd needs the host cgroup namespace to boot as PID 1 on cgroup-v2
     # hosts (GitHub Actions runners); Docker Desktop tolerated its absence.
@@ -28,7 +27,6 @@ services:
   # (docker populates a fresh named volume from the image content).
   pebble:
     image: ghcr.io/letsencrypt/pebble:2.7.0
-    container_name: kobox-pebble
     environment:
       - PEBBLE_VA_ALWAYS_VALID=1
     volumes:
