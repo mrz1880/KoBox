@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import type { JobQueuePort } from '../../../application/jobs/JobQueuePort.js';
+import { ROLES } from '../../../domain/portal/Role.js';
 import { USERNAME_PATTERN } from '../../../domain/user/Username.js';
 import { Password } from '../../../domain/user/Password.js';
 import { Username } from '../../../domain/user/Username.js';
@@ -19,7 +20,7 @@ const createUserSchema = z.object({
   email: z.email(),
   password: z.string().min(8).max(256),
   quotaGib: z.coerce.number().int().positive(),
-  role: z.enum(['admin', 'user']),
+  role: z.enum(ROLES),
 });
 
 const passwordSchema = z.object({ password: z.string().min(8).max(256) });

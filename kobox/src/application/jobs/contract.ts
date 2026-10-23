@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ROLES } from '../../domain/portal/Role.js';
 import { IPV4_PATTERN } from '../../domain/shared/IpAddress.js';
 import { INFO_HASH_PATTERN } from '../../domain/torrent/InfoHash.js';
 import { LABEL_PATTERN } from '../../domain/torrent/Label.js';
@@ -145,7 +146,7 @@ export const jobPayloadSchemas = {
       proxyPort: z.number().int().min(1).max(65535),
       passwordHash: passwordHashField,
       // portal capability level; provisioning is identical either way
-      role: z.enum(['admin', 'user']).default('user'),
+      role: z.enum(ROLES).default('user'),
     }),
   ),
   'delete-user': usernameOnly,
