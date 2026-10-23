@@ -37,4 +37,9 @@ RUN curl -fsSL "https://deb.nodesource.com/setup_${NODE_VERSION}.x" | bash - \
 
 RUN mkdir -p /var/lib/kobox /run/sshd
 
+# The checkout is bind-mounted, owned by the host user (the CI runner's uid),
+# while everything here runs as root: git refuses such a repository as
+# "dubious ownership", and pnpm's prepare script printed a fatal on every run.
+RUN git config --system --add safe.directory /opt/KoBox
+
 CMD ["/sbin/init"]
