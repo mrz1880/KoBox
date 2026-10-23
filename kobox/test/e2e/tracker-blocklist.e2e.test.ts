@@ -18,6 +18,7 @@ import { gzipSync } from 'node:zlib';
 import Database from 'better-sqlite3';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { aTorrentFile } from '../builders/TorrentFileBuilder.js';
+import { scgiCall } from './support/scgi.js';
 
 // Full Phase 2 E2E on a fresh Debian 13: a real torrent insert discovers the
 // tracker, a REAL openssl fetches its certificate from a local TLS fixture,
@@ -94,40 +95,6 @@ function dbRun(query: string, ...params: string[]): void {
 
 function unitProperty(name: string): string {
   return sh('systemctl', ['show', '-p', name, '--value', `rtorrent-${USER}`]).trim();
-}
-
-// Minimal XML-RPC-over-SCGI call for zero-argument getters: the strongest
-// proof of a parsed filter is rtorrent's own answer, not a log line.
-function scgiCall(method: string, timeoutMs = 5_000): Promise<string> {
-  const body =
-    '<?xml version="1.0"?><methodCall>' +
-    `<methodName>${method}</methodName><params></params>` +
-    '</methodCall>';
-  const payload = Buffer.from(body, 'utf8');
-  // SCGI headers are NUL-separated, never spaces
-  const headers = Buffer.from(
-    `CONTENT_LENGTH\u0000${String(payload.length)}\u0000SCGI\u00001\u0000`,
-    'utf8',
-  );
-  const frame = Buffer.concat([
-    Buffer.from(`${String(headers.length)}:`),
-    headers,
-    Buffer.from(','),
-    payload,
-  ]);
-  return new Promise((resolve, reject) => {
-    const socket = connect({ host: '127.0.0.1', port: SCGI_PORT });
-    const chunks: Buffer[] = [];
-    socket.setTimeout(timeoutMs, () => {
-      socket.destroy(new Error(`SCGI timeout calling ${method}`));
-    });
-    socket.on('connect', () => socket.write(frame));
-    socket.on('data', (chunk) => chunks.push(chunk));
-    socket.on('error', reject);
-    socket.on('close', () => {
-      resolve(Buffer.concat(chunks).toString('utf8'));
-    });
-  });
 }
 
 function waitForScgi(timeoutMs: number): Promise<void> {
@@ -325,7 +292,7 @@ describe.skipIf(!onDebianAsRoot)('E2E: tracker discovery, certs, whitelist and b
     sh('systemctl', ['restart', `rtorrent-${USER}`]);
     await waitForScgi(20_000);
     expect(unitProperty('ActiveState')).toBe('active');
-    const sizeAnswer = await scgiCall('ipv4_filter.size_data');
+    const sizeAnswer = await scgiCall(SCGI_PORT, 'ipv4_filter.size_data');
     const loaded = Number(/<i[48]>(\d+)<\/i[48]>/.exec(sizeAnswer)?.[1]);
     if (Number.isNaN(loaded)) {
       throw new Error(`unexpected ipv4_filter.size_data answer: ${sizeAnswer}`);
