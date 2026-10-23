@@ -1,4 +1,4 @@
-# KoBox — Operations runbook
+# KoBox operations runbook
 
 Day-2 operations for an installed box. Everything here goes through the `kobox`
 CLI; the root worker (`kobox-worker.service`) stays the only privileged executor.
@@ -90,7 +90,7 @@ the live chain under the `nginx -t` guard. Renewals are `certbot.timer`'s job;
 the rendered deploy hook reloads nginx after each real renewal. Without a
 public FQDN the component stays `skipped` and snakeoil remains.
 
-## Blocklist enforcement (ipset — pgl retired)
+## Blocklist enforcement (ipset, pgl retired)
 
 pgl was never packaged for Debian 12; KoBox replaces it (decision 2026-07-25):
 
@@ -603,7 +603,7 @@ their own requests + live status) or an admin can queue one with
 `kobox request-download`. Categories are the closed set `films|series`, which
 picks the `complete/<category>/` subdir.
 
-## The portal & application auth (Phase 6)
+## The portal & application auth
 
 The SSR portal (`kobox-portal.service`) replaces the legacy Wolf CMS theme and
 the shared nginx Basic Auth. It runs **non-root** on `127.0.0.1:8190`; nginx
