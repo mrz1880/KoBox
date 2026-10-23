@@ -107,8 +107,8 @@ pgl was never packaged for Debian 12; KoBox replaces it (decision 2026-07-25):
 
 ## DNS: switching the box to its local resolver
 
-`kobox install` never touches `/etc/resolv.conf` (the legacy clobbered it,
-AUDIT §5.2). bind listens on 127.0.0.1 with the KoBox blacklist zones and
+`kobox install` never touches `/etc/resolv.conf` (the legacy clobbered it).
+bind listens on 127.0.0.1 with the KoBox blacklist zones and
 forwards to `dnscrypt-proxy` on 127.0.0.1:52, which Debian 13 packages again,
 so queries leave the box encrypted. Where dnscrypt-proxy is not packaged, the
 component reports `skipped` and bind recurses directly. To make the box itself

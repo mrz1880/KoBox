@@ -1,7 +1,8 @@
 # KoBox — développement local
 
 Le code neuf vit dans **`kobox/`** (TypeScript strict, archi hexagonale). Le reste du repo
-est le legacy MySB : **on n'y touche pas** (stratégie strangler, cf. `docs/AUDIT.md §6`).
+est le legacy MySB : **on n'y touche pas** (stratégie strangler : KoBox le remplace
+morceau par morceau, sans le modifier).
 
 ## Prérequis
 
@@ -46,7 +47,7 @@ lourd pour la CI GitHub Free / le hook pre-push) : à jouer avant un refactor ou
 
 ```bash
 cd kobox
-make up        # build + boot du conteneur systemd privilégié (jrei/systemd-debian:12)
+make up        # build + boot du conteneur systemd privilégié (debian:13 + systemd)
 make test-int  # adapters système contre useradd/usermod/gpasswd réels
 make e2e       # cycle complet CLI -> worker root -> OS (create/suspend/resume/delete)
 make shell     # shell dans le conteneur (repo monté sur /opt/KoBox)
@@ -168,7 +169,8 @@ multipass shell kobox-test
 
 ## Garde-fous
 
-1. **Jamais** de test contre la seedbox de prod (`HANDOFF.md`).
+1. **Jamais** de test contre une seedbox en production : tout se joue dans le conteneur
+   ou une VM jetable.
 2. Le legacy (`install/ web/ inc/ bin/ scripts/ templates/ upgrade/`) est en lecture seule.
 3. `pnpm lint` interdit `any` ; le domaine n'importe ni Drizzle, ni pino, ni node:*.
 

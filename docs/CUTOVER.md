@@ -21,8 +21,8 @@
 - **Desired-state.** The import loads **data** only. KoBox then **regenerates**
   every file (per-user `.rtorrent.rc`, nginx `/RPC-*` includes, firewall, NFS
   exports, OpenVPN profiles, tracker whitelist). We never copy a generated
-  legacy file — we import the row that produces it (`docs/PROD-INSPECTION.md` §5:
-  "DB survives, files die").
+  legacy file: we import the row that produces it (on MySB the database
+  survives a regeneration, the files do not).
 - **Idempotent & re-entrant.** `migrate-from-mysb` is dry-run by default and a
   re-run is a no-op for users already imported (no second account, mail or
   provisioning) and an upsert for catalogue data. A partial run is safe to
@@ -75,8 +75,8 @@ account.
 
 MySB's real MariaDB column names differ from the contract above, so the export
 is a set of **read-only `SELECT`s that alias into the contract shape**. Sketch
-(run as a user with read grants; adjust column names to the live schema, which
-`docs/PROD-INSPECTION.md` §3 maps):
+(run as a user with read grants; adjust column names to the live schema, as mapped
+below):
 
 The mapping below was read off a live MySB box (2026-08-15, read-only) rather
 than reconstructed — the real column names and one unit differ from what this
@@ -134,7 +134,7 @@ Goal: a consistent snapshot. Put MySB into a quiet window:
   use `--single-transaction`-style consistency, so `mysb.sqlite` is coherent.
 
 If the owner wants the two dead file-patches restored before the snapshot
-(`docs/PROD-INSPECTION.md` §5, user-f), re-apply them now so the dump carries
+(see §9, user-f), re-apply them now so the dump carries
 the intended `sync_mode` — the importer is faithful to whatever the dump holds.
 
 ---
@@ -258,9 +258,9 @@ To roll back:
    ports were preserved on the KoBox side precisely so the two views agree.
 
 No destructive step (removing MySB, `userdel` on the old box) happens until the
-owner declares the cutover final. Preserving legacy ports (`docs/PHASE-7-BRIEF`
-§6) is what makes rollback non-disruptive: an imported user is never re-routed to
-a different SCGI/rtorrent port.
+owner declares the cutover final. Preserving legacy ports is what makes rollback
+non-disruptive: an imported user is never re-routed to a different SCGI/rtorrent
+port.
 
 ---
 
@@ -319,7 +319,7 @@ Both paths are supported.
 ## 9. Known drifts & post-migration toggles
 
 - **`allow_public_tracker`** has no prod DB source (the legacy patch lived in a
-  file that the regeneration erased — `docs/PROD-INSPECTION.md` §5). Import sets
+  file that the regeneration erased). Import sets
   it **false** for everyone. If a user (historically user-f) needs the public-
   tracker bypass, enable it after cutover:
   `kobox set-allow-public-tracker <user> on`.
@@ -335,5 +335,5 @@ Both paths are supported.
   read-only; `--apply` targets the KoBox box.
 - Never edit a generated file to change behaviour — set the DB flag and let
   KoBox regenerate (the persistent-hooks ADR).
-- Repo is public: real dumps and `HANDOFF.md` stay out of git; tests use neutral
+- Repo is public: real dumps and production notes stay out of git; tests use neutral
   fixtures only.
