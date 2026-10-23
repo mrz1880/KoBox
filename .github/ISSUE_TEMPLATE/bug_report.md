@@ -1,44 +1,33 @@
 ---
 name: Report a bug
-about: Create a report to help me improve the project
+about: Something on a KoBox box does not behave as expected
 title: "[BUG] "
 labels: bug
-assignees: toulousain79
 
 ---
 
-## Simple description of the problem
+## What happens
 
-A clear and concise description of the problem you encounter.
+A clear and short description of the problem.
 
-## Reproduce
+## Steps to reproduce
 
-Steps to reproduce the problem:
+1. ...
+2. ...
 
-1. '...'
-2. '....'
-'....'
+## What you expected
 
-## Predictable behavior
+## Diagnostics
 
-A clear and concise description of what you expected.
+Remove anything private (hostnames, IP addresses, member names) before posting.
 
-## Screenshot
+- `kobox doctor`
+- `kobox install-status`
+- `journalctl -u kobox-worker -u kobox-portal --since "1 hour ago"`
 
-If possible, add screenshots to explain your problem.
+## Environment
 
-## Logs
-
-If possible, add logs, those located in **/opt/MySB/logs**.
-
-## Hardware and environment
-
-- Provider: _[ex: KimSufi, SoYouStart, ...]_
-- Server type: _[ex: VPS, Dédié, ...]_
-- MySB version: _[ex: v5.3, v5.4 ...]_
-- Kernel version: _(uname -a)_
-- Hardware: _(CPU, RAM, HDD, Raid, ...)_
-
-## Additional context
-
-If necessary, add another context concerning the problem here.
+- KoBox version: _(tag, e.g. v1.0.1)_
+- Debian version: _(`cat /etc/debian_version`)_
+- Kernel: _(`uname -r`)_
+- Hardware: _(CPU, RAM, disks, RAID)_

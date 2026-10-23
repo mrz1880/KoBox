@@ -1,44 +1,33 @@
 ---
 name: Signaler un bug
-about: Créer un rapport pour m'aider à améliorer le projet
+about: Quelque chose ne se comporte pas comme prévu sur une box KoBox
 title: "[BUG] "
 labels: bug
-assignees: toulousain79
 
 ---
 
-## Description simple du problème
+## Ce qui se passe
 
-Une description claire et concise du problème que tu rencontres.
+Une description claire et courte du problème.
 
-## Reproduction du problème
+## Étapes pour reproduire
 
-Étapes pour reproduire le problème:
+1. ...
+2. ...
 
-1. '...'
-2. '....'
-'....'
+## Ce qui était attendu
 
-## Comportement prévisible
+## Diagnostic
 
-Une description claire et concise de ce à quoi tu t'attendais.
+Retire tout ce qui est privé (noms d'hôte, adresses IP, noms des membres) avant de publier.
 
-## Captures d'écran
+- `kobox doctor`
+- `kobox install-status`
+- `journalctl -u kobox-worker -u kobox-portal --since "1 hour ago"`
 
-Si possible, ajoutes des captures d'écran pour expliquer ton problème.
+## Environnement
 
-## Logs
-
-Si possible, ajoutes des logs, ceux se trouvant dans **/opt/MySB/logs**.
-
-## Matériel et environnement
-
-- Hébergeur: _[ex: KimSufi, SoYouStart, ...]_
-- Type de serveur: _[ex: VPS, Dédié, ...]_
-- Version de MySB: _[ex: v5.3, v5.4 ...]_
-- Version du noyau: _(uname -a)_
-- Matériel: _(CPU, RAM, HDD, Raid, ...)_
-
-## Contexte supplémentaire
-
-Si nécessaire, ajoutes un autre contexte concernant le problème ici.
+- Version de KoBox : _(tag, par ex. v1.0.1)_
+- Version de Debian : _(`cat /etc/debian_version`)_
+- Noyau : _(`uname -r`)_
+- Matériel : _(CPU, RAM, disques, RAID)_
