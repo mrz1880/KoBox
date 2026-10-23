@@ -139,6 +139,17 @@ export class InstallHostAdapter implements InstallHostPort {
   }
 
   async activateQuota(mountPoint: string): Promise<void> {
+    // Already enforcing from an earlier install: quotacheck refuses a live
+    // quota, and there is nothing to turn on. Read the state from the output;
+    // quotaon -p signals it through a non-zero exit, not an error.
+    const state = await this.runner.run({
+      command: 'quotaon',
+      args: ['-pu', mountPoint],
+      timeoutMs: HOST_TIMEOUT_MS,
+    });
+    if (/^user quota on .* is on$/m.test(state.stdout)) {
+      return;
+    }
     await runOrThrow(this.runner, {
       command: 'quotacheck',
       args: ['-ugm', mountPoint],
