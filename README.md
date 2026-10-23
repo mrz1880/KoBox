@@ -1,42 +1,178 @@
-<p align="center"><img src="web/public/themes/MySB/images/toulousain79.gif" height="200"></p>
-<!-- <p align="center"><img alt="v7.3 pipeline status" src="https://img.shields.io/gitlab/pipeline/toulousain79/MySB/v7.3.svg?label=v7.3%20pipeline%20status&style=plastic" /> <img alt="develop pipeline status" src="https://img.shields.io/gitlab/pipeline/toulousain79/MySB/develop.svg?label=develop%20pipeline%20status&style=plastic" /></p> -->
+# KoBox
 
-<p align="center"><img src="https://img.shields.io/github/commit-activity/m/toulousain79/mysb.svg?label=Commit%20activity&logo=github&style=plastic" /> <img src="https://img.shields.io/github/last-commit/toulousain79/mysb.svg?label=Last%20commit&logo=github&style=plastic" /> <img src="https://img.shields.io/github/issues/toulousain79/mysb.svg?label=Issues&logo=github&style=plastic" /> <img src="https://img.shields.io/github/issues-closed/toulousain79/mysb.svg?label=Issues&logo=github&style=plastic" /> <img src="https://img.shields.io/discord/469543542981656627.svg?label=Discord&logo=discord&style=plastic" /></p>
+[English](#english) · [Français](#français)
 
-<p align="center"><a href="https://github.com/toulousain79/MySB/blob/v7.3/LICENCE.md"><img src="https://img.shields.io/github/license/mashape/apistatus.svg?style=flat-square" /></a></p>
+## English
 
-<p align="center"><img src="https://img.shields.io/badge/Stable-v7.3-green" /></p>
+KoBox is a multi-user seedbox for a dedicated server running Debian 13 (trixie). Each member
+gets their own rTorrent, their own disk quota and their own way in; the administrator runs the
+whole box from a web console and a single command-line tool.
 
-# English
+KoBox started as a fork of [MySB](https://github.com/toulousain79/MySB) and replaces it piece by
+piece. Its security stance is the same: incoming peers are filtered through IP blocklists and a
+tracker whitelist, and outgoing DNS queries leave the box encrypted. What changed is how the box
+is driven: the bash scripts gave way to a tested TypeScript application, where a root worker is
+the only process allowed to touch the system and the web portal holds no privilege at all.
 
-MySB _(My SeedBox)_ is a multi-user seedbox for dedicated server under Debian 10 _(Buster)_ and could be renamed MySSB, My Secured SeedBox.
+### What a box offers
 
-All of MySB's interest lies in security through block list management with PeerGuardian _(or rTorrent)_ for incoming requests, as well as encrypting DNS queries with DNScrypt-proxy for outbound requests.
+- **Torrents**: one rTorrent per member, with ruTorrent, a watch folder and a disk quota.
+- **Filtering**: tracker whitelist, IP blocklists enforced by ipset, firewall, fail2ban.
+- **Privacy**: DNS resolved locally by bind and forwarded through dnscrypt-proxy; an OpenVPN
+  profile per member.
+- **Getting files in and out**: direct downloads through a debrid account (AllDebrid + aria2),
+  Nextcloud (drop a `.torrent` in the Watch folder), Samba, and automatic sending of finished
+  downloads to a member's own machine.
+- **Web portal**: a console for members and administrators, with a media browser, monitoring
+  (NanoMon), a link speed test and a browser shell.
+- **Running it**: scheduled jobs, backups and restore, upgrades by version tag with rollback,
+  Let's Encrypt certificates, mail through a relay.
 
-SSL connections are prioritized by rTorrent. Torrent management is also simplified with NextCloud and the MySB portal for remote data synchronization via Rsync or FTPs.
+### Install
 
-A simple question, do you know who to connect to your server?
+You need a dedicated server freshly installed with **Debian 13**, and root access. The bootstrap
+script installs Node.js, fetches the sources, builds them and hands over to `kobox install`:
 
-[English description of MySB](https://github.com/toulousain79/MySB/wiki/README-EN)
+```sh
+curl -fsSL https://raw.githubusercontent.com/<owner>/KoBox/main/kobox/bootstrap/install.sh \
+  | KOBOX_REPO=https://github.com/<owner>/KoBox.git bash
+```
 
-## Make a donation
+Replace `<owner>` with the account hosting the repository you install from. Some components
+(ruTorrent, Nextcloud, NanoMon, the speed test) only install from a release you pin and verify:
+without a pin they report `skipped` and say what is missing. `docs/OPS.md` gives each pin. Set
+them, run `kobox install` again, and check the result:
 
-[![Donate](https://img.shields.io/badge/Paypal-Donate-blue.svg?style=plastic&logo=paypal)](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=W23FUB5NNXLR4) [![Donate](https://img.shields.io/badge/BitCoin-Donate-orange.svg?style=plastic&logo=bitcoin)](https://www.blockchain.com/btc/payment_request?address=1HtuGsnSsGoUz7DmRbDLCFnRc41jYEY2FE)
+```sh
+kobox install-status
+kobox doctor
+```
 
-# Français
+Create the first administrator (the password is read from standard input):
 
-MySB _(My SeedBox)_ est une seedbox multi-utilisateurs pour un serveur dédié sous Debian 10 _(Buster)_ et pourrait être renommée MySSB, My Secured SeedBox.
+```sh
+read -rs PASSWORD && printf '%s' "$PASSWORD" \
+  | kobox create-user alice --email alice@example.org --admin
+```
 
-Tout l'intérêt de MySB réside dans la sécurité via la gestion de listes de blocage d'IP avec PeerGuardian _(ou rTorrent)_ pour les requêtes entrantes, ainsi que le chiffrement des requêtes DNS grâce à DNScrypt-proxy pour les requêtes sortantes.
+The portal answers on `https://<your-host>:8189`.
 
-Les connections SSL sont priorisées par rTorrent. La gestion des torrents est également simplifiée grâce à NextCloud et au portail MySB pour la synchronisation distante des données par Rsync ou FTPs.
+### Upgrade
 
-Une question simple, savez-vous qui se connecte à votre serveur ?
+Each version is a `vX.Y.Z` tag, listed on the repository's Releases page with its notes. A box
+deploys it from the sources and keeps the previous release to roll back to:
 
-[Description française de MySB](https://github.com/toulousain79/MySB/wiki/README-FR)
+```sh
+kobox upgrade --to vX.Y.Z
+kobox upgrade --rollback
+```
 
-[Documentation française](https://mysb.gitbook.io/doc/)
+### Documentation
 
-## Faire un don
+| Document | For | Language |
+| --- | --- | --- |
+| [`docs/OPS.md`](docs/OPS.md) | Running an installed box: pins, backups, upgrades, mail, DNS, portal | English |
+| [`docs/DEV.md`](docs/DEV.md) | Working on the code: tests, Debian 13 container, releasing | French |
+| [`docs/CUTOVER.md`](docs/CUTOVER.md) | Importing the members of an existing MySB box | English |
 
-[![Faire un don](https://img.shields.io/badge/Paypal-Faire%20un%20don-blue.svg?style=plastic&logo=paypal)](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=26PKHX8PGHLWG) [![Faire un don](https://img.shields.io/badge/BitCoin-Faire%20un%20don-orange.svg?style=plastic&logo=bitcoin)](https://www.blockchain.com/btc/payment_request?address=1HtuGsnSsGoUz7DmRbDLCFnRc41jYEY2FE)
+### Repository layout
+
+KoBox lives in [`kobox/`](kobox): domain, use cases, adapters, CLI, worker and portal, with
+their tests. Everything else at the root is the MySB code inherited from the fork, kept read-only
+while KoBox replaces it. KoBox still reads the rTorrent templates in `templates/rtorrent/`.
+
+To start working on it: `cd kobox && pnpm install && pnpm test`, then see `docs/DEV.md`.
+
+### Licence
+
+MIT, see [`LICENCE.md`](LICENCE.md). KoBox owes its starting point to MySB by toulousain79.
+
+## Français
+
+KoBox est une seedbox multi-utilisateurs pour un serveur dédié sous Debian 13 (trixie). Chaque
+membre a son propre rTorrent, son propre quota disque et ses propres accès ; l'administrateur
+pilote toute la box depuis une console web et un unique outil en ligne de commande.
+
+KoBox est né d'un fork de [MySB](https://github.com/toulousain79/MySB) et le remplace morceau
+par morceau. La philosophie de sécurité reste la même : les pairs entrants passent par des listes
+de blocage d'IP et une liste blanche de trackers, et les requêtes DNS sortantes quittent la box
+chiffrées. Ce qui change, c'est la façon de piloter la box : les scripts bash ont laissé la place
+à une application TypeScript testée, où un worker root est le seul processus autorisé à toucher
+au système et où le portail web ne détient aucun privilège.
+
+### Ce que propose une box
+
+- **Torrents** : un rTorrent par membre, avec ruTorrent, un dossier de surveillance et un quota
+  disque.
+- **Filtrage** : liste blanche de trackers, listes de blocage d'IP appliquées par ipset, pare-feu,
+  fail2ban.
+- **Confidentialité** : DNS résolu localement par bind et relayé par dnscrypt-proxy ; un profil
+  OpenVPN par membre.
+- **Faire entrer et sortir les fichiers** : téléchargement direct via un compte de débridage
+  (AllDebrid + aria2), Nextcloud (déposer un `.torrent` dans le dossier Watch), Samba, et envoi
+  automatique des téléchargements terminés vers la machine du membre.
+- **Portail web** : une console pour les membres et les administrateurs, avec un navigateur de
+  médias, la supervision (NanoMon), un test de débit du lien et un shell dans le navigateur.
+- **Exploitation** : tâches planifiées, sauvegardes et restauration, mises à jour par tag de
+  version avec retour arrière, certificats Let's Encrypt, mails via un relais.
+
+### Installer
+
+Il faut un serveur dédié fraîchement installé en **Debian 13**, et un accès root. Le script
+d'amorçage installe Node.js, récupère les sources, les compile puis passe la main à
+`kobox install` :
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/<owner>/KoBox/main/kobox/bootstrap/install.sh \
+  | KOBOX_REPO=https://github.com/<owner>/KoBox.git bash
+```
+
+Remplace `<owner>` par le compte qui héberge le dépôt depuis lequel tu installes. Certains
+composants (ruTorrent, Nextcloud, NanoMon, le test de débit) ne s'installent que depuis une
+version épinglée et vérifiée : sans épinglage, ils se déclarent `skipped` et disent ce qui manque.
+`docs/OPS.md` donne chaque épinglage. Renseigne-les, relance `kobox install`, puis vérifie :
+
+```sh
+kobox install-status
+kobox doctor
+```
+
+Crée le premier administrateur (le mot de passe est lu sur l'entrée standard) :
+
+```sh
+read -rs PASSWORD && printf '%s' "$PASSWORD" \
+  | kobox create-user alice --email alice@example.org --admin
+```
+
+Le portail répond sur `https://<ton-hôte>:8189`.
+
+### Mettre à jour
+
+Chaque version est un tag `vX.Y.Z`, publié avec ses notes dans la page Releases du dépôt. Une box
+la déploie depuis les sources et garde la version précédente pour revenir en arrière :
+
+```sh
+kobox upgrade --to vX.Y.Z
+kobox upgrade --rollback
+```
+
+### Documentation
+
+| Document | Pour | Langue |
+| --- | --- | --- |
+| [`docs/OPS.md`](docs/OPS.md) | Exploiter une box installée : épinglages, sauvegardes, mises à jour, mail, DNS, portail | anglais |
+| [`docs/DEV.md`](docs/DEV.md) | Travailler sur le code : tests, conteneur Debian 13, publication | français |
+| [`docs/CUTOVER.md`](docs/CUTOVER.md) | Importer les membres d'une box MySB existante | anglais |
+
+### Organisation du dépôt
+
+KoBox vit dans [`kobox/`](kobox) : domaine, cas d'usage, adaptateurs, CLI, worker et portail,
+avec leurs tests. Tout le reste à la racine est le code MySB hérité du fork, laissé en lecture
+seule pendant que KoBox le remplace. KoBox lit encore les modèles rTorrent de
+`templates/rtorrent/`.
+
+Pour s'y mettre : `cd kobox && pnpm install && pnpm test`, puis voir `docs/DEV.md`.
+
+### Licence
+
+MIT, voir [`LICENCE.md`](LICENCE.md). KoBox doit son point de départ à MySB, de toulousain79.
