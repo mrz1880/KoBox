@@ -1,4 +1,3 @@
-import type { AccountType } from './AccountType.js';
 import type { EmailAddress } from './EmailAddress.js';
 import type { ProxyPort, RtorrentPort, ScgiPort } from './Port.js';
 import type { Quota } from './Quota.js';
@@ -11,7 +10,6 @@ interface SeedboxUserProps {
   readonly id?: UserId;
   readonly username: Username;
   readonly email: EmailAddress;
-  readonly accountType: AccountType;
   readonly quota: Quota;
   readonly scgiPort: ScgiPort;
   readonly rtorrentPort: RtorrentPort;
@@ -23,7 +21,6 @@ export class SeedboxUser {
   readonly id: UserId | undefined;
   readonly username: Username;
   readonly email: EmailAddress;
-  readonly accountType: AccountType;
   readonly quota: Quota;
   readonly scgiPort: ScgiPort;
   readonly rtorrentPort: RtorrentPort;
@@ -34,7 +31,6 @@ export class SeedboxUser {
     this.id = props.id;
     this.username = props.username;
     this.email = props.email;
-    this.accountType = props.accountType;
     this.quota = props.quota;
     this.scgiPort = props.scgiPort;
     this.rtorrentPort = props.rtorrentPort;
@@ -87,7 +83,6 @@ export class SeedboxUser {
       ...(this.id !== undefined && { id: this.id }),
       username: this.username,
       email: this.email,
-      accountType: this.accountType,
       quota: this.quota,
       scgiPort: this.scgiPort,
       rtorrentPort: this.rtorrentPort,

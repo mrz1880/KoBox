@@ -20,14 +20,13 @@ const userDto: MysbUser = {
   rtorrentPort: 45000,
   proxyPort: 8080,
   quotaBytes: 442_381_107_200,
-  accountType: 'normal',
   active: true,
   syncDisabled: false,
   categories: [],
 };
 
 describe('toMappedUser', () => {
-  it('should_preserve_ports_quota_and_type', () => {
+  it('should_preserve_ports_and_quota', () => {
     const user = toMappedUser(userDto);
 
     expect(user.username.value).toBe('alice');
@@ -35,7 +34,6 @@ describe('toMappedUser', () => {
     expect(user.rtorrentPort.value).toBe(45000);
     expect(user.proxyPort.value).toBe(8080);
     expect(user.quota.toBytes()).toBe(442_381_107_200);
-    expect(user.accountType.value).toBe('normal');
     expect(user.suspended).toBe(false);
   });
 

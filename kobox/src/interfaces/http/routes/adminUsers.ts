@@ -19,7 +19,6 @@ const createUserSchema = z.object({
   email: z.email(),
   password: z.string().min(8).max(256),
   quotaGib: z.coerce.number().int().positive(),
-  accountType: z.enum(['normal', 'plex']),
   role: z.enum(['admin', 'user']),
 });
 
@@ -76,7 +75,6 @@ export function registerAdminUserRoutes(
       {
         username: parsed.data.username,
         email: parsed.data.email,
-        accountType: parsed.data.accountType,
         quotaGib: parsed.data.quotaGib,
         proxyPort: 8080,
         role: parsed.data.role,

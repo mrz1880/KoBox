@@ -20,7 +20,6 @@ export function adminUsersPage(
     (user) => html`<tr>
   <td><a href="/admin/users/${user.username.value}">${user.username.value}</a></td>
   <td>${user.email.value}</td>
-  <td>${user.accountType.value}</td>
   <td class="num">${user.quota.toGib()} GiB</td>
   <td class="num">${user.scgiPort.value}</td>
   <td>${statusChip(user, viewer)}</td>
@@ -34,7 +33,7 @@ export function adminUsersPage(
 ${flash(message)}
 <table>
   <thead>
-    <tr><th>${viewer.t('User')}</th><th>${viewer.t('Email')}</th><th>${viewer.t('Type')}</th><th>${viewer.t('Quota')}</th><th>${viewer.t('SCGI')}</th><th>${viewer.t('Status')}</th></tr>
+    <tr><th>${viewer.t('User')}</th><th>${viewer.t('Email')}</th><th>${viewer.t('Quota')}</th><th>${viewer.t('SCGI')}</th><th>${viewer.t('Status')}</th></tr>
   </thead>
   <tbody>${rows}</tbody>
 </table>
@@ -50,11 +49,6 @@ ${flash(message)}
   <input id="password" name="password" type="password" required minlength="8">
   <label for="quotaGib">${viewer.t('Quota (GiB)')}</label>
   <input id="quotaGib" name="quotaGib" type="number" min="1" value="412">
-  <label for="accountType">${viewer.t('Account type')}</label>
-  <select id="accountType" name="accountType">
-    <option value="normal">normal</option>
-    <option value="plex">plex</option>
-  </select>
   <label for="role">${viewer.t('Portal role')}</label>
   <select id="role" name="role">
     <option value="user">user</option>
@@ -174,7 +168,6 @@ export function adminUserDetailPage(
 ${flash(message)}
 <div class="card">
   <p>Email: ${user.email.value}<br>
-  Type: ${user.accountType.value}<br>
   Quota: ${user.quota.toGib()} GiB<br>
   SCGI port: <span class="mono">${user.scgiPort.value}</span> ·
   rTorrent port: <span class="mono">${user.rtorrentPort.value}</span></p>

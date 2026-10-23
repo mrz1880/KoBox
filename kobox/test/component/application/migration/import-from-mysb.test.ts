@@ -154,7 +154,6 @@ const aliceDto: MysbUser = {
   rtorrentPort: 45000,
   proxyPort: 8080,
   quotaBytes: 442_381_107_200,
-  accountType: 'normal',
   active: true,
   syncDisabled: false,
   categories: [],

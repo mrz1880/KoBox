@@ -157,13 +157,6 @@ exports[`job contract > should_keep_the_wire_contract_stable 1`] = `
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "additionalProperties": false,
     "properties": {
-      "accountType": {
-        "enum": [
-          "normal",
-          "plex",
-        ],
-        "type": "string",
-      },
       "email": {
         "pattern": "^[a-z0-9._%+-]+@[a-z0-9-]+(\\.[a-z0-9-]+)+$",
         "type": "string",
@@ -199,7 +192,6 @@ exports[`job contract > should_keep_the_wire_contract_stable 1`] = `
     "required": [
       "username",
       "email",
-      "accountType",
       "quotaBytes",
       "proxyPort",
       "passwordHash",

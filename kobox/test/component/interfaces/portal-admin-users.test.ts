@@ -50,7 +50,6 @@ describe('admin user creation', () => {
         email: 'carol@example.org',
         password: 'brand-new-password',
         quotaGib: '412',
-        accountType: 'normal',
         role: 'user',
       }),
     });
@@ -77,7 +76,6 @@ describe('admin user creation', () => {
         email: 'not-an-email',
         password: 'brand-new-password',
         quotaGib: '412',
-        accountType: 'normal',
         role: 'user',
       }),
     });
@@ -96,7 +94,6 @@ describe('admin user creation', () => {
         email: 'carol@example.org',
         password: 'brand-new-password',
         quotaGib: '412',
-        accountType: 'normal',
         role: 'user',
       }),
     });
@@ -116,7 +113,6 @@ describe('admin user creation', () => {
         email: 'carol@example.org',
         password: 'brand-new-password',
         quotaGib: '412',
-        accountType: 'normal',
         role: 'user',
       }),
     });

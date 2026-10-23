@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { AccountType } from '../../../../src/domain/user/AccountType.js';
 import { EmailAddress } from '../../../../src/domain/user/EmailAddress.js';
 import { ProxyPort, RtorrentPort, ScgiPort } from '../../../../src/domain/user/Port.js';
 import { Quota } from '../../../../src/domain/user/Quota.js';
@@ -11,7 +10,6 @@ function aUserCreation() {
   return SeedboxUser.create({
     username: Username.parse('alice'),
     email: EmailAddress.parse('alice@example.org'),
-    accountType: AccountType.normal,
     quota: Quota.gib(412),
     scgiPort: ScgiPort.parse(51101),
     rtorrentPort: RtorrentPort.parse(45000),

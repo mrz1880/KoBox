@@ -68,13 +68,11 @@ const FR: Readonly<Record<string, string>> = {
 
   // members
   Email: 'Adresse mail',
-  Type: 'Type',
   Quota: 'Quota',
   SCGI: 'SCGI',
   'Create user': 'Créer un membre',
   'Initial password': 'Mot de passe initial',
   'Quota (GiB)': 'Quota (Gio)',
-  'Account type': 'Type de compte',
   'Portal role': 'Rôle sur le portail',
   Suspend: 'Suspendre',
   Resume: 'Réactiver',

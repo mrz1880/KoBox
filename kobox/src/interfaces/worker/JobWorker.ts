@@ -10,7 +10,6 @@ import { EventHook } from '../../domain/torrent/EventHook.js';
 import { InfoHash } from '../../domain/torrent/InfoHash.js';
 import { Label } from '../../domain/torrent/Label.js';
 import { SyncMode } from '../../domain/torrent/SyncMode.js';
-import { AccountType } from '../../domain/user/AccountType.js';
 import { EmailAddress } from '../../domain/user/EmailAddress.js';
 import { HashedPassword } from '../../domain/user/HashedPassword.js';
 import { ProxyPort } from '../../domain/user/Port.js';
@@ -195,7 +194,6 @@ export class JobWorker {
         await this.useCases.createUser.execute({
           username: Username.parse(job.payload.username),
           email: EmailAddress.parse(job.payload.email),
-          accountType: AccountType.parse(job.payload.accountType),
           quota: Quota.bytes(job.payload.quotaBytes),
           proxyPort: ProxyPort.parse(job.payload.proxyPort),
           passwordHash: HashedPassword.parse(job.payload.passwordHash),

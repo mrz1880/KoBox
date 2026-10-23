@@ -38,7 +38,7 @@ export class SqliteMysbDumpSource implements MysbSource {
   users(): Promise<readonly MysbUser[]> {
     const rows = this.db
       .prepare(
-        'SELECT username, email, scgi_port, rtorrent_port, proxy_port, quota_bytes, account_type, active FROM users',
+        'SELECT username, email, scgi_port, rtorrent_port, proxy_port, quota_bytes, active FROM users',
       )
       .all();
     const users = rows.map((row): MysbUser => {

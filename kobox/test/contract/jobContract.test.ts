@@ -76,7 +76,6 @@ describe('job contract', () => {
     const payload = {
       username: 'alice',
       email: 'alice@example.org',
-      accountType: 'normal',
       quotaBytes: 1,
       proxyPort: 8080,
       passwordHash: HASH,
@@ -154,7 +153,6 @@ describe('job contract', () => {
     const job = parseJob('create-user', {
       username: 'alice',
       email: 'alice@example.org',
-      accountType: 'normal',
       quotaBytes: 412 * 1024 ** 3,
       proxyPort: 8080,
       passwordHash: HASH,
@@ -164,6 +162,33 @@ describe('job contract', () => {
     if (job.type === 'create-user') {
       expect(job.payload.username).toBe('alice');
     }
+  });
+
+  it('should_still_parse_a_create_user_job_queued_with_the_retired_account_type', () => {
+    const job = parseJob('create-user', {
+      username: 'alice',
+      email: 'alice@example.org',
+      accountType: 'plex',
+      quotaBytes: 1,
+      proxyPort: 8080,
+      passwordHash: HASH,
+    });
+
+    expect(job.type).toBe('create-user');
+    expect(job.payload).not.toHaveProperty('accountType');
+  });
+
+  it('should_reject_unknown_keys_on_a_create_user_job', () => {
+    expect(() =>
+      parseJob('create-user', {
+        username: 'alice',
+        email: 'alice@example.org',
+        quotaBytes: 1,
+        proxyPort: 8080,
+        passwordHash: HASH,
+        extra: 1,
+      }),
+    ).toThrow();
   });
 
   it('should_reject_unknown_job_types', () => {
@@ -180,8 +205,7 @@ describe('job contract', () => {
       parseJob('create-user', {
         username: 'alice',
         email: 'not-an-email',
-        accountType: 'normal',
-        quotaBytes: 1,
+          quotaBytes: 1,
         proxyPort: 8080,
         passwordHash: HASH,
       }),

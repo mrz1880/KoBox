@@ -24,7 +24,6 @@ export const mysbUserSchema = z
     rtorrent_port: port,
     proxy_port: port,
     quota_bytes: z.number().int().min(0),
-    account_type: z.enum(['normal', 'plex']),
     active: intBool,
   })
   .transform((row) => ({
@@ -34,7 +33,6 @@ export const mysbUserSchema = z
     rtorrentPort: row.rtorrent_port,
     proxyPort: row.proxy_port,
     quotaBytes: row.quota_bytes,
-    accountType: row.account_type,
     active: row.active,
   }));
 

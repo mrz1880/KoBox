@@ -1,5 +1,4 @@
 import { eq } from 'drizzle-orm';
-import { AccountType } from '../../domain/user/AccountType.js';
 import { EmailAddress } from '../../domain/user/EmailAddress.js';
 import { ProxyPort, RtorrentPort, ScgiPort } from '../../domain/user/Port.js';
 import { Quota } from '../../domain/user/Quota.js';
@@ -18,7 +17,6 @@ function toDomain(row: UserRow): SeedboxUser {
     id: UserId.parse(row.id),
     username: Username.parse(row.username),
     email: EmailAddress.parse(row.email),
-    accountType: AccountType.parse(row.accountType),
     quota: Quota.bytes(row.quotaBytes),
     scgiPort: ScgiPort.parse(row.scgiPort),
     rtorrentPort: RtorrentPort.parse(row.rtorrentPort),
@@ -51,7 +49,6 @@ export class SqliteUserRepository implements UserRepository {
     const values = {
       username: user.username.value,
       email: user.email.value,
-      accountType: user.accountType.value,
       quotaBytes: user.quota.toBytes(),
       scgiPort: user.scgiPort.value,
       rtorrentPort: user.rtorrentPort.value,

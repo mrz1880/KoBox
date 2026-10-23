@@ -172,7 +172,7 @@ describe.skipIf(!onDebianAsRoot)('E2E: portal login -> create user -> member sel
       body:
         `_csrf=${encodeURIComponent(csrf)}&username=${MEMBER}` +
         `&email=${MEMBER}%40example.org&password=${encodeURIComponent(PASSWORD)}` +
-        '&quotaGib=10&accountType=normal&role=user',
+        '&quotaGib=10&role=user',
       redirect: 'manual',
     });
     expect(created.status).toBe(303);

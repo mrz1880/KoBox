@@ -176,6 +176,13 @@
       "when": 1787045335860,
       "tag": "0024_download-progress",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "6",
+      "when": 1792788465872,
+      "tag": "0025_drop-account-type",
+      "breakpoints": true
     }
   ]
 }
