@@ -1,339 +1,207 @@
-# KoBox — Cutover runbook (MySB → KoBox)
+# KoBox cutover runbook (MySB to a new KoBox server)
 
-> Phase 7 deliverable. How to move the live users from the legacy **MySB**
-> (MariaDB + regenerated files) to **KoBox** (one SQLite store + declarative
-> desired-state) **without data loss and reversibly**. Strangler, not big-bang:
-> KoBox is installed *beside* MySB and only becomes reachable at the atomic nginx
-> switch. Every step before that switch is read-only against prod.
+How to move the members of a running **MySB** box to **KoBox** installed on a **separate, freshly
+installed server**. Nothing is copied across: no downloads, no rTorrent sessions. Each member gets
+a new account on the new box, and the switch-over is an address change, not an nginx switch on a
+shared machine.
 
-> ⚠️ **NOTHING here writes to the production seedbox without an explicit GO from
-> the owner.** The import dump is produced with read-only commands; the actual
-> `--apply` runs against the KoBox target, not MySB. The DNS/port switch and any
-> `userdel`/rollback are irreversible-class actions — confirm first.
+> **The old box is never written to.** Everything below happens on the new server. MySB keeps
+> running until the owner declares the cutover final, which is what makes the rollback trivial.
+> Repointing DNS, deleting accounts and decommissioning MySB are irreversible-class actions:
+> confirm each one first.
 
 ---
 
 ## 0. Model
 
-- **Coexistence.** MySB stays at `/opt/MySB`; KoBox installs at `/opt/kobox`.
-  Both can be present at once. Only one owns the portal port `:8189` at a time,
-  so the cutover is a single atomic nginx change (§7).
-- **Desired-state.** The import loads **data** only. KoBox then **regenerates**
-  every file (per-user `.rtorrent.rc`, nginx `/RPC-*` includes, firewall, NFS
-  exports, OpenVPN profiles, tracker whitelist). We never copy a generated
-  legacy file: we import the row that produces it (on MySB the database
-  survives a regeneration, the files do not).
-- **Idempotent & re-entrant.** `migrate-from-mysb` is dry-run by default and a
-  re-run is a no-op for users already imported (no second account, mail or
-  provisioning) and an upsert for catalogue data. A partial run is safe to
-  repeat.
+- **Two machines.** MySB stays where it is and keeps seeding. KoBox is installed, configured and
+  tested on its own server, reachable under a temporary name, while members still use MySB.
+- **No data carried over.** Members start with an empty rTorrent. Anything they want to keep
+  seeding, they re-add on the new box (see §5).
+- **Switch = address change.** On the day, the public name members use is repointed at the new
+  server. Until then, both boxes answer on their own name.
+- **Rollback = point the name back.** MySB was never stopped, so going back is one DNS change.
+  Whatever members did on KoBox in the meantime stays on KoBox.
 
 ---
 
-## 1. The dump contract
+## 1. Prepare the server
 
-`migrate-from-mysb --dump <dir>` reads a **frozen dump directory**, never a live
-MariaDB connection. Layout:
+- A dedicated server freshly installed with **Debian 13**, root access by SSH key.
+- **Disk layout.** Only `/` has to be ext4. Members' data lives under `/home/<member>`, so put the
+  large volume there. Disk quotas apply to the filesystem named by `KOBOX_QUOTA_FS`: add
+  `usrquota` to its options in `/etc/fstab` and remount **before** installing. The installer never
+  edits fstab; without `usrquota` it records quotas in the database and tells you what to do.
+- Check the kernel against the hardware (storage controller, network card) under some load before
+  going further: a box that loses its disk under the Debian 13 kernel is not a KoBox problem, and
+  it is cheaper to find out now.
+
+## 2. Install KoBox
+
+Follow the README's install section (bootstrap script, then `kobox install`). Then:
+
+```sh
+kobox install-status   # every component installed or skipped, with a reason for each skip
+kobox doctor           # green
+```
+
+Set up what the box needs before members arrive, each covered in `docs/OPS.md`:
+
+- **Mail relay** ("Mail relay"): members receive their mails through it.
+- **Let's Encrypt** ("Let's Encrypt"): request the certificate for the **temporary** name first.
+  Ask again for the final name at the switch (§7).
+- **Pinned components** (ruTorrent, Nextcloud, NanoMon, speedtest): unpinned means skipped.
+- **Trackers and blocklists**: add the trackers members use (admin console, or
+  `kobox discover-tracker <host>`), then `kobox import-blocklist-catalog` and
+  `kobox update-blocklists`.
+
+## 3. Create the accounts
+
+One per member, password on stdin:
+
+```sh
+printf '%s' '<initial password>' | kobox create-user <member> --email <address> \
+  [--quota-gib <n>] [--admin]
+```
+
+Or from the admin console's Users page. Hand each member their initial password through a channel
+you trust and ask them to change it on first login (`/password`). Create your own admin account
+first and run through §6 with it before creating the others.
+
+## 4. Recreate each member's settings
+
+Nothing comes over from MySB, so these are set again, per member, from what they had:
+
+- **Folders and sending** ("Sending finished downloads to a member's own machine" in OPS): the
+  destination, its folders and what each folder does with a finished download. Run
+  **Test it now** before relying on it.
+- **Public trackers**: a member who needs the public-tracker bypass gets
+  `kobox set-allow-public-tracker <member> on`.
+- **Restricted IPs and DynDNS hostnames**, if a member had them.
+- **Debrid accounts are per member** and must be authorised **from this server**: each member
+  pastes their AllDebrid key on the Downloads page. The first unlock from a new IP fails with
+  `AUTH_BLOCKED` and AllDebrid emails the account owner to approve the new location. This is per
+  IP and does not carry over: a key validated from a laptop is still blocked here. Expect one
+  failed download per member, the row reading "AllDebrid blocked this new location".
+- **Nextcloud**: members who drop `.torrent` files through Nextcloud need their account
+  provisioned; the Watch folder is mounted in it.
+
+## 5. What members redo on their side
+
+Send this to members ahead of the day:
+
+- **New password**, then change it.
+- **Download clients** (Sonarr, Radarr, a script) driving rTorrent: issue an **app token** on the
+  Account page and paste it where the password was (OPS, "Connecting an app"). The account
+  password is not accepted there. Their remote path mapping
+  (`/home/<member>/rtorrent/complete/<category>/`) keeps the same layout.
+- **VPN profiles**: the new box has its own PKI, so download the `.ovpn` again. The old profile
+  will not connect.
+- **SSH and SFTP**: the server's host key changed. The warning their client shows is expected,
+  once, after the switch.
+- **Torrents to keep seeding**: re-add the `.torrent` files (ruTorrent, the watch folder or
+  Nextcloud) and let rTorrent download them again; nothing is copied from MySB.
+
+## 6. Smoke test, on the temporary name
+
+With your own account, then with one member's:
+
+- `id -u <member>` exists; `rtorrent-<member>` is active; `/RPC-<MEMBER>` appears in
+  `/etc/nginx/kobox.d/rutorrent-users.conf`.
+- Portal login, ruTorrent frames, a torrent added through each path (ruTorrent, watch folder,
+  Nextcloud) reaches `complete/`.
+- A finished download is sent to the member's machine.
+- A debrid download completes (after the AllDebrid approval).
+- The `.ovpn` connects; SFTP lands in the member's chroot.
+- `kobox doctor` is green.
+
+## 7. Switch
+
+1. Lower the TTL of the final name a day ahead, so the change propagates quickly.
+2. Announce the window to members.
+3. Repoint the final name at the new server.
+4. Request the Let's Encrypt certificate for the final name (`KOBOX_LE_DOMAIN`, OPS
+   "Let's Encrypt"), and update `KOBOX_VPN_REMOTE` if profiles should carry it.
+5. Members log in on the new box and work through §5.
+
+## 8. Rollback window and decommission
+
+Keep MySB running and untouched for an agreed window (one to two weeks). To roll back, repoint the
+name at the old server: MySB never stopped seeding, so members find it as they left it.
+
+Nothing on MySB is removed until the owner declares the cutover final. Only then: stop its
+services, and keep a backup of its database for as long as the owner wants one.
+
+---
+
+## Appendix: importing from MySB instead
+
+`kobox migrate-from-mysb` can still import members from a MySB box: accounts on their **preserved**
+SCGI/rTorrent ports, a temporary password **mailed** to each (never stored in the jobs DB) with a
+forced reset at first login, sync folders, and the tracker, blocklist and address catalogue. It is
+dry-run by default, idempotent (a re-run creates no second account or mail), and isolates failures
+per member. It was built for a same-machine cutover and is not the plan above; it is kept for a box
+that wants it.
+
+### The dump contract
+
+The importer reads a **frozen dump directory**, never a live MariaDB connection:
 
 ```
 <dump>/
   mysb.sqlite          # control-plane tables mirrored from MariaDB MySB_db
-  sync/<username>.sq3  # each user's ~/db/<user>.sq3, copied verbatim
+  sync/<username>.sq3  # one per member: categories(name, sync_mode)
 ```
 
-`mysb.sqlite` must contain these tables/columns (the canonical schema is the
-neutral fixture builder `kobox/test/fixtures/migration/buildDump.ts`, which
-doubles as the contract):
+The canonical schema is the neutral fixture builder `kobox/test/fixtures/migration/buildDump.ts`,
+which doubles as the contract:
 
 | Table | Columns |
 |---|---|
-| `users` | `username, email, scgi_port, rtorrent_port, proxy_port, quota_bytes, account_type, active` |
+| `users` | `username, email, scgi_port, rtorrent_port, proxy_port, quota_bytes, active` |
 | `trackers_list` | `host, proto, port, privacy, is_active, is_dead, is_ssl` |
 | `trackers_list_ipv4` | `host, ipv4` |
 | `blocklists` | `source, author, name, url, subscription, enabled` |
 | `torrents` | `username, info_hash, name, label, state` |
-| `user_addresses` | `username, value, kind` (`kind` ∈ `ipv4` \| `hostname`) |
+| `user_addresses` | `username, value, kind` (`kind` is `ipv4` or `hostname`) |
 
-`sync/<username>.sq3` only needs its original `categories(name, sync_mode)`
-table. The importer reads **both columns**: each category becomes one of the
-member's folders, carrying what it does with a finished download
-(`0` keep it here, `1` send it a bit later, `2` send it straight away), and a
-member counts as **sync-disabled** only when *every* category is `0`.
-
-> Only that table is read. The same file holds `ident`, whose password column is
-> the one thing in a MySB dump nobody should be opening — not the importer, and
-> not whoever produces the dump.
-
-Category names keep their case: a live MySB box carries `Films`, `Series`,
-`Divers`, and the name also becomes the destination folder on the member's own
-machine. Folding it would create a second set of folders beside the ones already
-full of their files. A name that cannot be a directory segment is dropped with
-the rest of the member's import intact — they lose one folder, not their
-account.
+Each category becomes one of the member's folders with its mode (`0` keep it here, `1` send it a
+bit later, `2` send it straight away); a member is sync-disabled only when every category is `0`.
+Category names keep their case, since they are also folder names on the member's machine. When no
+files are carried over, leave `torrents` empty: its rows would point at downloads that are not
+there.
 
 ### Producing the dump (read-only, on the MySB box)
 
-MySB's real MariaDB column names differ from the contract above, so the export
-is a set of **read-only `SELECT`s that alias into the contract shape**. Sketch
-(run as a user with read grants; adjust column names to the live schema, as mapped
-below):
+MySB's MariaDB column names differ from the contract, so the export is a set of read-only
+`SELECT`s aliasing into it, materialised into `mysb.sqlite` by a small script:
 
-The mapping below was read off a live MySB box (2026-08-15, read-only) rather
-than reconstructed — the real column names and one unit differ from what this
-document used to claim.
-
-| Contract | Real source |
+| Contract | MySB source |
 |---|---|
 | `users.username` / `email` | `users.users_ident` / `users.users_email` |
-| `users.quota_bytes` | `users.quota * 1024` — the column is in **KB**, not GB |
+| `users.quota_bytes` | `users.quota * 1024` (the column is in **KB**) |
 | `users.active` | `users.is_active` |
-| `trackers_list.host` … | `trackers_list.tracker`, `tracker_proto`, `tracker_port` |
+| `trackers_list.host` ... | `trackers_list.tracker`, `tracker_proto`, `tracker_port` |
 | `blocklists.name` / `url` | `blocklists.list_name` / `list_url`; `enabled` = `enable` |
-| `blocklists.source` | derived: `iblocklist` when `author = 'I-Blocklist'`, else `personal` |
-| `torrents.username` | `torrents.users_ident` (no join needed) |
-| `torrents.label` | **no source — leave NULL** (see below) |
-| `user_addresses.username` | join `users_addresses.id_users` → `users` |
+| `blocklists.source` | `iblocklist` when `author = 'I-Blocklist'`, else `personal` |
+| `torrents.username` | `torrents.users_ident` |
+| `torrents.label` | no source: leave NULL (MySB kept labels in rTorrent's session only) |
+| `user_addresses.username` | join `users_addresses.id_users` to `users` |
 | `sync/<user>.sq3` categories | `users_rtorrent_cfg (sub_directory, sync_mode)` |
 
-Two things worth knowing before you write the export:
+Build `sync/<user>.sq3` from `users_rtorrent_cfg` rather than copying the member's real
+`~/db/<user>.sq3`: that file also holds `ident`, whose password column nobody should read.
 
-- **`torrents` has no label column.** MySB never stored one: the label lives in
-  rTorrent's own session (`d.custom1`), and `tree` holds the release name, not a
-  category. Deriving a label from the path invents thousands of them. Import
-  NULL — new downloads carry their own label from the event.
-- **The categories are in the control plane too.** `users_rtorrent_cfg` holds
-  `(sub_directory, sync_mode)` for every member, which is the same data as each
-  member's `categories` table. Building `sync/<user>.sq3` from it means **no real
-  `~/db/<user>.sq3` is ever opened** — that file also holds `ident`, whose
-  password column is the one thing in a MySB dump nobody should read.
+### Running it
 
 ```sh
-# 1. central control plane -> a portable SQLite (single read transaction)
-#    Read-only SELECTs aliasing into the contract shape, per the table above,
-#    materialised into mysb.sqlite by a small script.
-
-# 2. per-user categories -> sync/<user>.sq3, built from users_rtorrent_cfg:
-#    CREATE TABLE categories (name TEXT, sync_mode INTEGER) and one row per
-#    sub_directory. Copying the real .sq3 also works but carries `ident`.
+kobox migrate-from-mysb --dump /path/to/dump            # dry-run: review the JSON report
+kobox migrate-from-mysb --dump /path/to/dump --apply    # owner GO required
+kobox send-mails                                        # flush the temporary passwords now
 ```
 
-Then copy `<dump>/` to the KoBox target. **Fixtures for tests are neutral**
-(RFC 2606 / RFC 5737); a real dump carries prod identity — keep it off the repo.
-
----
-
-## 2. Freeze MySB
-
-Goal: a consistent snapshot. Put MySB into a quiet window:
-
-- Announce the maintenance window to users.
-- Stop new torrent adds / config changes (portal maintenance page, or stop the
-  MySB portal vhost). Leaving `rtorrent-*` running is fine — the dump is a
-  point-in-time read; late torrents just re-import cleanly on a re-run.
-- (Optional) `FLUSH TABLES WITH READ LOCK` for the duration of the SELECTs, or
-  use `--single-transaction`-style consistency, so `mysb.sqlite` is coherent.
-
-If the owner wants the two dead file-patches restored before the snapshot
-(see §9, user-f), re-apply them now so the dump carries
-the intended `sync_mode` — the importer is faithful to whatever the dump holds.
-
----
-
-## 3. Produce & review the dump — dry-run
-
-```sh
-kobox migrate-from-mysb --dump /path/to/dump            # dry-run (default)
-```
-
-The JSON report lists, per category, what **would** be created / imported and
-any **conflicts** (a malformed or reserved value, a torrent/address for an
-unknown user). Review it:
-
-- `users.created` should list exactly the expected accounts, with no conflicts.
-- `users.alreadyImported` is empty on a first run.
-- `trackers/blocklists/torrents/addresses.imported` counts match expectations;
-  `conflicts` should be empty (investigate any).
-
-Nothing has been written yet.
-
----
-
-## 4. Install KoBox on the target
-
-On the fresh target (a clean Debian 13 box, or beside MySB):
-
-```sh
-kobox install
-```
-
-This provisions the base stack and the OpenVPN PKI, seeding an empty
-`crl.pem` so `crl-verify` is satisfied (Phase 7). The root worker + portal units
-are installed but the portal is **not yet** on `:8189` (see §7). Confirm
-`kobox install-status` is all `installed`/`skipped`.
-
----
-
-## 5. Import — `--apply`  ⟵ **owner GO required**
-
-```sh
-kobox migrate-from-mysb --dump /path/to/dump --apply
-```
-
-Per user this: creates the account on its **preserved** SCGI/rtorrent ports,
-writes a temporary password (hashed for the account, **mailed** — never in the
-jobs DB), sets `must_change_password`, pre-writes the torrent instance with its
-`sync_disabled` flag, and enqueues provisioning. Catalogue data (trackers,
-blocklists, torrents, addresses) is upserted.
-
-Failures are **isolated per user**: a bad row (e.g. a colliding port) is recorded
-in the report's `conflicts` and the run continues for everyone else — check the
-report's `users.conflicts` is empty. If the run was interrupted, simply
-**re-run** `--apply`: already-created users are re-provisioned (idempotent) so a
-half-imported user converges, while the account and the temp-password mail are
-never redone.
-
----
-
-## 6. Regenerate & smoke
-
-Let the root worker drain (it runs continuously under systemd; or step it with
-`kobox`'s worker). Then trigger the regenerations that reflect imported data and
-flush the mail:
-
-```sh
-kobox send-mails            # deliver the temporary-password mails promptly (see note)
-kobox render-openvpn        # per-user .ovpn profiles from the PKI
-kobox renew-tracker-certs   # fetch real per-tracker certs (import left them pending)
-kobox update-blocklists     # download the imported blocklist ranges, build the ipset
-```
-
-Smoke checks (per a sample user):
-
-- `id -u <user>` exists; `/home/<user>/.rtorrent.rc` rendered; `rtorrent-<user>`
-  active; SCGI/rtorrent ports match the legacy ones.
-- `/etc/nginx/kobox.d/rutorrent-users.conf` contains `/RPC-<USER>`.
-- Portal login with the mailed temporary password → **forced** to `/password`;
-  after reset → ruTorrent frames, `.ovpn` downloads.
-- `kobox doctor` is green.
-
-> **Temporary-password window.** The mailed password is a real secret at rest in
-> `mails.body` until `send-mails` flushes it, and lands in the user's inbox. Run
-> `send-mails` immediately after `--apply`, and note that `must_change_password`
-> forces rotation on first login regardless — the temp password is single-use.
-
-> **Debrid accounts must be re-authorised from THIS server.** Debrid accounts are
-> per-user: each user pastes their own AllDebrid key on `/downloads` (or an admin
-> runs `printf '%s' '<key>' | kobox set-debrid-key <user>`). The **first** unlock
-> attempted from a new IP fails with `AUTH_BLOCKED` — AllDebrid emails the account
-> owner to authorise the new location, and only then do downloads work. This is
-> **per IP and does not carry over**: a key validated from a laptop while testing
-> is still blocked here. Expect one failed download per user at cutover, with the
-> row reading "AllDebrid blocked this new location — open the email it sent you…".
-> Have each user clear that email before declaring DDL green. (Verified against
-> the live AllDebrid API on 2026-07-30.)
-
----
-
-## 7. Atomic switch to `:8189`
-
-Coexistence means MySB currently owns the portal `server { listen 8189; }`. The
-switch is a single nginx change:
-
-1. Disable the MySB portal vhost (the `:8189` server block) and enable KoBox's.
-2. `nginx -t && systemctl reload nginx`.
-
-`:8189` is now served by KoBox. Because only one vhost binds the port at a time,
-this is atomic — there is no dual-write window. (If DNS also points at a new
-host, flip it here; keep the old A record's TTL low ahead of time.)
-
----
-
-## 8. Rollback window
-
-Keep MySB installed and its data intact for an agreed window (e.g. 1–2 weeks).
-To roll back:
-
-1. Re-enable the MySB `:8189` vhost, disable KoBox's, `nginx -t && reload`.
-2. MySB's `rtorrent-*` were never stopped, so torrents keep seeding throughout —
-   ports were preserved on the KoBox side precisely so the two views agree.
-
-No destructive step (removing MySB, `userdel` on the old box) happens until the
-owner declares the cutover final. Preserving legacy ports is what makes rollback
-non-disruptive: an imported user is never re-routed to a different SCGI/rtorrent
-port.
-
----
-
-## 8bis. What a real dump actually reports
-
-Rehearsed against the live box on 2026-08-15 (dry-run only, nothing written):
-
-| | Result |
-|---|---|
-| users | 8 created, 0 conflicts |
-| trackers | 46 imported, 0 conflicts |
-| blocklists | 316 imported, 0 conflicts |
-| torrents | 4232 imported, 0 conflicts |
-| addresses | 33 imported, **2 conflicts** |
-
-The two address conflicts are legacy hygiene: a row with `check_by = hostname`
-whose `hostname` column holds an IPv4 literal. Fix those two rows in MySB before
-the real run, or accept losing them — the same address is usually present as a
-static `ipv4` row already.
-
-Every blocklist on that box is `http://`. KoBox refuses http for a blocklist (an
-altered list ends up in the kernel's IP filter), so the **import upgrades the
-scheme to https** — the same hosts serve https. That is a migration repair, not a
-domain concession: `BlocklistUrl` still refuses http everywhere else.
-
-Account types were all `normal`; no `plex` account existed on that box.
-
----
-
-## 8ter. The *arr stack: hand out an app token before cutover
-
-Radarr and Sonarr on the owner's NAS drive rTorrent **natively** (their
-`TorrentBlackhole` client is present but disabled), pointing at
-`/ru/plugins/httprpc/action.php` with HTTP Basic. MySB answered that path with
-`www-authenticate: Basic realm="Restricted area"`.
-
-KoBox accepts Basic there too, but the credential is the member's **app token**,
-not their account password — issued from the Account page, revocable on its own.
-See `docs/OPS.md`, "Connecting an app".
-
-**On the day.** Each member using a download client issues a token and pastes it
-where the password used to be. The password in those configs is going to break
-anyway: the import mails a temporary one and forces a reset, so the config has to
-be touched regardless.
-
-Their **remote path mapping** — `/home/<member>/rtorrent/complete/<category>/` to
-a local path they scan — keeps working: Sending writes into the same
-`<root>/<category>/` layout.
-
-A member who would rather not connect anything can switch that client to
-*Torrent Blackhole* and drop `.torrent` files into the folder's watch directory.
-Both paths are supported.
-
----
-
-## 9. Known drifts & post-migration toggles
-
-- **`allow_public_tracker`** has no prod DB source (the legacy patch lived in a
-  file that the regeneration erased). Import sets
-  it **false** for everyone. If a user (historically user-f) needs the public-
-  tracker bypass, enable it after cutover:
-  `kobox set-allow-public-tracker <user> on`.
-- **`sync_disabled`** is imported faithfully from `categories.sync_mode`. If the
-  dump was taken before re-applying the user-f patch (§2), that user will import
-  as *syncing*; toggle with `kobox set-sync-disabled <user> on`.
-
----
-
-## Guardrails recap
-
-- No write to the production seedbox without an explicit owner GO. The dump is
-  read-only; `--apply` targets the KoBox box.
-- Never edit a generated file to change behaviour — set the DB flag and let
-  KoBox regenerate (the persistent-hooks ADR).
-- Repo is public: real dumps and production notes stay out of git; tests use neutral
-  fixtures only.
+The temporary password sits in `mails.body` until `send-mails` delivers it: run it right after
+`--apply`. Known findings on a real dump: an address row whose hostname holds an IPv4 literal is
+reported as a conflict (fix it in MySB or accept losing it), and `http://` blocklist URLs are
+upgraded to `https://` on import, since KoBox refuses http for a list that ends up in the kernel's
+IP filter. Real dumps carry production identity: keep them out of the repository.

@@ -73,7 +73,7 @@ kobox upgrade --rollback
 | --- | --- | --- |
 | [`docs/OPS.md`](docs/OPS.md) | Running an installed box: pins, backups, upgrades, mail, DNS, portal | English |
 | [`docs/DEV.md`](docs/DEV.md) | Working on the code: tests, Debian 13 container, releasing | French |
-| [`docs/CUTOVER.md`](docs/CUTOVER.md) | Importing the members of an existing MySB box | English |
+| [`docs/CUTOVER.md`](docs/CUTOVER.md) | Moving the members of a MySB box to a new KoBox server | English |
 
 ### Repository layout
 
@@ -162,7 +162,7 @@ kobox upgrade --rollback
 | --- | --- | --- |
 | [`docs/OPS.md`](docs/OPS.md) | Exploiter une box installée : épinglages, sauvegardes, mises à jour, mail, DNS, portail | anglais |
 | [`docs/DEV.md`](docs/DEV.md) | Travailler sur le code : tests, conteneur Debian 13, publication | français |
-| [`docs/CUTOVER.md`](docs/CUTOVER.md) | Importer les membres d'une box MySB existante | anglais |
+| [`docs/CUTOVER.md`](docs/CUTOVER.md) | Faire passer les membres d'une box MySB sur un nouveau serveur KoBox | anglais |
 
 ### Organisation du dépôt
 
