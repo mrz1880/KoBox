@@ -81,6 +81,24 @@ describe('installation rendering', () => {
     expect(renderNextcloudSite().content).toContain(socket);
   });
 
+  it('should_let_nextcloud_clients_authenticate_themselves', () => {
+    // the portal session stood in front of /nextcloud/: the desktop and
+    // mobile apps send their own Nextcloud credentials and never got through
+    const conf = renderNextcloudSite().content;
+    expect(conf).not.toContain('auth_request');
+  });
+
+  it('should_hand_the_path_after_a_php_script_to_nextcloud', () => {
+    // remote.php/dav/... (every app) and index.php/login reached no PHP:
+    // only URIs ending in .php were passed on, the rest got 404 or 405
+    const conf = renderNextcloudSite().content;
+    expect(conf).toContain('location ~ \\.php(?:$|/) {');
+    expect(conf).toContain('fastcgi_split_path_info ^(.+?\\.php)(/.*)$;');
+    expect(conf).toContain('fastcgi_param PATH_INFO $path_info;');
+    expect(conf).toContain('location ~ ^/nextcloud/(?:build|tests|config|lib|3rdparty|templates|data)(?:$|/) {');
+    expectGolden('nextcloud.conf.golden', conf);
+  });
+
   it('should_refuse_rutorrents_private_directories_before_any_other_ru_location', () => {
     // share/ holds every member's profile (uploaded .torrent files carry
     // private-tracker passkeys), conf/ the per-user wiring, tests/ dev code.

@@ -16,6 +16,9 @@ export interface NextcloudPort {
   isInstalled(): Promise<boolean>;
   install(adminUser: string, adminPassword: string): Promise<void>;
   enableApp(app: string): Promise<void>;
+  // the public name and port it is reached on, under /nextcloud over HTTPS:
+  // Nextcloud refuses any request whose host it was not told to trust
+  serveAt(address: { readonly host: string; readonly port: number }): Promise<void>;
   // members get an account only on request, so most of them have none
   hasUser(username: Username): Promise<boolean>;
   // idempotent: creating a member who exists is a no-op, not a failure

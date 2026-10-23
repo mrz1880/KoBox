@@ -20,6 +20,13 @@ export class FakeNextcloud implements NextcloudPort {
     return Promise.resolve();
   }
 
+  servedAt: { host: string; port: number } | undefined;
+
+  serveAt(address: { readonly host: string; readonly port: number }): Promise<void> {
+    this.servedAt = { host: address.host, port: address.port };
+    return Promise.resolve();
+  }
+
   enableApp(app: string): Promise<void> {
     this.enabledApps.push(app);
     return Promise.resolve();

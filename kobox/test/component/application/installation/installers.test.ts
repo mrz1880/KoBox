@@ -969,4 +969,17 @@ describe('nextcloud installer', () => {
     expect(pinned.host.dirs.get('/var/lib/nextcloud/data')).toBe('0750');
     expect(pinned.nextcloud.enabledApps).toContain('files_external');
   });
+
+  it('should_answer_on_the_public_name_the_portal_is_served_on', async () => {
+    // On the first production box Nextcloud trusted localhost only: every
+    // request through the portal's name failed with "Trusted domain error"
+    const pinned = buildWorld({
+      nextcloud: { url: 'https://example.net/nc.tar.gz', sha256: 'd'.repeat(64), adminPassword: 'chosen-by-the-operator' },
+      letsencrypt: { domain: 'box.example.org', email: 'ops@example.org' },
+    });
+
+    await installer(pinned, 'nextcloud').install();
+
+    expect(pinned.nextcloud.servedAt).toEqual({ host: 'box.example.org', port: 8189 });
+  });
 });
