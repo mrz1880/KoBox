@@ -46,6 +46,20 @@ export class OccNextcloudAdapter implements NextcloudPort {
     await runOrThrow(this.runner, this.occ(['app:enable', app]));
   }
 
+  async serveAt(address: { readonly host: string; readonly port: number }): Promise<void> {
+    const settings: readonly (readonly string[])[] = [
+      // index 0 stays localhost: occ and the box itself still reach it that way
+      ['trusted_domains', '0', '--value=localhost'],
+      ['trusted_domains', '1', `--value=${address.host}`],
+      ['overwritewebroot', '--value=/nextcloud'],
+      ['overwriteprotocol', '--value=https'],
+      ['overwrite.cli.url', `--value=https://${address.host}:${String(address.port)}/nextcloud`],
+    ];
+    for (const setting of settings) {
+      await runOrThrow(this.runner, this.occ(['config:system:set', ...setting]));
+    }
+  }
+
   async hasUser(username: Username): Promise<boolean> {
     const info = await this.runner.run(this.occ(['user:info', username.value]));
     return info.exitCode === 0;

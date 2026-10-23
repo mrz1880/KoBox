@@ -538,6 +538,11 @@ class NextcloudInstaller implements ComponentInstaller {
     // external storage is how a member's rtorrent folders appear at the root of
     // their Nextcloud; without this app the mounts silently do nothing
     await nextcloud.enableApp('files_external');
+    // the name the portal is served on; without one, the machine's own
+    await nextcloud.serveAt({
+      host: install.letsencrypt?.domain ?? (await host.hostname()),
+      port: this.ctx.security.portalPort,
+    });
     await files.apply([renderNextcloudSite()]);
     await systemd.reloadOrRestart('nginx');
     return installed();

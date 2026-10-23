@@ -671,29 +671,57 @@ export function renderRutorrentUserConfig(user: RutorrentUserWiring): RenderedFi
 // Nextcloud is a PHP application like ruTorrent, served from its own prefix
 // behind the same portal session. Its own front controller does the routing, so
 // this is a plain fastcgi block rather than the per-user SCGI wiring above.
+// Nextcloud's reference layout for a sub-directory install. No auth_request:
+// Nextcloud authenticates its own clients, and the desktop and mobile apps send
+// Nextcloud credentials that the portal session check would refuse. PHP gets
+// the path after the script (remote.php/dav/..., index.php/login), which the
+// apps and the web interface both depend on.
 export function renderNextcloudSite(): RenderedFile {
   return {
     path: '/etc/nginx/kobox.d/nextcloud.conf',
     content: [
       MANAGED_HEADER,
-      'location /nextcloud/ {',
-      '    auth_request /internal/auth;',
-      '    alias /var/www/nextcloud/;',
-      '    index index.php;',
+      'location ^~ /nextcloud {',
+      // root, not alias: the tree is /var/www/nextcloud and nested regex
+      // locations resolve against root reliably
+      '    root /var/www;',
       '    client_max_body_size 512M;',
-      '    try_files $uri $uri/ /nextcloud/index.php$is_args$args;',
+      '    client_body_timeout 300s;',
+      '    fastcgi_buffers 64 4K;',
+      '    index index.php index.html /nextcloud/index.php$request_uri;',
       '',
-      '    location ~ \\.php$ {',
+      '    # internal trees, and the data directory whatever it resolves to',
+      '    location ~ ^/nextcloud/(?:build|tests|config|lib|3rdparty|templates|data)(?:$|/) {',
+      '        return 404;',
+      '    }',
+      '    location ~ ^/nextcloud/(?:\\.|autotest|occ|issue|indie|db_|console) {',
+      '        return 404;',
+      '    }',
+      '',
+      '    location ~ \\.php(?:$|/) {',
+      '        rewrite ^/nextcloud/(?!index|remote|public|cron|core\\/ajax\\/update|status|ocs\\/v[12]|updater\\/.+|ocs-provider\\/.+) /nextcloud/index.php$request_uri;',
+      '        fastcgi_split_path_info ^(.+?\\.php)(/.*)$;',
+      '        set $path_info $fastcgi_path_info;',
+      '        try_files $fastcgi_script_name =404;',
       '        include fastcgi_params;',
-      '        fastcgi_param SCRIPT_FILENAME $request_filename;',
+      '        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;',
+      '        fastcgi_param PATH_INFO $path_info;',
+      '        fastcgi_param HTTPS on;',
+      '        fastcgi_param modHeadersAvailable true;',
+      '        fastcgi_intercept_errors on;',
+      '        fastcgi_request_buffering off;',
       `        fastcgi_pass unix:${PHP_FPM.socket};`,
       '    }',
-      '}',
       '',
-      '# the data directory must never be reachable over http, whatever the',
-      '# alias above resolves to',
-      'location ~ ^/nextcloud/(data|config|\\.ht) {',
-      '    deny all;',
+      '    location ~ \\.(?:css|js|mjs|svg|gif|png|jpg|ico|wasm|tflite|map|ogg|flac|woff2?)$ {',
+      '        try_files $uri /nextcloud/index.php$request_uri;',
+      '    }',
+      '    location /nextcloud/remote {',
+      '        return 301 /nextcloud/remote.php$request_uri;',
+      '    }',
+      '    location /nextcloud {',
+      '        try_files $uri $uri/ /nextcloud/index.php$request_uri;',
+      '    }',
       '}',
       '',
     ].join('\n'),
