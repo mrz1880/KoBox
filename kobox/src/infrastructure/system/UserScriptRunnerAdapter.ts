@@ -3,10 +3,11 @@ import { join } from 'node:path';
 import type { FinishedScriptArgs, UserScriptRunnerPort } from '../../domain/torrent/ports.js';
 import type { Username } from '../../domain/user/Username.js';
 import type { CommandRunner } from './CommandRunner.js';
+import { homeOf } from '../../domain/user/homeDirectory.js';
 
 type HomeResolver = (username: Username) => string;
 
-const defaultHome: HomeResolver = (username) => `/home/${username.value}`;
+const defaultHome: HomeResolver = homeOf;
 
 // Runs the user's ~/scripts/*.sh on torrent completion, AS the user (runuser,
 // argv only — the legacy ran them via screen with no privilege drop rigor).

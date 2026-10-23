@@ -3,12 +3,13 @@ import type { WatchDir } from '../../domain/torrent/WatchDir.js';
 import type { Username } from '../../domain/user/Username.js';
 import { runOrThrow, type CommandRunner } from './CommandRunner.js';
 import { KOBOX_USERS_GROUP } from './SystemAccountAdapter.js';
+import { homeOf } from '../../domain/user/homeDirectory.js';
 
 export class WatchDirAdapter implements WatchDirPort {
   constructor(private readonly runner: CommandRunner) {}
 
   async ensureLayout(username: Username, watchDirs: readonly WatchDir[]): Promise<void> {
-    const home = `/home/${username.value}`;
+    const home = homeOf(username);
     await this.install(username, '0755', `${home}/rtorrent`);
     await this.install(username, '0755', `${home}/rtorrent/config.d`);
     for (const dir of watchDirs) {

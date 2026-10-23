@@ -7,6 +7,7 @@ import type { MailOutboxPort } from '../maintenance/MailOutboxPort.js';
 import { ComponentName } from '../../domain/installation/ComponentName.js';
 import type { ComponentRegistry } from '../../domain/installation/ports.js';
 import { UserNotFoundError } from './errors.js';
+import { homeOf } from '../../domain/user/homeDirectory.js';
 
 async function nextcloudIsInstalled(components: ComponentRegistry): Promise<boolean> {
   const record = await components.get(ComponentName.parse('nextcloud'));
@@ -67,7 +68,7 @@ export class ProvisionNextcloudAccount {
       await this.deps.nextcloud.ensureLocalMount(
         user.username,
         mount.label,
-        `/home/${user.username.value}/${mount.under}`,
+        `${homeOf(user.username)}/${mount.under}`,
       );
     }
     // only the people who run the box administer Nextcloud, which is the whole

@@ -1,6 +1,7 @@
 import { DEBIAN_RELEASE, PHP_FPM } from './platform.js';
 import { DomainError } from '../shared/DomainError.js';
 import type { RenderedFile } from '../shared/files.js';
+import { HOME_BASE } from '../user/homeDirectory.js';
 
 const MANAGED_HEADER = '# KoBox-managed — DO NOT EDIT (rendered declaratively).';
 
@@ -529,7 +530,7 @@ export function renderNginxVhost(settings: NginxVhostSettings): RenderedFile {
       // ever see it.
       '    location ~ ^/internal-media/([^/]+)/(.+)$ {',
       '        internal;',
-      '        alias /home/$1/rtorrent/complete/$2;',
+      `        alias ${HOME_BASE}/$1/rtorrent/complete/$2;`,
       '    }',
       '',
       '    location /monitoring/ {',
@@ -558,7 +559,7 @@ export function renderNfsExports(users: readonly NfsExportWiring[]): RenderedFil
   const lines: string[] = [];
   for (const user of users) {
     for (const ip of user.ips) {
-      lines.push(`/home/${user.username} ${ip}(rw,sync,no_subtree_check,root_squash)`);
+      lines.push(`${HOME_BASE}/${user.username} ${ip}(rw,sync,no_subtree_check,root_squash)`);
     }
   }
   return {
@@ -727,7 +728,7 @@ export function renderRutorrentConfig(): RenderedFile {
     content: [
       '<?php',
       '// KoBox-managed — DO NOT EDIT (rendered declaratively).',
-      "$topDirectory = '/home';",
+      `$topDirectory = '${HOME_BASE}';`,
       `$profilePath = '${RUTORRENT_PROFILE_DIR}';`,
       "$scgi_port = 5000;",
       "$scgi_host = '127.0.0.1';",

@@ -4,6 +4,7 @@ import { SessionDir } from './SessionDir.js';
 import type { TorrentInstance } from './TorrentInstance.js';
 import type { WatchDir } from './WatchDir.js';
 import type { RenderedFile } from './ports.js';
+import { homeOf } from '../user/homeDirectory.js';
 
 export class UnresolvedPlaceholderError extends DomainError {
   constructor(names: readonly string[]) {
@@ -44,10 +45,6 @@ export function renderTemplate(template: string, vars: Record<string, string>): 
   return rendered;
 }
 
-function homeOf(instance: TorrentInstance): string {
-  return `/home/${instance.username.value}`;
-}
-
 // Maps each hook's rtorrent argv (EventHook.rtorrentArgs order) onto the
 // `kobox torrent-event` CLI flags, positionally: "$1", "$2", ... An empty
 // entry keeps positional alignment while forwarding nothing (rtorrent's
@@ -67,7 +64,7 @@ function shimCliArgs(hook: EventHook): string {
 }
 
 function renderRtorrentRc(instance: TorrentInstance, templates: RtorrentTemplates): string {
-  const home = homeOf(instance);
+  const home = homeOf(instance.username);
   const eventHooks = EventHook.all
     .map(
       (hook) =>
@@ -98,7 +95,7 @@ function watchSchedule(dir: WatchDir, index: number, home: string): string {
 }
 
 function renderWatchRc(instance: TorrentInstance, templates: RtorrentTemplates): string {
-  const home = homeOf(instance);
+  const home = homeOf(instance.username);
   const schedules = instance.watchDirs
     .map((dir, index) => watchSchedule(dir, index, home))
     .join('\n');
@@ -128,7 +125,7 @@ export function renderHomeFiles(
   templates: RtorrentTemplates,
   settings: RenderSettings,
 ): readonly RenderedFile[] {
-  const home = homeOf(instance);
+  const home = homeOf(instance.username);
   const owner = 'root';
   const group = instance.username.value;
   return [
@@ -159,6 +156,6 @@ export function renderHomeFiles(
 export function renderUnit(instance: TorrentInstance, templates: RtorrentTemplates): string {
   return renderTemplate(templates.systemdUnit, {
     username: instance.username.value,
-    home: homeOf(instance),
+    home: homeOf(instance.username),
   });
 }

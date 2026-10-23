@@ -1,6 +1,7 @@
 import type { RenderedFile } from '../shared/files.js';
 import type { Username } from '../user/Username.js';
 import type { Tracker } from './Tracker.js';
+import { homeOf } from '../user/homeDirectory.js';
 
 // Pure, deterministic renders of the whole desired state of each network
 // file. The legacy built these with appended `echo`/`sed -i` passes over live
@@ -69,7 +70,7 @@ export function renderIpsetRestore(ranges: readonly string[]): RenderedFile {
 }
 
 export function renderUserBlocklistDropin(username: Username, enabled: boolean): RenderedFile {
-  const home = `/home/${username.value}`;
+  const home = homeOf(username);
   const listPath = `${home}/blocklist/blocklist_rtorrent.txt`;
   const body = enabled
     ? [
@@ -115,7 +116,7 @@ export function renderUserBlocklistFile(
   ranges: readonly string[],
 ): RenderedFile {
   return {
-    path: `/home/${username.value}/blocklist/blocklist_rtorrent.txt`,
+    path: `${homeOf(username)}/blocklist/blocklist_rtorrent.txt`,
     content: `${ranges.join('\n')}\n`,
     mode: '0640',
     owner: 'root',

@@ -4,6 +4,7 @@ import type { SyncTransferRepository } from '../../domain/sync/ports.js';
 import type { Label } from '../../domain/torrent/Label.js';
 import type { TorrentInstanceRepository } from '../../domain/torrent/ports.js';
 import type { Username } from '../../domain/user/Username.js';
+import { homeOf } from '../../domain/user/homeDirectory.js';
 
 export interface QueueFinishedDownloadCommand {
   readonly username: Username;
@@ -52,7 +53,7 @@ export class QueueFinishedDownload {
     // Privilege seam, again: the path arrives from a shim a member controls, and
     // the root worker will read it. Anything outside their own home is ignored
     // — never read, never queued, never sent to somebody else's machine.
-    if (!source.isInside(`/home/${command.username.value}`)) {
+    if (!source.isInside(homeOf(command.username))) {
       return NOTHING;
     }
 

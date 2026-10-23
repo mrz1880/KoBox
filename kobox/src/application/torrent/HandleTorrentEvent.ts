@@ -17,6 +17,7 @@ import type { ContentRecyclerPort } from '../../domain/torrent/ports.js';
 import type { Username } from '../../domain/user/Username.js';
 import type { MailOutboxPort } from '../maintenance/MailOutboxPort.js';
 import { TorrentInstanceNotFoundError } from './errors.js';
+import { homeOf } from '../../domain/user/homeDirectory.js';
 
 export interface TorrentEventCommand {
   readonly username: Username;
@@ -75,7 +76,7 @@ export class HandleTorrentEvent {
     // Privilege-seam guard: a shell user could point the shim at any absolute
     // path. The root worker must only ever touch paths under the user's own
     // home — anything else is ignored (never read, never stored).
-    const home = `/home/${command.username.value}/`;
+    const home = `${homeOf(command.username)}/`;
     const provided = [command.torrentFile, command.directory, command.basePath];
     if (provided.some((path) => path !== undefined && !path.startsWith(home))) {
       return;
