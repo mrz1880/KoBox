@@ -47,6 +47,10 @@ describe('SystemAccountAdapter', () => {
     expect(runner.argvOf('groupadd')).toEqual(['-f', 'kobox-users']);
     expect(runner.argvOf('useradd')).toEqual([
       '-m',
+      // explicit, so the home every path derives from is not the
+      // distribution's useradd default by coincidence
+      '-d',
+      '/home/alice',
       '-s',
       '/bin/bash',
       '-G',
