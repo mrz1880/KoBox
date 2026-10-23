@@ -941,6 +941,24 @@ describe('connecting an app', () => {
     expect(after?.passwordHash).toBeDefined();
   });
 
+  it('should_keep_the_language_the_member_chose_when_revoking', async () => {
+    await world.server.inject({
+      method: 'POST',
+      url: '/access/language',
+      headers: { cookie: user.cookie, 'content-type': 'application/x-www-form-urlencoded' },
+      payload: form({ _csrf: user.csrf, language: 'fr' }),
+    });
+
+    await world.server.inject({
+      method: 'POST',
+      url: '/access/app-token/revoke',
+      headers: { cookie: user.cookie, 'content-type': 'application/x-www-form-urlencoded' },
+      payload: form({ _csrf: user.csrf }),
+    });
+
+    expect((await world.credentials.find(Username.parse('alice')))?.language?.value).toBe('fr');
+  });
+
   it('should_refuse_without_a_csrf_token', async () => {
     const response = await world.server.inject({
       method: 'POST',

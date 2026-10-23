@@ -14,6 +14,7 @@ import {
   UserAlreadyExistsError,
   UserNotFoundError,
 } from '../../../../src/application/user/errors.js';
+import { Language } from '../../../../src/domain/portal/Language.js';
 import { EmailAddress } from '../../../../src/domain/user/EmailAddress.js';
 import { HashedPassword } from '../../../../src/domain/user/HashedPassword.js';
 import { ProxyPort, RtorrentPort, ScgiPort } from '../../../../src/domain/user/Port.js';
@@ -360,6 +361,28 @@ describe('ChangePassword', () => {
     const credentials = await world.credentials.find(alice);
     expect(credentials?.passwordHash.value).toBe(newHash.value);
     expect(credentials?.role).toBe('admin');
+  });
+
+  it('should_keep_the_language_the_member_chose', async () => {
+    await world.createUser.execute(createUserCommand());
+    const stored = await world.credentials.find(alice);
+    if (stored === undefined) throw new Error('alice has no portal login');
+    await world.credentials.save({ ...stored, language: Language.fr }, '2026-07-25 10:00:00');
+
+    await world.changePassword.execute({ username: alice, passwordHash: aHash });
+
+    expect((await world.credentials.find(alice))?.language).toBe(Language.fr);
+  });
+
+  it('should_revoke_the_app_token_so_one_issued_with_a_stolen_password_dies_too', async () => {
+    await world.createUser.execute(createUserCommand());
+    const stored = await world.credentials.find(alice);
+    if (stored === undefined) throw new Error('alice has no portal login');
+    await world.credentials.save({ ...stored, appTokenHash: 'c'.repeat(64) }, '2026-07-25 10:00:00');
+
+    await world.changePassword.execute({ username: alice, passwordHash: aHash });
+
+    expect((await world.credentials.find(alice))?.appTokenHash).toBeUndefined();
   });
 
   it('should_revoke_live_sessions_so_a_stolen_cookie_dies_with_the_password', async () => {
