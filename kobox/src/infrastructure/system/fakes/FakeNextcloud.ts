@@ -25,6 +25,10 @@ export class FakeNextcloud implements NextcloudPort {
     return Promise.resolve();
   }
 
+  hasUser(username: Username): Promise<boolean> {
+    return Promise.resolve(this.users.includes(username.value));
+  }
+
   ensureUser(username: Username): Promise<void> {
     if (!this.users.includes(username.value)) {
       this.users.push(username.value);
@@ -39,6 +43,10 @@ export class FakeNextcloud implements NextcloudPort {
   }
 
   setAdmin(username: Username, admin: boolean): Promise<void> {
+    // occ group:adduser fails on an account Nextcloud does not know
+    if (!this.users.includes(username.value)) {
+      return Promise.reject(new Error(`occ: user ${username.value} not found`));
+    }
     this.admins.set(username.value, admin);
     return Promise.resolve();
   }

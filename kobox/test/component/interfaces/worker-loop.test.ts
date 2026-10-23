@@ -190,6 +190,7 @@ interface World {
   mailTransport: RecordingMailTransport;
   worker: JobWorker;
   hasher: FakePasswordHasher;
+  credentials: InMemoryPortalCredentialsRepository;
 }
 
 class RecordingMailTransport {
@@ -435,6 +436,7 @@ beforeEach(() => {
   world = {
     nextcloud,
     components,
+    credentials,
     queue,
     accounts,
     services,
@@ -660,6 +662,15 @@ describe('CLI enqueue -> root worker loop (the privilege seam)', () => {
 
     expect(await world.accounts.isLocked(alice)).toBe(false);
     expect(await world.services.isUserServiceRunning(alice)).toBe(true);
+  });
+
+  it('should_promote_a_member_through_a_role_change_job', async () => {
+    await enqueueCreateAlice();
+    await world.queue.enqueue(buildJob.setUserRole({ username: 'alice', role: 'admin' }));
+
+    await world.worker.drain();
+
+    expect((await world.credentials.find(alice))?.role).toBe('admin');
   });
 
   it('should_mark_a_job_failed_with_its_error_and_keep_going', async () => {

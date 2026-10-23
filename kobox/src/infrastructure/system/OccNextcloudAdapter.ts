@@ -46,9 +46,13 @@ export class OccNextcloudAdapter implements NextcloudPort {
     await runOrThrow(this.runner, this.occ(['app:enable', app]));
   }
 
+  async hasUser(username: Username): Promise<boolean> {
+    const info = await this.runner.run(this.occ(['user:info', username.value]));
+    return info.exitCode === 0;
+  }
+
   async ensureUser(username: Username, password: string): Promise<void> {
-    const exists = await this.runner.run(this.occ(['user:info', username.value]));
-    if (exists.exitCode === 0) {
+    if (await this.hasUser(username)) {
       return;
     }
     await runOrThrow(

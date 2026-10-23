@@ -217,6 +217,12 @@ export class JobWorker {
           quota: Quota.gib(job.payload.quotaGib),
         });
         return;
+      case 'set-user-role':
+        await this.useCases.changeRole.execute({
+          username: Username.parse(job.payload.username),
+          role: parseRole(job.payload.role),
+        });
+        return;
       case 'apply-mail-relay':
         await this.maintenance.applyMailRelay.execute();
         return;

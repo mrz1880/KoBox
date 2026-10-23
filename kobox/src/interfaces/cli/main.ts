@@ -15,6 +15,7 @@ import { RemotePath } from '../../domain/sync/RemotePath.js';
 import { RemotePort } from '../../domain/sync/RemotePort.js';
 import { SendHour } from '../../domain/sync/SendHour.js';
 import { TransferBatchSize } from '../../domain/sync/TransferBatchSize.js';
+import { ROLES, parseRole } from '../../domain/portal/Role.js';
 import { EmailAddress } from '../../domain/user/EmailAddress.js';
 import { Password } from '../../domain/user/Password.js';
 import { ProxyPort } from '../../domain/user/Port.js';
@@ -880,6 +881,25 @@ program
     const job = await buildJob.changePassword({ username: username.value }, password, c.hasher);
     const id = await c.queue.enqueue(job);
     await done(c, `job ${String(id)} enqueued: change-password ${username.value}`);
+  });
+
+program
+  .command('set-user-role')
+  .argument('<username>')
+  .argument('<role>', ROLES.join(' | '))
+  .description('move an existing user between portal admin and plain user')
+  .action(async (rawUser: string, rawRole: string) => {
+    const { direct } = program.opts<GlobalOptions>();
+    const username = Username.parse(rawUser);
+    const role = parseRole(rawRole);
+    const c = container();
+    if (direct) {
+      await c.useCases.changeRole.execute({ username, role });
+      await done(c, `${username.value} is now ${role}`);
+      return;
+    }
+    const id = await c.queue.enqueue(buildJob.setUserRole({ username: username.value, role }));
+    await done(c, `job ${String(id)} enqueued: set-user-role ${username.value} ${role}`);
   });
 
 // ---- Installation & Provisioning (Phase 4) ------------------------------

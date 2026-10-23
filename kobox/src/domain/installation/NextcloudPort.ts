@@ -16,6 +16,8 @@ export interface NextcloudPort {
   isInstalled(): Promise<boolean>;
   install(adminUser: string, adminPassword: string): Promise<void>;
   enableApp(app: string): Promise<void>;
+  // members get an account only on request, so most of them have none
+  hasUser(username: Username): Promise<boolean>;
   // idempotent: creating a member who exists is a no-op, not a failure
   ensureUser(username: Username, password: string): Promise<void>;
   // deletes the account and the data Nextcloud itself holds for it. KoBox

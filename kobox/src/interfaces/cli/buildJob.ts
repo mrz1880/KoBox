@@ -103,6 +103,10 @@ export const buildJob = {
     return parseJob('set-user-quota', input);
   },
 
+  setUserRole(input: { username: string; role: string }): Job {
+    return parseJob('set-user-role', input);
+  },
+
   setSyncDisabled(input: { username: string; disabled: boolean }): Job {
     return parseJob('set-sync-disabled', input);
   },
