@@ -3,6 +3,7 @@ import type { SeedboxUser } from '../../../domain/user/SeedboxUser.js';
 import type { DiskUsageSample } from '../../../domain/user/ports.js';
 import { html, type RawHtml } from '../html.js';
 import { flash, page, type Viewer } from './layout.js';
+import { HOME_BASE } from '../../../domain/user/homeDirectory.js';
 
 function statusChip(user: SeedboxUser, viewer: Viewer): RawHtml {
   return user.status.isSuspended()
@@ -93,7 +94,7 @@ function finishScripts(name: string, instance: TorrentInstance | undefined, view
     return html`<p class="muted">No rTorrent instance yet, so nothing runs.</p>`;
   }
   const run = !instance.syncDisabled;
-  return html`<p>Scripts in <span class="mono">/home/${name}/scripts</span> currently
+  return html`<p>Scripts in <span class="mono">${HOME_BASE}/${name}/scripts</span> currently
 ${run ? html`<strong>run</strong>` : html`<strong>do not run</strong>`} when one of
 ${name}'s downloads finishes.</p>
 <p class="muted">${viewer.t('scripts.theirs')}</p>

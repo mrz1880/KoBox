@@ -2,6 +2,7 @@ import type { HashedPassword } from '../../domain/user/HashedPassword.js';
 import type { SystemAccountPort } from '../../domain/user/ports.js';
 import type { Username } from '../../domain/user/Username.js';
 import { runOrThrow, type CommandRunner } from './CommandRunner.js';
+import { homeOf } from '../../domain/user/homeDirectory.js';
 
 export const KOBOX_USERS_GROUP = 'kobox-users';
 
@@ -20,7 +21,7 @@ export class SystemAccountAdapter implements SystemAccountPort {
     // the completed-downloads directory itself is 0755, as rtorrent needs.
     await runOrThrow(this.runner, {
       command: 'chmod',
-      args: ['0711', `/home/${username.value}`],
+      args: ['0711', homeOf(username)],
     });
   }
 

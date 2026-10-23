@@ -4,8 +4,8 @@ import { join, relative } from 'node:path';
 import { MediaPath } from '../../domain/media/MediaFile.js';
 import type { MediaEntry, MediaScanPort } from '../../domain/media/ports.js';
 import type { Username } from '../../domain/user/Username.js';
+import { HOME_BASE } from '../../domain/user/homeDirectory.js';
 
-const DEFAULT_HOME_BASE = '/home';
 // deep enough for complete/<category>/<release>/<file>, shallow enough that a
 // symlink loop or a pathological tree cannot spin the worker
 const MAX_DEPTH = 4;
@@ -13,7 +13,7 @@ const MAX_DEPTH = 4;
 // Walks ~user/rtorrent/complete. Symlinks are not followed: a user could
 // otherwise point one at /etc and have the portal list it.
 export class FsMediaScanner implements MediaScanPort {
-  constructor(private readonly homeBase: string = DEFAULT_HOME_BASE) {}
+  constructor(private readonly homeBase: string = HOME_BASE) {}
 
   async scan(username: Username): Promise<readonly MediaEntry[]> {
     const root = join(this.homeBase, username.value, 'rtorrent', 'complete');

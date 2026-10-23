@@ -4,8 +4,8 @@ import type { Label } from '../../domain/torrent/Label.js';
 import type { DownloadPlacementPort } from '../../domain/ddl/ports.js';
 import type { Username } from '../../domain/user/Username.js';
 import { runOrThrow, type CommandRunner } from './CommandRunner.js';
+import { HOME_BASE } from '../../domain/user/homeDirectory.js';
 
-const DEFAULT_HOME_BASE = '/home';
 
 // The root worker's placement step: move the staged file into the user's home
 // completed-downloads layout (same as torrents, so the *arr folder-import picks
@@ -14,7 +14,7 @@ const DEFAULT_HOME_BASE = '/home';
 export class DdlPlacementAdapter implements DownloadPlacementPort {
   constructor(
     private readonly runner: CommandRunner,
-    private readonly homeBase: string = DEFAULT_HOME_BASE,
+    private readonly homeBase: string = HOME_BASE,
   ) {}
 
   // Best-effort: a file that is already gone is the state we wanted.
