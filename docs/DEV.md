@@ -47,11 +47,12 @@ CI et le hook pre-push : à jouer avant un refactor ou pour blinder un module.
 ```bash
 cd kobox
 make up        # build + boot du conteneur systemd privilégié (debian:13) et de pebble
-make install   # kobox install dans le conteneur
+make install   # dépendances pnpm dans le conteneur
 make test-int  # adapters système contre useradd/usermod/gpasswd réels
 make e2e       # build puis toutes les suites test/e2e
 make shell     # shell dans le conteneur (repo monté sur /opt/KoBox)
 make down      # détruit conteneurs + volumes
+make e2e-full  # tout depuis zéro comme la CI (up, install, test-int, e2e), puis down -v même en échec
 ```
 
 L'E2E de la CI ne tourne que sur les pull requests : joue-le en local avant de pousser.
