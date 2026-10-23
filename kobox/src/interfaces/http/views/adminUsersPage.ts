@@ -1,9 +1,16 @@
+import { ROLES, type Role } from '../../../domain/portal/Role.js';
 import type { TorrentInstance } from '../../../domain/torrent/TorrentInstance.js';
 import type { SeedboxUser } from '../../../domain/user/SeedboxUser.js';
 import type { DiskUsageSample } from '../../../domain/user/ports.js';
 import { html, type RawHtml } from '../html.js';
 import { flash, page, type Viewer } from './layout.js';
 import { HOME_BASE } from '../../../domain/user/homeDirectory.js';
+
+function roleOptions(selected: Role): RawHtml[] {
+  return ROLES.map(
+    (role) => html`<option value="${role}"${role === selected ? html` selected` : html``}>${role}</option>`,
+  );
+}
 
 function statusChip(user: SeedboxUser, viewer: Viewer): RawHtml {
   return user.status.isSuspended()
@@ -50,10 +57,7 @@ ${flash(message)}
   <label for="quotaGib">${viewer.t('Quota (GiB)')}</label>
   <input id="quotaGib" name="quotaGib" type="number" min="1" value="412">
   <label for="role">${viewer.t('Portal role')}</label>
-  <select id="role" name="role">
-    <option value="user">user</option>
-    <option value="admin">admin</option>
-  </select>
+  <select id="role" name="role">${roleOptions('user')}</select>
   <button type="submit">${viewer.t('Create user')}</button>
 </form>`,
     viewer,
@@ -145,9 +149,25 @@ function recycling(name: string, instance: TorrentInstance | undefined, viewer: 
 <p class="muted">${viewer.t('recycling.tradeoff')}</p>`;
 }
 
+// An account created before the portal existed has no login yet, so there is
+// no role to move until somebody gives it a password.
+function portalRole(name: string, role: Role | undefined, viewer: Viewer): RawHtml {
+  if (role === undefined) {
+    return html`<p class="muted">${viewer.t('role.none')}</p>`;
+  }
+  return html`<p class="muted">${viewer.t('role.what')}</p>
+<form method="post" action="/admin/users/${name}/role">
+  <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
+  <label for="role">${viewer.t('Portal role')}</label>
+  <select id="role" name="role">${roleOptions(role)}</select>
+  <button type="submit">${viewer.t('Save')}</button>
+</form>`;
+}
+
 export function adminUserDetailPage(
   user: SeedboxUser,
   viewer: Viewer,
+  role: Role | undefined,
   instance?: TorrentInstance,
   usage?: DiskUsageSample,
   message?: string,
@@ -177,6 +197,9 @@ ${flash(message)}
     <button type="submit" class="danger">${viewer.t('Delete (irreversible)')}</button>
   </form>
 </div>
+
+<h2>${viewer.t('Portal role')}</h2>
+<div class="card">${portalRole(name, role, viewer)}</div>
 
 <h2>${viewer.t('Storage')}</h2>
 <div class="card">${storage(user, usage, viewer)}</div>
