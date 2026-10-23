@@ -8,16 +8,44 @@ on:
   push:
     branches: [main]
     paths: ['kobox/**', '.github/workflows/kobox-ci.yml']
+  # every pull request, without a paths filter: both test jobs are required
+  # checks on main, and a filtered-out workflow never reports, which would
+  # block a docs-only PR forever. The changes job decides instead.
   pull_request:
-    paths: ['kobox/**', '.github/workflows/kobox-ci.yml']
 
 defaults:
   run:
     working-directory: kobox
 
 jobs:
+  changes:
+    name: does this touch kobox?
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      code: ${{ steps.diff.outputs.code }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      # push to main is already filtered by paths; a pull request is compared
+      # with its base. A job skipped by its condition counts as passed.
+      - id: diff
+        working-directory: .
+        run: |
+          if [ "${{ github.event_name }}" != pull_request ]; then
+            echo code=true >> "$GITHUB_OUTPUT"
+          elif git diff --name-only "origin/${{ github.base_ref }}...HEAD" \
+              | grep -qE '^(kobox/|\.github/workflows/kobox-ci\.yml$)'; then
+            echo code=true >> "$GITHUB_OUTPUT"
+          else
+            echo code=false >> "$GITHUB_OUTPUT"
+          fi
+
   fast:
     name: lint + typecheck + unit + component + contract
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -40,7 +68,8 @@ jobs:
     name: integration + e2e (Debian 13 privileged)
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    if: github.event_name == 'pull_request'
+    needs: changes
+    if: github.event_name == 'pull_request' && needs.changes.outputs.code == 'true'
     steps:
       - uses: actions/checkout@v4
       # The steps go through the Makefile, as in local runs: one definition of
