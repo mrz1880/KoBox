@@ -45,6 +45,7 @@ export class IssueAppToken {
         ...(stored.mustChangePassword !== undefined && {
           mustChangePassword: stored.mustChangePassword,
         }),
+        ...(stored.language !== undefined && { language: stored.language }),
       },
       this.deps.clock(),
     );

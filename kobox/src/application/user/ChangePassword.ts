@@ -31,7 +31,9 @@ export class ChangePassword {
 
     await accounts.setPassword(user.username, command.passwordHash);
     // keep the portal mirror in sync; a pre-portal account gets a fresh
-    // credential row with the default role
+    // credential row with the default role. The app token is left out on
+    // purpose: whoever held the old password could have issued one from the
+    // Account page, and it must not outlive the password it was issued under.
     const existing = await credentials.find(user.username);
     await credentials.save(
       {
@@ -40,6 +42,7 @@ export class ChangePassword {
         role: existing?.role ?? 'user',
         // a completed change clears any forced-reset requirement
         mustChangePassword: false,
+        ...(existing?.language !== undefined && { language: existing.language }),
       },
       clock(),
     );
