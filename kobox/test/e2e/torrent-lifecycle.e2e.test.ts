@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import Database from 'better-sqlite3';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { aTorrentFile } from '../builders/TorrentFileBuilder.js';
+import { DEFAULT_SPOOL_DIR } from '../../src/infrastructure/spool/TorrentEventSpool.js';
 import { scgiCall } from './support/scgi.js';
 
 // Full Phase 1 E2E on a fresh Debian 13 with a REAL rtorrent:
@@ -31,8 +32,8 @@ function kobox(args: string[], stdin?: string): string {
   return sh('node', [CLI, ...args], stdin === undefined ? {} : { input: stdin });
 }
 
-function drainQueue(): void {
-  sh('node', [WORKER, '--once']);
+function drainQueue(overrides: NodeJS.ProcessEnv = {}): void {
+  sh('node', [WORKER, '--once'], { env: { ...env, ...overrides } });
 }
 
 function unitProperty(name: string): string {
@@ -429,34 +430,17 @@ describe.skipIf(!onDebianAsRoot)('E2E: torrent lifecycle with a real rtorrent', 
     // left stopped here is a download that silently never happens.
     const fixture = aTorrentFile({ name: 'dropped-linux.iso', isPrivate: true });
     const dropped = join(HOME, 'rtorrent/watch/films/dropped-linux.iso.torrent');
+    // a real box's worker has made the spool long before any drop
+    drainQueue({ KOBOX_SPOOL: DEFAULT_SPOOL_DIR });
     writeFileSync(dropped, fixture.data);
     sh('chown', [`${USER}:kobox-users`, dropped]);
 
-    // the watch schedule polls every 5 s and loads the file stopped
+    // rtorrent's watch schedule loads the file stopped and runs the
+    // inserted_new shim itself, every 5 s; it spools as on a real box
     await eventually(async () => {
-      expect(await rtorrentState(fixture.infoHash)).toBe(0);
-    }, 20_000);
-    // what rtorrent's inserted_new hook runs. Called by hand like the other
-    // hook tests: rtorrent's own call would spool outside this suite's KOBOX_SPOOL
-    sh('runuser', [
-      '-u',
-      USER,
-      '--',
-      'sh',
-      join(HOME, '.rTorrent_inserted_new.sh'),
-      fixture.infoHash,
-      'dropped-linux.iso',
-      `${HOME}/rtorrent/complete/films`,
-      dropped,
-      `${HOME}/rtorrent/torrents/films`,
-      'films',
-      '1',
-    ]);
-    drainQueue();
-
-    await eventually(async () => {
+      drainQueue({ KOBOX_SPOOL: DEFAULT_SPOOL_DIR });
       expect(await rtorrentState(fixture.infoHash)).toBe(1);
-    }, 10_000);
+    }, 30_000);
   }, 60_000);
 
   it('should_early_exit_on_an_inserted_event_without_torrent_file', () => {
