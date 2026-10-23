@@ -13,7 +13,7 @@ export class SystemAccountAdapter implements SystemAccountPort {
     await runOrThrow(this.runner, { command: 'groupadd', args: ['-f', KOBOX_USERS_GROUP] });
     await runOrThrow(this.runner, {
       command: 'useradd',
-      args: ['-m', '-s', '/bin/bash', '-G', KOBOX_USERS_GROUP, username.value],
+      args: ['-m', '-d', homeOf(username), '-s', '/bin/bash', '-G', KOBOX_USERS_GROUP, username.value],
     });
     // 0711, set explicitly rather than inherited from the distribution default:
     // nginx must TRAVERSE the home to stream a media file the portal authorised,
