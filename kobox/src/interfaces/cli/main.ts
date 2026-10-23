@@ -15,7 +15,6 @@ import { RemotePath } from '../../domain/sync/RemotePath.js';
 import { RemotePort } from '../../domain/sync/RemotePort.js';
 import { SendHour } from '../../domain/sync/SendHour.js';
 import { TransferBatchSize } from '../../domain/sync/TransferBatchSize.js';
-import { AccountType } from '../../domain/user/AccountType.js';
 import { EmailAddress } from '../../domain/user/EmailAddress.js';
 import { Password } from '../../domain/user/Password.js';
 import { ProxyPort } from '../../domain/user/Port.js';
@@ -82,7 +81,7 @@ async function done(c: Container, message: string): Promise<void> {
 }
 
 const program = new Command('kobox')
-  .description('KoBox seedbox manager (Phase 0: user management)')
+  .description('KoBox seedbox manager')
   .option('--direct', 'execute immediately in-process instead of enqueueing a job (requires root)');
 
 program
@@ -90,7 +89,6 @@ program
   .argument('<username>')
   .requiredOption('--email <email>')
   .option('--quota-gib <number>', 'disk quota in GiB', '500')
-  .option('--account-type <type>', 'normal|plex', 'normal')
   .option('--proxy-port <port>', 'shared proxy port', '8080')
   .option('--admin', 'grant the portal admin role')
   .description('create a seedbox user (password read from stdin)')
@@ -103,7 +101,6 @@ program
       await c.useCases.createUser.execute({
         username: Username.parse(username),
         email: EmailAddress.parse(options.email ?? ''),
-        accountType: AccountType.parse(options.accountType ?? 'normal'),
         quota: Quota.gib(Number(options.quotaGib ?? '500')),
         proxyPort: ProxyPort.parse(Number(options.proxyPort ?? '8080')),
         passwordHash: hash,
@@ -116,7 +113,6 @@ program
       {
         username,
         email: options.email ?? '',
-        accountType: options.accountType ?? 'normal',
         quotaGib: Number(options.quotaGib ?? '500'),
         proxyPort: Number(options.proxyPort ?? '8080'),
         role: options.admin === undefined ? 'user' : 'admin',

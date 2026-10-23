@@ -144,7 +144,6 @@ export class ImportFromMysb {
     await this.deps.createUser.execute({
       username: mapped.username,
       email: mapped.email,
-      accountType: mapped.accountType,
       quota: mapped.quota,
       proxyPort: mapped.proxyPort,
       passwordHash,

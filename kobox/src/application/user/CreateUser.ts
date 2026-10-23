@@ -1,6 +1,5 @@
 import type { Role } from '../../domain/portal/Role.js';
 import type { PortalCredentialsPort } from '../../domain/portal/ports.js';
-import type { AccountType } from '../../domain/user/AccountType.js';
 import type { EmailAddress } from '../../domain/user/EmailAddress.js';
 import type { HashedPassword } from '../../domain/user/HashedPassword.js';
 import type { ProxyPort, RtorrentPort, ScgiPort } from '../../domain/user/Port.js';
@@ -20,7 +19,6 @@ import { UserAlreadyExistsError } from './errors.js';
 export interface CreateUserCommand {
   readonly username: Username;
   readonly email: EmailAddress;
-  readonly accountType: AccountType;
   readonly quota: Quota;
   readonly proxyPort: ProxyPort;
   readonly passwordHash: HashedPassword;
@@ -79,7 +77,6 @@ export class CreateUser {
     const { user, event } = SeedboxUser.create({
       username: command.username,
       email: command.email,
-      accountType: command.accountType,
       quota: command.quota,
       scgiPort,
       rtorrentPort,

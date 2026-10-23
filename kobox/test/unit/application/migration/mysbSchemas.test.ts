@@ -15,7 +15,6 @@ describe('mysbUserSchema', () => {
     rtorrent_port: 45000,
     proxy_port: 8080,
     quota_bytes: 442381107200,
-    account_type: 'normal',
     active: 1,
   };
 
@@ -26,7 +25,6 @@ describe('mysbUserSchema', () => {
     expect(user.scgiPort).toBe(51101);
     expect(user.rtorrentPort).toBe(45000);
     expect(user.proxyPort).toBe(8080);
-    expect(user.accountType).toBe('normal');
     expect(user.active).toBe(true);
   });
 
@@ -36,10 +34,6 @@ describe('mysbUserSchema', () => {
 
   it('should_reject_a_malformed_username', () => {
     expect(() => mysbUserSchema.parse({ ...valid, username: 'Bad Name' })).toThrow();
-  });
-
-  it('should_reject_an_unknown_account_type', () => {
-    expect(() => mysbUserSchema.parse({ ...valid, account_type: 'wizard' })).toThrow();
   });
 
   it('should_reject_an_out_of_range_port', () => {

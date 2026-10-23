@@ -14,7 +14,6 @@ import {
   UserAlreadyExistsError,
   UserNotFoundError,
 } from '../../../../src/application/user/errors.js';
-import { AccountType } from '../../../../src/domain/user/AccountType.js';
 import { EmailAddress } from '../../../../src/domain/user/EmailAddress.js';
 import { HashedPassword } from '../../../../src/domain/user/HashedPassword.js';
 import { ProxyPort, RtorrentPort, ScgiPort } from '../../../../src/domain/user/Port.js';
@@ -98,7 +97,6 @@ function createUserCommand() {
   return {
     username: alice,
     email: EmailAddress.parse('alice@example.org'),
-    accountType: AccountType.normal,
     quota: Quota.gib(412),
     proxyPort: ProxyPort.parse(8080),
     passwordHash: aHash,

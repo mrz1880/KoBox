@@ -1,4 +1,3 @@
-import { AccountType } from '../../src/domain/user/AccountType.js';
 import { EmailAddress } from '../../src/domain/user/EmailAddress.js';
 import { ProxyPort, RtorrentPort, ScgiPort } from '../../src/domain/user/Port.js';
 import { Quota } from '../../src/domain/user/Quota.js';
@@ -8,7 +7,6 @@ import { Username } from '../../src/domain/user/Username.js';
 export class UserBuilder {
   private username = Username.parse('alice');
   private email = EmailAddress.parse('alice@example.org');
-  private readonly accountType = AccountType.normal;
   private quota = Quota.gib(412);
   private scgiPort = ScgiPort.parse(51101);
   private rtorrentPort = RtorrentPort.parse(45000);
@@ -47,7 +45,6 @@ export class UserBuilder {
     return SeedboxUser.create({
       username: this.username,
       email: this.email,
-      accountType: this.accountType,
       quota: this.quota,
       scgiPort: this.scgiPort,
       rtorrentPort: this.rtorrentPort,

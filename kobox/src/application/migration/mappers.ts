@@ -13,7 +13,6 @@ import { InfoHash } from '../../domain/torrent/InfoHash.js';
 import { Label } from '../../domain/torrent/Label.js';
 import { Torrent } from '../../domain/torrent/Torrent.js';
 import { TorrentState } from '../../domain/torrent/TorrentState.js';
-import { AccountType } from '../../domain/user/AccountType.js';
 import { EmailAddress } from '../../domain/user/EmailAddress.js';
 import { ProxyPort, RtorrentPort, ScgiPort } from '../../domain/user/Port.js';
 import { Quota } from '../../domain/user/Quota.js';
@@ -37,7 +36,6 @@ import type {
 export interface MappedUser {
   readonly username: Username;
   readonly email: EmailAddress;
-  readonly accountType: AccountType;
   readonly quota: Quota;
   readonly scgiPort: ScgiPort;
   readonly rtorrentPort: RtorrentPort;
@@ -51,7 +49,6 @@ export function toMappedUser(dto: MysbUser): MappedUser {
   return {
     username: Username.parse(dto.username),
     email: EmailAddress.parse(dto.email),
-    accountType: AccountType.parse(dto.accountType),
     quota: Quota.bytes(dto.quotaBytes),
     scgiPort: ScgiPort.parse(dto.scgiPort),
     rtorrentPort: RtorrentPort.parse(dto.rtorrentPort),

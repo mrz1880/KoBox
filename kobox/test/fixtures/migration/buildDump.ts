@@ -14,7 +14,6 @@ export interface DumpUserSpec {
   readonly rtorrentPort: number;
   readonly proxyPort?: number;
   readonly quotaBytes?: number;
-  readonly accountType?: 'normal' | 'plex';
   readonly active?: 0 | 1;
   // the categories written to sync/<username>.sq3 (omit for no file). Names
   // matter: a real MySB box carries Films, Series, Divers — capitalised.
@@ -71,7 +70,6 @@ CREATE TABLE users (
   rtorrent_port INTEGER NOT NULL,
   proxy_port INTEGER NOT NULL,
   quota_bytes INTEGER NOT NULL,
-  account_type TEXT NOT NULL,
   active INTEGER NOT NULL
 );
 CREATE TABLE trackers_list (
@@ -108,7 +106,7 @@ export function buildDump(spec: DumpSpec): string {
   db.exec(SCHEMA);
 
   const insertUser = db.prepare(
-    'INSERT INTO users (username, email, scgi_port, rtorrent_port, proxy_port, quota_bytes, account_type, active) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+    'INSERT INTO users (username, email, scgi_port, rtorrent_port, proxy_port, quota_bytes, active) VALUES (?, ?, ?, ?, ?, ?, ?)',
   );
   for (const u of spec.users) {
     insertUser.run(
@@ -118,7 +116,6 @@ export function buildDump(spec: DumpSpec): string {
       u.rtorrentPort,
       u.proxyPort ?? 8080,
       u.quotaBytes ?? 442_381_107_200,
-      u.accountType ?? 'normal',
       u.active ?? 1,
     );
   }

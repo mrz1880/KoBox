@@ -5,7 +5,6 @@ export const users = sqliteTable('users', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   username: text('username').notNull().unique(),
   email: text('email').notNull(),
-  accountType: text('account_type', { enum: ['normal', 'plex'] }).notNull(),
   quotaBytes: integer('quota_bytes').notNull(),
   scgiPort: integer('scgi_port').notNull().unique(),
   rtorrentPort: integer('rtorrent_port').notNull().unique(),

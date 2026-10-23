@@ -7,7 +7,6 @@ const BYTES_PER_GIB = 1024 ** 3;
 export interface CreateUserInput {
   readonly username: string;
   readonly email: string;
-  readonly accountType: string;
   readonly quotaGib: number;
   readonly proxyPort: number;
   readonly role?: string;
@@ -25,7 +24,6 @@ export const buildJob = {
     return parseJob('create-user', {
       username: input.username,
       email: input.email,
-      accountType: input.accountType,
       quotaBytes: Math.round(input.quotaGib * BYTES_PER_GIB),
       proxyPort: input.proxyPort,
       passwordHash,

@@ -480,7 +480,6 @@ async function enqueueCreateAlice(): Promise<number> {
     {
       username: 'alice',
       email: 'alice@example.org',
-      accountType: 'normal',
       quotaGib: 412,
       proxyPort: 8080,
     },

@@ -122,18 +122,32 @@ const dynDnsHostField = z
   });
 const userHostnamePayload = z.strictObject({ username: usernameField, hostname: dynDnsHostField });
 
+// A create-user job queued before the account type was retired still carries
+// `accountType` in its stored payload. The key meant nothing to provisioning,
+// so it is dropped before the strict check rather than quarantining the job.
+function withoutRetiredAccountType(raw: unknown): unknown {
+  if (typeof raw !== 'object' || raw === null || !('accountType' in raw)) {
+    return raw;
+  }
+  const payload: Record<string, unknown> = { ...raw };
+  delete payload.accountType;
+  return payload;
+}
+
 export const jobPayloadSchemas = {
-  'create-user': z.strictObject({
-    username: usernameField,
-    // case-insensitive on the wire; EmailAddress normalizes to lowercase
-    email: z.string().regex(new RegExp(EMAIL_PATTERN.source, 'i')),
-    accountType: z.enum(['normal', 'plex']),
-    quotaBytes: z.number().int().nonnegative(),
-    proxyPort: z.number().int().min(1).max(65535),
-    passwordHash: passwordHashField,
-    // portal capability level (Phase 6); provisioning is identical either way
-    role: z.enum(['admin', 'user']).default('user'),
-  }),
+  'create-user': z.preprocess(
+    withoutRetiredAccountType,
+    z.strictObject({
+      username: usernameField,
+      // case-insensitive on the wire; EmailAddress normalizes to lowercase
+      email: z.string().regex(new RegExp(EMAIL_PATTERN.source, 'i')),
+      quotaBytes: z.number().int().nonnegative(),
+      proxyPort: z.number().int().min(1).max(65535),
+      passwordHash: passwordHashField,
+      // portal capability level; provisioning is identical either way
+      role: z.enum(['admin', 'user']).default('user'),
+    }),
+  ),
   'delete-user': usernameOnly,
   'change-password': z.strictObject({
     username: usernameField,
