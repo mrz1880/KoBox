@@ -39,6 +39,16 @@ describe('admin users list', () => {
 });
 
 describe('admin user creation', () => {
+  it('should_offer_the_plain_member_role_unless_the_admin_picks_otherwise', async () => {
+    const response = await world.server.inject({
+      method: 'GET',
+      url: '/admin/users',
+      headers: { cookie: admin.cookie },
+    });
+
+    expect(response.body).toContain('<option value="user" selected>');
+  });
+
   it('should_enqueue_a_create_user_job_with_a_hashed_password', async () => {
     const response = await world.server.inject({
       method: 'POST',
@@ -294,6 +304,44 @@ describe('admin per-instance settings', () => {
 
     expect(response.body).toContain('/admin/users/alice/finish-scripts');
     expect(response.body).toContain('name="run" checked');
+  });
+});
+
+describe("a member's portal role", () => {
+  it('should_let_an_admin_promote_a_member', async () => {
+    const response = await world.server.inject({
+      method: 'POST',
+      url: '/admin/users/alice/role',
+      headers: { cookie: admin.cookie, 'content-type': 'application/x-www-form-urlencoded' },
+      payload: form({ _csrf: admin.csrf, role: 'admin' }),
+    });
+
+    expect(response.statusCode).toBe(303);
+    const job = world.queue.jobs.find((j) => j.type === 'set-user-role');
+    expect(job?.payload).toEqual({ username: 'alice', role: 'admin' });
+  });
+
+  it('should_show_on_the_member_page_which_role_they_hold', async () => {
+    const response = await world.server.inject({
+      method: 'GET',
+      url: '/admin/users/boss',
+      headers: { cookie: admin.cookie },
+    });
+
+    expect(response.body).toContain('/admin/users/boss/role');
+    expect(response.body).toContain('<option value="admin" selected>');
+  });
+
+  it('should_refuse_a_role_the_portal_does_not_know', async () => {
+    const response = await world.server.inject({
+      method: 'POST',
+      url: '/admin/users/alice/role',
+      headers: { cookie: admin.cookie, 'content-type': 'application/x-www-form-urlencoded' },
+      payload: form({ _csrf: admin.csrf, role: 'superuser' }),
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(world.queue.jobs).toHaveLength(0);
   });
 });
 

@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import type { JobQueuePort } from '../../../application/jobs/JobQueuePort.js';
+import type { PortalCredentialsPort } from '../../../domain/portal/ports.js';
 import { ROLES } from '../../../domain/portal/Role.js';
 import { USERNAME_PATTERN } from '../../../domain/user/Username.js';
 import { Password } from '../../../domain/user/Password.js';
@@ -33,6 +34,7 @@ export interface AdminUsersDeps {
   readonly hasher: PasswordHasherPort;
   readonly instances: TorrentInstanceRepository;
   readonly diskSamples: DiskUsageRepository;
+  readonly credentials: PortalCredentialsPort;
 }
 
 // Every mutation is an enqueue of the same typed jobs the CLI produces; the
@@ -101,9 +103,10 @@ export function registerAdminUserRoutes(
     }
     const instance = await deps.instances.findByUsername(user.username);
     const usage = await deps.diskSamples.find(user.username);
+    const role = (await deps.credentials.find(user.username))?.role;
     return reply
       .type('text/html')
-      .send(adminUserDetailPage(user, viewerOf(session), instance, usage, flashOf(request)));
+      .send(adminUserDetailPage(user, viewerOf(session), role, instance, usage, flashOf(request)));
   });
 
   const lifecycle = [
@@ -164,6 +167,28 @@ export function registerAdminUserRoutes(
       reply,
       `/admin/users/${params.data.name}`,
       `${params.data.name} now has ${parsed.data.quotaGib} GiB. Nobody else is affected.`,
+    );
+  });
+
+  const roleSchema = z.object({ role: z.enum(ROLES) });
+
+  server.post('/admin/users/:name/role', async (request, reply) => {
+    const session = await guards.requireAdminCsrf(request, reply);
+    if (session === undefined) {
+      return;
+    }
+    const params = usernameParamSchema.safeParse(request.params);
+    const parsed = roleSchema.safeParse(request.body);
+    if (!params.success || !parsed.success) {
+      return reply.code(400).send();
+    }
+    await deps.queue.enqueue(
+      buildJob.setUserRole({ username: params.data.name, role: parsed.data.role }),
+    );
+    return redirectWithFlash(
+      reply,
+      `/admin/users/${params.data.name}`,
+      `${params.data.name} is now ${parsed.data.role} on the portal.`,
     );
   });
 

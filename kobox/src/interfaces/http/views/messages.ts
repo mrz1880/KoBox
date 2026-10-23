@@ -160,6 +160,10 @@ const FR: Readonly<Record<string, string>> = {
     'Le mot de passe Nextcloud est le sien et lui est envoyé par mail. KoBox ne garde le mot de passe du portail que sous forme d’empreinte et n’a rien à réutiliser : prétendre que les deux sont identiques serait mentir sur leur rapport.',
   'storage.using': 'Utilise {used} Gio sur {allowance} Gio',
   'storage.measured': 'mesuré le {at}',
+  'role.what':
+    'Un administrateur voit tous les membres et pilote la machine d’ici ; un membre ne voit que son propre compte. Le changement s’applique dès sa page suivante, et décide aussi s’il administre Nextcloud.',
+  'role.none':
+    'Ce compte n’a pas encore d’accès au portail. Donnez-lui un mot de passe pour lui en ouvrir un.',
 
 };
 
@@ -191,6 +195,10 @@ const EN: Readonly<Record<string, string>> = {
     'The Nextcloud password is its own and is mailed to them. KoBox keeps the portal password as a hash and has nothing to reuse, so pretending the two are the same would be a lie about how they relate.',
   'storage.using': 'Using {used} GiB of {allowance} GiB',
   'storage.measured': 'measured {at}',
+  'role.what':
+    'An admin sees every member and runs the box from here; a member sees only their own account. It applies from their next page, and it also decides whether they administer Nextcloud.',
+  'role.none':
+    'This account has no portal login yet. Give it a password to open one.',
 };
 
 const CATALOGUES: Readonly<Record<string, Readonly<Record<string, string>>>> = { en: EN, fr: FR };

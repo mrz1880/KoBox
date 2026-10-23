@@ -616,8 +616,8 @@ mutation enqueues a typed job the root worker executes.
   (a sha512-crypt hash, the same one the system account receives) is written by
   the worker into `portal_credentials` on create-user / change-password, and
   removed on delete-user. There is no separate portal password to manage.
-  `kobox set-user-role <name> admin|user` moves an existing account between the
-  two roles. It applies to open sessions on their next request, and it also
+  `kobox set-user-role <name> admin|user` (or the **Portal role** section of the
+  member's admin page) moves an existing account between the two roles. It applies to open sessions on their next request, and it also
   adds the member to (or removes them from) the Nextcloud `admin` group when
   they have a Nextcloud account.
 - **Sessions**: server-side rows (`portal_sessions`), keyed by the sha256 of an
