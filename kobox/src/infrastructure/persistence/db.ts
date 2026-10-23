@@ -1,3 +1,5 @@
+import { mkdirSync } from 'node:fs';
+import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import Database from 'better-sqlite3';
 import { drizzle, type BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
@@ -15,6 +17,9 @@ export class KoboxDatabase {
   ) {}
 
   static open(filePath: string): KoboxDatabase {
+    // On a fresh box `kobox install` opens the database before kobox-core has
+    // made its directory; that component sets the final owner and mode.
+    mkdirSync(dirname(filePath), { recursive: true, mode: 0o700 });
     const raw = new Database(filePath);
     raw.pragma('journal_mode = WAL');
     raw.pragma('foreign_keys = ON');
