@@ -186,9 +186,25 @@ describe('InstallHostAdapter (fs side)', () => {
       'sysctl --system',
       'postconf -e inet_interfaces=loopback-only',
       'debconf-set-selections',
+      'quotaon -pu /home',
       'quotacheck -ugm /home',
       'quotaon -ug /home',
     ]);
     expect(runner.calls[2]?.stdin).toContain('main_mailer_type');
+  });
+
+  it('should_leave_a_quota_already_enforced_alone_on_a_second_install', async () => {
+    // quotacheck refuses a filesystem whose quota is live ("might damage the
+    // file"): the second `kobox install` on the first production box died here
+    const runner = new RecordingRunner();
+    runner.on((request) =>
+      request.command === 'quotaon' && request.args[0] === '-pu'
+        ? { stdout: 'user quota on /home (/dev/md2) is on\n', stderr: '', exitCode: 1 }
+        : undefined,
+    );
+
+    await new InstallHostAdapter(runner).activateQuota('/home');
+
+    expect(runner.argvs()).toEqual(['quotaon -pu /home']);
   });
 });
