@@ -11,6 +11,7 @@ describe('job contract', () => {
       'delete-user',
       'change-password',
       'set-user-quota',
+      'set-user-role',
       'sample-disk-usage',
       'provision-nextcloud-account',
       'delete-nextcloud-account',
@@ -89,6 +90,14 @@ describe('job contract', () => {
       expect(admin.payload.role).toBe('admin');
     }
     expect(() => parseJob('create-user', { ...payload, role: 'superuser' })).toThrow();
+  });
+
+  it('should_parse_a_role_change_and_refuse_a_role_the_portal_does_not_know', () => {
+    expect(parseJob('set-user-role', { username: 'alice', role: 'admin' }).payload).toEqual({
+      username: 'alice',
+      role: 'admin',
+    });
+    expect(() => parseJob('set-user-role', { username: 'alice', role: 'superuser' })).toThrow();
   });
 
   it('should_parse_fair_use_override_jobs_with_nullable_clears', () => {

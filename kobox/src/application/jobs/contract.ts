@@ -16,6 +16,7 @@ export const JOB_TYPES = [
   'delete-user',
   'change-password',
   'set-user-quota',
+  'set-user-role',
   'sample-disk-usage',
   'provision-nextcloud-account',
   'delete-nextcloud-account',
@@ -158,6 +159,7 @@ export const jobPayloadSchemas = {
   // turns it into a Quota; the payload stays a plain number so a queued job is
   // readable months later.
   'set-user-quota': z.strictObject({ username: usernameField, quotaGib: z.number().int().positive() }),
+  'set-user-role': z.strictObject({ username: usernameField, role: z.enum(ROLES) }),
   'sample-disk-usage': z.strictObject({}),
   'provision-nextcloud-account': usernameOnly,
   'delete-nextcloud-account': usernameOnly,

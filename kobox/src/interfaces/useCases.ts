@@ -94,6 +94,7 @@ import { DeleteNextcloudAccount, ProvisionNextcloudAccount } from '../applicatio
 import { RemoveSshKey, SetSshKey } from '../application/user/SetSshKey.js';
 import { SampleDiskUsage } from '../application/user/SampleDiskUsage.js';
 import { SetUserQuota } from '../application/user/SetUserQuota.js';
+import { ChangeRole } from '../application/user/ChangeRole.js';
 import { CreateUser } from '../application/user/CreateUser.js';
 import { DeleteUser } from '../application/user/DeleteUser.js';
 import { ResumeUser } from '../application/user/ResumeUser.js';
@@ -184,6 +185,7 @@ export interface UseCases {
   readonly deleteUser: DeleteUser;
   readonly changePassword: ChangePassword;
   readonly setUserQuota: SetUserQuota;
+  readonly changeRole: ChangeRole;
   readonly sampleDiskUsage: SampleDiskUsage;
   readonly provisionNextcloudAccount: ProvisionNextcloudAccount;
   readonly deleteNextcloudAccount: DeleteNextcloudAccount;
@@ -199,6 +201,7 @@ export function buildUseCases(deps: UseCaseDeps): UseCases {
     deleteUser: new DeleteUser(deps),
     changePassword: new ChangePassword(deps),
     setUserQuota: new SetUserQuota(deps),
+    changeRole: new ChangeRole(deps),
     sampleDiskUsage: new SampleDiskUsage({ ...deps, samples: deps.diskSamples }),
     provisionNextcloudAccount: new ProvisionNextcloudAccount(deps),
     deleteNextcloudAccount: new DeleteNextcloudAccount(deps),

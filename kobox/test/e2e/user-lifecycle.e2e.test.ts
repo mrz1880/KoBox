@@ -2,6 +2,7 @@ import { execFileSync, type ExecFileSyncOptions } from 'node:child_process';
 import { existsSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import Database from 'better-sqlite3';
 import { beforeAll, describe, expect, it } from 'vitest';
 
 // Full privilege-seam E2E on a fresh Debian 13: real CLI (unprivileged path:
@@ -21,6 +22,18 @@ function sh(command: string, args: string[], options: ExecFileSyncOptions = {}):
 
 function kobox(args: string[], stdin?: string): string {
   return sh('node', [CLI, ...args], stdin === undefined ? {} : { input: stdin });
+}
+
+function portalRole(): unknown {
+  const db = new Database(env.KOBOX_DB ?? '', { readonly: true });
+  try {
+    const row = db
+      .prepare('SELECT role FROM portal_credentials WHERE username = ?')
+      .get(E2E_USER) as { role: string } | undefined;
+    return row?.role;
+  } finally {
+    db.close();
+  }
 }
 
 function drainQueue(): void {
@@ -87,6 +100,16 @@ describe.skipIf(!onDebianAsRoot)('E2E: create -> suspend -> resume -> delete', (
     // Phase 1: create-user chains provision-rtorrent — a REAL rtorrent runs
     expect(existsSync(`/home/${E2E_USER}/.rtorrent.rc`)).toBe(true);
     expect(unitState()).toBe('active');
+  });
+
+  it('should_promote_then_demote_the_member_on_the_portal', () => {
+    expect(kobox(['set-user-role', E2E_USER, 'admin'])).toMatch(/enqueued: set-user-role/);
+    drainQueue();
+    expect(portalRole()).toBe('admin');
+
+    kobox(['set-user-role', E2E_USER, 'user']);
+    drainQueue();
+    expect(portalRole()).toBe('user');
   });
 
   it('should_suspend_reversibly_cutting_auth_sftp_and_rtorrent', () => {
