@@ -2,8 +2,11 @@
 name: kobox-ci
 
 on:
+  # main only: on a feature branch the pull_request run below already covers
+  # every job a push would run, plus the E2E. The run on main tests what the
+  # rebase merge actually produced, and the pre-push hook needs it to tag.
   push:
-    branches: ['**']
+    branches: [main]
     paths: ['kobox/**', '.github/workflows/kobox-ci.yml']
   pull_request:
     paths: ['kobox/**', '.github/workflows/kobox-ci.yml']
