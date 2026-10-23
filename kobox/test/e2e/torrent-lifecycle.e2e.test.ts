@@ -159,6 +159,39 @@ describe.skipIf(!onDebianAsRoot)('E2E: torrent lifecycle with a real rtorrent', 
     await waitForScgi(20_000); // rtorrent parsed our config and opened SCGI
   });
 
+  it('should_keep_other_members_out_of_a_tree_the_web_server_can_reach', () => {
+    // On the first production box any member could write into another's watch
+    // folder and list their downloads (shared kobox-users group), while nginx
+    // could not read a single finished file (rtorrent's UMask 0027).
+    const neighbour = 'e2eneighbour';
+    try {
+      execFileSync('userdel', ['-r', neighbour], { stdio: 'ignore' });
+    } catch {
+      // not there yet
+    }
+    sh('useradd', ['-m', '-G', 'kobox-users', neighbour]);
+    const finished = join(HOME, 'rtorrent/complete/finished.bin');
+    // written the way rtorrent writes, under its UMask
+    sh('runuser', ['-u', USER, '--', 'sh', '-c', `umask 0027 && echo data > ${finished}`]);
+    const can = (user: string, command: string): boolean => {
+      try {
+        execFileSync('runuser', ['-u', user, '--', 'sh', '-c', command], { stdio: 'ignore' });
+        return true;
+      } catch {
+        return false;
+      }
+    };
+    try {
+      expect(can(neighbour, `touch ${join(HOME, 'rtorrent/watch/intruder.torrent')}`)).toBe(false);
+      expect(can(neighbour, `ls ${join(HOME, 'rtorrent/complete')}`)).toBe(false);
+      expect(can('www-data', `cat ${finished}`)).toBe(true);
+      expect(can('www-data', `touch ${join(HOME, 'rtorrent/watch/from-the-web.torrent')}`)).toBe(true);
+    } finally {
+      execFileSync('userdel', ['-r', neighbour], { stdio: 'ignore' });
+      sh('rm', ['-f', finished, join(HOME, 'rtorrent/watch/from-the-web.torrent')]);
+    }
+  });
+
   it('should_rerender_idempotently_leaving_user_dropins_and_the_process_alone', () => {
     const startedAt = unitProperty('ActiveEnterTimestampMonotonic');
     const rcBefore = readFileSync(join(HOME, '.rtorrent.rc'), 'utf8');

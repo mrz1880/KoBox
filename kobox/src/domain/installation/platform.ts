@@ -10,3 +10,7 @@ export const PHP_FPM = {
   unit: `php${PHP_VERSION}-fpm`,
   socket: `/run/php/php${PHP_VERSION}-fpm.sock`,
 } as const;
+
+// The account nginx and PHP-FPM run as: what serves ruTorrent, Nextcloud and
+// the media a member streams, and so what has to reach into member trees.
+export const WEB_SERVER_USER = 'www-data';
