@@ -1,10 +1,13 @@
 import type { HashedPassword } from '../../domain/user/HashedPassword.js';
 import type { SystemAccountPort } from '../../domain/user/ports.js';
 import type { Username } from '../../domain/user/Username.js';
-import { runOrThrow, type CommandRunner } from './CommandRunner.js';
+import { runAllowing, runOrThrow, type CommandRunner } from './CommandRunner.js';
 import { homeOf } from '../../domain/user/homeDirectory.js';
 
 export const KOBOX_USERS_GROUP = 'kobox-users';
+
+// groupdel's exit status for a group that does not exist
+const GROUP_DOES_NOT_EXIST = 6;
 
 export class SystemAccountAdapter implements SystemAccountPort {
   constructor(private readonly runner: CommandRunner) {}
@@ -27,6 +30,14 @@ export class SystemAccountAdapter implements SystemAccountPort {
 
   async deleteAccount(username: Username): Promise<void> {
     await runOrThrow(this.runner, { command: 'userdel', args: ['-r', username.value] });
+    // The web server is a member of every member's group, so userdel keeps the
+    // group ("has other members") and the same name could never be created
+    // again. Exit 6: it is already gone, which is the state we want.
+    await runAllowing(
+      this.runner,
+      { command: 'groupdel', args: [username.value] },
+      [GROUP_DOES_NOT_EXIST],
+    );
   }
 
   async setPassword(username: Username, hash: HashedPassword): Promise<void> {

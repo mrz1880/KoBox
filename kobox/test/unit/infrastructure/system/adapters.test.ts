@@ -38,6 +38,24 @@ const alice = Username.parse('alice');
 const aHash = HashedPassword.parse('$6$testsalt$0123456789abcdefghijklmnopqrstuv');
 
 describe('SystemAccountAdapter', () => {
+  it('should_remove_the_member_group_the_web_server_kept_alive', async () => {
+    // the web server joins every member's group, so userdel no longer drops
+    // it ("has other members") and re-creating the same name then fails
+    const runner = new RecordingRunner();
+
+    await new SystemAccountAdapter(runner).deleteAccount(alice);
+
+    expect(runner.argvOf('userdel')).toEqual(['-r', 'alice']);
+    expect(runner.argvOf('groupdel')).toEqual(['alice']);
+  });
+
+  it('should_accept_a_member_group_already_gone', async () => {
+    const runner = new RecordingRunner();
+    runner.onCommand('groupdel', { exitCode: 6, stderr: "groupdel: group 'alice' does not exist" });
+
+    await expect(new SystemAccountAdapter(runner).deleteAccount(alice)).resolves.toBeUndefined();
+  });
+
   it('should_create_an_account_with_home_shell_and_group_via_argv_only', async () => {
     const runner = new RecordingRunner();
     const adapter = new SystemAccountAdapter(runner);
