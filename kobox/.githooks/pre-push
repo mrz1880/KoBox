@@ -1,10 +1,68 @@
 #!/usr/bin/env bash
-# Heavy gate — the full local suite before anything leaves the machine, so a
+# Heavy gate: the full local suite before a branch leaves the machine, so a
 # push only reaches CI once it already passes here (saves Free-plan minutes).
+# A release tag (v*) gets a different gate: its commit must be on main and
+# green in CI, because `kobox upgrade --to <tag>` deploys exactly that commit.
 set -euo pipefail
 
+remote="$1"
 repo_root="$(git rev-parse --show-toplevel)"
 cd "$repo_root/kobox"
+
+zero_sha='0000000000000000000000000000000000000000'
+# kobox-ci only runs on pushes touching these paths: keep in sync with its `paths:`.
+ci_paths=(kobox .github/workflows/kobox-ci.yml)
+# How far back the green runs are looked up: a tag is cut shortly after its merge.
+green_runs_scanned=100
+
+fail_tag() {
+  echo "[pre-push] tag $1: $2" >&2
+  echo "[pre-push] tag only a commit of main whose kobox-ci run is green" >&2
+  exit 1
+}
+
+check_release_tag() {
+  local tag="$1" sha="$2" commit
+  # An annotated tag points at a tag object: peel it down to the commit.
+  commit="$(git rev-parse "${sha}^{commit}")"
+
+  git merge-base --is-ancestor "$commit" "$remote/main" \
+    || fail_tag "$tag" "${commit:0:8} is not on $remote/main (git fetch, or tag main)"
+
+  # CI runs only on the last commit of each push, and only when the CI paths
+  # changed, so the tagged commit rarely has a run of its own. Any green run on
+  # a commit of main whose CI paths hold the same content tested this code too.
+  command -v gh >/dev/null || fail_tag "$tag" "gh CLI missing, cannot read the CI status"
+  local green_shas candidate
+  green_shas="$(gh run list --workflow kobox-ci.yml --status success --limit "$green_runs_scanned" \
+    --json headSha --jq '.[].headSha')" \
+    || fail_tag "$tag" "could not query the kobox-ci runs (gh auth status?)"
+  for candidate in "$commit" $(git rev-list "$commit..$remote/main"); do
+    # -C: the CI paths are repo-relative, and the hook runs from kobox/.
+    git -C "$repo_root" diff --quiet "$commit" "$candidate" -- "${ci_paths[@]}" || continue
+    if grep -qx "$candidate" <<<"$green_shas"; then
+      echo "[pre-push] tag $tag: ${commit:0:8} on $remote/main, same code green in CI at ${candidate:0:8}"
+      return
+    fi
+  done
+  fail_tag "$tag" "no green kobox-ci run on this code (CI still running, red, or never ran)"
+}
+
+# git feeds one line per pushed ref: <local ref> <local sha> <remote ref> <remote sha>.
+branch_pushed=false
+while read -r local_ref local_sha _remote_ref _remote_sha; do
+  [ "$local_sha" = "$zero_sha" ] && continue # a deletion carries no code
+  case "$local_ref" in
+    refs/tags/v*) check_release_tag "${local_ref#refs/tags/}" "$local_sha" ;;
+    refs/tags/*) ;;
+    *) branch_pushed=true ;;
+  esac
+done
+
+if [ "$branch_pushed" = false ]; then
+  echo "[pre-push] no branch pushed, local suite skipped"
+  exit 0
+fi
 
 echo "[pre-push] lint"
 pnpm lint
