@@ -18,19 +18,18 @@ export const COMPONENT_NAMES = [
   'fail2ban',
   'openvpn',
   'postfix',
-  // Phase 5 (pgl retired 2026-07-25: never packaged for Debian 12, kernel
-  // enforcement moves to ipset)
+  // operations: scheduled jobs, certificates, blocklist enforcement in the kernel
   'scheduler',
   'letsencrypt',
   'ipset',
-  // Phase 6 — Portal & Access
+  // portal and member access
   'portal',
   'nfs',
   'samba',
   'shellinabox',
-  // Phase 8 — lightweight host monitoring (vendored NanoMon binary)
+  // lightweight host monitoring (vendored NanoMon binary)
   'nanomon',
-  // Phase 9 — DDL/debrid download engine (aria2 daemon, localhost RPC)
+  // DDL/debrid download engine (aria2 daemon, localhost RPC)
   'aria2',
   'speedtest',
 ] as const;
