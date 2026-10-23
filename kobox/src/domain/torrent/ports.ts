@@ -60,6 +60,7 @@ export interface TorrentMetainfoPort {
 }
 
 export interface RtorrentControlPort {
+  start(scgiPort: ScgiPort, infoHash: InfoHash): Promise<void>;
   stopAndClose(scgiPort: ScgiPort, infoHash: InfoHash): Promise<void>;
 }
 

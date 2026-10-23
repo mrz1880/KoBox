@@ -82,7 +82,7 @@ export class HandleTorrentEvent {
     }
     switch (command.event) {
       case 'inserted_new':
-        await this.onInsertedNew(instance, command);
+        await this.onInsertedNew(instance, command, home);
         return;
       case 'finished':
         await this.onFinished(instance, command);
@@ -93,7 +93,11 @@ export class HandleTorrentEvent {
     }
   }
 
-  private async onInsertedNew(instance: TorrentInstance, command: TorrentEventCommand): Promise<void> {
+  private async onInsertedNew(
+    instance: TorrentInstance,
+    command: TorrentEventCommand,
+    home: string,
+  ): Promise<void> {
     // An XMLRPC add (Sonarr, Radarr, any client driving rTorrent) carries no
     // .torrent file, so there is nothing on disk to inspect. Privacy still has
     // to be decided: skipping meant the rule silently did not apply, and
@@ -128,7 +132,15 @@ export class HandleTorrentEvent {
     const decision = instance.admitTorrent(isPrivate ? 'private' : 'public');
     if (decision === 'accepted') {
       await this.deps.torrents.upsert(command.username, torrent);
+      // recycled content first, so rTorrent hash-checks it rather than
+      // starting to download what is about to land
       await this.recycleIfPossible(instance, command);
+      if (
+        command.torrentFile !== undefined &&
+        instance.startsOnceAdmitted(command.torrentFile, home)
+      ) {
+        await this.deps.control.start(instance.scgiPort, command.infoHash);
+      }
       return;
     }
     await this.deps.torrents.upsert(command.username, torrent.reject());

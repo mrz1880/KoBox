@@ -124,6 +124,14 @@ export class TorrentInstance {
     return 'accepted';
   }
 
+  // rTorrent loads a dropped file stopped so its tracker can be vetted first:
+  // such a torrent is one nobody else will ever start. A file added any other
+  // way (ruTorrent's upload form, a client over RPC) carries its owner's own
+  // choice of starting it or not, which is theirs to keep.
+  startsOnceAdmitted(torrentFile: string, home: string): boolean {
+    return this.watchDirs.some((dir) => torrentFile.startsWith(`${dir.watchPath(home)}/`));
+  }
+
   private props(): TorrentInstanceProps {
     return {
       username: this.username,

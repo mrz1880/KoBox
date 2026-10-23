@@ -331,6 +331,25 @@ describe('HandleTorrentEvent', () => {
     expect(torrent?.state.value).toBe('loaded');
     expect(torrent?.label?.value).toBe('films');
     expect(torrent?.name).toBe('x'); // name from metainfo
+    // not a watch folder: whoever added it chose whether it starts
+    expect(c.control.started).toHaveLength(0);
+  });
+
+  it('should_start_an_admitted_torrent_dropped_into_a_watch_folder', async () => {
+    // rTorrent loads watched files stopped so the tracker can be vetted first;
+    // once admitted, starting it is the hook's job, as it was on MySB.
+    const dropped = '/home/alice/rtorrent/watch/films/x.torrent';
+    c.meta.preload(dropped, metainfo(true));
+
+    await c.handleEvent.execute({
+      username: alice,
+      event: 'inserted_new',
+      infoHash: HASH,
+      torrentFile: dropped,
+      label: Label.parse('films'),
+    });
+
+    expect(c.control.started).toEqual([{ scgiPort: 51101, infoHash: HASH.value }]);
   });
 
   it('should_tell_the_member_why_their_torrent_was_taken_out', async () => {
