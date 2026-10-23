@@ -18,10 +18,17 @@ const onDebianAsRoot = process.platform === 'linux' && process.getuid?.() === 0;
 const runner = new ExecFileRunner();
 
 function cleanupUser(name: string): void {
-  try {
-    execFileSync('userdel', ['-r', name], { stdio: 'ignore' });
-  } catch {
-    // absent user is fine
+  // groupdel too, as deleteAccount does: the web server joins every member's
+  // group, so userdel alone leaves it behind and the next run cannot recreate
+  for (const [command, args] of [
+    ['userdel', ['-r', name]],
+    ['groupdel', [name]],
+  ] as const) {
+    try {
+      execFileSync(command, [...args], { stdio: 'ignore' });
+    } catch {
+      // absent user or group is fine
+    }
   }
 }
 
@@ -110,7 +117,9 @@ describe.skipIf(!onDebianAsRoot)('torrent adapters on real Debian', () => {
     ]);
     const watchStat = statSync('/home/kbxituser4/rtorrent/watch/films');
     expect(watchStat.isDirectory()).toBe(true);
-    expect(watchStat.mode & 0o777).toBe(0o775);
+    // the member's own group, setgid so a file the web server drops keeps it
+    expect(watchStat.mode & 0o7777).toBe(0o2770);
+    expect(watchStat.gid).toBe(statSync('/home/kbxituser4').gid);
 
     const rc = {
       path: '/home/kbxituser4/.rtorrent.rc',
