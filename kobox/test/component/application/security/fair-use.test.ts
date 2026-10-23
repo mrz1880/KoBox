@@ -3,13 +3,10 @@ import { EvaluateFairUse } from '../../../../src/application/security/EvaluateFa
 import { Bandwidth } from '../../../../src/domain/security/Bandwidth.js';
 import { FairUsePolicy } from '../../../../src/domain/security/FairUsePolicy.js';
 import type { SecurityEvent } from '../../../../src/domain/security/events.js';
-import type {
-  HealthCheckResult,
-  HealthProbePort,
-} from '../../../../src/domain/user/ports.js';
 import { Username } from '../../../../src/domain/user/Username.js';
 import { InMemoryFairUseRepository } from '../../../../src/infrastructure/persistence/InMemoryFairUseRepository.js';
 import { InMemoryUserRepository } from '../../../../src/infrastructure/persistence/InMemoryUserRepository.js';
+import { FakeHealthProbe } from '../../../../src/infrastructure/system/fakes/FakeHealthProbe.js';
 import { FakeShaping } from '../../../../src/infrastructure/system/fakes/FakeShaping.js';
 import { FakeSshAuthLog } from '../../../../src/infrastructure/system/fakes/FakeSshAuthLog.js';
 import { FakeUsageMeter } from '../../../../src/infrastructure/system/fakes/FakeUsageMeter.js';
@@ -22,21 +19,6 @@ class RecordingSecurityNotifications {
   notify(event: SecurityEvent): Promise<void> {
     this.published.push(event);
     return Promise.resolve();
-  }
-}
-
-class StubHealthProbe implements HealthProbePort {
-  healthy = true;
-
-  checkProcess(name: string): Promise<HealthCheckResult> {
-    return Promise.resolve({ name, state: this.healthy ? 'healthy' : 'unhealthy' });
-  }
-
-  checkSocket(host: string, port: number): Promise<HealthCheckResult> {
-    return Promise.resolve({
-      name: `${host}:${String(port)}`,
-      state: this.healthy ? 'healthy' : 'unhealthy',
-    });
   }
 }
 
@@ -54,7 +36,7 @@ let meter: FakeUsageMeter;
 let authLog: FakeSshAuthLog;
 let identity: FakeUserIdentity;
 let shaping: FakeShaping;
-let health: StubHealthProbe;
+let health: FakeHealthProbe;
 let notifications: RecordingSecurityNotifications;
 let useCase: EvaluateFairUse;
 
@@ -65,7 +47,7 @@ beforeEach(async () => {
   authLog = new FakeSshAuthLog();
   identity = new FakeUserIdentity();
   shaping = new FakeShaping();
-  health = new StubHealthProbe();
+  health = new FakeHealthProbe();
   notifications = new RecordingSecurityNotifications();
   useCase = new EvaluateFairUse({
     users,
@@ -217,7 +199,7 @@ describe('EvaluateFairUse — the user-h scenario end-to-end', () => {
   });
 
   it('should_report_an_unhealthy_service_once_not_every_run', async () => {
-    health.healthy = false;
+    health.markSocketDown('127.0.0.1', aUser().build().scgiPort.value);
 
     await useCase.execute({ now: '2026-07-24 10:00:00' });
     await useCase.execute({ now: '2026-07-24 10:05:00' });

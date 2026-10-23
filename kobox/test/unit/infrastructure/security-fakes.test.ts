@@ -6,6 +6,7 @@ import { Username } from '../../../src/domain/user/Username.js';
 import { InMemoryFairUseRepository } from '../../../src/infrastructure/persistence/InMemoryFairUseRepository.js';
 import { InMemoryUserAddressRepository } from '../../../src/infrastructure/persistence/InMemoryUserAddressRepository.js';
 import { FakeFirewallApply } from '../../../src/infrastructure/system/fakes/FakeFirewallApply.js';
+import { FakeHealthProbe } from '../../../src/infrastructure/system/fakes/FakeHealthProbe.js';
 import { FakeNetworkServices } from '../../../src/infrastructure/system/fakes/FakeNetworkServices.js';
 import { FakeShaping } from '../../../src/infrastructure/system/fakes/FakeShaping.js';
 import { FakeSshAuthLog } from '../../../src/infrastructure/system/fakes/FakeSshAuthLog.js';
@@ -105,5 +106,16 @@ describe('security fakes', () => {
 
     fake.failWith(new Error('rndc: connect failed'));
     await expect(fake.reloadDns()).rejects.toThrow('rndc: connect failed');
+  });
+
+  it('fake_health_probe_fails_only_the_socket_marked_down', async () => {
+    const probe = new FakeHealthProbe();
+    probe.markSocketDown('127.0.0.1', 22);
+
+    expect(await probe.checkSocket('127.0.0.1', 22)).toEqual({
+      name: 'socket:127.0.0.1:22',
+      state: 'unhealthy',
+    });
+    expect((await probe.checkSocket('127.0.0.1', 5000)).state).toBe('healthy');
   });
 });

@@ -4,10 +4,6 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { RenderedFile } from '../../../../src/domain/shared/files.js';
 import type {
-  HealthCheckResult,
-  HealthProbePort,
-} from '../../../../src/domain/user/ports.js';
-import type {
   CommandRequest,
   CommandResult,
   CommandRunner,
@@ -21,6 +17,7 @@ import { IptablesRestoreAdapter } from '../../../../src/infrastructure/system/Ip
 import { IptablesUsageMeterAdapter } from '../../../../src/infrastructure/system/IptablesUsageMeterAdapter.js';
 import { JournaldSshAuthAdapter } from '../../../../src/infrastructure/system/JournaldSshAuthAdapter.js';
 import { TcShapingAdapter } from '../../../../src/infrastructure/system/TcShapingAdapter.js';
+import { FakeHealthProbe } from '../../../../src/infrastructure/system/fakes/FakeHealthProbe.js';
 import { Bandwidth } from '../../../../src/domain/security/Bandwidth.js';
 import { NetworkServiceAdapter } from '../../../../src/infrastructure/system/NetworkServiceAdapter.js';
 import { Username } from '../../../../src/domain/user/Username.js';
@@ -45,18 +42,6 @@ class RecordingRunner implements CommandRunner {
   }
 }
 
-class StubProbe implements HealthProbePort {
-  state: 'healthy' | 'unhealthy' = 'healthy';
-
-  checkProcess(name: string): Promise<HealthCheckResult> {
-    return Promise.resolve({ name, state: this.state });
-  }
-
-  checkSocket(host: string, port: number): Promise<HealthCheckResult> {
-    return Promise.resolve({ name: `${host}:${String(port)}`, state: this.state });
-  }
-}
-
 class RecordingFiles {
   readonly applied: RenderedFile[] = [];
 
@@ -69,11 +54,12 @@ class RecordingFiles {
   }
 }
 
+const SSH_PORT = 22;
 const SNAPSHOT = '*filter\n:INPUT ACCEPT [0:0]\nCOMMIT\n';
 
 let dir: string;
 let runner: RecordingRunner;
-let probe: StubProbe;
+let probe: FakeHealthProbe;
 let files: RecordingFiles;
 let adapter: IptablesRestoreAdapter;
 let rules: RenderedFile;
@@ -82,9 +68,9 @@ beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), 'kobox-fw-'));
   runner = new RecordingRunner();
   runner.on('iptables-save', { stdout: SNAPSHOT });
-  probe = new StubProbe();
+  probe = new FakeHealthProbe();
   files = new RecordingFiles();
-  adapter = new IptablesRestoreAdapter(runner, files, probe, 22);
+  adapter = new IptablesRestoreAdapter(runner, files, probe, SSH_PORT);
   rules = {
     path: join(dir, 'firewall.rules'),
     content: '*filter\n:INPUT DROP [0:0]\n-A INPUT -i lo -j ACCEPT\nCOMMIT\n',
@@ -138,7 +124,7 @@ describe('IptablesRestoreAdapter', () => {
   });
 
   it('should_restore_the_snapshot_and_keep_the_old_file_when_the_probe_fails', async () => {
-    probe.state = 'unhealthy';
+    probe.markSocketDown('127.0.0.1', SSH_PORT);
 
     const outcome = await adapter.apply(rules);
 
