@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import Database from 'better-sqlite3';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { aTorrentFile } from '../builders/TorrentFileBuilder.js';
+import { scgiCall } from './support/scgi.js';
 
 // Full Phase 1 E2E on a fresh Debian 13 with a REAL rtorrent:
 // provision -> config validated by rtorrent itself -> declarative re-render
@@ -67,6 +68,31 @@ function waitForScgi(timeoutMs: number): Promise<void> {
     };
     attempt();
   });
+}
+
+// d.state as rtorrent reports it: 1 started, 0 stopped, undefined not loaded
+async function rtorrentState(infoHash: string): Promise<number | undefined> {
+  const response = await scgiCall(SCGI_PORT, 'd.state', [infoHash]);
+  if (response.includes('<fault>')) {
+    return undefined;
+  }
+  const value = /<(?:i4|i8|int)>(\d+)<\//.exec(response)?.[1];
+  return value === undefined ? undefined : Number(value);
+}
+
+async function eventually(assertion: () => Promise<void>, timeoutMs: number): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    try {
+      await assertion();
+      return;
+    } catch (error) {
+      if (Date.now() > deadline) {
+        throw error;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+  }
 }
 
 function markerCount(): number {
@@ -395,6 +421,43 @@ describe.skipIf(!onDebianAsRoot)('E2E: torrent lifecycle with a real rtorrent', 
     );
     expect(row?.state).toBe('loaded');
   });
+
+  it('should_start_a_torrent_dropped_into_a_watch_folder', async () => {
+    // How members actually add downloads: a .torrent dropped into Watch from
+    // the Nextcloud app. rTorrent loads it stopped (load.normal) so the hook can
+    // vet the tracker first; on MySB the hook then started it, and a torrent
+    // left stopped here is a download that silently never happens.
+    const fixture = aTorrentFile({ name: 'dropped-linux.iso', isPrivate: true });
+    const dropped = join(HOME, 'rtorrent/watch/films/dropped-linux.iso.torrent');
+    writeFileSync(dropped, fixture.data);
+    sh('chown', [`${USER}:kobox-users`, dropped]);
+
+    // the watch schedule polls every 5 s and loads the file stopped
+    await eventually(async () => {
+      expect(await rtorrentState(fixture.infoHash)).toBe(0);
+    }, 20_000);
+    // what rtorrent's inserted_new hook runs. Called by hand like the other
+    // hook tests: rtorrent's own call would spool outside this suite's KOBOX_SPOOL
+    sh('runuser', [
+      '-u',
+      USER,
+      '--',
+      'sh',
+      join(HOME, '.rTorrent_inserted_new.sh'),
+      fixture.infoHash,
+      'dropped-linux.iso',
+      `${HOME}/rtorrent/complete/films`,
+      dropped,
+      `${HOME}/rtorrent/torrents/films`,
+      'films',
+      '1',
+    ]);
+    drainQueue();
+
+    await eventually(async () => {
+      expect(await rtorrentState(fixture.infoHash)).toBe(1);
+    }, 10_000);
+  }, 60_000);
 
   it('should_early_exit_on_an_inserted_event_without_torrent_file', () => {
     const hash = 'B1B2C3D4E5F6A7B8C9D0A1B2C3D4E5F6A7B8C9D0';

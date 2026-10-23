@@ -314,6 +314,17 @@ describe('ScgiRtorrentControlAdapter', () => {
     expect(received[1]).toContain('<methodName>d.close</methodName>');
   });
 
+  it('should_send_d_start_as_scgi_xmlrpc', async () => {
+    const adapter = new ScgiRtorrentControlAdapter();
+    const hash = InfoHash.parse('a1b2c3d4e5f6a7b8c9d0a1b2c3d4e5f6a7b8c9d0');
+
+    await adapter.start(ScgiPort.parse(port), hash);
+
+    expect(received).toHaveLength(1);
+    expect(received[0]).toContain('<methodName>d.start</methodName>');
+    expect(received[0]).toContain(hash.value);
+  });
+
   it('should_throw_on_an_xmlrpc_fault', async () => {
     reply =
       'Status: 200 OK\r\nContent-Type: text/xml\r\n\r\n' +

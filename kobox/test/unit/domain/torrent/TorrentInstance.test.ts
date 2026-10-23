@@ -58,6 +58,19 @@ describe('TorrentInstance', () => {
     expect(instance.setAllowPublicTracker(true).admitTorrent('public')).toBe('accepted');
   });
 
+  it.each([
+    ['/home/alice/rtorrent/watch/x.torrent', true],
+    ['/home/alice/rtorrent/watch/films/x.torrent', true],
+    // ruTorrent's upload form: its owner chose whether to start it
+    ['/home/alice/rtorrent/torrents/x.torrent', false],
+    // a sibling that merely shares the prefix is not a watch folder
+    ['/home/alice/rtorrent/watchlist/x.torrent', false],
+    ['/home/bob/rtorrent/watch/x.torrent', false],
+  ])('should_start_only_what_was_dropped_into_a_watch_folder: %s', (file, starts) => {
+    const instance = provisioned().addWatchDir(Label.parse('films')).instance;
+    expect(instance.startsOnceAdmitted(file, '/home/alice/')).toBe(starts);
+  });
+
   it('should_restore_from_persistence_without_emitting_events', () => {
     const restored = TorrentInstance.restore({
       username: Username.parse('bob'),
