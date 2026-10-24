@@ -1,3 +1,4 @@
+import type { VpnHost } from '../user/VpnHost.js';
 import { DomainError } from '../shared/DomainError.js';
 import { IPV4_PATTERN, IpAddress } from '../shared/IpAddress.js';
 
@@ -64,6 +65,15 @@ export class Cidr {
   // Convention shared with the legacy layout: the box owns .1 of each tunnel.
   get gatewayAddress(): string {
     return intToIp((this.network + 1) >>> 0);
+  }
+
+  // A member's address in this tunnel: the same host number in every tunnel.
+  addressOf(host: VpnHost): string {
+    const size = (~this.mask >>> 0) + 1;
+    if (host.value >= size - 1) {
+      throw new InvalidCidrError(this.value, `has no room for host ${host.toString()}`);
+    }
+    return intToIp((this.network + host.value) >>> 0);
   }
 
   contains(ip: IpAddress): boolean {
