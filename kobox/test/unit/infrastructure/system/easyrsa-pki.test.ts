@@ -101,6 +101,29 @@ describe('EasyRsaPkiAdapter', () => {
     expect(runner.argvs()).toHaveLength(1);
   });
 
+  it('should_take_a_removed_member_out_of_every_tunnel_address_book', async () => {
+    seedPki('issued/alice.crt', 'private/alice.key', 'reqs/alice.req');
+    const ccdBase = join(pkiDir, '..', 'ccd');
+    for (const variant of ['tun-gw', 'tun', 'tap']) {
+      mkdirSync(join(ccdBase, variant), { recursive: true });
+      writeFileSync(join(ccdBase, variant, 'alice'), 'ifconfig-push 10.0.1.2 255.255.255.0');
+      writeFileSync(join(ccdBase, variant, 'bob'), 'ifconfig-push 10.0.1.3 255.255.255.0');
+    }
+    const withAddresses = new EasyRsaPkiAdapter(
+      runner,
+      pkiDir,
+      join(pkiDir, '..', 'vpn-profiles'),
+      (variant) => join(ccdBase, variant),
+    );
+
+    await withAddresses.removeClientMaterial(alice);
+
+    for (const variant of ['tun-gw', 'tun', 'tap']) {
+      expect(existsSync(join(ccdBase, variant, 'alice'))).toBe(false);
+      expect(existsSync(join(ccdBase, variant, 'bob'))).toBe(true);
+    }
+  });
+
   it('should_remove_client_material_and_rendered_profiles', async () => {
     seedPki('issued/alice.crt', 'private/alice.key', 'reqs/alice.req');
     const profilesDir = join(pkiDir, '..', 'vpn-profiles');

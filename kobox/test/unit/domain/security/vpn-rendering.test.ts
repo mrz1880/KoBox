@@ -6,12 +6,14 @@ import { Cidr } from '../../../../src/domain/security/Cidr.js';
 import { DynDnsHost } from '../../../../src/domain/security/DynDnsHost.js';
 import {
   VPN_VARIANTS,
+  renderOpenVpnClientAddress,
   renderOpenVpnClientProfile,
   renderOpenVpnServer,
   type VpnClientMaterial,
   type VpnServerPaths,
 } from '../../../../src/domain/security/vpn.js';
 import { Username } from '../../../../src/domain/user/Username.js';
+import { VpnHost } from '../../../../src/domain/user/VpnHost.js';
 
 const GOLDEN_DIR = join(dirname(fileURLToPath(import.meta.url)), '../../../golden/security');
 
@@ -53,6 +55,17 @@ describe('renderOpenVpnServer', () => {
       expect(file.path).toBe(`/etc/openvpn/server/kobox-${variant}.conf`);
       expect(file.mode).toBe('0600');
       expectGolden(`openvpn-${variant}.conf.golden`, file.content);
+    }
+  });
+
+  // The NFS export trusts a member's address and nothing else, so every client
+  // gets the address KoBox gave it, and a certificate without one is refused
+  it('should_take_every_client_address_from_its_member_and_hand_out_no_other', () => {
+    for (const variant of VPN_VARIANTS) {
+      const lines = renderOpenVpnServer(variant, vpn, pki).content.split('\n');
+      expect(lines).toContain(`client-config-dir /etc/openvpn/server/kobox-ccd-${variant}`);
+      expect(lines).toContain('ccd-exclusive');
+      expect(lines.some((line) => line.startsWith('server ') && line.endsWith(' nopool'))).toBe(true);
     }
   });
 
@@ -107,6 +120,23 @@ describe('renderOpenVpnServer', () => {
     expect(tap).toContain('port 8195');
     expect(tap).toContain('dev tap');
     expect(tap).toContain('server 10.0.2.0 255.255.255.0');
+  });
+});
+
+describe('renderOpenVpnClientAddress', () => {
+  it('should_pin_a_member_to_the_same_host_number_in_each_tunnel', () => {
+    const alice = Username.parse('alice');
+    const host = VpnHost.parse(7);
+
+    const tun = renderOpenVpnClientAddress(alice, 'tun', host, vpn);
+    const tap = renderOpenVpnClientAddress(alice, 'tap', host, vpn);
+
+    // named after the certificate's common name, which is the username
+    expect(tun.path).toBe('/etc/openvpn/server/kobox-ccd-tun/alice');
+    expect(tun.content).toContain('ifconfig-push 10.0.1.7 255.255.255.0');
+    expect(tap.content).toContain('ifconfig-push 10.0.2.7 255.255.255.0');
+    // the servers read it after dropping to nobody
+    expect(tun.mode).toBe('0644');
   });
 });
 

@@ -1,5 +1,6 @@
 import type { RenderedFile } from '../shared/files.js';
 import type { Username } from '../user/Username.js';
+import type { VpnHost } from '../user/VpnHost.js';
 import type { Cidr } from './Cidr.js';
 import type { DynDnsHost } from './DynDnsHost.js';
 import type { VpnSettings } from './FirewallPolicy.js';
@@ -61,6 +62,13 @@ function subnetOf(variant: VpnVariant, vpn: VpnSettings): Cidr {
   return variant === 'tun' ? vpn.tunSubnet : vpn.tapSubnet;
 }
 
+// Where each tunnel looks up the address of a connecting client, by the common
+// name of its certificate (the username). One directory per tunnel, because the
+// same host number makes a different address in each.
+export function vpnClientAddressDir(variant: VpnVariant): string {
+  return `/etc/openvpn/server/kobox-ccd-${variant}`;
+}
+
 // Hardened shared base: AEAD ciphers only, no compression (VORACLE), dropped
 // privileges. Applies to servers and clients alike.
 const COMMON_CRYPTO = ['data-ciphers AES-256-GCM:AES-128-GCM', 'auth SHA256'];
@@ -86,7 +94,11 @@ export function renderOpenVpnServer(
       'proto udp4',
       `dev ${shape.dev}`,
       'topology subnet',
-      `server ${subnet.networkAddress} ${subnet.netmask}`,
+      // no pool: every client gets its member's address from client-config-dir,
+      // and ccd-exclusive refuses a certificate that has none (a deleted member)
+      `server ${subnet.networkAddress} ${subnet.netmask} nopool`,
+      `client-config-dir ${vpnClientAddressDir(variant)}`,
+      'ccd-exclusive',
       `ca ${pki.caCrt}`,
       `cert ${pki.serverCrt}`,
       `key ${pki.serverKey}`,
@@ -104,6 +116,27 @@ export function renderOpenVpnServer(
       '',
     ].join('\n'),
     mode: '0600',
+    owner: 'root',
+    group: 'root',
+  };
+}
+
+export function renderOpenVpnClientAddress(
+  username: Username,
+  variant: VpnVariant,
+  host: VpnHost,
+  vpn: VpnSettings,
+): RenderedFile {
+  const subnet = subnetOf(variant, vpn);
+  return {
+    path: `${vpnClientAddressDir(variant)}/${username.value}`,
+    content: [
+      `# KoBox-managed address of ${username.value} in the ${variant} tunnel. DO NOT EDIT.`,
+      `ifconfig-push ${subnet.addressOf(host)} ${subnet.netmask}`,
+      '',
+    ].join('\n'),
+    // read by the server after it has dropped to nobody
+    mode: '0644',
     owner: 'root',
     group: 'root',
   };

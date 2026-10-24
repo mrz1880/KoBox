@@ -1,6 +1,7 @@
 import type { NetworkServicePort, VpnPkiPort } from '../../domain/security/ports.js';
 import {
   VPN_VARIANTS,
+  renderOpenVpnClientAddress,
   renderOpenVpnClientProfile,
   renderOpenVpnServer,
 } from '../../domain/security/vpn.js';
@@ -37,11 +38,22 @@ export class RenderOpenVpn {
       renderOpenVpnServer(variant, settings.vpn, pki.serverPaths()),
     );
 
+    const members = await users.listAll();
+    // every member's address, profile or not: the NFS export trusts it
+    for (const user of members) {
+      if (user.vpnHost === undefined) {
+        continue;
+      }
+      for (const variant of VPN_VARIANTS) {
+        rendered.push(renderOpenVpnClientAddress(user.username, variant, user.vpnHost, settings.vpn));
+      }
+    }
+
     const skippedUsers: string[] = [];
     let profilesRendered = 0;
     const remote = settings.vpnRemote;
     if (remote !== undefined) {
-      for (const user of await users.listAll()) {
+      for (const user of members) {
         const material = await pki.clientMaterial(user.username);
         if (material === undefined) {
           skippedUsers.push(user.username.value);

@@ -64,6 +64,23 @@ describe('RenderOpenVpn', () => {
     expect(report.skippedUsers).toEqual(['bob']);
   });
 
+  it('should_pin_every_member_to_their_own_address_in_each_tunnel', async () => {
+    const alice = await users.save(aUser().build());
+    const bob = await users.save(
+      aUser().withUsername('bob').withScgiPort(51102).withRtorrentPort(45001).build(),
+    );
+
+    await useCase(true).execute();
+
+    expect(alice.vpnHost?.value).toBe(2);
+    expect(files.contentAt('/etc/openvpn/server/kobox-ccd-tun-gw/alice')).toContain(
+      'ifconfig-push 10.0.0.2 255.255.255.0',
+    );
+    expect(files.contentAt('/etc/openvpn/server/kobox-ccd-tun/bob')).toContain(
+      `ifconfig-push 10.0.1.${String(bob.vpnHost?.value)} 255.255.255.0`,
+    );
+  });
+
   it('should_reload_openvpn_when_a_server_config_changed', async () => {
     // a fresh render writes the three server configs (the CRL directive lands
     // here) — the servers must reload to pick it up

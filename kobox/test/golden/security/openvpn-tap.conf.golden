@@ -3,7 +3,9 @@ port 8195
 proto udp4
 dev tap
 topology subnet
-server 10.0.2.0 255.255.255.0
+server 10.0.2.0 255.255.255.0 nopool
+client-config-dir /etc/openvpn/server/kobox-ccd-tap
+ccd-exclusive
 ca /etc/openvpn/kobox-pki/ca.crt
 cert /etc/openvpn/kobox-pki/issued/server.crt
 key /etc/openvpn/kobox-pki/private/server.key
