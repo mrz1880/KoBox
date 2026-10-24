@@ -205,6 +205,7 @@ iframe.app { width: 100%; height: calc(100vh - 8rem); border: 1px solid var(--li
   <input id="password" name="password" type="password" autocomplete="current-password" required>
   <button type="submit">Sign in</button>
 </form>
+<p class="muted"><a href="/forgot-password">Forgot your password?</a></p>
 </main>
 </body>
 </html>

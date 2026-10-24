@@ -6,32 +6,35 @@ import { ROLES } from '../../../domain/portal/Role.js';
 import { USERNAME_PATTERN } from '../../../domain/user/Username.js';
 import { Username } from '../../../domain/user/Username.js';
 import type { TorrentInstanceRepository } from '../../../domain/torrent/ports.js';
-import type {
-  DiskUsageRepository,
-  PasswordSealerPort,
-  UserRepository,
-} from '../../../domain/user/ports.js';
+import type { DiskUsageRepository, UserRepository } from '../../../domain/user/ports.js';
+import {
+  MemberSuspendedError,
+  TooManyPasswordLinksError,
+  type InviteMember,
+  type SendPasswordLink,
+} from '../../../application/portal/PasswordLinks.js';
+import { UserAlreadyExistsError } from '../../../application/user/errors.js';
+import { EmailAddress } from '../../../domain/user/EmailAddress.js';
+import { Quota } from '../../../domain/user/Quota.js';
 import { buildJob } from '../../cli/buildJob.js';
-import { passwordField } from '../passwordField.js';
+import { invitationLinkPage } from '../views/passwordLinkPages.js';
 import { flashOf, redirectWithFlash, viewerOf, type Guards } from '../guards.js';
 import { adminUserDetailPage, adminUsersPage } from '../views/adminUsersPage.js';
 
 const createUserSchema = z.object({
   username: z.string().regex(USERNAME_PATTERN),
   email: z.email(),
-  password: passwordField,
   quotaGib: z.coerce.number().int().positive(),
   role: z.enum(ROLES),
 });
-
-const passwordSchema = z.object({ password: passwordField });
 
 const usernameParamSchema = z.object({ name: z.string().regex(USERNAME_PATTERN) });
 
 export interface AdminUsersDeps {
   readonly users: UserRepository;
   readonly queue: JobQueuePort;
-  readonly passwords: PasswordSealerPort;
+  readonly inviteMember: InviteMember;
+  readonly sendPasswordLink: SendPasswordLink;
   readonly instances: TorrentInstanceRepository;
   readonly diskSamples: DiskUsageRepository;
   readonly credentials: PortalCredentialsPort;
@@ -74,19 +77,24 @@ export function registerAdminUserRoutes(
         adminUsersPage(await deps.users.listAll(), viewerOf(session), undefined),
       );
     }
-    const job = await buildJob.createUser(
-      {
-        username: parsed.data.username,
-        email: parsed.data.email,
-        quotaGib: parsed.data.quotaGib,
-        proxyPort: 8080,
+    // nobody types the member's password: they choose it through the link
+    let invitation: { readonly url: string };
+    try {
+      invitation = await deps.inviteMember.execute({
+        username: Username.parse(parsed.data.username),
+        email: EmailAddress.parse(parsed.data.email),
+        quota: Quota.gib(parsed.data.quotaGib),
         role: parsed.data.role,
-      },
-      parsed.data.password,
-      deps.passwords,
-    );
-    await deps.queue.enqueue(job);
-    return redirectWithFlash(reply, '/admin/users', `Creating ${parsed.data.username}.`);
+      });
+    } catch (error) {
+      if (error instanceof UserAlreadyExistsError) {
+        return redirectWithFlash(reply, '/admin/users', `${parsed.data.username} already exists.`);
+      }
+      throw error;
+    }
+    return reply
+      .type('text/html')
+      .send(invitationLinkPage(parsed.data.username, invitation.url, viewerOf(session)));
   });
 
   server.get('/admin/users/:name', async (request, reply) => {
@@ -103,10 +111,14 @@ export function registerAdminUserRoutes(
     }
     const instance = await deps.instances.findByUsername(user.username);
     const usage = await deps.diskSamples.find(user.username);
-    const role = (await deps.credentials.find(user.username))?.role;
+    const login = await deps.credentials.find(user.username);
+    // no password yet: they have not followed their invitation
+    const access = login !== undefined && login.passwordHash === undefined ? 'invited' : 'active';
     return reply
       .type('text/html')
-      .send(adminUserDetailPage(user, viewerOf(session), role, instance, usage, flashOf(request)));
+      .send(
+        adminUserDetailPage(user, viewerOf(session), login?.role, access, instance, usage, flashOf(request)),
+      );
   });
 
   const lifecycle = [
@@ -250,26 +262,32 @@ export function registerAdminUserRoutes(
     );
   });
 
-  server.post('/admin/users/:name/password', async (request, reply) => {
+  // An invitation again for a member who never chose a password (its link is
+  // shown, to pass on another way), a reset for one who did (mailed only).
+  server.post('/admin/users/:name/password-link', async (request, reply) => {
     const session = await guards.requireAdminCsrf(request, reply);
     if (session === undefined) {
       return;
     }
     const params = usernameParamSchema.safeParse(request.params);
-    const parsed = passwordSchema.safeParse(request.body);
-    if (!params.success || !parsed.success) {
+    if (!params.success) {
       return reply.code(400).send();
     }
-    const job = await buildJob.changePassword(
-      { username: params.data.name },
-      parsed.data.password,
-      deps.passwords,
-    );
-    await deps.queue.enqueue(job);
-    return redirectWithFlash(
-      reply,
-      `/admin/users/${params.data.name}`,
-      'Password change under way, it takes a few seconds.',
-    );
+    const target = `/admin/users/${params.data.name}`;
+    let sent: { readonly url?: string };
+    try {
+      sent = await deps.sendPasswordLink.execute(Username.parse(params.data.name));
+    } catch (error) {
+      if (error instanceof TooManyPasswordLinksError || error instanceof MemberSuspendedError) {
+        return redirectWithFlash(reply, target, error.message);
+      }
+      throw error;
+    }
+    if (sent.url === undefined) {
+      return redirectWithFlash(reply, target, `A reset link is on its way to ${params.data.name}.`);
+    }
+    return reply
+      .type('text/html')
+      .send(invitationLinkPage(params.data.name, sent.url, viewerOf(session)));
   });
 }

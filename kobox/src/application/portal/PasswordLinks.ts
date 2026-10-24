@@ -204,6 +204,13 @@ export class RequestPasswordReset {
 export class SetPasswordFromLink {
   constructor(private readonly deps: Deps) {}
 
+  // For the page that asks for the password: looking does not use the link,
+  // so a mail scanner that opens it first cannot burn it.
+  async isOpen(token: string): Promise<boolean> {
+    const link = await this.deps.links.findByTokenHash(this.deps.tokens.hashToken(token));
+    return link?.isOpen(this.deps.clock()) === true;
+  }
+
   async execute(command: { readonly token: string; readonly password: Password }): Promise<Username> {
     const now = this.deps.clock();
     const link = await this.deps.links.findByTokenHash(this.deps.tokens.hashToken(command.token));

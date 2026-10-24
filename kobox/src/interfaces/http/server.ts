@@ -54,6 +54,13 @@ import { registerAdminTrackerRoutes } from './routes/adminTrackers.js';
 import { registerAdminDomainRoutes } from './routes/adminDomain.js';
 import { registerAdminMailRoutes } from './routes/adminMail.js';
 import { registerAdminUserRoutes } from './routes/adminUsers.js';
+import { registerPasswordLinkRoutes } from './routes/passwordLinks.js';
+import type {
+  InviteMember,
+  RequestPasswordReset,
+  SendPasswordLink,
+  SetPasswordFromLink,
+} from '../../application/portal/PasswordLinks.js';
 import { registerUserRoutes } from './routes/user.js';
 import { loginPage } from './views/loginPage.js';
 
@@ -75,6 +82,11 @@ export interface PortalServerDeps {
   // the public half of the host key: the portal seals a new password for the
   // worker and can never open one back
   readonly passwords: PasswordSealerPort;
+  // invitations and forgotten passwords: links to choose a password
+  readonly inviteMember: InviteMember;
+  readonly sendPasswordLink: SendPasswordLink;
+  readonly requestPasswordReset: RequestPasswordReset;
+  readonly setPasswordFromLink: SetPasswordFromLink;
   readonly trackers: TrackerRepository;
   readonly blocklists: BlocklistRepository;
   readonly addresses: UserAddressRepository;
@@ -279,6 +291,7 @@ export function buildPortalServer(deps: PortalServerDeps): FastifyInstance {
 
   registerUserRoutes(server, deps, guards);
   registerAdminUserRoutes(server, deps, guards);
+  registerPasswordLinkRoutes(server, deps);
   registerAdminMailRoutes(server, deps, guards);
   registerAdminDomainRoutes(server, deps, guards);
   registerAdminTrackerRoutes(server, deps, guards);

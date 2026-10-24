@@ -1,3 +1,4 @@
+import { hostname } from 'node:os';
 import { randomBytes } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
@@ -62,7 +63,16 @@ import type { SecurityNotificationPort } from '../domain/security/ports.js';
 import type { TrackerNotificationPort } from '../domain/tracker/ports.js';
 import type { NotificationPort, PasswordSealerPort } from '../domain/user/ports.js';
 import { ComponentName } from '../domain/installation/ComponentName.js';
+import type { SiteSettings } from '../domain/installation/ports.js';
 import { NextcloudLogin } from '../application/user/NextcloudLogin.js';
+import {
+  InviteMember,
+  RequestPasswordReset,
+  SendPasswordLink,
+  SetPasswordFromLink,
+  type PortalAddressPort,
+} from '../application/portal/PasswordLinks.js';
+import { SqlitePasswordLinkRepository } from '../infrastructure/persistence/SqlitePasswordLinkRepository.js';
 import { WhenInstalled } from '../application/user/WhenInstalled.js';
 import { RsaPasswordCipher } from '../infrastructure/system/RsaPasswordCipher.js';
 import { SmbpasswdLogin } from '../infrastructure/system/SmbpasswdLogin.js';
@@ -197,6 +207,22 @@ function debridKeyCipher(): RsaDebridKeyCipher {
   return new RsaDebridKeyCipher(keys.publicKey, keys.privateKey);
 }
 
+// What an admin set in the interface wins over the environment: the screen is
+// the newer, discoverable way to say it, and KOBOX_LE_* stays valid for anyone
+// who already scripted an install.
+function publicDomain(site: SiteSettings | undefined): string | undefined {
+  return site?.domain ?? process.env.KOBOX_LE_DOMAIN;
+}
+
+// Where a member reaches the portal, for the links in their mail: the public
+// domain on the standard https port, or this machine's name before there is one.
+function portalAddress(db: KoboxDatabase): PortalAddressPort {
+  return {
+    baseUrl: async () =>
+      `https://${publicDomain(await new SqliteSiteSettingsRepository(db).get()) ?? hostname()}`,
+  };
+}
+
 function nowStamp(): string {
   return new Date().toISOString().slice(0, 19).replace('T', ' ');
 }
@@ -308,11 +334,8 @@ export async function buildInstallation(
   const aria2RpcSecret = process.env.KOBOX_ARIA2_RPC_SECRET;
   const ddlStagingDir = process.env.KOBOX_DDL_STAGING;
   const quotaFs = process.env.KOBOX_QUOTA_FS;
-  // What an admin set in the interface wins over the environment: the screen is
-  // the newer, discoverable way to say it, and KOBOX_LE_* stays valid for anyone
-  // who already scripted an install.
   const site = await new SqliteSiteSettingsRepository(c.db).get();
-  const leDomain = site?.domain ?? process.env.KOBOX_LE_DOMAIN;
+  const leDomain = publicDomain(site);
   const leEmail = site?.email ?? process.env.KOBOX_LE_EMAIL;
   const acmeUrl = process.env.KOBOX_ACME_URL;
   const installPki = new EasyRsaPkiAdapter(runner, process.env.KOBOX_VPN_PKI ?? DEFAULT_PKI_DIR);
@@ -534,6 +557,10 @@ export interface PortalContainer {
   readonly passwords: PasswordSealerPort;
   readonly media: SqliteMediaRepository;
   readonly requestDownload: RequestDebridDownload;
+  readonly inviteMember: InviteMember;
+  readonly sendPasswordLink: SendPasswordLink;
+  readonly requestPasswordReset: RequestPasswordReset;
+  readonly setPasswordFromLink: SetPasswordFromLink;
 }
 
 export function buildPortalContainer(name: string): PortalContainer {
@@ -546,11 +573,29 @@ export function buildPortalContainer(name: string): PortalContainer {
   const debridDownloadRepo = new SqliteDebridDownloadRepository(db);
   const portalCredentialsRepo = new SqlitePortalCredentialsRepository(db);
   const portalAttempts = new SqliteLoginAttemptsRepository(db);
+  const users = new SqliteUserRepository(db);
+  // what invitations and forgotten passwords need: the portal mints the link,
+  // mails it, and seals the chosen password for the worker
+  const linkDeps = {
+    users,
+    credentials: portalCredentialsRepo,
+    links: new SqlitePasswordLinkRepository(db),
+    outbox: new SqliteMailOutbox(db),
+    queue,
+    passwords: passwordCipher(),
+    tokens: new CryptoSessionTokens(),
+    address: portalAddress(db),
+    clock: nowStamp,
+  };
   return {
     db,
     logger,
     queue,
-    repo: new SqliteUserRepository(db),
+    repo: users,
+    inviteMember: new InviteMember(linkDeps),
+    sendPasswordLink: new SendPasswordLink(linkDeps),
+    requestPasswordReset: new RequestPasswordReset(linkDeps),
+    setPasswordFromLink: new SetPasswordFromLink(linkDeps),
     credentials: portalCredentialsRepo,
     sessions: new SqlitePortalSessionRepository(db),
     loginAttempts: portalAttempts,
