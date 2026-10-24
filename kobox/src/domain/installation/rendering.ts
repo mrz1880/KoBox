@@ -415,6 +415,9 @@ export const NANOMON_PORT = 8191;
 // subrequests to the portal. Snakeoil TLS until the letsencrypt component
 // confirms an issued certificate. The :80 block only serves ACME challenges
 // (webroot) and shoves everything else to the TLS portal.
+// The standard HTTPS port: the portal answers there as well as on its own port.
+export const HTTPS_PORT = 443;
+
 export function renderNginxVhost(settings: NginxVhostSettings): RenderedFile {
   const le = settings.letsencrypt;
   const portal = `http://127.0.0.1:${String(PORTAL_HTTP_PORT)}`;
@@ -440,12 +443,15 @@ export function renderNginxVhost(settings: NginxVhostSettings): RenderedFile {
       '    }',
       '',
       '    location / {',
-      `        return 301 https://$host:${String(settings.portalPort)}$request_uri;`,
+      // the standard port serves the portal too, so plain http goes there
+      '        return 301 https://$host$request_uri;',
       '    }',
       '}',
       '',
       'server {',
       `    listen ${String(settings.portalPort)} ssl;`,
+      // what people type; the portal port stays for download clients
+      `    listen ${String(HTTPS_PORT)} ssl;`,
       '    http2 on;',
       `    server_name ${le ? le.domain : '_'};`,
       ...certLines,
