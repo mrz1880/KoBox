@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3';
 import { execFile, execFileSync, type ExecFileSyncOptions } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { Resolver } from 'node:dns/promises';
 import { createServer as createHttpsServer, type Server } from 'node:https';
 import { tmpdir } from 'node:os';
@@ -336,6 +336,31 @@ describe.skipIf(!onDebianAsRoot)('E2E: fresh Debian 13 -> bootstrap -> full stac
     expect(JSON.stringify(stored)).not.toContain('sealedPassword');
   });
 
+
+  it('should_reach_the_members_home_from_their_own_tunnel_address_and_no_other', async () => {
+    // the first member of this box holds host 2 in every tunnel
+    const uid = sh('id', ['-u', USER]).trim();
+    const gid = sh('id', ['-g', USER]).trim();
+    const options = `rw,sync,no_subtree_check,all_squash,anonuid=${uid},anongid=${gid}`;
+    await waitFor('member export', () =>
+      (readFileSync('/etc/exports.d/kobox.exports', 'utf8')).includes(`/home/${USER} 10.0.1.2(${options})`),
+    );
+    const exportsFile = readFileSync('/etc/exports.d/kobox.exports', 'utf8');
+    expect(exportsFile).toContain(`/home/${USER} 10.0.0.2(${options})`);
+    expect(exportsFile).not.toMatch(/\/24\(/);
+
+    // each tunnel pins the member to that address, readable by a dropped server
+    for (const variant of ['tun-gw', 'tun', 'tap']) {
+      const dir = `/etc/openvpn/server/kobox-ccd-${variant}`;
+      expect((statSync(dir).mode & 0o777).toString(8), dir).toBe('755');
+      expect(readFileSync(`${dir}/${USER}`, 'utf8')).toMatch(/^ifconfig-push 10\.0\.[012]\.2 255\.255\.255\.0$/m);
+    }
+    expect(readFileSync('/etc/nfs.conf.d/kobox.conf', 'utf8')).toContain('port=32767');
+    if (isActive('nfs-server')) {
+      // the kernel's own view, where this container can run an NFS server
+      expect(sh('exportfs', ['-s'])).toMatch(new RegExp(`/home/${USER}\\s+10\\.0\\.1\\.2\\(`));
+    }
+  });
 
   it('should_have_installed_what_carries_a_download_to_a_members_own_machine', () => {
     // rsync and sshpass are not decoration: without them the transfer adapter

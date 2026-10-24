@@ -15,6 +15,7 @@ export const CONVERGENCE_JOBS = [
   'render-fail2ban',
   'render-whitelist',
   'render-openvpn',
+  'render-nfs-exports',
 ] as const;
 
 export type ConvergenceJobType = (typeof CONVERGENCE_JOBS)[number];
