@@ -24,6 +24,7 @@ import {
   renderAria2Conf,
   renderAria2Unit,
   renderNanomonUnit,
+  renderNfsConf,
   renderPortalEnv,
   renderPortalUnit,
   renderNextcloudSite,
@@ -906,12 +907,17 @@ class NfsInstaller implements ComponentInstaller {
     await packages.ensureInstalled(['nfs-kernel-server']);
     await host.ensureDir('/etc/exports.d', '0755');
     await systemd.enable('nfs-server', { now: true });
+    // mountd only binds its port at start: a changed pin needs a restart
+    if ((await this.ctx.files.apply([renderNfsConf()])).length > 0) {
+      await systemd.reloadOrRestart('nfs-mountd');
+    }
     return installed(await packages.installedVersion('nfs-kernel-server'));
   }
 
   async uninstall(): Promise<void> {
     await this.ctx.systemd.disable('nfs-server', { now: true });
     await this.ctx.host.removeFile('/etc/exports.d/kobox.exports');
+    await this.ctx.host.removeFile(renderNfsConf().path);
   }
 }
 
