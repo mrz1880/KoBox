@@ -1,3 +1,4 @@
+import { NFS_MOUNTD_PORT, SAMBA_PORT } from '../installation/rendering.js';
 import type { RenderedFile } from '../shared/files.js';
 import type { IpAddress } from '../shared/IpAddress.js';
 import type { FirewallPolicy, FirewallUser } from './FirewallPolicy.js';
@@ -63,6 +64,17 @@ export function renderFirewallRules(policy: FirewallPolicy): RenderedFile {
     ...subnets.flatMap((subnet) => [
       `-A INPUT -s ${subnet.value} -p udp --dport 53 -j ACCEPT`,
       `-A INPUT -s ${subnet.value} -p tcp --dport 53 -j ACCEPT`,
+    ]),
+    // file sharing rides the tunnels only: NFS v3 (rpcbind, nfsd, the pinned
+    // mountd; nolock, so no statd) and Samba. Each export still names one
+    // member's own address, so the tunnel is the door and not the key.
+    ...subnets.flatMap((subnet) => [
+      `-A INPUT -s ${subnet.value} -p tcp --dport 111 -j ACCEPT`,
+      `-A INPUT -s ${subnet.value} -p udp --dport 111 -j ACCEPT`,
+      `-A INPUT -s ${subnet.value} -p tcp --dport 2049 -j ACCEPT`,
+      `-A INPUT -s ${subnet.value} -p tcp --dport ${String(NFS_MOUNTD_PORT)} -j ACCEPT`,
+      `-A INPUT -s ${subnet.value} -p udp --dport ${String(NFS_MOUNTD_PORT)} -j ACCEPT`,
+      `-A INPUT -s ${subnet.value} -p tcp --dport ${String(SAMBA_PORT)} -j ACCEPT`,
     ]),
     ...users.map(
       (user) => `-A INPUT -p tcp --dport ${String(user.rtorrentPort)} -j ${chainOf(user)}`,

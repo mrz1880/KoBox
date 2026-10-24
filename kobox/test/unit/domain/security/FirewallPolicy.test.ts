@@ -8,6 +8,7 @@ import {
   InvalidFirewallPolicyError,
   type FirewallUser,
 } from '../../../../src/domain/security/FirewallPolicy.js';
+import { NFS_MOUNTD_PORT } from '../../../../src/domain/installation/rendering.js';
 import { renderFirewallRules } from '../../../../src/domain/security/rendering.js';
 import { IpAddress } from '../../../../src/domain/shared/IpAddress.js';
 import { Username } from '../../../../src/domain/user/Username.js';
@@ -167,6 +168,28 @@ describe('renderFirewallRules', () => {
     expect(content).toContain(
       '-A kobox-meter-out -m owner --uid-owner 1001 -m comment --comment "kobox:egress:alice" -j RETURN',
     );
+  });
+
+  it('should_open_nfs_and_samba_to_the_vpn_tunnels_and_never_to_the_internet', () => {
+    const lines = renderFirewallRules(policyWith(users)).content.split('\n');
+    const fileSharing = lines.filter((line) =>
+      /--dport (111|2049|445|${String(NFS_MOUNTD_PORT)}) /.test(line),
+    );
+
+    for (const subnet of ['10.0.0.0/24', '10.0.1.0/24', '10.0.2.0/24']) {
+      for (const rule of [
+        `-p tcp --dport 111 `,
+        `-p udp --dport 111 `,
+        `-p tcp --dport 2049 `,
+        `-p tcp --dport ${String(NFS_MOUNTD_PORT)} `,
+        `-p udp --dport ${String(NFS_MOUNTD_PORT)} `,
+        `-p tcp --dport 445 `,
+      ]) {
+        expect(lines).toContain(`-A INPUT -s ${subnet} ${rule}-j ACCEPT`);
+      }
+    }
+    // every one of them names a tunnel as its source
+    expect(fileSharing.every((line) => / -s 10\.0\.[012]\.0\/24 /.test(line))).toBe(true);
   });
 
   it('should_own_only_the_filter_table', () => {
