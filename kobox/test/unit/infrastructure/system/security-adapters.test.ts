@@ -502,5 +502,15 @@ describe('GetentUserIdentityAdapter', () => {
     const identity = new GetentUserIdentityAdapter(identityRunner);
 
     expect(await identity.uidOf(Username.parse('ghost'))).toBeUndefined();
+    expect(await identity.idsOf(Username.parse('ghost'))).toBeUndefined();
+  });
+
+  it('should_read_the_uid_and_the_gid_together', async () => {
+    const identityRunner = new RecordingRunner();
+    identityRunner.on('getent', { stdout: 'alice:x:1008:1009::/home/alice:/bin/bash\n' });
+
+    const ids = await new GetentUserIdentityAdapter(identityRunner).idsOf(Username.parse('alice'));
+
+    expect(ids).toEqual({ uid: 1008, gid: 1009 });
   });
 });

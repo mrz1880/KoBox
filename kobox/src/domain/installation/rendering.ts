@@ -1,7 +1,9 @@
 import { DEBIAN_RELEASE, PHP_FPM } from './platform.js';
 import { DomainError } from '../shared/DomainError.js';
 import type { RenderedFile } from '../shared/files.js';
-import { HOME_BASE } from '../user/homeDirectory.js';
+import { HOME_BASE, homeOf } from '../user/homeDirectory.js';
+import type { AccountIds } from '../security/ports.js';
+import type { Username } from '../user/Username.js';
 
 const MANAGED_HEADER = '# KoBox-managed — DO NOT EDIT (rendered declaratively).';
 
@@ -548,18 +550,22 @@ export function renderNginxVhost(settings: NginxVhostSettings): RenderedFile {
 }
 
 export interface NfsExportWiring {
-  readonly username: string;
-  readonly ips: readonly string[];
+  readonly username: Username;
+  readonly ids: AccountIds;
+  // the member's own VPN addresses and the trusted addresses added by hand
+  readonly clients: readonly string[];
 }
 
-// Per-user home exports scoped to each trusted address (the legacy exported
-// homes to whitelisted IPs). A user with no trusted address exports to
-// nobody — never a wildcard, which would open the home to the whole net.
+// Per-member home exports, each scoped to one client address: NFS v3 trusts the
+// address alone, so a member with no client exports to nobody, never to a
+// subnet or a wildcard. all_squash maps every request to the member, so what a
+// NAS writes is theirs whatever uids that machine uses.
 export function renderNfsExports(users: readonly NfsExportWiring[]): RenderedFile {
   const lines: string[] = [];
   for (const user of users) {
-    for (const ip of user.ips) {
-      lines.push(`${HOME_BASE}/${user.username} ${ip}(rw,sync,no_subtree_check,root_squash)`);
+    const options = `rw,sync,no_subtree_check,all_squash,anonuid=${String(user.ids.uid)},anongid=${String(user.ids.gid)}`;
+    for (const client of user.clients) {
+      lines.push(`${homeOf(user.username)} ${client}(${options})`);
     }
   }
   return {

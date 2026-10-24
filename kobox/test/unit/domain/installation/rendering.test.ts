@@ -1,6 +1,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { Username } from '../../../../src/domain/user/Username.js';
 import { describe, expect, it } from 'vitest';
 import {
   InvalidWorkerEnvError,
@@ -355,14 +356,23 @@ describe('installation rendering', () => {
 
   it('should_render_nfs_exports_per_user_and_trusted_address_golden', () => {
     const file = renderNfsExports([
-      { username: 'alice', ips: ['203.0.113.9', '198.51.100.7'] },
-      { username: 'bob', ips: [] },
+      {
+        username: Username.parse('alice'),
+        ids: { uid: 1001, gid: 1001 },
+        clients: ['10.0.0.2', '10.0.1.2', '10.0.2.2', '203.0.113.9'],
+      },
+      { username: Username.parse('bob'), ids: { uid: 1002, gid: 1002 }, clients: [] },
     ]);
     expect(file.path).toBe('/etc/exports.d/kobox.exports');
-    // one export line per user home, scoped to each trusted address
-    expect(file.content).toContain('/home/alice 203.0.113.9(rw,sync,no_subtree_check,root_squash)');
-    expect(file.content).toContain('/home/alice 198.51.100.7(rw,sync,no_subtree_check,root_squash)');
-    // a user with no trusted address exports to nobody (no wildcard)
+    // one line per client of a member's home, and whatever a client writes
+    // belongs to the member, whatever uids that machine uses
+    expect(file.content).toContain(
+      '/home/alice 10.0.1.2(rw,sync,no_subtree_check,all_squash,anonuid=1001,anongid=1001)',
+    );
+    expect(file.content).toContain(
+      '/home/alice 203.0.113.9(rw,sync,no_subtree_check,all_squash,anonuid=1001,anongid=1001)',
+    );
+    // a member with no client exports to nobody (no wildcard)
     expect(file.content).not.toContain('/home/bob ');
     expectGolden('nfs-kobox.exports.golden', file.content);
   });
