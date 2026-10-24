@@ -91,6 +91,18 @@ export interface PasswordHasherPort {
   verify(password: Password, hash: HashedPassword): Promise<boolean>;
 }
 
+// A member has one password for every service, but Samba and Nextcloud each
+// keep their own copy, so the root worker needs it in clear once. It crosses the
+// privilege boundary sealed: the non-root portal holds the public half and can
+// only seal, the root worker holds the private half and opens.
+export interface PasswordSealerPort {
+  seal(password: Password): Promise<string>;
+}
+
+export interface PasswordOpenerPort {
+  open(sealed: string): Promise<Password>;
+}
+
 export interface NotificationPort {
   notify(event: UserEvent): Promise<void>;
 }
