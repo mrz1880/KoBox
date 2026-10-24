@@ -122,6 +122,23 @@ describe('logout', () => {
 });
 
 describe('nginx auth_request endpoints', () => {
+  // Sonarr and Radarr (.NET) only send their credentials once challenged: a 401
+  // that names no scheme leaves them knocking forever without a password
+  it('should_challenge_a_program_for_its_token_where_a_token_is_accepted', async () => {
+    for (const url of ['/internal/auth', '/internal/auth/rpc']) {
+      const anonymous = await world.server.inject({
+        method: 'GET',
+        url,
+        headers: { 'x-original-uri': '/RPC-ALICE' },
+      });
+      expect(anonymous.statusCode, url).toBe(401);
+      expect(anonymous.headers['www-authenticate'], url).toBe('Basic realm="KoBox"');
+    }
+    // the admin gate takes no token: it has nothing to ask a program for
+    const admin = await world.server.inject({ method: 'GET', url: '/internal/auth/admin' });
+    expect(admin.headers['www-authenticate']).toBeUndefined();
+  });
+
   it('should_return_401_without_a_session_and_204_with_one', async () => {
     const anonymous = await world.server.inject({ method: 'GET', url: '/internal/auth' });
     expect(anonymous.statusCode).toBe(401);

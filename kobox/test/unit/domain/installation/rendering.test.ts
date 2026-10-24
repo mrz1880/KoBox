@@ -66,6 +66,24 @@ describe('installation rendering', () => {
     expect(conf).toContain('index index.html index.php;');
   });
 
+  // auth_request drops the subrequest's headers: without relaying the portal's
+  // challenge, a 401 names no scheme and a .NET client never sends its token
+  it('should_relay_the_portals_challenge_where_programs_call_rutorrent', () => {
+    const conf = renderNginxVhost({ portalPort: 8189 }).content;
+    const php = conf.slice(conf.indexOf('location ~ ^/ru/(.+\\.php)$ {'));
+    const block = php.slice(0, php.indexOf('}') + 1);
+
+    expect(block).toContain('auth_request_set $kobox_challenge $upstream_http_www_authenticate;');
+    expect(block).toContain('add_header WWW-Authenticate $kobox_challenge always;');
+  });
+
+  it('should_relay_the_challenge_on_every_member_rpc_mount', () => {
+    const content = renderRutorrentUsersInclude([{ username: 'alice', scgiPort: 51101 }]).content;
+
+    expect(content).toContain('auth_request_set $kobox_challenge $upstream_http_www_authenticate;');
+    expect(content).toContain('add_header WWW-Authenticate $kobox_challenge always;');
+  });
+
   it('should_turn_http2_on_with_the_directive_nginx_1_26_expects', () => {
     // `listen ... http2` is deprecated since nginx 1.25 and warns on every reload
     const conf = renderNginxVhost({ portalPort: 8189 }).content;
