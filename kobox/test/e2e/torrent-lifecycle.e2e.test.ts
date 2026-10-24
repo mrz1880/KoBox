@@ -7,6 +7,7 @@ import Database from 'better-sqlite3';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { aTorrentFile } from '../builders/TorrentFileBuilder.js';
 import { DEFAULT_SPOOL_DIR } from '../../src/infrastructure/spool/TorrentEventSpool.js';
+import { openString } from '../../src/infrastructure/system/rsaSealing.js';
 import { scgiCall } from './support/scgi.js';
 
 // Full Phase 1 E2E on a fresh Debian 13 with a REAL rtorrent:
@@ -23,6 +24,7 @@ const SCGI_PORT = 51101; // first allocation on a fresh DB
 
 let env: NodeJS.ProcessEnv;
 let dbPath: string;
+let hostKey: string;
 
 function sh(command: string, args: string[], options: ExecFileSyncOptions = {}): string {
   return execFileSync(command, args, { encoding: 'utf8', env, ...options }) as string;
@@ -112,9 +114,18 @@ describe.skipIf(!onDebianAsRoot)('E2E: torrent lifecycle with a real rtorrent', 
     const dir = mkdtempSync(join(tmpdir(), 'kobox-torrent-e2e-'));
     chmodSync(dir, 0o711); // the seedbox user must traverse into the spool
     dbPath = join(dir, 'kobox.db');
+    // a key pair of its own, handed over the way ddl-debrid does it: the host
+    // pair that e2e-setup lays down is never rewritten from here
+    hostKey = join(dir, 'debrid-key.pem');
+    execFileSync('openssl', ['genrsa', '-out', hostKey, '4096'], { stdio: 'pipe' });
+    execFileSync('openssl', ['rsa', '-in', hostKey, '-pubout', '-out', join(dir, 'debrid-pub.pem')], {
+      stdio: 'pipe',
+    });
     env = {
       ...process.env,
       KOBOX_DB: dbPath,
+      KOBOX_DEBRID_PRIVATE_KEY: hostKey,
+      KOBOX_DEBRID_PUBLIC_KEY: join(dir, 'debrid-pub.pem'),
       KOBOX_SPOOL: join(dir, 'events'),
       KOBOX_BIN: `/usr/bin/env node ${process.cwd()}/${CLI}`,
     };
@@ -247,10 +258,6 @@ describe.skipIf(!onDebianAsRoot)('E2E: torrent lifecycle with a real rtorrent', 
     sh('useradd', ['--create-home', '--shell', '/bin/sh', TARGET]);
     sh('chpasswd', [], { input: `${TARGET}:${SECRET}\n` });
     sh('install', ['-d', '-o', TARGET, '-g', TARGET, `/home/${TARGET}/incoming`]);
-    // the host key pair the portal seals with — install normally lays it down
-    sh('mkdir', ['-p', '/etc/kobox']);
-    sh('openssl', ['genrsa', '-out', '/etc/kobox/debrid-key.pem', '4096'], { stdio: 'pipe' });
-    sh('sh', ['-c', 'openssl rsa -in /etc/kobox/debrid-key.pem -pubout -out /etc/kobox/debrid-pub.pem']);
 
     kobox(
       [
@@ -265,6 +272,9 @@ describe.skipIf(!onDebianAsRoot)('E2E: torrent lifecycle with a real rtorrent', 
     expect(row?.last_check_ok, String(row?.last_check_detail)).toBe(1);
     // never stored in the clear, whatever else happens
     expect(String(row?.sealed_password)).not.toContain(SECRET);
+    // and sealed with the pair this box was told to use, not a default path
+    const opened = openString(readFileSync(hostKey, 'utf8'), String(row?.sealed_password), 'password');
+    expect(opened).toBe(SECRET);
     // first sight pinned the key rather than accepting anything that answers
     expect(existsSync(`/var/lib/kobox/sync/${USER}.known_hosts`)).toBe(true);
   }, 120_000);
