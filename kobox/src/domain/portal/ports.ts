@@ -8,7 +8,9 @@ import type { Role } from './Role.js';
 // unprivileged portal only ever reads it to verify a login).
 export interface PortalCredentials {
   readonly username: Username;
-  readonly passwordHash: HashedPassword;
+  // absent for an invited member until they choose a password through their
+  // link: such a login exists, holds its role, and no password opens it
+  readonly passwordHash?: HashedPassword;
   readonly role: Role;
   // Phase 7: set when a migrated user is given a temporary password — the
   // portal forces a password change before granting access. Defaults to false.

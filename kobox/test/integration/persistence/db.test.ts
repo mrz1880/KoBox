@@ -36,7 +36,11 @@ describe('KoboxDatabase', () => {
     cpSync('drizzle', before, { recursive: true });
     const journalPath = join(before, 'meta/_journal.json');
     const journal = JSON.parse(readFileSync(journalPath, 'utf8')) as { entries: { tag: string }[] };
-    journal.entries = journal.entries.filter((entry) => entry.tag !== '0026_member-vpn-host');
+    // everything from the VPN addresses on is still to come
+    journal.entries = journal.entries.slice(
+      0,
+      journal.entries.findIndex((entry) => entry.tag === '0026_member-vpn-host'),
+    );
     writeFileSync(journalPath, JSON.stringify(journal));
     const path = join(dir, 'kobox.db');
     const old = new Database(path);

@@ -190,6 +190,13 @@
       "when": 1792838391496,
       "tag": "0026_member-vpn-host",
       "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "6",
+      "when": 1792847606329,
+      "tag": "0027_invited-member-without-password",
+      "breakpoints": true
     }
   ]
 }

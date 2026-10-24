@@ -20,7 +20,7 @@ export class SqlitePortalCredentialsRepository implements PortalCredentialsPort 
     }
     return Promise.resolve({
       username: Username.parse(row.username),
-      passwordHash: HashedPassword.parse(row.passwordHash),
+      ...(row.passwordHash !== null && { passwordHash: HashedPassword.parse(row.passwordHash) }),
       role: row.role,
       mustChangePassword: row.mustChangePassword === 1,
       ...(row.appTokenHash !== null && { appTokenHash: row.appTokenHash }),
@@ -34,7 +34,7 @@ export class SqlitePortalCredentialsRepository implements PortalCredentialsPort 
       .insert(portalCredentials)
       .values({
         username: credentials.username.value,
-        passwordHash: credentials.passwordHash.value,
+        passwordHash: credentials.passwordHash?.value ?? null,
         role: credentials.role,
         mustChangePassword: mustChange,
         appTokenHash: credentials.appTokenHash ?? null,
@@ -44,7 +44,7 @@ export class SqlitePortalCredentialsRepository implements PortalCredentialsPort 
       .onConflictDoUpdate({
         target: portalCredentials.username,
         set: {
-          passwordHash: credentials.passwordHash.value,
+          passwordHash: credentials.passwordHash?.value ?? null,
           role: credentials.role,
           mustChangePassword: mustChange,
           appTokenHash: credentials.appTokenHash ?? null,

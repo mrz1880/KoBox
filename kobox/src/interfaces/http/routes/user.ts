@@ -257,7 +257,7 @@ export function registerUserRoutes(
     const current = passwordField.safeParse(parsed.data.current);
     const currentValid =
       current.success &&
-      stored !== undefined &&
+      stored?.passwordHash !== undefined &&
       (await deps.hasher.verify(current.data, stored.passwordHash));
     if (!currentValid) {
       return reply

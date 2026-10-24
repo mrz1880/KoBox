@@ -287,7 +287,8 @@ export const jobs = sqliteTable('jobs', {
 export const portalCredentials = sqliteTable('portal_credentials', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   username: text('username').notNull().unique(),
-  passwordHash: text('password_hash').notNull(),
+  // null for an invited member who has not chosen a password yet
+  passwordHash: text('password_hash'),
   role: text('role', { enum: ['admin', 'user'] })
     .notNull()
     .default('user'),
