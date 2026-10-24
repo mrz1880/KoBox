@@ -956,6 +956,20 @@ describe('nextcloud installer', () => {
     expect(pinned.packages.installed).toContain('bzip2');
   });
 
+  it('should_give_the_code_and_the_data_to_the_web_server_user', async () => {
+    // occ and php-fpm both run as www-data: a tree it cannot write is an
+    // install that fails at its first upgrade or upload
+    const pinned = buildWorld({
+      nextcloud: { url: 'https://example.net/nc.tar.gz', sha256: 'd'.repeat(64), adminPassword: 'chosen-by-the-operator' },
+    });
+
+    await installer(pinned, 'nextcloud').install();
+
+    for (const path of ['/var/www/nextcloud', '/var/lib/nextcloud/data']) {
+      expect(pinned.host.chowned).toContainEqual({ path, owner: 'www-data', group: 'www-data' });
+    }
+  });
+
   it('should_keep_the_data_directory_out_of_the_web_root', async () => {
     const pinned = buildWorld({
       nextcloud: { url: 'https://example.net/nc.tar.gz', sha256: 'd'.repeat(64), adminPassword: 'chosen-by-the-operator' },

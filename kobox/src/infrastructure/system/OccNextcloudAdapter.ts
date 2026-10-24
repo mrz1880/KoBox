@@ -1,9 +1,9 @@
+import { WEB_SERVER_USER } from '../../domain/installation/platform.js';
 import type { NextcloudPort } from '../../domain/installation/NextcloudPort.js';
 import type { Password } from '../../domain/user/Password.js';
 import type { Username } from '../../domain/user/Username.js';
 import { runOrThrow, type CommandRunner } from './CommandRunner.js';
 
-const WEB_USER = 'www-data';
 const OCC = '/var/www/nextcloud/occ';
 
 // occ takes its arguments as argv, never as a shell line, so a member's name
@@ -15,7 +15,7 @@ export class OccNextcloudAdapter implements NextcloudPort {
   private occ(args: readonly string[], env?: Readonly<Record<string, string>>) {
     return {
       command: 'runuser',
-      args: ['-u', WEB_USER, '--', 'php', OCC, ...args],
+      args: ['-u', WEB_SERVER_USER, '--', 'php', OCC, ...args],
       ...(env !== undefined && { env }),
     };
   }
