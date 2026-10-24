@@ -503,7 +503,6 @@ export function renderNginxVhost(settings: NginxVhostSettings): RenderedFile {
       '    location ~ ^/ru/(.+\\.php)$ {',
       '        auth_request /internal/auth;',
       '        auth_request_set $kobox_user $upstream_http_x_kobox_user;',
-      ...RELAY_APP_CHALLENGE.map((line) => `        ${line}`),
       '        include fastcgi_params;',
       '        fastcgi_param SCRIPT_FILENAME /var/www/rutorrent/$1;',
       '        fastcgi_param REMOTE_USER $kobox_user;',
@@ -651,15 +650,6 @@ export interface RutorrentUserWiring {
   readonly scgiPort: number;
 }
 
-// auth_request drops the subrequest's headers, so a refusal reaches the client
-// as a 401 naming no scheme, and a .NET client (Sonarr, Radarr) then never sends
-// its token. Where programs call in, the portal's challenge is relayed; nginx
-// leaves an empty header out, so an allowed request carries none.
-const RELAY_APP_CHALLENGE = [
-  'auth_request_set $kobox_challenge $upstream_http_www_authenticate;',
-  'add_header WWW-Authenticate $kobox_challenge always;',
-];
-
 // The per-user SCGI mounts: one `/RPC-<UPPERCASE>` location per active user
 // (legacy /RPC-<USER> parity), each gated by the portal to its owner (or an
 // admin). Rendered as a single include so nginx reloads see the whole set
@@ -669,7 +659,6 @@ export function renderRutorrentUsersInclude(users: readonly RutorrentUserWiring[
     [
       `location = /RPC-${user.username.toUpperCase()} {`,
       '    auth_request /internal/auth/rpc;',
-      ...RELAY_APP_CHALLENGE.map((line) => `    ${line}`),
       '    include scgi_params;',
       `    scgi_pass 127.0.0.1:${String(user.scgiPort)};`,
       '}',

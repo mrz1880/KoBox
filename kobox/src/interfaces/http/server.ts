@@ -206,7 +206,8 @@ export function buildPortalServer(deps: PortalServerDeps): FastifyInstance {
 
   // Where a program may present a token instead of a session, a refusal names
   // the scheme: .NET clients (Sonarr, Radarr) only send their credentials once
-  // challenged, and nginx relays this header to them (see the vhost).
+  // challenged. nginx's auth_request copies a 401 subrequest's challenge onto
+  // the response itself, so this header is the only one the client sees.
   const challenge = (reply: FastifyReply): FastifyReply =>
     reply.header('www-authenticate', APP_AUTH_CHALLENGE).code(401).send();
 
