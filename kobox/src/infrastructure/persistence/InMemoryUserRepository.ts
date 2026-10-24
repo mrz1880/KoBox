@@ -2,6 +2,7 @@ import type { SeedboxUser } from '../../domain/user/SeedboxUser.js';
 import { UserId } from '../../domain/user/UserId.js';
 import type { UserRepository } from '../../domain/user/ports.js';
 import type { Username } from '../../domain/user/Username.js';
+import { VpnHost } from '../../domain/user/VpnHost.js';
 
 export class InMemoryUserRepository implements UserRepository {
   private readonly users = new Map<string, SeedboxUser>();
@@ -16,7 +17,15 @@ export class InMemoryUserRepository implements UserRepository {
   }
 
   save(user: SeedboxUser): Promise<SeedboxUser> {
-    const identified = user.id ? user : user.identifiedBy(UserId.parse(this.nextId++));
+    const identified = user.id
+      ? user
+      : user
+          .identifiedBy(UserId.parse(this.nextId++))
+          .placedAt(
+            VpnHost.lowestFree(
+              [...this.users.values()].flatMap((other) => other.vpnHost ?? []),
+            ),
+          );
     this.users.set(identified.username.value, identified);
     return Promise.resolve(identified);
   }

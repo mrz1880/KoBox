@@ -3,6 +3,7 @@ import type { ProxyPort, RtorrentPort, ScgiPort } from './Port.js';
 import type { Quota } from './Quota.js';
 import type { UserId } from './UserId.js';
 import { UserStatus } from './UserStatus.js';
+import type { VpnHost } from './VpnHost.js';
 import type { Username } from './Username.js';
 import type { UserCreated, UserResumed, UserSuspended } from './events.js';
 
@@ -15,6 +16,8 @@ interface SeedboxUserProps {
   readonly rtorrentPort: RtorrentPort;
   readonly proxyPort: ProxyPort;
   readonly status: UserStatus;
+  // handed out by the repository with the id, when the member is first saved
+  readonly vpnHost?: VpnHost;
 }
 
 export class SeedboxUser {
@@ -26,6 +29,7 @@ export class SeedboxUser {
   readonly rtorrentPort: RtorrentPort;
   readonly proxyPort: ProxyPort;
   readonly status: UserStatus;
+  readonly vpnHost: VpnHost | undefined;
 
   private constructor(props: SeedboxUserProps) {
     this.id = props.id;
@@ -36,10 +40,11 @@ export class SeedboxUser {
     this.rtorrentPort = props.rtorrentPort;
     this.proxyPort = props.proxyPort;
     this.status = props.status;
+    this.vpnHost = props.vpnHost;
   }
 
   static create(
-    props: Omit<SeedboxUserProps, 'status' | 'id'>,
+    props: Omit<SeedboxUserProps, 'status' | 'id' | 'vpnHost'>,
   ): { user: SeedboxUser; event: UserCreated } {
     const user = new SeedboxUser({ ...props, status: UserStatus.active });
     return { user, event: { type: 'UserCreated', username: user.username.value } };
@@ -78,6 +83,10 @@ export class SeedboxUser {
     return new SeedboxUser({ ...this.props(), id });
   }
 
+  placedAt(vpnHost: VpnHost): SeedboxUser {
+    return new SeedboxUser({ ...this.props(), vpnHost });
+  }
+
   private props(): SeedboxUserProps {
     return {
       ...(this.id !== undefined && { id: this.id }),
@@ -88,6 +97,7 @@ export class SeedboxUser {
       rtorrentPort: this.rtorrentPort,
       proxyPort: this.proxyPort,
       status: this.status,
+      ...(this.vpnHost !== undefined && { vpnHost: this.vpnHost }),
     };
   }
 }

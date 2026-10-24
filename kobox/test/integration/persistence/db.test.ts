@@ -1,6 +1,9 @@
-import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import Database from 'better-sqlite3';
+import { drizzle } from 'drizzle-orm/better-sqlite3';
+import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { KoboxDatabase } from '../../../src/infrastructure/persistence/db.js';
 
@@ -25,4 +28,36 @@ describe('KoboxDatabase', () => {
 
     expect(existsSync(path)).toBe(true);
   });
+
+  it('should_give_every_member_already_there_a_vpn_host_of_their_own', () => {
+    // a box that predates the VPN addresses: its schema stops at the migration
+    // before them, with members already in it
+    const before = join(dir, 'drizzle-before');
+    cpSync('drizzle', before, { recursive: true });
+    const journalPath = join(before, 'meta/_journal.json');
+    const journal = JSON.parse(readFileSync(journalPath, 'utf8')) as { entries: { tag: string }[] };
+    journal.entries = journal.entries.filter((entry) => entry.tag !== '0026_member-vpn-host');
+    writeFileSync(journalPath, JSON.stringify(journal));
+    const path = join(dir, 'kobox.db');
+    const old = new Database(path);
+    migrate(drizzle(old), { migrationsFolder: before });
+    const insert = old.prepare(
+      "INSERT INTO users (username, email, quota_bytes, scgi_port, rtorrent_port, proxy_port, status) VALUES (?, 'm@example.org', 1, ?, ?, 8080, 'active')",
+    );
+    insert.run('alice', 51101, 45000);
+    insert.run('bob', 51102, 45001);
+    insert.run('carol', 51103, 45002);
+    old.close();
+
+    const db = KoboxDatabase.open(path);
+    const hosts = db.raw.prepare('SELECT username, vpn_host FROM users ORDER BY id').all();
+    db.close();
+
+    expect(hosts).toEqual([
+      { username: 'alice', vpn_host: 2 },
+      { username: 'bob', vpn_host: 3 },
+      { username: 'carol', vpn_host: 4 },
+    ]);
+  });
 });
+

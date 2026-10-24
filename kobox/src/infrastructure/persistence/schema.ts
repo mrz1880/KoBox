@@ -10,6 +10,8 @@ export const users = sqliteTable('users', {
   rtorrentPort: integer('rtorrent_port').notNull().unique(),
   proxyPort: integer('proxy_port').notNull(),
   status: text('status', { enum: ['active', 'suspended'] }).notNull(),
+  // the member's host number in every VPN tunnel (VpnHost); set at insert
+  vpnHost: integer('vpn_host').unique(),
   createdAt: text('created_at')
     .notNull()
     .default(sql`(datetime('now'))`),
