@@ -1,4 +1,5 @@
 import type { FastifyReply, FastifyRequest } from 'fastify';
+import { passwordField } from './passwordField.js';
 import fastifyCookie from '@fastify/cookie';
 import fastifyFormbody from '@fastify/formbody';
 import Fastify, { type FastifyInstance } from 'fastify';
@@ -11,7 +12,6 @@ import type { IssueAppToken } from '../../application/portal/IssueAppToken.js';
 import type { Authenticate } from '../../application/portal/Authenticate.js';
 import type { Login } from '../../application/portal/Login.js';
 import type { Logout } from '../../application/portal/Logout.js';
-import { Password } from '../../domain/user/Password.js';
 import { USERNAME_PATTERN, Username } from '../../domain/user/Username.js';
 import type { MailOutboxPort } from '../../application/maintenance/MailOutboxPort.js';
 import type { ReleaseRepositoryPort } from '../../application/maintenance/ReleaseRepositoryPort.js';
@@ -108,9 +108,10 @@ export interface PortalServerDeps {
 
 // Zod owns the HTTP boundary: whatever fails to parse is an authentication
 // failure, never an exception reaching a handler (anti-§5.5).
+// a password the domain refuses cannot be anyone's, so it reads as invalid
 const loginFormSchema = z.object({
   username: z.string().regex(USERNAME_PATTERN),
-  password: z.string().min(8).max(256),
+  password: passwordField,
 });
 
 export function buildPortalServer(deps: PortalServerDeps): FastifyInstance {
@@ -135,7 +136,7 @@ export function buildPortalServer(deps: PortalServerDeps): FastifyInstance {
     }
     const result = await deps.login.execute({
       username: Username.parse(parsed.data.username),
-      password: Password.parse(parsed.data.password),
+      password: parsed.data.password,
       now: deps.now(),
     });
     if (!result.ok) {

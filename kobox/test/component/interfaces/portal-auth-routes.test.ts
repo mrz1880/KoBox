@@ -73,6 +73,19 @@ describe('login page and flow', () => {
 });
 
 describe('session guard', () => {
+  it('should_call_an_impossible_password_invalid_rather_than_crash', async () => {
+    // no member's password is longer than 100 characters: refuse, do not 500
+    const response = await world.server.inject({
+      method: 'POST',
+      url: '/login',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      payload: `username=alice&password=${'x'.repeat(120)}`,
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.body).toContain('Invalid credentials.');
+  });
+
   it('should_redirect_anonymous_visitors_to_login', async () => {
     const response = await world.server.inject({ method: 'GET', url: '/' });
 
