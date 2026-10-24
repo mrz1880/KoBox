@@ -667,6 +667,16 @@ describe('apt-sources installer', () => {
 });
 
 describe('openvpn installer', () => {
+  it('should_lay_down_address_books_the_servers_can_read_once_dropped_to_nobody', async () => {
+    // OpenVPN refuses to start on a client-config-dir it cannot reach, and with
+    // ccd-exclusive an unreadable one would refuse every client
+    await installer(world, 'openvpn').install();
+
+    for (const variant of ['tun-gw', 'tun', 'tap']) {
+      expect(world.host.dirs.get(`/etc/openvpn/server/kobox-ccd-${variant}`)).toBe('0755');
+    }
+  });
+
   it('should_bootstrap_the_pki_render_servers_and_start_when_tun_exists', async () => {
     const outcome = await installer(world, 'openvpn').install();
 

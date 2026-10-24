@@ -4,8 +4,11 @@ import { join } from 'node:path';
 import type { VpnPkiPort, VpnPkiProvisionPort } from '../../domain/security/ports.js';
 import {
   VPN_PROFILES_BASE,
+  VPN_VARIANTS,
+  vpnClientAddressDir,
   type VpnClientMaterial,
   type VpnServerPaths,
+  type VpnVariant,
 } from '../../domain/security/vpn.js';
 import type { Username } from '../../domain/user/Username.js';
 import { runOrThrow, type CommandRunner } from './CommandRunner.js';
@@ -23,6 +26,7 @@ export class EasyRsaPkiAdapter implements VpnPkiPort, VpnPkiProvisionPort {
     private readonly runner: CommandRunner,
     private readonly baseDir: string = DEFAULT_PKI_DIR,
     private readonly profilesBaseDir: string = VPN_PROFILES_BASE,
+    private readonly clientAddressDir: (variant: VpnVariant) => string = vpnClientAddressDir,
   ) {
     this.reader = new FsVpnPkiAdapter(baseDir);
   }
@@ -79,6 +83,10 @@ export class EasyRsaPkiAdapter implements VpnPkiPort, VpnPkiProvisionPort {
       await rm(join(this.baseDir, file), { force: true });
     }
     await rm(join(this.profilesBaseDir, username.value), { recursive: true, force: true });
+    // their address in each tunnel: ccd-exclusive refuses whoever has none left
+    for (const variant of VPN_VARIANTS) {
+      await rm(join(this.clientAddressDir(variant), username.value), { force: true });
+    }
   }
 
   private async easyrsa(

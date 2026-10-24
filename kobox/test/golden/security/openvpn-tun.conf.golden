@@ -3,7 +3,9 @@ port 8194
 proto udp4
 dev tun
 topology subnet
-server 10.0.1.0 255.255.255.0
+server 10.0.1.0 255.255.255.0 nopool
+client-config-dir /etc/openvpn/server/kobox-ccd-tun
+ccd-exclusive
 ca /etc/openvpn/kobox-pki/ca.crt
 cert /etc/openvpn/kobox-pki/issued/server.crt
 key /etc/openvpn/kobox-pki/private/server.key

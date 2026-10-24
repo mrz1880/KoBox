@@ -41,7 +41,12 @@ import { renderCronFile, renderKoboxCommand } from '../../domain/maintenance/ren
 import type { DebridKeyPairPort } from '../../domain/ddl/ports.js';
 import type { IpsetPort } from '../../domain/tracker/ports.js';
 import type { VpnPkiPort, VpnPkiProvisionPort } from '../../domain/security/ports.js';
-import { PORTAL_GROUP, VPN_VARIANTS, renderOpenVpnServer } from '../../domain/security/vpn.js';
+import {
+  PORTAL_GROUP,
+  VPN_VARIANTS,
+  renderOpenVpnServer,
+  vpnClientAddressDir,
+} from '../../domain/security/vpn.js';
 import type { ManagedFilesPort, RenderedFile } from '../../domain/shared/files.js';
 import type { SecuritySettings } from '../security/settings.js';
 
@@ -822,6 +827,11 @@ class OpenVpnInstaller implements ComponentInstaller {
     await packages.ensureInstalled(['openvpn', 'easy-rsa']);
     await pkiProvision.ensurePki();
     await host.ensureDir('/var/log/openvpn', '0755');
+    // each member's address, read by the servers after they drop to nobody;
+    // OpenVPN refuses to start on a client-config-dir it cannot reach
+    for (const variant of VPN_VARIANTS) {
+      await host.ensureDir(vpnClientAddressDir(variant), '0755');
+    }
     // servers render here so the units can start; the chained render-openvpn
     // re-applies them (idempotent) and adds per-user profiles
     await files.apply(
