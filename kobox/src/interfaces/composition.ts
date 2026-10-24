@@ -177,9 +177,24 @@ function hostKeyPair(): { readonly publicKey: string; readonly privateKey: strin
   };
 }
 
+function hostKeyFiles(): FsDebridKeyPair {
+  const keys = hostKeyPair();
+  return new FsDebridKeyPair(keys.publicKey, keys.privateKey);
+}
+
 function passwordCipher(): RsaPasswordCipher {
   const keys = hostKeyPair();
   return new RsaPasswordCipher(keys.publicKey, keys.privateKey);
+}
+
+function remotePasswordCipher(): RsaRemotePasswordCipher {
+  const keys = hostKeyPair();
+  return new RsaRemotePasswordCipher(keys.publicKey, keys.privateKey);
+}
+
+function debridKeyCipher(): RsaDebridKeyCipher {
+  const keys = hostKeyPair();
+  return new RsaDebridKeyCipher(keys.publicKey, keys.privateKey);
 }
 
 function nowStamp(): string {
@@ -308,10 +323,7 @@ export async function buildInstallation(
     checks: new ConfigCheckAdapter(runner),
     host: new InstallHostAdapter(runner),
     ipset: new IpsetAdapter(runner),
-    debridKeys: new FsDebridKeyPair(
-      process.env.KOBOX_DEBRID_PUBLIC_KEY ?? DEFAULT_DEBRID_PUBLIC_KEY,
-      process.env.KOBOX_DEBRID_PRIVATE_KEY ?? DEFAULT_DEBRID_PRIVATE_KEY,
-    ),
+    debridKeys: hostKeyFiles(),
     certbot: new CertbotAdapter(runner, process.env.KOBOX_ACME_CA_BUNDLE),
     pki: installPki,
     pkiProvision: installPki,
@@ -574,7 +586,7 @@ export function buildPortalContainer(name: string): PortalContainer {
     diskSamples: new SqliteDiskUsageRepository(db),
     mailRelay: new SqliteMailRelayRepository(db),
     siteSettings: new SqliteSiteSettingsRepository(db),
-    sealer: new RsaRemotePasswordCipher(),
+    sealer: remotePasswordCipher(),
     passwords: passwordCipher(),
     sshKeys: new SqliteSshKeyRepository(db),
     destinations: syncDestinations,
@@ -583,16 +595,13 @@ export function buildPortalContainer(name: string): PortalContainer {
     // the PUBLIC half only: the portal can seal a password, never open one
     setDestination: new SetSyncDestination({
       destinations: syncDestinations,
-      sealer: new RsaRemotePasswordCipher(),
+      sealer: remotePasswordCipher(),
     }),
     outbox: new SqliteMailOutbox(db),
     debridDownloadRepo,
     debridAccountRepo: new SqliteDebridAccountRepository(db),
     media: new SqliteMediaRepository(db),
-    debridEncryptor: new RsaDebridKeyCipher(
-      process.env.KOBOX_DEBRID_PUBLIC_KEY ?? DEFAULT_DEBRID_PUBLIC_KEY,
-      process.env.KOBOX_DEBRID_PRIVATE_KEY ?? DEFAULT_DEBRID_PRIVATE_KEY,
-    ),
+    debridEncryptor: debridKeyCipher(),
     requestDownload: new RequestDebridDownload({
       repo: debridDownloadRepo,
       queue,
@@ -750,7 +759,7 @@ export function buildContainer(name: string): Container {
     packageUpdates: new AptUpdateAdapter(runner),
     diagnostics: diagnosticsRepo,
     mailRelay: new SqliteMailRelayRepository(db),
-    opener: new RsaRemotePasswordCipher(),
+    opener: remotePasswordCipher(),
     files: new RtorrentConfigAdapter(runner),
     installHost: new InstallHostAdapter(runner),
     clock: nowStamp,
@@ -759,10 +768,7 @@ export function buildContainer(name: string): Container {
   // only opened here, worker-side, by the root-only private PEM. No user key,
   // no download for that user; everything else is unaffected.
   const debridDownloadRepo = new SqliteDebridDownloadRepository(db);
-  const debridCipher = new RsaDebridKeyCipher(
-    process.env.KOBOX_DEBRID_PUBLIC_KEY ?? DEFAULT_DEBRID_PUBLIC_KEY,
-    process.env.KOBOX_DEBRID_PRIVATE_KEY ?? DEFAULT_DEBRID_PRIVATE_KEY,
-  );
+  const debridCipher = debridKeyCipher();
   const downloader = new Aria2Adapter(
     process.env.KOBOX_ARIA2_RPC_URL ?? DEFAULT_ARIA2_RPC_URL,
     process.env.KOBOX_ARIA2_RPC_SECRET ?? '',
@@ -792,7 +798,7 @@ export function buildContainer(name: string): Container {
     hour: () => new Date().getHours(),
     // the private half of the host key: root only, which is why this lives in
     // the worker container and not in the portal's
-    opener: new RsaRemotePasswordCipher(),
+    opener: remotePasswordCipher(),
     probe: new SshRemoteProbe(runner),
     clock: nowStamp,
   });
@@ -804,7 +810,7 @@ export function buildContainer(name: string): Container {
     // root holds both halves; sealing still only needs the public one
     setDestination: new SetSyncDestination({
       destinations: syncDestinationRepo,
-      sealer: new RsaRemotePasswordCipher(),
+      sealer: remotePasswordCipher(),
     }),
     torrentUseCases,
     trackerUseCases,
