@@ -6,7 +6,7 @@ export const MAX_LOGIN_FAILURES = 5;
 export const LOCK_MINUTES = 15;
 export const SESSION_TTL_DAYS = 7;
 
-function shift(now: string, milliseconds: number): string {
+export function shift(now: string, milliseconds: number): string {
   const date = new Date(`${now.replace(' ', 'T')}Z`);
   return new Date(date.getTime() + milliseconds).toISOString().slice(0, 19).replace('T', ' ');
 }
