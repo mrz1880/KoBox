@@ -651,6 +651,24 @@ mutation enqueues a typed job the root worker executes.
   --auth-per-hour <n|clear> --throttle-bps <n|clear>` (also from the admin
   fair-use screen) — audited, per-field (`clear` resets to the install default).
 
+## A member's NAS through the VPN
+
+The VPN is optional: Nextcloud, the portal, ruTorrent, SFTP, the apps' RPC and
+debrid downloads all work over the internet. The tunnels carry what must not be
+exposed to it, NFS and Samba.
+
+Every member holds a host number for life, handed out when the account is
+created: their client is `10.0.0.N`, `10.0.1.N` or `10.0.2.N` depending on the
+tunnel, pinned by a `client-config-dir` file per tunnel (the servers run with
+`ccd-exclusive`, so a certificate with no address is refused). Their home is
+exported read-write to those three addresses only (and to any trusted address
+added by hand), `all_squash` to their own uid and gid. The firewall accepts NFS
+(rpcbind 111, nfsd 2049, mountd pinned on 32767) and Samba (445) from the tunnel
+subnets and from nowhere else.
+
+A NAS mounts, for instance, `10.0.1.1:/home/alice/rtorrent/complete/films`
+with NFS v3 over TCP and `nolock`.
+
 ## One password for every service
 
 A member has one password: the portal, SFTP, Samba and Nextcloud all open with
