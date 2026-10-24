@@ -29,6 +29,10 @@ services:
     image: ghcr.io/letsencrypt/pebble:2.7.0
     environment:
       - PEBBLE_VA_ALWAYS_VALID=1
+      # Pebble rejects 5% of nonces on purpose by default, to exercise a client's
+      # retry. certbot gives up instead, which made the letsencrypt E2E fail at
+      # random; nothing here tests that retry.
+      - PEBBLE_WFE_NONCEREJECT=0
     volumes:
       - pebble_test:/test
 
