@@ -118,6 +118,8 @@ describe('RunInstallation', () => {
       'render-fail2ban',
       'render-whitelist',
       'render-openvpn',
+      // a member's exports follow their VPN address: an upgrade re-renders them
+      'render-nfs-exports',
     ]);
     expect(world.drained).toBe(1);
     expect((await world.registry.get(ComponentName.parse('sshd')))?.state.value).toBe('installed');
@@ -224,6 +226,8 @@ describe('RunInstallation', () => {
       'render-fail2ban',
       'render-whitelist',
       'render-openvpn',
+      // a member's exports follow their VPN address: an upgrade re-renders them
+      'render-nfs-exports',
     ]);
   });
 });
