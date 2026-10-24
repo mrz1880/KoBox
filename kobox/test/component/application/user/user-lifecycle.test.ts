@@ -225,7 +225,7 @@ describe('CreateUser', () => {
 
     const credentials = await world.credentials.find(alice);
     if (credentials === undefined) throw new Error('alice has no portal login');
-    expect(await world.hasher.verify(aPassword, credentials.passwordHash)).toBe(true);
+    expect(credentials.passwordHash && (await world.hasher.verify(aPassword, credentials.passwordHash))).toBe(true);
     expect(credentials.role).toBe('admin');
   });
 
@@ -398,7 +398,7 @@ describe('ChangePassword', () => {
 
     const credentials = await world.credentials.find(alice);
     if (credentials === undefined) throw new Error('alice has no portal login');
-    expect(await world.hasher.verify(newPassword, credentials.passwordHash)).toBe(true);
+    expect(credentials.passwordHash && (await world.hasher.verify(newPassword, credentials.passwordHash))).toBe(true);
     expect(credentials.role).toBe('admin');
   });
 

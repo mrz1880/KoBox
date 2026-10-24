@@ -141,6 +141,19 @@ describe('Login', () => {
     expect(result).toEqual({ ok: false, reason: 'invalid-credentials' });
   });
 
+  // an invited member has a portal login (and a role) but no password until
+  // they follow their invitation link: no password can open it
+  it('should_refuse_a_member_who_has_not_chosen_a_password_yet', async () => {
+    await world.credentials.save({ username: alice, role: 'user' }, NOW);
+    const before = world.hasher.verifyCalls;
+
+    const result = await world.login.execute({ username: alice, password: goodPassword(), now: NOW });
+
+    expect(result).toEqual({ ok: false, reason: 'invalid-credentials' });
+    // and pays for a verify like any other miss, so timing tells nothing
+    expect(world.hasher.verifyCalls).toBe(before + 1);
+  });
+
   it('should_verify_against_a_dummy_hash_on_unknown_users_to_equalize_timing', async () => {
     const before = world.hasher.verifyCalls;
 

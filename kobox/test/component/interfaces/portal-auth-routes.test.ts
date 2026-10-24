@@ -209,7 +209,7 @@ describe('a machine presenting HTTP Basic', () => {
     await world.credentials.save(
       {
         username: alice.username,
-        passwordHash: alice.passwordHash,
+        ...(alice.passwordHash !== undefined && { passwordHash: alice.passwordHash }),
         role: 'user',
         appTokenHash: tokens.hashToken(TOKEN),
       },

@@ -40,7 +40,7 @@ export class IssueAppToken {
     await this.deps.credentials.save(
       {
         username: stored.username,
-        passwordHash: stored.passwordHash,
+        ...(stored.passwordHash !== undefined && { passwordHash: stored.passwordHash }),
         role: stored.role,
         ...(stored.mustChangePassword !== undefined && {
           mustChangePassword: stored.mustChangePassword,

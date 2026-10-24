@@ -37,6 +37,16 @@ afterEach(() => {
 });
 
 describe('SqlitePortalCredentialsRepository', () => {
+  it('should_keep_an_invited_members_login_without_any_password', async () => {
+    const repo = new SqlitePortalCredentialsRepository(db);
+
+    await repo.save({ username: ALICE, role: 'admin' }, '2026-10-24 10:00:00');
+
+    const found = await repo.find(ALICE);
+    expect(found?.role).toBe('admin');
+    expect(found?.passwordHash).toBeUndefined();
+  });
+
   it('should_return_undefined_for_an_unknown_username', async () => {
     const repo = new SqlitePortalCredentialsRepository(db);
 
@@ -50,7 +60,7 @@ describe('SqlitePortalCredentialsRepository', () => {
     const found = await repo.find(ALICE);
 
     expect(found?.username.value).toBe('alice');
-    expect(found?.passwordHash.value).toBe(HASH.value);
+    expect(found?.passwordHash?.value).toBe(HASH.value);
     expect(found?.role).toBe('admin');
   });
 
@@ -64,7 +74,7 @@ describe('SqlitePortalCredentialsRepository', () => {
     );
     const found = await repo.find(ALICE);
 
-    expect(found?.passwordHash.value).toBe(OTHER_HASH.value);
+    expect(found?.passwordHash?.value).toBe(OTHER_HASH.value);
   });
 
   it('should_delete_credentials', async () => {
