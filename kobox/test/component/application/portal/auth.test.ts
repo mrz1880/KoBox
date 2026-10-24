@@ -3,34 +3,28 @@ import { Authenticate } from '../../../../src/application/portal/Authenticate.js
 import { Login } from '../../../../src/application/portal/Login.js';
 import { Logout } from '../../../../src/application/portal/Logout.js';
 import { LOCK_MINUTES, MAX_LOGIN_FAILURES } from '../../../../src/domain/portal/policy.js';
-import { HashedPassword } from '../../../../src/domain/user/HashedPassword.js';
+import type { HashedPassword } from '../../../../src/domain/user/HashedPassword.js';
 import { Password } from '../../../../src/domain/user/Password.js';
 import { Username } from '../../../../src/domain/user/Username.js';
-import type { PasswordHasherPort } from '../../../../src/domain/user/ports.js';
 import { InMemoryLoginAttemptsRepository } from '../../../../src/infrastructure/persistence/InMemoryLoginAttemptsRepository.js';
 import { InMemoryPortalCredentialsRepository } from '../../../../src/infrastructure/persistence/InMemoryPortalCredentialsRepository.js';
 import { InMemoryPortalSessionRepository } from '../../../../src/infrastructure/persistence/InMemoryPortalSessionRepository.js';
 import { InMemoryUserRepository } from '../../../../src/infrastructure/persistence/InMemoryUserRepository.js';
+import { FakePasswordHasher } from '../../../../src/infrastructure/system/fakes/FakePasswordHasher.js';
 import { FakeSessionTokens } from '../../../../src/infrastructure/system/fakes/FakeSessionTokens.js';
 import { UserBuilder } from '../../../builders/UserBuilder.js';
 
 const alice = Username.parse('alice');
-const GOOD_HASH = HashedPassword.parse(`$6$fakesalt$${'x'.repeat(20)}8`);
 const NOW = '2026-07-25 10:00:00';
 
-// Mirrors FakePasswordHasher in worker-loop tests: hash depends only on length.
-class FakeHasher implements PasswordHasherPort {
+// The shared fake, counting verifications: a login for an unknown member must
+// still pay for one, so its timing does not tell who exists.
+class CountingHasher extends FakePasswordHasher {
   verifyCalls = 0;
 
-  hash(password: Password): Promise<HashedPassword> {
-    return Promise.resolve(
-      HashedPassword.parse(`$6$fakesalt$${'x'.repeat(20)}${String(password.reveal().length)}`),
-    );
-  }
-
-  async verify(password: Password, hash: HashedPassword): Promise<boolean> {
+  override verify(password: Password, hash: HashedPassword): Promise<boolean> {
     this.verifyCalls += 1;
-    return (await this.hash(password)).value === hash.value;
+    return super.verify(password, hash);
   }
 }
 
@@ -40,7 +34,7 @@ interface World {
   sessions: InMemoryPortalSessionRepository;
   attempts: InMemoryLoginAttemptsRepository;
   tokens: FakeSessionTokens;
-  hasher: FakeHasher;
+  hasher: CountingHasher;
   login: Login;
   logout: Logout;
   authenticate: Authenticate;
@@ -54,7 +48,7 @@ beforeEach(async () => {
   const sessions = new InMemoryPortalSessionRepository();
   const attempts = new InMemoryLoginAttemptsRepository();
   const tokens = new FakeSessionTokens();
-  const hasher = new FakeHasher();
+  const hasher = new CountingHasher();
   const deps = { users, credentials, sessions, attempts, tokens, hasher };
   world = {
     users,
@@ -68,10 +62,11 @@ beforeEach(async () => {
     authenticate: new Authenticate(deps),
   };
   await users.save(new UserBuilder().build());
-  await credentials.save({ username: alice, passwordHash: GOOD_HASH, role: 'user' }, NOW);
+  goodHash = await hasher.hash(goodPassword());
+  await credentials.save({ username: alice, passwordHash: goodHash, role: 'user' }, NOW);
 });
 
-// 8 chars -> matches GOOD_HASH under FakeHasher
+let goodHash: HashedPassword;
 const goodPassword = (): Password => Password.parse('8chars!!');
 const badPassword = (): Password => Password.parse('wrong-password');
 
@@ -175,7 +170,7 @@ describe('Authenticate', () => {
 
   it('should_carry_the_must_change_password_flag', async () => {
     await world.credentials.save(
-      { username: alice, passwordHash: GOOD_HASH, role: 'user', mustChangePassword: true },
+      { username: alice, passwordHash: goodHash, role: 'user', mustChangePassword: true },
       NOW,
     );
     const login = await world.login.execute({ username: alice, password: goodPassword(), now: NOW });

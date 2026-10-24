@@ -6,7 +6,6 @@ import {
   TEST_PASSWORD,
   type PortalWorld,
 } from './portalWorld.js';
-import { HashedPassword } from '../../../src/domain/user/HashedPassword.js';
 import { Username } from '../../../src/domain/user/Username.js';
 import { FakeSessionTokens } from '../../../src/infrastructure/system/fakes/FakeSessionTokens.js';
 
@@ -188,10 +187,12 @@ describe('a machine presenting HTTP Basic', () => {
   async function withToken(): Promise<PortalWorld> {
     const world = await buildPortalWorld();
     const tokens = new FakeSessionTokens();
+    const alice = await world.credentials.find(Username.parse('alice'));
+    if (alice === undefined) throw new Error('alice has no portal login');
     await world.credentials.save(
       {
-        username: Username.parse('alice'),
-        passwordHash: HashedPassword.parse(`$6$fakesalt$${'x'.repeat(20)}8`),
+        username: alice.username,
+        passwordHash: alice.passwordHash,
         role: 'user',
         appTokenHash: tokens.hashToken(TOKEN),
       },
