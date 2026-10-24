@@ -49,6 +49,13 @@ import { InMemoryUserAddressRepository } from '../../../src/infrastructure/persi
 import { InMemoryPortalCredentialsRepository } from '../../../src/infrastructure/persistence/InMemoryPortalCredentialsRepository.js';
 import { InMemoryPortalSessionRepository } from '../../../src/infrastructure/persistence/InMemoryPortalSessionRepository.js';
 import { InMemoryUserRepository } from '../../../src/infrastructure/persistence/InMemoryUserRepository.js';
+import {
+  InviteMember,
+  RequestPasswordReset,
+  SendPasswordLink,
+  SetPasswordFromLink,
+} from '../../../src/application/portal/PasswordLinks.js';
+import { InMemoryPasswordLinkRepository } from '../../../src/infrastructure/persistence/InMemoryPasswordLinkRepository.js';
 import { FakeSessionTokens } from '../../../src/infrastructure/system/fakes/FakeSessionTokens.js';
 import {
   buildPortalServer,
@@ -184,6 +191,17 @@ export async function buildPortalWorld(
   const destinations = new InMemorySyncDestinationRepository();
   const transfers = new InMemorySyncTransferRepository();
   const authDeps = { users, credentials, sessions, attempts, tokens, hasher };
+  const linkDeps = {
+    users,
+    credentials,
+    links: new InMemoryPasswordLinkRepository(),
+    outbox,
+    queue,
+    passwords,
+    tokens: new FakeSessionTokens(),
+    address: { baseUrl: () => Promise.resolve('https://box.example.org') },
+    clock: () => NOW,
+  };
   const server = buildPortalServer({
     login: new Login(authDeps),
     logout: new Logout(authDeps),
@@ -200,6 +218,10 @@ export async function buildPortalWorld(
     queue,
     hasher,
     passwords,
+    inviteMember: new InviteMember(linkDeps),
+    sendPasswordLink: new SendPasswordLink(linkDeps),
+    requestPasswordReset: new RequestPasswordReset(linkDeps),
+    setPasswordFromLink: new SetPasswordFromLink(linkDeps),
     trackers: new InMemoryTrackerRepository(),
     blocklists: new InMemoryBlocklistRepository(),
     addresses: new InMemoryUserAddressRepository(),

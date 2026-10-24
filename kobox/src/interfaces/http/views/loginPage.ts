@@ -12,6 +12,7 @@ ${flash(error, 'error')}
   <label for="password">Password</label>
   <input id="password" name="password" type="password" autocomplete="current-password" required>
   <button type="submit">Sign in</button>
-</form>`,
+</form>
+<p class="muted"><a href="/forgot-password">Forgot your password?</a></p>`,
   );
 }

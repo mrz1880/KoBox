@@ -52,8 +52,6 @@ ${flash(message)}
   <input id="username" name="username" required pattern="[a-z][a-z0-9]{0,31}">
   <label for="email">Email</label>
   <input id="email" name="email" type="email" required>
-  <label for="password">${viewer.t('Initial password')}</label>
-  <input id="password" name="password" type="password" required minlength="8">
   <label for="quotaGib">${viewer.t('Quota (GiB)')}</label>
   <input id="quotaGib" name="quotaGib" type="number" min="1" value="412">
   <label for="role">${viewer.t('Portal role')}</label>
@@ -168,6 +166,7 @@ export function adminUserDetailPage(
   user: SeedboxUser,
   viewer: Viewer,
   role: Role | undefined,
+  access: 'invited' | 'active',
   instance?: TorrentInstance,
   usage?: DiskUsageSample,
   message?: string,
@@ -218,12 +217,11 @@ ${flash(message)}
 <h2>${viewer.t('Their own scripts')}</h2>
 <div class="card">${finishScripts(name, instance, viewer)}</div>
 
-<h2>${viewer.t('Reset password')}</h2>
-<form class="card" method="post" action="/admin/users/${name}/password">
+<h2>${viewer.t('Password')}</h2>
+<form class="card" method="post" action="/admin/users/${name}/password-link">
   <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
-  <label for="password">${viewer.t('New password')}</label>
-  <input id="password" name="password" type="password" required minlength="8">
-  <button type="submit">${viewer.t('Reset password')}</button>
+  <p class="muted">${viewer.t(access === 'invited' ? 'password.invited' : 'password.active', { name })}</p>
+  <button type="submit">${viewer.t(access === 'invited' ? 'Resend the invitation' : 'Send a reset link')}</button>
 </form>`,
     viewer,
   );

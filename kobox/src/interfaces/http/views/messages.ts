@@ -71,20 +71,19 @@ const FR: Readonly<Record<string, string>> = {
   Quota: 'Quota',
   SCGI: 'SCGI',
   'Create user': 'Créer un membre',
-  'Initial password': 'Mot de passe initial',
   'Quota (GiB)': 'Quota (Gio)',
   'Portal role': 'Rôle sur le portail',
   Suspend: 'Suspendre',
   Resume: 'Réactiver',
   'Delete (irreversible)': 'Supprimer (irréversible)',
-  'Reset password': 'Réinitialiser le mot de passe',
-  'New password': 'Nouveau mot de passe',
   Storage: 'Stockage',
   'Allowance (GiB)': 'Allocation (Gio)',
   Save: 'Enregistrer',
   'Public trackers': 'Trackers publics',
   'Their own scripts': 'Leurs propres scripts',
   Nextcloud: 'Nextcloud',
+  'Resend the invitation': "Renvoyer l'invitation",
+  'Send a reset link': 'Envoyer un lien de réinitialisation',
   'Reusing what is already here': 'Réutiliser ce qui est déjà là',
   'What to do': 'Que faire',
   'Download it again (default)': 'Le retélécharger (par défaut)',
@@ -153,6 +152,10 @@ const FR: Readonly<Record<string, string>> = {
     'Quand {name} ajoute un torrent dont un autre membre a déjà les fichiers ici, KoBox peut les réutiliser au lieu de retélécharger les mêmes octets.',
   'recycling.tradeoff':
     'Copier dépense du disque pour économiser de la bande passante, et chaque membre garde ses propres octets : son quota continue de dire ce qu’il dit. Partager ne dépense presque rien et casse justement cela : les mêmes blocs sont comptés une seule fois, pour celui à qui le système de fichiers les attribue, et un membre qui supprime son torrent ne libère rien tant qu’un autre pointe encore dessus. Ce réglage ne vaut que pour les ajouts à venir.',
+  'password.invited':
+    "{name} n'a pas encore choisi son mot de passe. Renvoyer l'invitation remplace le lien précédent, et vous le montre pour le transmettre autrement.",
+  'password.active':
+    "Personne ne connaît le mot de passe de {name}, pas même vous : un lien par mail lui permet d'en choisir un nouveau.",
   'nextcloud.what':
     '{name} se connecte à Nextcloud et au partage réseau avec le mot de passe du portail : son compte Nextcloud est créé avec, ses trois dossiers rTorrent à la racine, et suit chacun de ses changements. Les membres sont des utilisateurs ordinaires ; seuls les administrateurs du portail administrent Nextcloud.',
   'storage.using': 'Utilise {used} Gio sur {allowance} Gio',
@@ -186,6 +189,10 @@ const EN: Readonly<Record<string, string>> = {
     'When {name} adds a torrent whose files another member already has here, KoBox can reuse them instead of downloading the same bytes again.',
   'recycling.tradeoff':
     'Copy spends disk to save bandwidth, and every member still holds their own bytes, so their quota keeps meaning what it says. Sharing spends almost nothing, and breaks that: the same blocks are counted once, for whoever the filesystem happens to attribute them to, and one member deleting their torrent frees nothing while another still points at the files. Changing this affects future adds only.',
+  'password.invited':
+    "{name} has not chosen a password yet. Resending the invitation replaces the previous link, and shows it to you to pass on another way.",
+  'password.active':
+    "Nobody knows {name}'s password, you included: a link by mail lets them choose a new one.",
   'nextcloud.what':
     '{name} signs in to Nextcloud and to the network share with their portal password: their Nextcloud account is created with it, their three rTorrent folders at its root, and follows every change of it. Members are ordinary Nextcloud users; only portal admins administer it.',
   'storage.using': 'Using {used} GiB of {allowance} GiB',

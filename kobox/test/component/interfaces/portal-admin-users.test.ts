@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Quota } from '../../../src/domain/user/Quota.js';
 import { Username } from '../../../src/domain/user/Username.js';
-import { buildPortalWorld, form, loginAs, type AgentSession, type PortalWorld } from './portalWorld.js';
+import { UserBuilder } from '../../builders/UserBuilder.js';
+import { NOW, buildPortalWorld, form, loginAs, type AgentSession, type PortalWorld } from './portalWorld.js';
 
 let world: PortalWorld;
 let admin: AgentSession;
@@ -49,7 +50,7 @@ describe('admin user creation', () => {
     expect(response.body).toContain('<option value="user" selected>');
   });
 
-  it('should_enqueue_a_create_user_job_with_a_hashed_password', async () => {
+  it('should_invite_a_member_and_show_the_admin_their_link_once', async () => {
     const response = await world.server.inject({
       method: 'POST',
       url: '/admin/users',
@@ -58,22 +59,22 @@ describe('admin user creation', () => {
         _csrf: admin.csrf,
         username: 'carol',
         email: 'carol@example.org',
-        password: 'brand-new-password',
         quotaGib: '412',
         role: 'user',
       }),
     });
 
-    expect(response.statusCode).toBe(303);
+    expect(response.statusCode).toBe(200);
+    const link = /https:\/\/[^"<\s]+\/password-link\/[0-9a-f]+/.exec(response.body)?.[0];
+    expect(link, 'the page shows the invitation link').toBeDefined();
     const job = world.queue.jobs.find((j) => j.type === 'create-user');
-    expect(job).toBeDefined();
     if (job?.type === 'create-user') {
-      expect(job.payload.username).toBe('carol');
-      expect(JSON.stringify(job.payload)).not.toContain('brand-new-password');
-      // sealed for the worker, which opens it back to what was typed
-      expect((await world.passwords.open(job.payload.sealedPassword ?? '')).reveal()).toBe('brand-new-password');
-      expect(job.payload.role).toBe('user');
+      expect(job.payload).toMatchObject({ username: 'carol', role: 'user' });
+      // nobody typed a password: the member chooses it
+      expect(job.payload).not.toHaveProperty('sealedPassword');
     }
+    const mails = await world.outbox.listRecent(10);
+    expect(mails.find((mail) => mail.recipient === 'carol@example.org')?.body).toContain(link);
   });
 
   it('should_reject_invalid_input_without_enqueueing', async () => {
@@ -85,7 +86,6 @@ describe('admin user creation', () => {
         _csrf: admin.csrf,
         username: 'Tony Z; rm -rf /',
         email: 'not-an-email',
-        password: 'brand-new-password',
         quotaGib: '412',
         role: 'user',
       }),
@@ -103,7 +103,6 @@ describe('admin user creation', () => {
       payload: form({
         username: 'carol',
         email: 'carol@example.org',
-        password: 'brand-new-password',
         quotaGib: '412',
         role: 'user',
       }),
@@ -122,7 +121,6 @@ describe('admin user creation', () => {
         _csrf: user.csrf,
         username: 'carol',
         email: 'carol@example.org',
-        password: 'brand-new-password',
         quotaGib: '412',
         role: 'user',
       }),
@@ -150,7 +148,36 @@ describe('admin user lifecycle actions', () => {
     expect(world.queue.jobs.map((j) => j.type)).toEqual([jobType]);
   });
 
-  it('should_enqueue_a_password_reset_with_a_hash_only', async () => {
+  it('should_mail_an_active_member_a_reset_link_and_show_it_to_nobody', async () => {
+    const response = await world.server.inject({
+      method: 'POST',
+      url: '/admin/users/alice/password-link',
+      headers: { cookie: admin.cookie, 'content-type': 'application/x-www-form-urlencoded' },
+      payload: form({ _csrf: admin.csrf }),
+    });
+
+    expect(response.statusCode).toBe(303);
+    const [mail] = await world.outbox.listRecent(10);
+    expect(mail?.body).toMatch(/\/password-link\/[0-9a-f]+/);
+    expect(world.queue.jobs).toHaveLength(0);
+  });
+
+  it('should_show_an_invited_member_their_invitation_again', async () => {
+    await world.users.save(new UserBuilder().withUsername('dave').withScgiPort(51190).withRtorrentPort(45090).build());
+    await world.credentials.save({ username: Username.parse('dave'), role: 'user' }, NOW);
+
+    const response = await world.server.inject({
+      method: 'POST',
+      url: '/admin/users/dave/password-link',
+      headers: { cookie: admin.cookie, 'content-type': 'application/x-www-form-urlencoded' },
+      payload: form({ _csrf: admin.csrf }),
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.body).toMatch(/\/password-link\/[0-9a-f]+/);
+  });
+
+  it('should_no_longer_let_an_admin_type_a_members_password', async () => {
     const response = await world.server.inject({
       method: 'POST',
       url: '/admin/users/alice/password',
@@ -158,14 +185,8 @@ describe('admin user lifecycle actions', () => {
       payload: form({ _csrf: admin.csrf, password: 'fresh-password-42' }),
     });
 
-    expect(response.statusCode).toBe(303);
-    const job = world.queue.jobs[0];
-    expect(job?.type).toBe('change-password');
-    if (job?.type === 'change-password') {
-      expect(JSON.stringify(job.payload)).not.toContain('fresh-password-42');
-      // sealed for the worker, which opens it back to what was typed
-      expect((await world.passwords.open(job.payload.sealedPassword)).reveal()).toBe('fresh-password-42');
-    }
+    expect(response.statusCode).toBe(404);
+    expect(world.queue.jobs).toHaveLength(0);
   });
 
   it('should_show_the_user_detail_page', async () => {
