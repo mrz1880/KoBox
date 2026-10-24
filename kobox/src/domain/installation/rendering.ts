@@ -549,6 +549,20 @@ export function renderNginxVhost(settings: NginxVhostSettings): RenderedFile {
   };
 }
 
+// NFS v3 asks rpcbind where mountd listens, and by default that is a random
+// port. Pinned, the firewall can open it to the VPN tunnels and nothing else.
+export const NFS_MOUNTD_PORT = 32767;
+
+export function renderNfsConf(): RenderedFile {
+  return {
+    path: '/etc/nfs.conf.d/kobox.conf',
+    content: [MANAGED_HEADER, '[mountd]', `port=${String(NFS_MOUNTD_PORT)}`, ''].join('\n'),
+    mode: '0644',
+    owner: 'root',
+    group: 'root',
+  };
+}
+
 export interface NfsExportWiring {
   readonly username: Username;
   readonly ids: AccountIds;

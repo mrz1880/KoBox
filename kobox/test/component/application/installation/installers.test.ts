@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
+import { NFS_MOUNTD_PORT } from '../../../../src/domain/installation/rendering.js';
 import {
   InstallGuardError,
   buildInstallers,
@@ -397,6 +398,25 @@ describe('vendored extras installers', () => {
     expect(world.packages.installed).toContain('nfs-kernel-server');
     expect(world.host.dirs.get('/etc/exports.d')).toBe('0755');
     expect(world.systemd.log).toContain('enable-now nfs-server');
+  });
+
+  it('should_pin_mountd_to_the_port_the_firewall_opens_and_restart_it_on_change', async () => {
+    // NFS v3 asks rpcbind where mountd listens: on a random port the firewall
+    // could not let a NAS reach it through the tunnel
+    await installer(world, 'nfs').install();
+
+    expect(world.host.contentAt('/etc/nfs.conf.d/kobox.conf')).toContain(
+      `[mountd]\nport=${String(NFS_MOUNTD_PORT)}`,
+    );
+    expect(world.systemd.log).toContain('reload-or-restart nfs-mountd');
+  });
+
+  it('should_take_its_mountd_pin_away_on_uninstall', async () => {
+    await installer(world, 'nfs').install();
+
+    await installer(world, 'nfs').uninstall();
+
+    expect(world.host.contentAt('/etc/nfs.conf.d/kobox.conf')).toBeUndefined();
   });
 
   it('should_render_the_samba_config_under_the_testparm_guard', async () => {
