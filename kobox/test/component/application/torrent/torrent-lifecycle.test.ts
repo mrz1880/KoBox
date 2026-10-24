@@ -114,7 +114,7 @@ function makeContext(): Context {
     }),
     deprovision: new DeprovisionRtorrentInstance({ instances, torrents, services }),
     render,
-    addWatchDir: new AddWatchDir({ instances, render }),
+    addWatchDir: new AddWatchDir({ instances }),
     setSyncDisabled: new SetSyncDisabled({ instances }),
     setAllowPublicTracker: new SetAllowPublicTracker({ instances }),
     handleEvent: new HandleTorrentEvent({
@@ -177,11 +177,17 @@ describe('ProvisionRtorrentInstance', () => {
 });
 
 describe('AddWatchDir and RenderRtorrentConfig', () => {
-  it('should_add_a_watch_dir_rerender_and_restart_a_running_instance', async () => {
+  // A render restarts rTorrent, and systemd refuses a sixth start within ten
+  // seconds: adding a folder only records it, and the worker renders once for a
+  // whole burst of additions.
+  it('should_record_a_folder_and_leave_the_render_to_its_own_job', async () => {
     await c.provision.execute({ username: alice });
 
-    await c.addWatchDir.execute({ username: alice, label: Label.parse('films') });
+    const added = await c.addWatchDir.execute({ username: alice, label: Label.parse('films') });
 
+    expect(added).toEqual({ added: true });
+    expect(c.services.restartsFor(alice)).toBe(0);
+    await c.render.execute({ username: alice });
     expect(c.config.contentAt('/home/alice/rtorrent/config.d/80-watch.rc')).toContain(
       'd.custom1.set=films',
     );
@@ -195,8 +201,9 @@ describe('AddWatchDir and RenderRtorrentConfig', () => {
   it('should_not_restart_a_stopped_instance_on_render', async () => {
     await c.provision.execute({ username: alice });
     await c.services.stopUserService(alice);
-
     await c.addWatchDir.execute({ username: alice, label: Label.parse('films') });
+
+    await c.render.execute({ username: alice });
 
     expect(c.services.restartsFor(alice)).toBe(0);
   });
@@ -205,9 +212,9 @@ describe('AddWatchDir and RenderRtorrentConfig', () => {
     await c.provision.execute({ username: alice });
     await c.addWatchDir.execute({ username: alice, label: Label.parse('films') });
 
-    await c.addWatchDir.execute({ username: alice, label: Label.parse('films') });
+    const again = await c.addWatchDir.execute({ username: alice, label: Label.parse('films') });
 
-    expect(c.services.restartsFor(alice)).toBe(1); // only the first add rendered
+    expect(again).toEqual({ added: false });
   });
 
   it('should_require_a_provisioned_instance', async () => {

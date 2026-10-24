@@ -658,6 +658,23 @@ describe('CLI enqueue -> root worker loop (the privilege seam)', () => {
     expect(instance?.watchDirs.map((dir) => dir.label?.value)).toEqual([undefined, 'films']);
   });
 
+  // systemd refuses a sixth start within ten seconds: a member (or an admin)
+  // adding several folders in a row must cost one restart, not one each
+  it('should_restart_rtorrent_once_for_a_burst_of_new_folders', async () => {
+    await enqueueCreateAlice();
+    await world.worker.drain();
+    const before = world.services.restartsFor(alice);
+    for (const label of ['Films', 'Series', 'Jeux', 'Divers', 'Apps', 'Ebooks', 'Musiques']) {
+      await world.queue.enqueue(parseJob('add-watch-dir', { username: 'alice', label }));
+    }
+
+    await world.worker.drain();
+
+    expect(world.services.restartsFor(alice) - before).toBe(1);
+    const instance = await world.instances.findByUsername(alice);
+    expect(instance?.watchDirs.filter((dir) => dir.label !== undefined)).toHaveLength(7);
+  });
+
   it('should_suspend_then_resume_via_jobs', async () => {
     await enqueueCreateAlice();
     await world.queue.enqueue(buildJob.suspendUser({ username: 'alice' }));
