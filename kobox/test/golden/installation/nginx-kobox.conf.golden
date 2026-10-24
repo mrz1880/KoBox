@@ -66,8 +66,6 @@ server {
     location ~ ^/ru/(.+\.php)$ {
         auth_request /internal/auth;
         auth_request_set $kobox_user $upstream_http_x_kobox_user;
-        auth_request_set $kobox_challenge $upstream_http_www_authenticate;
-        add_header WWW-Authenticate $kobox_challenge always;
         include fastcgi_params;
         fastcgi_param SCRIPT_FILENAME /var/www/rutorrent/$1;
         fastcgi_param REMOTE_USER $kobox_user;
