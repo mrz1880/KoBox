@@ -116,6 +116,12 @@ function probePebble(): Promise<boolean> {
   });
 }
 
+// The pnpm a real release pins, read from KoBox's own manifest: corepack runs
+// the pinned version from its cache, where an unpinned tree would send it to the
+// npm registry to ask which pnpm is the latest.
+const PACKAGE_MANAGER = (JSON.parse(readFileSync('package.json', 'utf8')) as { packageManager: string })
+  .packageManager;
+
 // A tiny installable "release": enough package to survive pnpm install,
 // pnpm build, `main.js migrate` and a worker main that stays alive. The
 // upgrade machinery cannot tell it from a real KoBox build.
@@ -129,6 +135,7 @@ function scaffoldFakeRelease(dir: string, marker: string, brokenBuild: boolean):
         name: 'kobox-fake-release',
         version: '0.0.1',
         private: true,
+        packageManager: PACKAGE_MANAGER,
         scripts: { build: brokenBuild ? 'node -e "process.exit(2)"' : 'node build.js' },
       },
       null,
@@ -496,6 +503,9 @@ describe.skipIf(!onDebianAsRoot)('E2E: maintenance keeps the installed box alive
         ...env,
         KOBOX_REPO_DIR: repo,
         KOBOX_RELEASES_DIR: releasesDir,
+        // --offline means it: building a release must not need the npm registry,
+        // or one DNS hiccup fails an upgrade the box could have done alone
+        COREPACK_ENABLE_NETWORK: '0',
       };
 
       // upgrade to v1: link flips, the (stub) worker comes up
