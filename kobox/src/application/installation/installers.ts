@@ -1,4 +1,4 @@
-import { PHP_FPM } from '../../domain/installation/platform.js';
+import { PHP_FPM, WEB_SERVER_USER } from '../../domain/installation/platform.js';
 import type { NextcloudPort } from '../../domain/installation/NextcloudPort.js';
 import type { ComponentNameValue } from '../../domain/installation/ComponentName.js';
 import type {
@@ -456,7 +456,7 @@ class RutorrentInstaller implements ComponentInstaller {
       ]);
     }
     await host.ensureDir(RUTORRENT_PROFILE_DIR, '0750');
-    await host.chown(RUTORRENT_PROFILE_DIR, 'www-data', 'www-data');
+    await host.chown(RUTORRENT_PROFILE_DIR, WEB_SERVER_USER, WEB_SERVER_USER);
     await files.apply([renderRutorrentConfig()]);
     return installed();
   }
@@ -530,8 +530,8 @@ class NextcloudInstaller implements ComponentInstaller {
     // alias, and a data dir under it would be one misconfigured location block
     // away from being downloadable
     await host.ensureDir(NEXTCLOUD_DATA, '0750');
-    await host.chown(NEXTCLOUD_DIR, 'www-data', 'www-data');
-    await host.chown(NEXTCLOUD_DATA, 'www-data', 'www-data');
+    await host.chown(NEXTCLOUD_DIR, WEB_SERVER_USER, WEB_SERVER_USER);
+    await host.chown(NEXTCLOUD_DATA, WEB_SERVER_USER, WEB_SERVER_USER);
     if (!(await nextcloud.isInstalled())) {
       await nextcloud.install('kobox-admin', install.nextcloudAdminPassword);
     }

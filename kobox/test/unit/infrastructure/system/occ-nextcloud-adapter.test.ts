@@ -36,7 +36,9 @@ describe('OccNextcloudAdapter', () => {
 
     await new OccNextcloudAdapter(runner).serveAt({ host: 'box.example.org', port: 8189 });
 
+    // occ refuses root: every call runs as the web server user
     expect(runner.calls.every((call) => call.command === 'runuser')).toBe(true);
+    expect(runner.calls.every((call) => call.args.slice(0, 2).join(' ') === '-u www-data')).toBe(true);
     expect(runner.occArgs()).toEqual([
       'config:system:set trusted_domains 0 --value=localhost',
       'config:system:set trusted_domains 1 --value=box.example.org',
