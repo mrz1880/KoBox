@@ -183,6 +183,13 @@
       "when": 1792788465872,
       "tag": "0025_drop-account-type",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "6",
+      "when": 1792838391496,
+      "tag": "0026_member-vpn-host",
+      "breakpoints": true
     }
   ]
 }

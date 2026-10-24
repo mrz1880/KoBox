@@ -6,6 +6,7 @@ import { SeedboxUser } from '../../domain/user/SeedboxUser.js';
 import { UserId } from '../../domain/user/UserId.js';
 import { UserStatus } from '../../domain/user/UserStatus.js';
 import { Username } from '../../domain/user/Username.js';
+import { VpnHost } from '../../domain/user/VpnHost.js';
 import type { UserRepository } from '../../domain/user/ports.js';
 import type { KoboxDatabase } from './db.js';
 import { allocatedPorts, users } from './schema.js';
@@ -22,6 +23,7 @@ function toDomain(row: UserRow): SeedboxUser {
     rtorrentPort: RtorrentPort.parse(row.rtorrentPort),
     proxyPort: ProxyPort.parse(row.proxyPort),
     status: UserStatus.parse(row.status),
+    ...(row.vpnHost !== null && { vpnHost: VpnHost.parse(row.vpnHost) }),
   });
 }
 
@@ -59,8 +61,25 @@ export class SqliteUserRepository implements UserRepository {
       this.db.orm.update(users).set(values).where(eq(users.id, user.id.value)).run();
       return user;
     }
-    const inserted = this.db.orm.insert(users).values(values).returning({ id: users.id }).get();
-    return user.identifiedBy(UserId.parse(inserted.id));
+    // lowest free host and insert in one write transaction: two members created
+    // at once cannot be handed the same address
+    return this.db.orm.transaction(
+      (tx) => {
+        const taken = tx
+          .select({ vpnHost: users.vpnHost })
+          .from(users)
+          .all()
+          .flatMap((row) => (row.vpnHost === null ? [] : [VpnHost.parse(row.vpnHost)]));
+        const vpnHost = VpnHost.lowestFree(taken);
+        const inserted = tx
+          .insert(users)
+          .values({ ...values, vpnHost: vpnHost.value })
+          .returning({ id: users.id })
+          .get();
+        return user.identifiedBy(UserId.parse(inserted.id)).placedAt(vpnHost);
+      },
+      { behavior: 'immediate' },
+    );
   }
 
   delete(username: Username): Promise<void> {

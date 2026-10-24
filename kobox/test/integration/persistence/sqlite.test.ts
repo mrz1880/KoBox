@@ -66,6 +66,26 @@ describe('SqliteUserRepository', () => {
     expect(found?.status.isSuspended()).toBe(false);
   });
 
+  it('should_give_each_new_member_the_lowest_vpn_host_nobody_holds_and_keep_it', async () => {
+    const repo = new SqliteUserRepository(db);
+    const alice = await repo.save(aUser().build());
+    const bob = await repo.save(
+      aUser().withUsername('bob').withScgiPort(51102).withRtorrentPort(45001).build(),
+    );
+    await repo.save(bob.suspend().user);
+    await repo.delete(alice.username);
+
+    const carol = await repo.save(
+      aUser().withUsername('carol').withScgiPort(51103).withRtorrentPort(45002).build(),
+    );
+
+    expect(alice.vpnHost?.value).toBe(2);
+    // an update leaves the address where it was: the NAS export trusts it
+    expect((await repo.findByUsername(bob.username))?.vpnHost?.value).toBe(3);
+    // a deleted member's address goes back to the pool
+    expect(carol.vpnHost?.value).toBe(2);
+  });
+
   it('should_persist_status_transitions', async () => {
     const repo = new SqliteUserRepository(db);
     const saved = await repo.save(aUser().build());
