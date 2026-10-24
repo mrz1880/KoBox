@@ -38,6 +38,8 @@ interface ChainHints {
   readonly nfsDirty?: boolean;
   // a member asked this folder to go out straight away rather than at their hour
   readonly sendNowFor?: string;
+  // a member's rTorrent config changed: render it (and restart) once per burst
+  readonly renderConfigFor?: string;
 }
 
 function nowStamp(): string {
@@ -160,6 +162,13 @@ export class JobWorker {
     if (hints?.nfsDirty === true) {
       await this.queue.enqueue(parseJob('render-nfs-exports', {}));
     }
+    // unique while pending: the folders queued behind this one join the same
+    // render, so a burst of them restarts rTorrent once
+    if (hints?.renderConfigFor !== undefined) {
+      await this.queue.enqueueUnique(
+        parseJob('render-rtorrent-config', { username: hints.renderConfigFor }),
+      );
+    }
   }
 
   private async execute(job: Job): Promise<ChainHints | undefined> {
@@ -240,12 +249,13 @@ export class JobWorker {
       case 'render-rtorrent-config':
         await this.torrents.render.execute({ username: Username.parse(job.payload.username) });
         return;
-      case 'add-watch-dir':
-        await this.torrents.addWatchDir.execute({
+      case 'add-watch-dir': {
+        const { added } = await this.torrents.addWatchDir.execute({
           username: Username.parse(job.payload.username),
           label: Label.parse(job.payload.label),
         });
-        return;
+        return added ? { renderConfigFor: job.payload.username } : undefined;
+      }
       case 'send-pending-transfers':
         await this.sync.sendPending.execute(
           job.payload.username === undefined

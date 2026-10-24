@@ -301,7 +301,11 @@ program
     const label = Label.parse(rawLabel);
     const c = container();
     if (direct) {
-      await c.torrentUseCases.addWatchDir.execute({ username, label });
+      // no worker to chain the render: do it here, once
+      const { added } = await c.torrentUseCases.addWatchDir.execute({ username, label });
+      if (added) {
+        await c.torrentUseCases.render.execute({ username });
+      }
       await done(c, `watch dir ${label.value} added for ${username.value}`);
       return;
     }

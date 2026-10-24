@@ -423,7 +423,7 @@ export function buildTorrentUseCases(deps: TorrentUseCaseDeps): TorrentUseCases 
     provision: new ProvisionRtorrentInstance(deps),
     deprovision: new DeprovisionRtorrentInstance(deps),
     render,
-    addWatchDir: new AddWatchDir({ instances: deps.instances, render }),
+    addWatchDir: new AddWatchDir({ instances: deps.instances }),
     setCategorySyncMode: new SetCategorySyncMode({ instances: deps.instances }),
     setSyncDisabled: new SetSyncDisabled(deps),
     setAllowPublicTracker: new SetAllowPublicTracker(deps),
