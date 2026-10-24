@@ -156,12 +156,11 @@ kobox install
 Nextcloud 35 needs PHP 8.3 or later; Debian 13 ships 8.4. The admin password
 is a secret: it reaches the worker's environment only, never the portal's.
 
-Members get their account on demand, with their three rTorrent folders
-mounted (dropping a `.torrent` into Watch starts the download):
-
-```
-kobox provision-nextcloud-account alice
-```
+A member signs in to Nextcloud with their portal password. Their account is
+created with it, their three rTorrent folders mounted at its root (dropping a
+`.torrent` into Watch starts the download), and every password change on the
+portal changes it there too. A member created before Nextcloud was installed
+gets their account at their next password change.
 
 ## My media (the Cakebox successor)
 
@@ -652,14 +651,16 @@ mutation enqueues a typed job the root worker executes.
   --auth-per-hour <n|clear> --throttle-bps <n|clear>` (also from the admin
   fair-use screen) — audited, per-field (`clear` resets to the install default).
 
-## Samba passwords
+## One password for every service
 
-Samba uses its own password store (tdb), never the KoBox database. Set or
-update one directly (the secret is read from stdin and never enters a job):
-
-```
-printf '%s' 'the-password' | kobox set-samba-password alice
-```
+A member has one password: the portal, SFTP, Samba and Nextcloud all open with
+it. Samba (its own tdb, which needs the clear password to derive an NT hash)
+and Nextcloud keep their own copy, so the portal seals a new password with the
+host public key (`/etc/kobox/debrid-pub.pem`) and the root worker opens it with
+the private half, hands it to `smbpasswd` and `occ` through stdin and the
+environment, never argv, and the job queue forgets the sealed value as soon as
+the worker has claimed the job. Creating a member is all or nothing: if one
+service refuses the password, the account is rolled back everywhere.
 
 ## ShellInABox
 

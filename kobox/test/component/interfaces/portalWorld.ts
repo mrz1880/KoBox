@@ -25,6 +25,7 @@ import type { RemotePasswordSealerPort } from '../../../src/domain/sync/ports.js
 import type { RemotePassword } from '../../../src/domain/sync/RemotePassword.js';
 import { SetSyncDestination } from '../../../src/application/sync/SetSyncDestination.js';
 import type { PasswordHasherPort } from '../../../src/domain/user/ports.js';
+import { FakePasswordCipher } from '../../../src/infrastructure/system/fakes/FakePasswordCipher.js';
 import { FakeHealthProbe } from '../../../src/infrastructure/system/fakes/FakeHealthProbe.js';
 import { InMemoryBlocklistRepository } from '../../../src/infrastructure/persistence/InMemoryBlocklistRepository.js';
 import { InMemoryFairUseRepository } from '../../../src/infrastructure/persistence/InMemoryFairUseRepository.js';
@@ -163,6 +164,8 @@ export interface PortalWorld {
   readonly siteSettings: InMemorySiteSettingsRepository;
   readonly destinations: InMemorySyncDestinationRepository;
   readonly transfers: InMemorySyncTransferRepository;
+  // what the root worker would open the sealed passwords with
+  readonly passwords: FakePasswordCipher;
 }
 
 // Builds a portal server over in-memory fakes with two accounts:
@@ -176,6 +179,7 @@ export async function buildPortalWorld(
   const attempts = new InMemoryLoginAttemptsRepository();
   const tokens = new FakeSessionTokens();
   const hasher = new FakeHasher();
+  const passwords = new FakePasswordCipher();
   const queue = new RecordingQueue();
   const outbox = new InMemoryMailOutbox();
   const downloads = new InMemoryDebridDownloadRepository();
@@ -209,6 +213,7 @@ export async function buildPortalWorld(
     users,
     queue,
     hasher,
+    passwords,
     trackers: new InMemoryTrackerRepository(),
     blocklists: new InMemoryBlocklistRepository(),
     addresses: new InMemoryUserAddressRepository(),
@@ -264,7 +269,7 @@ export async function buildPortalWorld(
     { username: Username.parse('boss'), passwordHash: GOOD_HASH, role: 'admin' },
     NOW,
   );
-  return { server, users, credentials, sessions, queue, outbox, downloads, debridAccounts, media, fairUse, diagnostics, instances, diskSamples, sshKeys, components, mailRelay, siteSettings, destinations, transfers };
+  return { server, users, credentials, sessions, queue, outbox, downloads, debridAccounts, media, fairUse, diagnostics, instances, diskSamples, sshKeys, components, mailRelay, siteSettings, destinations, transfers, passwords };
 }
 
 export interface AgentSession {

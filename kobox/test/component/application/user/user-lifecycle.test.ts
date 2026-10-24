@@ -16,7 +16,7 @@ import {
 } from '../../../../src/application/user/errors.js';
 import { Language } from '../../../../src/domain/portal/Language.js';
 import { EmailAddress } from '../../../../src/domain/user/EmailAddress.js';
-import { HashedPassword } from '../../../../src/domain/user/HashedPassword.js';
+import { Password } from '../../../../src/domain/user/Password.js';
 import { ProxyPort, RtorrentPort, ScgiPort } from '../../../../src/domain/user/Port.js';
 import type { PortAllocatorPort } from '../../../../src/domain/user/PortAllocatorPort.js';
 import { PortAlreadyClaimedError } from '../../../../src/domain/user/PortAllocatorPort.js';
@@ -27,6 +27,8 @@ import { InMemoryDebridAccountRepository } from '../../../../src/infrastructure/
 import { InMemoryPortalSessionRepository } from '../../../../src/infrastructure/persistence/InMemoryPortalSessionRepository.js';
 import { InMemoryDiskUsageRepository } from '../../../../src/infrastructure/persistence/InMemoryDiskUsageRepository.js';
 import { InMemoryUserRepository } from '../../../../src/infrastructure/persistence/InMemoryUserRepository.js';
+import { FakePasswordHasher } from '../../../../src/infrastructure/system/fakes/FakePasswordHasher.js';
+import { FakeServiceLogin } from '../../../../src/infrastructure/system/fakes/FakeServiceLogin.js';
 import { FakeNotifications } from '../../../../src/infrastructure/system/fakes/FakeNotifications.js';
 import { FakeQuota } from '../../../../src/infrastructure/system/fakes/FakeQuota.js';
 import { FakeServiceControl } from '../../../../src/infrastructure/system/fakes/FakeServiceControl.js';
@@ -92,7 +94,7 @@ class SequentialPortAllocator implements PortAllocatorPort {
 }
 
 const alice = Username.parse('alice');
-const aHash = HashedPassword.parse('$6$testsalt$0123456789abcdefghijklmnopqrstuv');
+const aPassword = Password.parse('correct horse battery');
 
 function createUserCommand() {
   return {
@@ -100,7 +102,7 @@ function createUserCommand() {
     email: EmailAddress.parse('alice@example.org'),
     quota: Quota.gib(412),
     proxyPort: ProxyPort.parse(8080),
-    passwordHash: aHash,
+    password: aPassword,
     role: 'user' as const,
   };
 }
@@ -115,6 +117,9 @@ interface World {
   credentials: InMemoryPortalCredentialsRepository;
   sessions: InMemoryPortalSessionRepository;
   debridAccounts: InMemoryDebridAccountRepository;
+  hasher: FakePasswordHasher;
+  samba: FakeServiceLogin;
+  nextcloud: FakeServiceLogin;
   createUser: CreateUser;
   deleteUser: DeleteUser;
   changePassword: ChangePassword;
@@ -138,14 +143,19 @@ beforeEach(() => {
   const sessions = new InMemoryPortalSessionRepository();
   const debridAccounts = new InMemoryDebridAccountRepository();
   const diskSamples = new InMemoryDiskUsageRepository();
+  const hasher = new FakePasswordHasher();
+  const samba = new FakeServiceLogin();
+  const nextcloud = new FakeServiceLogin();
   const allocator = new SequentialPortAllocator();
   const clock = (): string => '2026-07-25 10:00:00';
   const deps = {
     repo, accounts, quota, sftp, services, notifications, credentials, sessions,
-    debridAccounts, clock,
+    debridAccounts, clock, hasher, logins: [samba, nextcloud],
   };
   world = {
     ...deps,
+    samba,
+    nextcloud,
     createUser: new CreateUser({ ...deps, allocator }),
     deleteUser: new DeleteUser(deps),
     changePassword: new ChangePassword(deps),
@@ -184,6 +194,24 @@ describe('CreateUser', () => {
     expect(retried.scgiPort.value).toBe(51101); // released port is reusable
   });
 
+  it('should_open_every_service_with_its_own_login_with_the_portal_password', async () => {
+    await world.createUser.execute(createUserCommand());
+
+    expect(world.samba.passwordOf(alice)).toBe(aPassword.reveal());
+    expect(world.nextcloud.passwordOf(alice)).toBe(aPassword.reveal());
+  });
+
+  it('should_undo_every_service_login_when_one_service_refuses_the_member', async () => {
+    world.nextcloud.failNextSetPassword('occ exploded');
+
+    await expect(world.createUser.execute(createUserCommand())).rejects.toThrow(/occ exploded/);
+
+    // all or nothing: a retry must find no account and no half-made login
+    expect(world.samba.passwordOf(alice)).toBeUndefined();
+    expect(await world.accounts.accountExists(alice)).toBe(false);
+    expect(await world.credentials.find(alice)).toBeUndefined();
+  });
+
   it('should_reject_duplicate_usernames', async () => {
     await world.createUser.execute(createUserCommand());
 
@@ -196,8 +224,9 @@ describe('CreateUser', () => {
     await world.createUser.execute({ ...createUserCommand(), role: 'admin' });
 
     const credentials = await world.credentials.find(alice);
-    expect(credentials?.passwordHash.value).toBe(aHash.value);
-    expect(credentials?.role).toBe('admin');
+    if (credentials === undefined) throw new Error('alice has no portal login');
+    expect(await world.hasher.verify(aPassword, credentials.passwordHash)).toBe(true);
+    expect(credentials.role).toBe('admin');
   });
 
   it('should_flag_an_imported_user_for_a_forced_password_change', async () => {
@@ -335,6 +364,15 @@ describe('DeleteUser', () => {
     expect(await world.debridAccounts.has(alice)).toBe(false);
   });
 
+  it('should_remove_the_member_from_every_service_with_its_own_login', async () => {
+    await world.createUser.execute(createUserCommand());
+
+    await world.deleteUser.execute({ username: alice });
+
+    expect(world.samba.passwordOf(alice)).toBeUndefined();
+    expect(world.nextcloud.passwordOf(alice)).toBeUndefined();
+  });
+
   it('should_reject_deleting_an_unknown_user', async () => {
     await expect(world.deleteUser.execute({ username: alice })).rejects.toThrow(UserNotFoundError);
   });
@@ -344,7 +382,7 @@ describe('ChangePassword', () => {
   it('should_set_the_system_password_and_notify', async () => {
     await world.createUser.execute(createUserCommand());
 
-    await world.changePassword.execute({ username: alice, passwordHash: aHash });
+    await world.changePassword.execute({ username: alice, password: aPassword });
 
     expect(world.notifications.published.at(-1)).toEqual({
       type: 'PasswordChanged',
@@ -354,13 +392,24 @@ describe('ChangePassword', () => {
 
   it('should_update_the_portal_credential_hash_preserving_the_role', async () => {
     await world.createUser.execute({ ...createUserCommand(), role: 'admin' });
-    const newHash = HashedPassword.parse('$6$newsalt00$abcdefghijklmnopqrstuvwxyz012345');
+    const newPassword = Password.parse('a brand new one');
 
-    await world.changePassword.execute({ username: alice, passwordHash: newHash });
+    await world.changePassword.execute({ username: alice, password: newPassword });
 
     const credentials = await world.credentials.find(alice);
-    expect(credentials?.passwordHash.value).toBe(newHash.value);
-    expect(credentials?.role).toBe('admin');
+    if (credentials === undefined) throw new Error('alice has no portal login');
+    expect(await world.hasher.verify(newPassword, credentials.passwordHash)).toBe(true);
+    expect(credentials.role).toBe('admin');
+  });
+
+  it('should_change_the_password_of_every_service_with_its_own_login', async () => {
+    await world.createUser.execute(createUserCommand());
+    const newPassword = Password.parse('a brand new one');
+
+    await world.changePassword.execute({ username: alice, password: newPassword });
+
+    expect(world.samba.passwordOf(alice)).toBe(newPassword.reveal());
+    expect(world.nextcloud.passwordOf(alice)).toBe(newPassword.reveal());
   });
 
   it('should_keep_the_language_the_member_chose', async () => {
@@ -369,7 +418,7 @@ describe('ChangePassword', () => {
     if (stored === undefined) throw new Error('alice has no portal login');
     await world.credentials.save({ ...stored, language: Language.fr }, '2026-07-25 10:00:00');
 
-    await world.changePassword.execute({ username: alice, passwordHash: aHash });
+    await world.changePassword.execute({ username: alice, password: aPassword });
 
     expect((await world.credentials.find(alice))?.language).toBe(Language.fr);
   });
@@ -380,7 +429,7 @@ describe('ChangePassword', () => {
     if (stored === undefined) throw new Error('alice has no portal login');
     await world.credentials.save({ ...stored, appTokenHash: 'c'.repeat(64) }, '2026-07-25 10:00:00');
 
-    await world.changePassword.execute({ username: alice, passwordHash: aHash });
+    await world.changePassword.execute({ username: alice, password: aPassword });
 
     expect((await world.credentials.find(alice))?.appTokenHash).toBeUndefined();
   });
@@ -395,7 +444,7 @@ describe('ChangePassword', () => {
       expiresAt: '2026-08-01 10:00:00',
     });
 
-    await world.changePassword.execute({ username: alice, passwordHash: aHash });
+    await world.changePassword.execute({ username: alice, password: aPassword });
 
     expect(await world.sessions.find('a'.repeat(64))).toBeUndefined();
   });
@@ -404,7 +453,7 @@ describe('ChangePassword', () => {
     await world.createUser.execute(createUserCommand());
     await world.credentials.delete(alice); // simulate a pre-Phase-6 row
 
-    await world.changePassword.execute({ username: alice, passwordHash: aHash });
+    await world.changePassword.execute({ username: alice, password: aPassword });
 
     expect((await world.credentials.find(alice))?.role).toBe('user');
   });
@@ -412,14 +461,14 @@ describe('ChangePassword', () => {
   it('should_clear_the_must_change_flag_once_the_password_is_changed', async () => {
     await world.createUser.execute({ ...createUserCommand(), mustChangePassword: true });
 
-    await world.changePassword.execute({ username: alice, passwordHash: aHash });
+    await world.changePassword.execute({ username: alice, password: aPassword });
 
     expect((await world.credentials.find(alice))?.mustChangePassword).toBe(false);
   });
 
   it('should_reject_unknown_users', async () => {
     await expect(
-      world.changePassword.execute({ username: alice, passwordHash: aHash }),
+      world.changePassword.execute({ username: alice, password: aPassword }),
     ).rejects.toThrow(UserNotFoundError);
   });
 });

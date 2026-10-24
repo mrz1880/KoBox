@@ -36,10 +36,14 @@ import type { IssueAppToken } from '../../../application/portal/IssueAppToken.js
 import { DomainError } from '../../../domain/shared/DomainError.js';
 import type { FairUseRepository } from '../../../domain/security/ports.js';
 import { VPN_VARIANTS, type VpnVariant } from '../../../domain/security/vpn.js';
-import { Password } from '../../../domain/user/Password.js';
-import type { PasswordHasherPort, UserRepository } from '../../../domain/user/ports.js';
+import type {
+  PasswordHasherPort,
+  PasswordSealerPort,
+  UserRepository,
+} from '../../../domain/user/ports.js';
 import type { SeedboxUser } from '../../../domain/user/SeedboxUser.js';
 import { buildJob } from '../../cli/buildJob.js';
+import { passwordField } from '../passwordField.js';
 import { flashOf, redirectWithFlash, viewerOf, type Guards } from '../guards.js';
 import {
   accessPage,
@@ -75,8 +79,8 @@ const categoryModeSchema = z.object({
 });
 
 const passwordSchema = z.object({
-  current: z.string().min(1).max(256),
-  next: z.string().min(8).max(256),
+  current: z.string().min(1).max(1024),
+  next: passwordField,
 });
 
 const downloadSchema = z.object({
@@ -153,6 +157,7 @@ export interface UserRoutesDeps {
   readonly fairUse: FairUseRepository;
   readonly queue: JobQueuePort;
   readonly hasher: PasswordHasherPort;
+  readonly passwords: PasswordSealerPort;
   readonly credentials: PortalCredentialsPort;
   readonly issueAppToken: IssueAppToken;
   readonly profiles: VpnProfileStorePort;
@@ -233,18 +238,27 @@ export function registerUserRoutes(
     }
     const parsed = passwordSchema.safeParse(request.body);
     if (!parsed.success) {
+      const refusal = parsed.error.issues.find((issue) => issue.path[0] === 'next');
       return reply
         .code(200)
         .type('text/html')
-        .send(passwordPage(viewerOf(session), 'Please choose a new password of at least 8 characters.'));
+        .send(
+          passwordPage(
+            viewerOf(session),
+            refusal === undefined
+              ? 'Please fill in both passwords.'
+              : `Please choose another new password: ${refusal.message}.`,
+          ),
+        );
     }
     const stored = await deps.credentials.find(session.username);
-    // a valid password is always >= 8 chars, so a shorter `current` is simply
-    // incorrect — never let Password.parse throw into an unhandled 500
+    // a current password the domain would refuse cannot be the right one, and
+    // must read as incorrect rather than throw into a 500
+    const current = passwordField.safeParse(parsed.data.current);
     const currentValid =
-      parsed.data.current.length >= 8 &&
+      current.success &&
       stored !== undefined &&
-      (await deps.hasher.verify(Password.parse(parsed.data.current), stored.passwordHash));
+      (await deps.hasher.verify(current.data, stored.passwordHash));
     if (!currentValid) {
       return reply
         .code(200)
@@ -253,8 +267,8 @@ export function registerUserRoutes(
     }
     const job = await buildJob.changePassword(
       { username: session.username.value },
-      Password.parse(parsed.data.next),
-      deps.hasher,
+      parsed.data.next,
+      deps.passwords,
     );
     await deps.queue.enqueue(job);
     return redirectWithFlash(reply, '/password', 'Password change under way — it takes a few seconds.');

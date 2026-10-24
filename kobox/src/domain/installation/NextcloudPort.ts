@@ -1,3 +1,4 @@
+import type { Password } from '../user/Password.js';
 import type { Username } from '../user/Username.js';
 
 // The three folders a member expects at the root of their Nextcloud, and where
@@ -19,13 +20,11 @@ export interface NextcloudPort {
   // the public name and port it is reached on, under /nextcloud over HTTPS:
   // Nextcloud refuses any request whose host it was not told to trust
   serveAt(address: { readonly host: string; readonly port: number }): Promise<void>;
-  // members get an account only on request, so most of them have none
   hasUser(username: Username): Promise<boolean>;
-  // idempotent: creating a member who exists is a no-op, not a failure
-  ensureUser(username: Username, password: string): Promise<void>;
-  // deletes the account and the data Nextcloud itself holds for it. KoBox
-  // removes a deleted member's home with userdel -r, so leaving the account
-  // would leave an orphan nobody administers.
+  // creates the account on its first password, resets the password after that
+  setUserPassword(username: Username, password: Password): Promise<void>;
+  // deletes the account and the data Nextcloud itself holds for it; an account
+  // that is already gone is not a failure
   deleteUser(username: Username): Promise<void>;
   setAdmin(username: Username, admin: boolean): Promise<void>;
   ensureLocalMount(username: Username, label: string, absolutePath: string): Promise<void>;

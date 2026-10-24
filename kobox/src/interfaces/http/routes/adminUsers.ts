@@ -4,34 +4,34 @@ import type { JobQueuePort } from '../../../application/jobs/JobQueuePort.js';
 import type { PortalCredentialsPort } from '../../../domain/portal/ports.js';
 import { ROLES } from '../../../domain/portal/Role.js';
 import { USERNAME_PATTERN } from '../../../domain/user/Username.js';
-import { Password } from '../../../domain/user/Password.js';
 import { Username } from '../../../domain/user/Username.js';
 import type { TorrentInstanceRepository } from '../../../domain/torrent/ports.js';
 import type {
   DiskUsageRepository,
-  PasswordHasherPort,
+  PasswordSealerPort,
   UserRepository,
 } from '../../../domain/user/ports.js';
 import { buildJob } from '../../cli/buildJob.js';
+import { passwordField } from '../passwordField.js';
 import { flashOf, redirectWithFlash, viewerOf, type Guards } from '../guards.js';
 import { adminUserDetailPage, adminUsersPage } from '../views/adminUsersPage.js';
 
 const createUserSchema = z.object({
   username: z.string().regex(USERNAME_PATTERN),
   email: z.email(),
-  password: z.string().min(8).max(256),
+  password: passwordField,
   quotaGib: z.coerce.number().int().positive(),
   role: z.enum(ROLES),
 });
 
-const passwordSchema = z.object({ password: z.string().min(8).max(256) });
+const passwordSchema = z.object({ password: passwordField });
 
 const usernameParamSchema = z.object({ name: z.string().regex(USERNAME_PATTERN) });
 
 export interface AdminUsersDeps {
   readonly users: UserRepository;
   readonly queue: JobQueuePort;
-  readonly hasher: PasswordHasherPort;
+  readonly passwords: PasswordSealerPort;
   readonly instances: TorrentInstanceRepository;
   readonly diskSamples: DiskUsageRepository;
   readonly credentials: PortalCredentialsPort;
@@ -82,8 +82,8 @@ export function registerAdminUserRoutes(
         proxyPort: 8080,
         role: parsed.data.role,
       },
-      Password.parse(parsed.data.password),
-      deps.hasher,
+      parsed.data.password,
+      deps.passwords,
     );
     await deps.queue.enqueue(job);
     return redirectWithFlash(reply, '/admin/users', `Creating ${parsed.data.username}.`);
@@ -130,23 +130,6 @@ export function registerAdminUserRoutes(
       return redirectWithFlash(reply, target, `${ACTION_WORDS[action]} ${params.data.name}.`);
     });
   }
-
-  server.post('/admin/users/:name/nextcloud', async (request, reply) => {
-    const session = await guards.requireAdminCsrf(request, reply);
-    if (session === undefined) {
-      return;
-    }
-    const params = usernameParamSchema.safeParse(request.params);
-    if (!params.success) {
-      return reply.code(400).send();
-    }
-    await deps.queue.enqueue(buildJob.provisionNextcloudAccount({ username: params.data.name }));
-    return redirectWithFlash(
-      reply,
-      `/admin/users/${params.data.name}`,
-      `Creating a Nextcloud account for ${params.data.name}. They will be mailed its password.`,
-    );
-  });
 
   const quotaSchema = z.object({ quotaGib: z.coerce.number().int().positive() });
 
@@ -279,8 +262,8 @@ export function registerAdminUserRoutes(
     }
     const job = await buildJob.changePassword(
       { username: params.data.name },
-      Password.parse(parsed.data.password),
-      deps.hasher,
+      parsed.data.password,
+      deps.passwords,
     );
     await deps.queue.enqueue(job);
     return redirectWithFlash(

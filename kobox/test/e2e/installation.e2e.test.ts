@@ -1,3 +1,4 @@
+import Database from 'better-sqlite3';
 import { execFile, execFileSync, type ExecFileSyncOptions } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -320,6 +321,20 @@ describe.skipIf(!onDebianAsRoot)('E2E: fresh Debian 13 -> bootstrap -> full stac
     },
     240_000,
   );
+
+  it('should_open_the_members_network_share_with_their_portal_password', async () => {
+    // the password went to the installed worker sealed with the key install laid
+    // down, was opened there and handed to smbpasswd: Samba now holds the member
+    await waitFor('samba account', () =>
+      sh('pdbedit', ['-L'], { stdio: 'pipe' }).split('\n').some((line) => line.startsWith(`${USER}:`)),
+    );
+    // and the job queue no longer holds the sealed password it carried
+    const db = new Database(env.KOBOX_DB ?? '', { readonly: true });
+    const stored = db.prepare("SELECT payload_json FROM jobs WHERE type = 'create-user'").all();
+    db.close();
+    expect(stored).toHaveLength(1);
+    expect(JSON.stringify(stored)).not.toContain('sealedPassword');
+  });
 
 
   it('should_have_installed_what_carries_a_download_to_a_members_own_machine', () => {

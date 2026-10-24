@@ -30,6 +30,15 @@ done
 # are the truth; NetworkServiceAdapter skips their absent units explicitly).
 mkdir -p /etc/pgl /etc/dnscrypt-proxy /etc/bind /etc/kobox
 
+# The host key pair kobox install lays down: a member's password travels to the
+# worker sealed with it. Never regenerated once present, like on the real box.
+if [ ! -f /etc/kobox/debrid-key.pem ]; then
+    openssl genrsa -out /etc/kobox/debrid-key.pem 4096 2>/dev/null
+    chmod 600 /etc/kobox/debrid-key.pem
+fi
+openssl rsa -in /etc/kobox/debrid-key.pem -pubout -out /etc/kobox/debrid-pub.pem 2>/dev/null
+chmod 644 /etc/kobox/debrid-pub.pem
+
 # fail2ban is exercised with `fail2ban-client -t` (config check) only — the
 # service stays down so bans never interfere with the container's own tests.
 # The nginx-http-auth jail needs its log file to exist (no nginx in the

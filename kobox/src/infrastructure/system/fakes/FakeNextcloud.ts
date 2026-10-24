@@ -1,4 +1,5 @@
 import type { NextcloudPort } from '../../../domain/installation/NextcloudPort.js';
+import type { Password } from '../../../domain/user/Password.js';
 import type { Username } from '../../../domain/user/Username.js';
 
 // Records what occ would have been asked to do. Starts uninstalled, because
@@ -7,6 +8,7 @@ export class FakeNextcloud implements NextcloudPort {
   private installed = false;
   readonly enabledApps: string[] = [];
   readonly users: string[] = [];
+  private readonly passwords = new Map<string, string>();
   readonly deleted: string[] = [];
   readonly admins = new Map<string, boolean>();
   readonly mounts: { username: string; label: string; path: string }[] = [];
@@ -36,16 +38,25 @@ export class FakeNextcloud implements NextcloudPort {
     return Promise.resolve(this.users.includes(username.value));
   }
 
-  ensureUser(username: Username): Promise<void> {
+  setUserPassword(username: Username, password: Password): Promise<void> {
     if (!this.users.includes(username.value)) {
       this.users.push(username.value);
     }
+    this.passwords.set(username.value, password.reveal());
     return Promise.resolve();
   }
 
+  passwordOf(username: Username): string | undefined {
+    return this.passwords.get(username.value);
+  }
+
   deleteUser(username: Username): Promise<void> {
-    this.deleted.push(username.value);
-    this.users.splice(this.users.indexOf(username.value), 1);
+    const index = this.users.indexOf(username.value);
+    if (index !== -1) {
+      this.deleted.push(username.value);
+      this.users.splice(index, 1);
+      this.passwords.delete(username.value);
+    }
     return Promise.resolve();
   }
 

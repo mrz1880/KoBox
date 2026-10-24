@@ -103,6 +103,14 @@ export interface PasswordOpenerPort {
   open(sealed: string): Promise<Password>;
 }
 
+// A service that keeps its own copy of a member's password (Samba, Nextcloud):
+// whatever the member signs in to the portal with must open it too. Both calls
+// are idempotent, and a service that is not installed accepts them as no-ops.
+export interface ServiceLoginPort {
+  setPassword(username: Username, password: Password): Promise<void>;
+  remove(username: Username): Promise<void>;
+}
+
 export interface NotificationPort {
   notify(event: UserEvent): Promise<void>;
 }

@@ -1,10 +1,11 @@
+import { ComponentName } from '../../domain/installation/ComponentName.js';
 import type { NextcloudPort } from '../../domain/installation/NextcloudPort.js';
 import type { ComponentRegistry } from '../../domain/installation/ports.js';
 import type { PortalCredentialsPort } from '../../domain/portal/ports.js';
 import type { Role } from '../../domain/portal/Role.js';
 import type { UserRepository } from '../../domain/user/ports.js';
 import type { Username } from '../../domain/user/Username.js';
-import { nextcloudIsInstalled } from './ProvisionNextcloudAccount.js';
+import { componentIsInstalled } from './WhenInstalled.js';
 import { PortalLoginMissingError, UserNotFoundError } from './errors.js';
 
 export interface ChangeRoleCommand {
@@ -39,7 +40,7 @@ export class ChangeRole {
     // the Nextcloud admins are the box admins: a demoted member must not keep
     // administering the files of everybody else
     if (
-      (await nextcloudIsInstalled(this.deps.components)) &&
+      (await componentIsInstalled(this.deps.components, ComponentName.parse('nextcloud'))) &&
       (await this.deps.nextcloud.hasUser(user.username))
     ) {
       await this.deps.nextcloud.setAdmin(user.username, command.role === 'admin');

@@ -4,6 +4,7 @@ import type { Username } from '../../domain/user/Username.js';
 import type {
   NotificationPort,
   ServiceControlPort,
+  ServiceLoginPort,
   SftpPort,
   SystemAccountPort,
   UserRepository,
@@ -23,14 +24,16 @@ interface Deps {
   readonly credentials: PortalCredentialsPort;
   readonly sessions: SessionStorePort;
   readonly debridAccounts: DebridAccountRepository;
+  readonly logins: readonly ServiceLoginPort[];
 }
 
 export class DeleteUser {
   constructor(private readonly deps: Deps) {}
 
   async execute(command: DeleteUserCommand): Promise<void> {
-    const { repo, accounts, sftp, services, notifications, credentials, sessions, debridAccounts } =
-      this.deps;
+    const {
+      repo, accounts, sftp, services, notifications, credentials, sessions, debridAccounts, logins,
+    } = this.deps;
 
     const user = await repo.findByUsername(command.username);
     if (!user) {
@@ -39,6 +42,10 @@ export class DeleteUser {
 
     await services.stopUserService(user.username);
     await sftp.disableChrootAccess(user.username);
+    // a login that outlives its member is one nobody is watching
+    for (const login of logins) {
+      await login.remove(user.username);
+    }
     await accounts.deleteAccount(user.username);
     await sessions.deleteForUser(user.username);
     await credentials.delete(user.username);

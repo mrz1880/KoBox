@@ -1,8 +1,18 @@
 import { asc, eq, sql } from 'drizzle-orm';
-import { parseJob, type Job } from '../../application/jobs/contract.js';
+import { parseJob, payloadAfterClaim, type Job } from '../../application/jobs/contract.js';
 import type { ClaimedJob, JobQueuePort } from '../../application/jobs/JobQueuePort.js';
 import type { KoboxDatabase } from './db.js';
 import { jobs } from './schema.js';
+
+// A poisoned row is kept as it is: there is nothing to parse, so nothing to
+// strip, and the quarantine below still needs to show what arrived.
+function storedAfterClaim(payloadJson: string): string {
+  try {
+    return JSON.stringify(payloadAfterClaim(JSON.parse(payloadJson)));
+  } catch {
+    return payloadJson;
+  }
+}
 
 export class SqliteJobQueue implements JobQueuePort {
   constructor(private readonly db: KoboxDatabase) {}
@@ -69,7 +79,11 @@ export class SqliteJobQueue implements JobQueuePort {
             return undefined;
           }
           tx.update(jobs)
-            .set({ status: 'running', updatedAt: sql`(datetime('now'))` })
+            .set({
+              status: 'running',
+              payloadJson: storedAfterClaim(row.payloadJson),
+              updatedAt: sql`(datetime('now'))`,
+            })
             .where(eq(jobs.id, row.id))
             .run();
           return row;
