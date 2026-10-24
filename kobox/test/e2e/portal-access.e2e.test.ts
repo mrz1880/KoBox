@@ -225,6 +225,8 @@ describe.skipIf(!onDebianAsRoot)('E2E: portal login -> create user -> member sel
       headers: { authorization: basic(PASSWORD) },
     });
     expect(withPassword.status).toBe(401);
+    // a refusal names the scheme, or a .NET client never sends its token
+    expect(withPassword.headers.get('www-authenticate')).toBe('Basic realm="KoBox"');
 
     // and throwing it away stops it everywhere, at once
     await fetch(`${BASE}/access/app-token/revoke`, {

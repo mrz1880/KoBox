@@ -362,6 +362,17 @@ describe.skipIf(!onDebianAsRoot)('E2E: fresh Debian 13 -> bootstrap -> full stac
     }
   });
 
+  it('should_challenge_a_download_client_through_the_real_nginx', () => {
+    // auth_request drops the portal's headers unless the vhost relays them:
+    // this is the door Sonarr and Radarr knock on, before they send a token
+    const headers = sh('curl', [
+      '-sk', '-o', '/dev/null', '-D', '-', '-X', 'POST',
+      'https://127.0.0.1:8189/ru/plugins/httprpc/action.php',
+    ]);
+    expect(headers).toMatch(/^HTTP\/\S+ 401/m);
+    expect(headers).toMatch(/^www-authenticate: Basic realm="KoBox"\r?$/im);
+  });
+
   it('should_have_installed_what_carries_a_download_to_a_members_own_machine', () => {
     // rsync and sshpass are not decoration: without them the transfer adapter
     // fails at spawn, and the member is told the test could not run. They come

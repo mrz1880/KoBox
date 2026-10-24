@@ -1,11 +1,15 @@
 # KoBox-managed — DO NOT EDIT (rendered declaratively).
 location = /RPC-ALICE {
     auth_request /internal/auth/rpc;
+    auth_request_set $kobox_challenge $upstream_http_www_authenticate;
+    add_header WWW-Authenticate $kobox_challenge always;
     include scgi_params;
     scgi_pass 127.0.0.1:51101;
 }
 location = /RPC-BOB {
     auth_request /internal/auth/rpc;
+    auth_request_set $kobox_challenge $upstream_http_www_authenticate;
+    add_header WWW-Authenticate $kobox_challenge always;
     include scgi_params;
     scgi_pass 127.0.0.1:51102;
 }

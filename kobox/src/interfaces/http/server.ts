@@ -57,6 +57,9 @@ import { registerAdminUserRoutes } from './routes/adminUsers.js';
 import { registerUserRoutes } from './routes/user.js';
 import { loginPage } from './views/loginPage.js';
 
+// The realm a program is asked to authenticate to with its member's token.
+const APP_AUTH_CHALLENGE = 'Basic realm="KoBox"';
+
 export { SESSION_COOKIE } from './guards.js';
 
 export interface PortalServerDeps {
@@ -201,6 +204,12 @@ export function buildPortalServer(deps: PortalServerDeps): FastifyInstance {
     });
   };
 
+  // Where a program may present a token instead of a session, a refusal names
+  // the scheme: .NET clients (Sonarr, Radarr) only send their credentials once
+  // challenged, and nginx relays this header to them (see the vhost).
+  const challenge = (reply: FastifyReply): FastifyReply =>
+    reply.header('www-authenticate', APP_AUTH_CHALLENGE).code(401).send();
+
   server.get('/internal/auth', async (request, reply) => {
     const app = await appOf(request);
     if (app !== undefined) {
@@ -208,7 +217,7 @@ export function buildPortalServer(deps: PortalServerDeps): FastifyInstance {
     }
     const session = await guards.sessionOf(request);
     if (session === undefined) {
-      return reply.code(401).send();
+      return challenge(reply);
     }
     if (session.mustChangePassword) {
       return reply.code(403).send();
@@ -243,7 +252,7 @@ export function buildPortalServer(deps: PortalServerDeps): FastifyInstance {
     }
     const session = await guards.sessionOf(request);
     if (session === undefined) {
-      return reply.code(401).send();
+      return challenge(reply);
     }
     // ruTorrent/RPC stays closed until the forced password change is done
     if (session.mustChangePassword) {
