@@ -50,21 +50,6 @@ function openDb(): KoboxDatabase {
   return KoboxDatabase.open(env.KOBOX_DB ?? '');
 }
 
-// What `kobox install` recorded as failed, with the reason it recorded — the
-// difference between "the fixture misbehaved" and "KoBox is broken".
-function failedComponents(): { name: string; reason: string | null }[] {
-  try {
-    const db = openDb();
-    const rows = db.raw
-      .prepare("SELECT name, reason FROM components WHERE state = 'failed'")
-      .all() as { name: string; reason: string | null }[];
-    db.close();
-    return rows;
-  } catch {
-    return [];
-  }
-}
-
 function jobCounts(): Map<string, { pending: number; failed: number; done: number }> {
   const db = openDb();
   const rows = db.raw
@@ -201,44 +186,11 @@ describe.skipIf(!onDebianAsRoot)('E2E: maintenance keeps the installed box alive
 
     // the box: the earlier install suite uninstalled at its end — converge
     // the whole stack again (idempotent, packages cached)
-    try {
-      await execFileAsync('node', [CLI, 'install', '--allow-non-ext4'], {
-        env,
-        timeout: INSTALL_TIMEOUT_MS,
-        maxBuffer: 64 * 1024 * 1024,
-      });
-    } catch (error) {
-      // `kobox install` failing is normally fatal for this suite, and stays so.
-      // The ONE exception is the letsencrypt component, whose only reason to run
-      // here is the local pebble fixture: certbot has been seen to fail against
-      // it non-deterministically (once in CI, never reproduced in 20 consecutive
-      // local runs). That is a fixture problem, and letting it take out the
-      // outbox, backup and journal tests below turns one flake into four.
-      //
-      // Deliberately narrow: any other failed component still throws, so this
-      // can never hide a regression in what KoBox actually installs.
-      const failed = failedComponents();
-      const only = failed.length === 1 ? failed[0] : undefined;
-      if (only?.name !== 'letsencrypt') {
-        throw error;
-      }
-      console.warn(
-        `pebble fixture: certbot failed, letsencrypt assertions skipped — ${
-          only.reason ?? 'no reason recorded'
-        }`,
-      );
-      // A failed component STOPS the install, which is right in production and
-      // would leave this box half-configured. Converge the rest without the
-      // ACME pins: completed components are not redone, so this is cheap, and
-      // letsencrypt turns into an honest skip.
-      pebbleAvailable = false;
-      env = withoutLetsEncrypt;
-      await execFileAsync('node', [CLI, 'install', '--allow-non-ext4'], {
-        env,
-        timeout: INSTALL_TIMEOUT_MS,
-        maxBuffer: 64 * 1024 * 1024,
-      });
-    }
+    await execFileAsync('node', [CLI, 'install', '--allow-non-ext4'], {
+      env,
+      timeout: INSTALL_TIMEOUT_MS,
+      maxBuffer: 64 * 1024 * 1024,
+    });
     originalCurrentTarget = readlinkSync(CURRENT_LINK);
     await waitFor('worker active', () => isActive('kobox-worker'), 60_000);
   }, INSTALL_TIMEOUT_MS);
