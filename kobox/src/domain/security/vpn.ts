@@ -55,7 +55,7 @@ function portOf(variant: VpnVariant, vpn: VpnSettings): number {
   return variant === 'tun' ? vpn.tunPort : vpn.tapPort;
 }
 
-function subnetOf(variant: VpnVariant, vpn: VpnSettings): Cidr {
+export function subnetOf(variant: VpnVariant, vpn: VpnSettings): Cidr {
   if (variant === 'tun-gw') {
     return vpn.tunGwSubnet;
   }

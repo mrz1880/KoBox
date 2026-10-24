@@ -43,8 +43,17 @@ export interface SshAuthLogPort {
   countAcceptedPublickey(username: Username, windowMinutes: number): Promise<number>;
 }
 
+// A member's numeric ids on this box, for what cannot name them: an NFS export
+// maps a client's requests to an anonuid, not to a username.
+export interface AccountIds {
+  readonly uid: number;
+  readonly gid: number;
+}
+
+// undefined = no such account on the system
 export interface UserIdentityPort {
   uidOf(username: Username): Promise<number | undefined>;
+  idsOf(username: Username): Promise<AccountIds | undefined>;
 }
 
 // undefined = NXDOMAIN / no A record. Resolution failures are soft: a

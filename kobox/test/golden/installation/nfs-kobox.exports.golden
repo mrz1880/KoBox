@@ -1,3 +1,5 @@
 # KoBox-managed — DO NOT EDIT (rendered declaratively).
-/home/alice 203.0.113.9(rw,sync,no_subtree_check,root_squash)
-/home/alice 198.51.100.7(rw,sync,no_subtree_check,root_squash)
+/home/alice 10.0.0.2(rw,sync,no_subtree_check,all_squash,anonuid=1001,anongid=1001)
+/home/alice 10.0.1.2(rw,sync,no_subtree_check,all_squash,anonuid=1001,anongid=1001)
+/home/alice 10.0.2.2(rw,sync,no_subtree_check,all_squash,anonuid=1001,anongid=1001)
+/home/alice 203.0.113.9(rw,sync,no_subtree_check,all_squash,anonuid=1001,anongid=1001)
