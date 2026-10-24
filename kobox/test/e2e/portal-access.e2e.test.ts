@@ -162,20 +162,22 @@ describe.skipIf(!onDebianAsRoot)('E2E: portal login -> create user -> member sel
     expect(cookie).toBeDefined();
   });
 
-  it('should_create_a_member_through_the_portal_and_let_them_sign_in', async () => {
+  it('should_invite_a_member_who_then_chooses_their_own_password', async () => {
     const cookie = (await login(ADMIN)) ?? '';
     const csrf = await csrfFrom('/admin/users', cookie);
 
-    const created = await fetch(`${BASE}/admin/users`, {
+    // nobody types the member's password: the admin gets a link to pass on
+    const invited = await fetch(`${BASE}/admin/users`, {
       method: 'POST',
       headers: { cookie, 'content-type': 'application/x-www-form-urlencoded' },
       body:
         `_csrf=${encodeURIComponent(csrf)}&username=${MEMBER}` +
-        `&email=${MEMBER}%40example.org&password=${encodeURIComponent(PASSWORD)}` +
-        '&quotaGib=10&role=user',
+        `&email=${MEMBER}%40example.org&quotaGib=10&role=user`,
       redirect: 'manual',
     });
-    expect(created.status).toBe(303);
+    expect(invited.status).toBe(200);
+    const linkPath = /\/password-link\/[0-9a-f]{64}/.exec(await invited.text())?.[0];
+    expect(linkPath, 'the admin sees the invitation link').toBeDefined();
     expect(userExists(MEMBER)).toBe(false); // unprivileged path only enqueued
 
     let guard = 0;
@@ -187,10 +189,24 @@ describe.skipIf(!onDebianAsRoot)('E2E: portal login -> create user -> member sel
       }
     }
     expect(userExists(MEMBER)).toBe(true);
+    // invited, not active: no password opens the account yet
+    expect(await login(MEMBER)).toBeUndefined();
 
-    // the member can now sign in to the portal (credentials row was written)
-    const memberCookie = await login(MEMBER);
-    expect(memberCookie).toBeDefined();
+    const page = await fetch(`${BASE}${linkPath ?? ''}`);
+    expect(await page.text()).toContain('name="password"');
+    const chosen = await fetch(`${BASE}${linkPath ?? ''}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: `password=${encodeURIComponent(PASSWORD)}&confirm=${encodeURIComponent(PASSWORD)}`,
+    });
+    expect(await chosen.text()).toContain('Password saved');
+    drainQueue();
+
+    // the password the member chose opens the portal, and the system account
+    expect(await login(MEMBER)).toBeDefined();
+    expect(sh('getent', ['shadow', MEMBER]).split(':')[1]).toMatch(/^\$(6|y)\$/);
+    // and the link is spent
+    expect(await (await fetch(`${BASE}${linkPath ?? ''}`)).text()).toContain('no longer works');
   });
 
   it('should_let_a_download_client_in_with_a_token_and_keep_the_password_out', async () => {

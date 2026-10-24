@@ -36,8 +36,10 @@ prefetches the URL cannot burn it. Submitting consumes the link, enqueues
 - The member page shows the state (invited until..., invitation expired, active)
   and offers "Resend the invitation" or "Send a reset link".
 - "Forgot your password?" on the sign-in page takes a username or an email and
-  always answers the same way. At most 3 links per member per hour, requests
-  counted per IP like failed sign-ins, nothing for a suspended member.
+  always answers the same way. At most 3 links per member per hour and nothing
+  for a suspended member. (As built: the limit is per member only; the sign-in
+  attempts store is keyed by account, not by address, so there is no per-IP
+  count.)
 - Mails carry no password, only the link and how long it lasts, in the member's
   language (French by default). The link uses the public domain from the site
   settings and the portal port, or the hostname when no domain is set. The

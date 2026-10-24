@@ -615,6 +615,16 @@ mutation enqueues a typed job the root worker executes.
   (a sha512-crypt hash, the same one the system account receives) is written by
   the worker into `portal_credentials` on create-user / change-password, and
   removed on delete-user. There is no separate portal password to manage.
+- **Invitations and forgotten passwords**: the admin console creates a member
+  without any password and mails them a single-use link to choose one (valid 7
+  days; the console also shows it once, to pass on another way). "Forgot your
+  password?" on the sign-in page mails a reset link (valid 1 hour) and answers
+  the same way whether the account exists or not. A new link replaces the open
+  one, three at most per member per hour, none for a suspended member; links go
+  with the member and close once a password is chosen. Links name the public
+  domain on the standard https port. Nobody, admins included, knows a member's
+  password; `kobox create-user` with a password on stdin stays as the
+  operator's fallback.
   `kobox set-user-role <name> admin|user` (or the **Portal role** section of the
   member's admin page) moves an existing account between the two roles. It applies to open sessions on their next request, and it also
   adds the member to (or removes them from) the Nextcloud `admin` group when
