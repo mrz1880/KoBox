@@ -143,6 +143,7 @@ import type { PortalCredentialsPort, SessionStorePort } from '../domain/portal/p
 import type { PortAllocatorPort } from '../domain/user/PortAllocatorPort.js';
 import type { NextcloudPort } from '../domain/installation/NextcloudPort.js';
 import type { ComponentRegistry } from '../domain/installation/ports.js';
+import type { PasswordLinkRepository } from '../domain/portal/ports.js';
 import type {
   HealthProbePort,
   NotificationPort,
@@ -179,6 +180,7 @@ export interface UseCaseDeps {
   readonly hasher: PasswordHasherPort;
   // every service keeping its own copy of a member's password
   readonly logins: readonly ServiceLoginPort[];
+  readonly links: PasswordLinkRepository;
   readonly clock: () => string;
 }
 

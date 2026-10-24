@@ -1,4 +1,8 @@
-import type { PortalCredentialsPort, SessionStorePort } from '../../domain/portal/ports.js';
+import type {
+  PasswordLinkRepository,
+  PortalCredentialsPort,
+  SessionStorePort,
+} from '../../domain/portal/ports.js';
 import type { Password } from '../../domain/user/Password.js';
 import type { Username } from '../../domain/user/Username.js';
 import type {
@@ -23,6 +27,7 @@ interface Deps {
   readonly sessions: SessionStorePort;
   readonly hasher: PasswordHasherPort;
   readonly logins: readonly ServiceLoginPort[];
+  readonly links: PasswordLinkRepository;
   readonly clock: () => string;
 }
 
@@ -62,6 +67,8 @@ export class ChangePassword {
     // a password change contains a compromise: every existing session dies with
     // it (self-change or admin reset), so a stolen cookie cannot outlive it
     await sessions.deleteForUser(user.username);
+    // the password is chosen: a link still lying in a mailbox would change it again
+    await this.deps.links.closeOpen(user.username, clock());
     await notifications.notify({ type: 'PasswordChanged', username: user.username.value });
   }
 }
