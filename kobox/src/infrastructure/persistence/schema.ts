@@ -451,3 +451,16 @@ export const syncTransfers = sqliteTable(
     index('sync_transfers_state_idx').on(table.username, table.state),
   ],
 );
+
+// A member's single-use links to choose their password (invitation or reset).
+// Only the sha256 of the token is kept: a database read yields no usable link.
+export const passwordLinks = sqliteTable('password_links', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  username: text('username').notNull(),
+  purpose: text('purpose', { enum: ['invitation', 'reset'] }).notNull(),
+  tokenHash: text('token_hash').notNull().unique(),
+  expiresAt: text('expires_at').notNull(),
+  usedAt: text('used_at'),
+  issuedAt: text('issued_at').notNull(),
+});
+

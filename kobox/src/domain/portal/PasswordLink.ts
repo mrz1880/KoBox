@@ -79,6 +79,14 @@ export class PasswordLink {
     return new PasswordLink({ ...this.props(), usedAt: now });
   }
 
+  // Replaced by a newer link: closed for good, whether or not it had expired.
+  closedAt(now: string): PasswordLink {
+    if (this.usedAt !== undefined) {
+      return this;
+    }
+    return new PasswordLink({ ...this.props(), usedAt: now });
+  }
+
   private props(): PasswordLinkProps {
     return {
       username: this.username,

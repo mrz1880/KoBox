@@ -40,4 +40,15 @@ describe('PasswordLink', () => {
   it('should_refuse_to_be_used_once_expired', () => {
     expect(() => issue('reset').use('2026-10-24 12:00:00')).toThrow(PasswordLinkClosedError);
   });
+
+  it('should_close_for_good_when_a_newer_link_replaces_it_even_once_expired', () => {
+    const replaced = issue('reset').closedAt('2026-10-24 12:00:00');
+
+    expect(replaced.usedAt).toBe('2026-10-24 12:00:00');
+    expect(replaced.isOpen('2026-10-24 10:30:00')).toBe(false);
+    // a link already used keeps the moment it was used
+    const used = issue('reset').use('2026-10-24 10:05:00');
+    expect(used.closedAt('2026-10-24 12:00:00').usedAt).toBe('2026-10-24 10:05:00');
+  });
 });
+
