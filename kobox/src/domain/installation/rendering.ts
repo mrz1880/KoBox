@@ -591,6 +591,10 @@ export function renderNfsExports(users: readonly NfsExportWiring[]): RenderedFil
   };
 }
 
+// The one port Samba answers on (no NetBIOS): the firewall opens it to the VPN
+// tunnels only, since a share exposed to the internet is a classic target.
+export const SAMBA_PORT = 445;
+
 // Samba: user-level security with per-user [homes] shares (KEEP from prod).
 // Passwords live in the Samba tdb: a member's is their portal password, set
 // through smbpasswd stdin whenever it is set on the portal.
@@ -606,7 +610,7 @@ export function renderSmbConf(): RenderedFile {
       '    map to guest = never',
       '    server role = standalone server',
       '    disable netbios = yes',
-      '    smb ports = 445',
+      `    smb ports = ${String(SAMBA_PORT)}`,
       '',
       '[homes]',
       '    comment = Home directory',
