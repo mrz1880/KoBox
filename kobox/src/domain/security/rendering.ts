@@ -1,4 +1,4 @@
-import { NFS_MOUNTD_PORT, SAMBA_PORT } from '../installation/rendering.js';
+import { HTTPS_PORT, NFS_MOUNTD_PORT, SAMBA_PORT } from '../installation/rendering.js';
 import type { RenderedFile } from '../shared/files.js';
 import type { IpAddress } from '../shared/IpAddress.js';
 import type { FirewallPolicy, FirewallUser } from './FirewallPolicy.js';
@@ -56,7 +56,7 @@ export function renderFirewallRules(policy: FirewallPolicy): RenderedFile {
     `-A INPUT -p tcp --dport ${String(policy.sshPort)} -j ACCEPT`,
     `-A INPUT -p tcp --dport ${String(policy.portalPort)} -j ACCEPT`,
     '-A INPUT -p tcp --dport 80 -j ACCEPT',
-    '-A INPUT -p tcp --dport 443 -j ACCEPT',
+    `-A INPUT -p tcp --dport ${String(HTTPS_PORT)} -j ACCEPT`,
     `-A INPUT -p udp --dport ${String(vpn.tunGwPort)} -j ACCEPT`,
     `-A INPUT -p udp --dport ${String(vpn.tunPort)} -j ACCEPT`,
     `-A INPUT -p udp --dport ${String(vpn.tapPort)} -j ACCEPT`,

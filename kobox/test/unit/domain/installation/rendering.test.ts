@@ -66,6 +66,21 @@ describe('installation rendering', () => {
     expect(conf).toContain('index index.html index.php;');
   });
 
+  // https://box/ is what people type: the portal answers there too, and 8189
+  // stays for the download clients and the habits carried over from MySB
+  it('should_serve_the_portal_on_the_standard_https_port_as_well', () => {
+    const conf = renderNginxVhost({ portalPort: 8189 }).content;
+    const portalBlock = conf.slice(conf.indexOf('listen 8189 ssl;') - 200);
+
+    expect(portalBlock).toMatch(/listen 8189 ssl;\n\s+listen 443 ssl;/);
+  });
+
+  it('should_send_plain_http_to_the_address_people_type', () => {
+    const conf = renderNginxVhost({ portalPort: 8189 }).content;
+
+    expect(conf).toContain('return 301 https://$host$request_uri;');
+  });
+
   it('should_turn_http2_on_with_the_directive_nginx_1_26_expects', () => {
     // `listen ... http2` is deprecated since nginx 1.25 and warns on every reload
     const conf = renderNginxVhost({ portalPort: 8189 }).content;

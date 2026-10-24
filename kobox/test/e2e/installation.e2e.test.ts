@@ -362,6 +362,14 @@ describe.skipIf(!onDebianAsRoot)('E2E: fresh Debian 13 -> bootstrap -> full stac
     }
   });
 
+  it('should_answer_on_the_address_people_type_and_send_plain_http_there', () => {
+    // https://box/ on the standard port reaches the portal like :8189 does
+    const standard = sh('curl', ['-sk', '-o', '/dev/null', '-w', '%{http_code} %{redirect_url}', 'https://127.0.0.1/']);
+    expect(standard).toMatch(/^303 https:\/\/127\.0\.0\.1\/login$/);
+    const plain = sh('curl', ['-s', '-o', '/dev/null', '-w', '%{http_code} %{redirect_url}', 'http://127.0.0.1/']);
+    expect(plain).toBe('301 https://127.0.0.1/');
+  });
+
   it('should_challenge_a_download_client_through_the_real_nginx', () => {
     // this is the door Sonarr and Radarr knock on, before they send a token
     const headers = sh('curl', [
