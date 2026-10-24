@@ -190,7 +190,9 @@ export class JobWorker {
           email: EmailAddress.parse(job.payload.email),
           quota: Quota.bytes(job.payload.quotaBytes),
           proxyPort: ProxyPort.parse(job.payload.proxyPort),
-          password: await this.passwords.open(job.payload.sealedPassword),
+          ...(job.payload.sealedPassword !== undefined && {
+            password: await this.passwords.open(job.payload.sealedPassword),
+          }),
           role: parseRole(job.payload.role),
         });
         return;

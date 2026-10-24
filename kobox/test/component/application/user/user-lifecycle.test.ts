@@ -212,6 +212,21 @@ describe('CreateUser', () => {
     expect(await world.credentials.find(alice)).toBeUndefined();
   });
 
+  it('should_create_an_invited_member_locked_until_they_choose_a_password', async () => {
+    const { username, email, quota, proxyPort } = createUserCommand();
+
+    await world.createUser.execute({ username, email, quota, proxyPort, role: 'admin' });
+
+    expect(await world.accounts.accountExists(alice)).toBe(true);
+    expect(world.accounts.passwordWasSetFor(alice)).toBe(false);
+    // the share and Nextcloud open with the password: there is none to give yet
+    expect(world.samba.passwordOf(alice)).toBeUndefined();
+    expect(world.nextcloud.passwordOf(alice)).toBeUndefined();
+    const credentials = await world.credentials.find(alice);
+    expect(credentials?.role).toBe('admin');
+    expect(credentials?.passwordHash).toBeUndefined();
+  });
+
   it('should_reject_duplicate_usernames', async () => {
     await world.createUser.execute(createUserCommand());
 

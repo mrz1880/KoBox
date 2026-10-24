@@ -196,7 +196,6 @@ exports[`job contract > should_keep_the_wire_contract_stable 1`] = `
       "email",
       "quotaBytes",
       "proxyPort",
-      "sealedPassword",
       "role",
     ],
     "type": "object",

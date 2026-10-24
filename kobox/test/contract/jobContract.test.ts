@@ -186,6 +186,17 @@ describe('job contract', () => {
     expect(job.payload).not.toHaveProperty('accountType');
   });
 
+  it('should_parse_a_create_user_job_for_an_invited_member_without_a_password', () => {
+    const job = parseJob('create-user', {
+      username: 'alice',
+      email: 'alice@example.org',
+      quotaBytes: 1,
+      proxyPort: 8080,
+    });
+
+    expect(job.payload).not.toHaveProperty('sealedPassword');
+  });
+
   it('should_reject_unknown_keys_on_a_create_user_job', () => {
     expect(() =>
       parseJob('create-user', {
