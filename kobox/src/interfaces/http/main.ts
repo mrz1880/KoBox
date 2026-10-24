@@ -38,6 +38,7 @@ async function main(): Promise<void> {
     users: container.repo,
     queue: container.queue,
     hasher: container.hasher,
+    passwords: container.passwords,
     trackers: container.trackerRepo,
     blocklists: container.blocklistRepo,
     addresses: container.addressRepo,

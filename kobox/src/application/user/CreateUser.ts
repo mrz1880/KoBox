@@ -1,7 +1,7 @@
 import type { Role } from '../../domain/portal/Role.js';
 import type { PortalCredentialsPort } from '../../domain/portal/ports.js';
 import type { EmailAddress } from '../../domain/user/EmailAddress.js';
-import type { HashedPassword } from '../../domain/user/HashedPassword.js';
+import type { Password } from '../../domain/user/Password.js';
 import type { ProxyPort, RtorrentPort, ScgiPort } from '../../domain/user/Port.js';
 import type { PortAllocatorPort } from '../../domain/user/PortAllocatorPort.js';
 import type { Quota } from '../../domain/user/Quota.js';
@@ -9,7 +9,9 @@ import { SeedboxUser } from '../../domain/user/SeedboxUser.js';
 import type { Username } from '../../domain/user/Username.js';
 import type {
   NotificationPort,
+  PasswordHasherPort,
   QuotaPort,
+  ServiceLoginPort,
   SftpPort,
   SystemAccountPort,
   UserRepository,
@@ -21,7 +23,7 @@ export interface CreateUserCommand {
   readonly email: EmailAddress;
   readonly quota: Quota;
   readonly proxyPort: ProxyPort;
-  readonly passwordHash: HashedPassword;
+  readonly password: Password;
   readonly role: Role;
   // Phase 7 import: preserve a legacy user's exact ports instead of allocating
   // fresh ones (keeps their in-flight torrents on the same SCGI/rtorrent ports).
@@ -39,6 +41,9 @@ interface Deps {
   readonly notifications: NotificationPort;
   readonly allocator: PortAllocatorPort;
   readonly credentials: PortalCredentialsPort;
+  readonly hasher: PasswordHasherPort;
+  // Samba, Nextcloud: every service that keeps its own copy of the password
+  readonly logins: readonly ServiceLoginPort[];
   readonly clock: () => string;
 }
 
@@ -46,7 +51,7 @@ export class CreateUser {
   constructor(private readonly deps: Deps) {}
 
   async execute(command: CreateUserCommand): Promise<SeedboxUser> {
-    const { repo, accounts, quota, sftp, notifications, allocator, credentials, clock } =
+    const { repo, accounts, quota, sftp, notifications, allocator, credentials, hasher, logins, clock } =
       this.deps;
 
     if (await repo.findByUsername(command.username)) {
@@ -88,7 +93,8 @@ export class CreateUser {
     try {
       await accounts.createAccount(user.username);
       accountCreated = true;
-      await accounts.setPassword(user.username, command.passwordHash);
+      const passwordHash = await hasher.hash(command.password);
+      await accounts.setPassword(user.username, passwordHash);
       await quota.setQuota(user.username, user.quota);
       await sftp.enableChrootAccess(user.username);
       const saved = await repo.save(user);
@@ -96,18 +102,25 @@ export class CreateUser {
       await credentials.save(
         {
           username: user.username,
-          passwordHash: command.passwordHash,
+          passwordHash,
           role: command.role,
           mustChangePassword: command.mustChangePassword === true,
         },
         clock(),
       );
+      // one password for everything: the share and Nextcloud open with it too
+      for (const login of logins) {
+        await login.setPassword(user.username, command.password);
+      }
       await notifications.notify(event);
       return saved;
     } catch (error) {
       // Compensate so a retry starts clean: no orphan account, no leaked port.
       if (accountCreated) {
         await accounts.deleteAccount(user.username).catch(() => undefined);
+      }
+      for (const login of logins) {
+        await login.remove(user.username).catch(() => undefined);
       }
       await credentials.delete(user.username).catch(() => undefined);
       await allocator.releaseScgiPort(scgiPort).catch(() => undefined);

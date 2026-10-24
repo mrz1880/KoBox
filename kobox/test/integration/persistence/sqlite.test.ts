@@ -30,6 +30,7 @@ import { SqliteFairUseRepository } from '../../../src/infrastructure/persistence
 import { SqliteBlocklistRepository } from '../../../src/infrastructure/persistence/SqliteBlocklistRepository.js';
 import { SqliteTrackerRepository } from '../../../src/infrastructure/persistence/SqliteTrackerRepository.js';
 import { SqliteUserAddressRepository } from '../../../src/infrastructure/persistence/SqliteUserAddressRepository.js';
+import { jobs } from '../../../src/infrastructure/persistence/schema.js';
 import { SqliteJobQueue } from '../../../src/infrastructure/persistence/SqliteJobQueue.js';
 import { SqlitePortAllocator } from '../../../src/infrastructure/persistence/SqlitePortAllocator.js';
 import { PortAlreadyClaimedError } from '../../../src/domain/user/PortAllocatorPort.js';
@@ -161,6 +162,19 @@ describe('SqliteJobQueue', () => {
     expect((await queue.claimNextPending())?.job.type).toBe('resume-user');
   });
 
+  it('should_forget_a_sealed_password_once_the_worker_holds_it', async () => {
+    const queue = new SqliteJobQueue(db);
+    const sealed = `${'A'.repeat(682)}==`;
+    await queue.enqueue(parseJob('change-password', { username: 'alice', sealedPassword: sealed }));
+
+    const claimed = await queue.claimNextPending();
+
+    // the worker still gets it, the database (and every backup of it) does not
+    expect(claimed?.job.payload).toEqual({ username: 'alice', sealedPassword: sealed });
+    const stored = db.orm.select({ payloadJson: jobs.payloadJson }).from(jobs).all();
+    expect(stored.map((row) => row.payloadJson)).toEqual([JSON.stringify({ username: 'alice' })]);
+  });
+
   it('should_not_hand_a_claimed_job_to_a_second_worker', async () => {
     const queue = new SqliteJobQueue(db);
     await queue.enqueue(parseJob('suspend-user', { username: 'alice' }));
@@ -201,6 +215,21 @@ describe('SqliteJobQueue', () => {
     };
     expect(row.status).toBe('failed');
     expect(row.error).toMatch(/username/);
+  });
+
+  it('should_quarantine_a_payload_that_is_not_even_json', async () => {
+    const queue = new SqliteJobQueue(db);
+    const poisoned = await queue.enqueue(parseJob('suspend-user', { username: 'alice' }));
+    await queue.enqueue(parseJob('resume-user', { username: 'alice' }));
+    db.raw.prepare('UPDATE jobs SET payload_json = ? WHERE id = ?').run('{not json', poisoned);
+
+    const claimed = await queue.claimNextPending();
+
+    expect(claimed?.job.type).toBe('resume-user');
+    const row = db.raw.prepare('SELECT status FROM jobs WHERE id = ?').get(poisoned) as {
+      status: string;
+    };
+    expect(row.status).toBe('failed');
   });
 
   it('should_dedupe_identical_pending_jobs_on_enqueue_unique', async () => {

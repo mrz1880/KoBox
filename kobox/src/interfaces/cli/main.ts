@@ -25,7 +25,7 @@ import { ConfigureMailRelay } from '../../application/maintenance/ConfigureMailR
 import { RestoreBackup } from '../../application/maintenance/RestoreBackup.js';
 import { ProbeSeedboxHealth } from '../../application/user/ProbeSeedboxHealth.js';
 import { BackupHostAdapter } from '../../infrastructure/system/BackupHostAdapter.js';
-import { ExecFileRunner, runOrThrow } from '../../infrastructure/system/CommandRunner.js';
+import { ExecFileRunner } from '../../infrastructure/system/CommandRunner.js';
 import { InstallHostAdapter } from '../../infrastructure/system/InstallHostAdapter.js';
 import { RtorrentConfigAdapter } from '../../infrastructure/system/RtorrentConfigAdapter.js';
 import { SystemdAdapter } from '../../infrastructure/system/SystemdAdapter.js';
@@ -98,13 +98,12 @@ program
     const password = await readPassword();
     const c = container();
     if (direct) {
-      const hash = await c.hasher.hash(password);
       await c.useCases.createUser.execute({
         username: Username.parse(username),
         email: EmailAddress.parse(options.email ?? ''),
         quota: Quota.gib(Number(options.quotaGib ?? '500')),
         proxyPort: ProxyPort.parse(Number(options.proxyPort ?? '8080')),
-        passwordHash: hash,
+        password,
         role: options.admin === undefined ? 'user' : 'admin',
       });
       await done(c, `user ${username} created`);
@@ -119,7 +118,7 @@ program
         role: options.admin === undefined ? 'user' : 'admin',
       },
       password,
-      c.hasher,
+      c.passwords,
     );
     const id = await c.queue.enqueue(job);
     await done(c, `job ${String(id)} enqueued: create-user ${username}`);
@@ -310,25 +309,6 @@ program
       buildJob.addWatchDir({ username: username.value, label: label.value }),
     );
     await done(c, `job ${String(id)} enqueued: add-watch-dir ${username.value} ${label.value}`);
-  });
-
-program
-  .command('provision-nextcloud-account')
-  .argument('<username>')
-  .description("give a member their Nextcloud account and their three rTorrent folders")
-  .action(async (rawUser: string) => {
-    const { direct } = program.opts<GlobalOptions>();
-    const username = Username.parse(rawUser);
-    const c = container();
-    if (direct) {
-      await c.useCases.provisionNextcloudAccount.execute({ username });
-      await done(c, `nextcloud account provisioned for ${username.value}`);
-      return;
-    }
-    const id = await c.queue.enqueue(
-      buildJob.provisionNextcloudAccount({ username: username.value }),
-    );
-    await done(c, `job ${String(id)} enqueued: provision-nextcloud-account ${username.value}`);
   });
 
 function flagCommand(
@@ -873,12 +853,11 @@ program
     const password = await readPassword();
     const c = container();
     if (direct) {
-      const hash = await c.hasher.hash(password);
-      await c.useCases.changePassword.execute({ username, passwordHash: hash });
+      await c.useCases.changePassword.execute({ username, password });
       await done(c, `password changed for ${username.value}`);
       return;
     }
-    const job = await buildJob.changePassword({ username: username.value }, password, c.hasher);
+    const job = await buildJob.changePassword({ username: username.value }, password, c.passwords);
     const id = await c.queue.enqueue(job);
     await done(c, `job ${String(id)} enqueued: change-password ${username.value}`);
   });
@@ -1006,25 +985,6 @@ program
       password,
     });
     process.stdout.write('postfix relay configured (sasl_passwd 0600, postmap, reload)\n');
-  });
-
-program
-  .command('set-samba-password')
-  .argument('<username>')
-  .description('set a user Samba password (read from stdin; direct root, never in the DB or a job)')
-  .action(async (username: string) => {
-    // no container: the secret goes straight to smbpasswd via stdin and never
-    // touches the database or a job payload
-    const password = await readStdin();
-    const name = Username.parse(username).value;
-    const runner = new ExecFileRunner();
-    // -s: read from stdin (new password + confirmation); -a: add/update
-    await runOrThrow(runner, {
-      command: 'smbpasswd',
-      args: ['-s', '-a', name],
-      stdin: `${password}\n${password}\n`,
-    });
-    process.stdout.write(`samba password set for ${name}\n`);
   });
 
 program

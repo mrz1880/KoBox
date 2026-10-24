@@ -83,8 +83,9 @@ Nothing comes over from MySB, so these are set again, per member, from what they
   `AUTH_BLOCKED` and AllDebrid emails the account owner to approve the new location. This is per
   IP and does not carry over: a key validated from a laptop is still blocked here. Expect one
   failed download per member, the row reading "AllDebrid blocked this new location".
-- **Nextcloud**: members who drop `.torrent` files through Nextcloud need their account
-  provisioned; the Watch folder is mounted in it.
+- **Nextcloud**: a member's account is created with their portal password, the Watch folder
+  mounted in it; a member created before Nextcloud was installed gets it at their next
+  password change.
 
 ## 5. What members redo on their side
 

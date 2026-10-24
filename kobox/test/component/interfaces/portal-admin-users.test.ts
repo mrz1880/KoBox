@@ -69,8 +69,9 @@ describe('admin user creation', () => {
     expect(job).toBeDefined();
     if (job?.type === 'create-user') {
       expect(job.payload.username).toBe('carol');
-      expect(job.payload.passwordHash.startsWith('$6$')).toBe(true);
       expect(JSON.stringify(job.payload)).not.toContain('brand-new-password');
+      // sealed for the worker, which opens it back to what was typed
+      expect((await world.passwords.open(job.payload.sealedPassword)).reveal()).toBe('brand-new-password');
       expect(job.payload.role).toBe('user');
     }
   });
@@ -161,8 +162,9 @@ describe('admin user lifecycle actions', () => {
     const job = world.queue.jobs[0];
     expect(job?.type).toBe('change-password');
     if (job?.type === 'change-password') {
-      expect(job.payload.passwordHash.startsWith('$6$')).toBe(true);
       expect(JSON.stringify(job.payload)).not.toContain('fresh-password-42');
+      // sealed for the worker, which opens it back to what was typed
+      expect((await world.passwords.open(job.payload.sealedPassword)).reveal()).toBe('fresh-password-42');
     }
   });
 

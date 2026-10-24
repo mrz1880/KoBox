@@ -11,11 +11,11 @@ import { InfoHash } from '../../domain/torrent/InfoHash.js';
 import { Label } from '../../domain/torrent/Label.js';
 import { SyncMode } from '../../domain/torrent/SyncMode.js';
 import { EmailAddress } from '../../domain/user/EmailAddress.js';
-import { HashedPassword } from '../../domain/user/HashedPassword.js';
 import { ProxyPort } from '../../domain/user/Port.js';
 import { RecyclingMode } from '../../domain/torrent/RecyclingMode.js';
 import { BlocklistSource } from '../../domain/tracker/BlocklistSource.js';
 import { Quota } from '../../domain/user/Quota.js';
+import type { PasswordOpenerPort } from '../../domain/user/ports.js';
 import { Username } from '../../domain/user/Username.js';
 import type {
   DdlUseCases,
@@ -58,6 +58,9 @@ export class JobWorker {
     private readonly outbox: MailOutboxPort,
     private readonly ddl: DdlUseCases,
     private readonly sync: SyncUseCases,
+    // the private half of the host key: only the root worker can open a
+    // password the portal sealed
+    private readonly passwords: PasswordOpenerPort,
   ) {}
 
   async processNext(): Promise<boolean> {
@@ -98,12 +101,6 @@ export class JobWorker {
       await this.queue.enqueue(parseJob('provision-rtorrent', { username: job.payload.username }));
       // Phase 3 debt #2: client cert issuance rides the same seam
       await this.queue.enqueue(parseJob('provision-vpn-user', { username: job.payload.username }));
-      // Nextcloud rides the same seam as rtorrent and the VPN. Leaving it to a
-      // button meant a member without an account until somebody remembered; the
-      // job itself does nothing when the component is not installed.
-      await this.queue.enqueue(
-        parseJob('provision-nextcloud-account', { username: job.payload.username }),
-      );
       // welcome mail through the durable outbox — never a password in it
       await this.outbox.enqueue(
         {
@@ -115,6 +112,9 @@ export class JobWorker {
             'Your seedbox account has been created. Sign in to the portal with',
             'your username and the password you were given, then change it from',
             'the "Password" page.',
+            '',
+            'The same password opens Nextcloud and the network share, and',
+            'changing it on the portal changes it there too.',
           ].join('\n'),
         },
         nowStamp(),
@@ -129,12 +129,6 @@ export class JobWorker {
       );
     }
     // a user's home appears/disappears with the account: re-render NFS exports
-    if (job.type === 'delete-user') {
-      // an account that outlives its member is a login nobody is watching
-      await this.queue.enqueue(
-        parseJob('delete-nextcloud-account', { username: job.payload.username }),
-      );
-    }
     if (job.type === 'create-user' || job.type === 'delete-user') {
       await this.queue.enqueue(parseJob('render-nfs-exports', {}));
     }
@@ -196,7 +190,7 @@ export class JobWorker {
           email: EmailAddress.parse(job.payload.email),
           quota: Quota.bytes(job.payload.quotaBytes),
           proxyPort: ProxyPort.parse(job.payload.proxyPort),
-          passwordHash: HashedPassword.parse(job.payload.passwordHash),
+          password: await this.passwords.open(job.payload.sealedPassword),
           role: parseRole(job.payload.role),
         });
         return;
@@ -208,7 +202,7 @@ export class JobWorker {
       case 'change-password':
         await this.useCases.changePassword.execute({
           username: Username.parse(job.payload.username),
-          passwordHash: HashedPassword.parse(job.payload.passwordHash),
+          password: await this.passwords.open(job.payload.sealedPassword),
         });
         return;
       case 'set-user-quota':
@@ -225,16 +219,6 @@ export class JobWorker {
         return;
       case 'apply-mail-relay':
         await this.maintenance.applyMailRelay.execute();
-        return;
-      case 'delete-nextcloud-account':
-        await this.useCases.deleteNextcloudAccount.execute({
-          username: Username.parse(job.payload.username),
-        });
-        return;
-      case 'provision-nextcloud-account':
-        await this.useCases.provisionNextcloudAccount.execute({
-          username: Username.parse(job.payload.username),
-        });
         return;
       case 'set-ssh-key':
         await this.useCases.setSshKey.execute({

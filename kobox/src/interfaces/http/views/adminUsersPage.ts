@@ -207,11 +207,6 @@ ${flash(message)}
 <h2>${viewer.t('Nextcloud')}</h2>
 <div class="card">
   <p class="muted">${viewer.t('nextcloud.what', { name })}</p>
-  <p class="muted">${viewer.t('nextcloud.password')}</p>
-  <form class="inline" method="post" action="/admin/users/${name}/nextcloud">
-    <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
-    <button type="submit">${viewer.t('Create their Nextcloud account')}</button>
-  </form>
 </div>
 
 <h2>${viewer.t('Reusing what is already here')}</h2>

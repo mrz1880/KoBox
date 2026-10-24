@@ -4,7 +4,6 @@ import { IPV4_PATTERN } from '../../domain/shared/IpAddress.js';
 import { INFO_HASH_PATTERN } from '../../domain/torrent/InfoHash.js';
 import { LABEL_PATTERN } from '../../domain/torrent/Label.js';
 import { EMAIL_PATTERN } from '../../domain/user/EmailAddress.js';
-import { CRYPT_HASH_PATTERN } from '../../domain/user/HashedPassword.js';
 import { USERNAME_PATTERN, Username } from '../../domain/user/Username.js';
 
 // The privilege boundary: the unprivileged side enqueues one of these closed
@@ -18,8 +17,6 @@ export const JOB_TYPES = [
   'set-user-quota',
   'set-user-role',
   'sample-disk-usage',
-  'provision-nextcloud-account',
-  'delete-nextcloud-account',
   'apply-mail-relay',
   'set-ssh-key',
   'remove-ssh-key',
@@ -83,7 +80,16 @@ const usernameField = z
   .string()
   .regex(USERNAME_PATTERN)
   .refine((raw) => !Username.RESERVED.includes(raw), { message: 'reserved username' });
-const passwordHashField = z.string().min(16).regex(CRYPT_HASH_PATTERN);
+// A member's password, sealed by the portal with the host public key (base64
+// RSA-OAEP). The smallest block that key could produce, RSA-2048, is already 344
+// characters, while a password is at most 100: a plaintext cannot pass for one.
+// The queue erases it once the worker has claimed the job.
+const SEALED_BLOCK_MIN_LENGTH = 344;
+const sealedPasswordField = z
+  .string()
+  .min(SEALED_BLOCK_MIN_LENGTH)
+  .max(4096)
+  .regex(/^[A-Za-z0-9+/=]+$/);
 
 const usernameOnly = z.strictObject({ username: usernameField });
 const labelField = z.string().regex(LABEL_PATTERN);
@@ -136,6 +142,18 @@ function withoutRetiredAccountType(raw: unknown): unknown {
   return payload;
 }
 
+// A sealed password is needed exactly once, by the worker that claims the job.
+// The row that stays in the jobs table afterwards, and every backup of it, must
+// not keep it: the queue stores this instead once the job is claimed.
+export function payloadAfterClaim(payload: unknown): unknown {
+  if (typeof payload !== 'object' || payload === null || !('sealedPassword' in payload)) {
+    return payload;
+  }
+  const kept: Record<string, unknown> = { ...payload };
+  delete kept.sealedPassword;
+  return kept;
+}
+
 export const jobPayloadSchemas = {
   'create-user': z.preprocess(
     withoutRetiredAccountType,
@@ -145,7 +163,7 @@ export const jobPayloadSchemas = {
       email: z.string().regex(new RegExp(EMAIL_PATTERN.source, 'i')),
       quotaBytes: z.number().int().nonnegative(),
       proxyPort: z.number().int().min(1).max(65535),
-      passwordHash: passwordHashField,
+      sealedPassword: sealedPasswordField,
       // portal capability level; provisioning is identical either way
       role: z.enum(ROLES).default('user'),
     }),
@@ -153,7 +171,7 @@ export const jobPayloadSchemas = {
   'delete-user': usernameOnly,
   'change-password': z.strictObject({
     username: usernameField,
-    passwordHash: passwordHashField,
+    sealedPassword: sealedPasswordField,
   }),
   // GiB, the unit the operator types and the one the form shows. The domain
   // turns it into a Quota; the payload stays a plain number so a queued job is
@@ -161,8 +179,6 @@ export const jobPayloadSchemas = {
   'set-user-quota': z.strictObject({ username: usernameField, quotaGib: z.number().int().positive() }),
   'set-user-role': z.strictObject({ username: usernameField, role: z.enum(ROLES) }),
   'sample-disk-usage': z.strictObject({}),
-  'provision-nextcloud-account': usernameOnly,
-  'delete-nextcloud-account': usernameOnly,
   // deliberately empty: the relay password never transits the jobs table
   'apply-mail-relay': z.strictObject({}),
   // the key is public by nature: nothing here is a secret, and the domain

@@ -11,7 +11,7 @@ import { RecyclingMode } from '../../domain/torrent/RecyclingMode.js';
 import { TorrentInstance } from '../../domain/torrent/TorrentInstance.js';
 import type { TorrentInstanceRepository, TorrentRepository } from '../../domain/torrent/ports.js';
 import type { Password } from '../../domain/user/Password.js';
-import type { PasswordHasherPort, UserRepository } from '../../domain/user/ports.js';
+import type { UserRepository } from '../../domain/user/ports.js';
 import { CreateUser } from '../user/CreateUser.js';
 import { SuspendUser } from '../user/SuspendUser.js';
 import type { MysbSource } from './MysbSourcePort.js';
@@ -60,7 +60,6 @@ interface Deps {
   readonly torrents: TorrentRepository;
   readonly addresses: UserAddressRepository;
   readonly bindings: DynDnsBindingRepository;
-  readonly hasher: PasswordHasherPort;
   readonly newTemporaryPassword: () => Password;
   readonly outbox: MailOutboxPort;
   readonly queue: JobQueuePort;
@@ -140,13 +139,12 @@ export class ImportFromMysb {
 
   private async importUser(mapped: MappedUser): Promise<void> {
     const tempPassword = this.deps.newTemporaryPassword();
-    const passwordHash = await this.deps.hasher.hash(tempPassword);
     await this.deps.createUser.execute({
       username: mapped.username,
       email: mapped.email,
       quota: mapped.quota,
       proxyPort: mapped.proxyPort,
-      passwordHash,
+      password: tempPassword,
       role: 'user',
       ports: { scgi: mapped.scgiPort, rtorrent: mapped.rtorrentPort },
       mustChangePassword: true,

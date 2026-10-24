@@ -60,7 +60,12 @@ import { NtfyChannel } from '../infrastructure/notifications/NtfyChannel.js';
 import type { NotificationChannel } from '../infrastructure/notifications/formatEvent.js';
 import type { SecurityNotificationPort } from '../domain/security/ports.js';
 import type { TrackerNotificationPort } from '../domain/tracker/ports.js';
-import type { NotificationPort } from '../domain/user/ports.js';
+import type { NotificationPort, PasswordSealerPort } from '../domain/user/ports.js';
+import { ComponentName } from '../domain/installation/ComponentName.js';
+import { NextcloudLogin } from '../application/user/NextcloudLogin.js';
+import { WhenInstalled } from '../application/user/WhenInstalled.js';
+import { RsaPasswordCipher } from '../infrastructure/system/RsaPasswordCipher.js';
+import { SmbpasswdLogin } from '../infrastructure/system/SmbpasswdLogin.js';
 import { KoboxDatabase } from '../infrastructure/persistence/db.js';
 import { SqliteBlocklistRepository } from '../infrastructure/persistence/SqliteBlocklistRepository.js';
 import { SqliteJobQueue } from '../infrastructure/persistence/SqliteJobQueue.js';
@@ -161,6 +166,20 @@ function envInt(name: string, fallback: number): number {
     throw new Error(`${name} must be a positive integer, got ${JSON.stringify(raw)}`);
   }
   return value;
+}
+
+// The host key pair, wherever this box keeps it: one place reads the override
+// so every cipher built here seals and opens with the same pair.
+function hostKeyPair(): { readonly publicKey: string; readonly privateKey: string } {
+  return {
+    publicKey: process.env.KOBOX_DEBRID_PUBLIC_KEY ?? DEFAULT_DEBRID_PUBLIC_KEY,
+    privateKey: process.env.KOBOX_DEBRID_PRIVATE_KEY ?? DEFAULT_DEBRID_PRIVATE_KEY,
+  };
+}
+
+function passwordCipher(): RsaPasswordCipher {
+  const keys = hostKeyPair();
+  return new RsaPasswordCipher(keys.publicKey, keys.privateKey);
 }
 
 function nowStamp(): string {
@@ -405,7 +424,6 @@ export function buildMigrateFromMysb(
     torrents: new SqliteTorrentRepository(c.db),
     addresses: c.addressRepo,
     bindings: c.addressRepo,
-    hasher: c.hasher,
     newTemporaryPassword: () => Password.parse(randomBytes(18).toString('base64url')),
     outbox: c.outbox,
     queue: c.queue,
@@ -434,7 +452,8 @@ export interface Container {
   readonly debridCipher: RsaDebridKeyCipher;
   readonly queue: SqliteJobQueue;
   readonly worker: JobWorker;
-  readonly hasher: OpensslPasswordHasher;
+  // seals a password typed at the CLI for the worker, like the portal does
+  readonly passwords: RsaPasswordCipher;
   readonly repo: SqliteUserRepository;
   readonly trackerRepo: SqliteTrackerRepository;
   readonly blocklistRepo: SqliteBlocklistRepository;
@@ -498,6 +517,9 @@ export interface PortalContainer {
   readonly debridDownloadRepo: SqliteDebridDownloadRepository;
   readonly debridAccountRepo: SqliteDebridAccountRepository;
   readonly debridEncryptor: DebridKeyEncryptorPort;
+  // the SEALER port only, for the same reason: a member's new password goes to
+  // the worker sealed, and the portal can never open one back
+  readonly passwords: PasswordSealerPort;
   readonly media: SqliteMediaRepository;
   readonly requestDownload: RequestDebridDownload;
 }
@@ -553,6 +575,7 @@ export function buildPortalContainer(name: string): PortalContainer {
     mailRelay: new SqliteMailRelayRepository(db),
     siteSettings: new SqliteSiteSettingsRepository(db),
     sealer: new RsaRemotePasswordCipher(),
+    passwords: passwordCipher(),
     sshKeys: new SqliteSshKeyRepository(db),
     destinations: syncDestinations,
     // read-only from here: the portal shows the queue, the worker moves it
@@ -597,15 +620,27 @@ export function buildContainer(name: string): Container {
   const sessions = new SqlitePortalSessionRepository(db);
   const loginAttempts = new SqliteLoginAttemptsRepository(db);
   const debridAccountRepo = new SqliteDebridAccountRepository(db);
+  const nextcloud = new OccNextcloudAdapter(runner);
+  const components = new SqliteComponentRegistry(db);
+  const passwords = passwordCipher();
   const useCases = buildUseCases({
     repo,
     accounts: new SystemAccountAdapter(runner),
     quota,
     diskSamples: new SqliteDiskUsageRepository(db),
-    nextcloud: new OccNextcloudAdapter(runner),
-    components: new SqliteComponentRegistry(db),
+    nextcloud,
+    components,
     outbox,
-    newPassword: () => Password.parse(randomBytes(12).toString('base64url')),
+    hasher: new OpensslPasswordHasher(runner),
+    // one password for every service: each one keeping its own copy is here
+    logins: [
+      new WhenInstalled(ComponentName.parse('samba'), components, new SmbpasswdLogin(runner)),
+      new WhenInstalled(
+        ComponentName.parse('nextcloud'),
+        components,
+        new NextcloudLogin({ nextcloud, credentials }),
+      ),
+    ],
     sshKeys: new SqliteSshKeyRepository(db),
     authorizedKeys: new AuthorizedKeysAdapter(runner, new RtorrentConfigAdapter(runner)),
     sftp: new SftpAdapter(runner),
@@ -787,6 +822,7 @@ export function buildContainer(name: string): Container {
       outbox,
       ddlUseCases,
       syncUseCases,
+      passwords,
     ),
     ddlUseCases,
     downloader,
@@ -796,7 +832,7 @@ export function buildContainer(name: string): Container {
     debridDownloadRepo,
     debridAccountRepo,
     debridCipher,
-    hasher: new OpensslPasswordHasher(runner),
+    passwords,
     repo,
     trackerRepo,
     blocklistRepo,

@@ -1,4 +1,5 @@
 import type { NextcloudPort } from '../../domain/installation/NextcloudPort.js';
+import type { Password } from '../../domain/user/Password.js';
 import type { Username } from '../../domain/user/Username.js';
 import { runOrThrow, type CommandRunner } from './CommandRunner.js';
 
@@ -65,19 +66,21 @@ export class OccNextcloudAdapter implements NextcloudPort {
     return info.exitCode === 0;
   }
 
-  async ensureUser(username: Username, password: string): Promise<void> {
-    if (await this.hasUser(username)) {
-      return;
-    }
+  async setUserPassword(username: Username, password: Password): Promise<void> {
+    const subcommand = (await this.hasUser(username)) ? 'user:resetpassword' : 'user:add';
+    // through the environment: an argv is readable by every user in /proc
     await runOrThrow(
       this.runner,
-      this.occ(['user:add', '--password-from-env', username.value], {
-        OC_PASS: password,
+      this.occ([subcommand, '--password-from-env', username.value], {
+        OC_PASS: password.reveal(),
       }),
     );
   }
 
   async deleteUser(username: Username): Promise<void> {
+    if (!(await this.hasUser(username))) {
+      return;
+    }
     await runOrThrow(this.runner, this.occ(['user:delete', username.value]));
   }
 

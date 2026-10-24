@@ -572,8 +572,8 @@ export function renderNfsExports(users: readonly NfsExportWiring[]): RenderedFil
 }
 
 // Samba: user-level security with per-user [homes] shares (KEEP from prod).
-// Passwords live in the Samba tdb, set out-of-band via `kobox set-samba-password`
-// (stdin → smbpasswd) — never in the DB or a job payload.
+// Passwords live in the Samba tdb: a member's is their portal password, set
+// through smbpasswd stdin whenever it is set on the portal.
 export function renderSmbConf(): RenderedFile {
   return {
     path: '/etc/samba/smb.conf',

@@ -103,9 +103,10 @@ exports[`job contract > should_keep_the_wire_contract_stable 1`] = `
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "additionalProperties": false,
     "properties": {
-      "passwordHash": {
-        "minLength": 16,
-        "pattern": "^\\$(6|y)\\$[A-Za-z0-9./=,$-]+$",
+      "sealedPassword": {
+        "maxLength": 4096,
+        "minLength": 344,
+        "pattern": "^[A-Za-z0-9+/=]+$",
         "type": "string",
       },
       "username": {
@@ -115,7 +116,7 @@ exports[`job contract > should_keep_the_wire_contract_stable 1`] = `
     },
     "required": [
       "username",
-      "passwordHash",
+      "sealedPassword",
     ],
     "type": "object",
   },
@@ -161,11 +162,6 @@ exports[`job contract > should_keep_the_wire_contract_stable 1`] = `
         "pattern": "^[a-z0-9._%+-]+@[a-z0-9-]+(\\.[a-z0-9-]+)+$",
         "type": "string",
       },
-      "passwordHash": {
-        "minLength": 16,
-        "pattern": "^\\$(6|y)\\$[A-Za-z0-9./=,$-]+$",
-        "type": "string",
-      },
       "proxyPort": {
         "maximum": 65535,
         "minimum": 1,
@@ -184,6 +180,12 @@ exports[`job contract > should_keep_the_wire_contract_stable 1`] = `
         ],
         "type": "string",
       },
+      "sealedPassword": {
+        "maxLength": 4096,
+        "minLength": 344,
+        "pattern": "^[A-Za-z0-9+/=]+$",
+        "type": "string",
+      },
       "username": {
         "pattern": "^[a-z][a-z0-9]{0,31}$",
         "type": "string",
@@ -194,7 +196,7 @@ exports[`job contract > should_keep_the_wire_contract_stable 1`] = `
       "email",
       "quotaBytes",
       "proxyPort",
-      "passwordHash",
+      "sealedPassword",
       "role",
     ],
     "type": "object",
@@ -211,20 +213,6 @@ exports[`job contract > should_keep_the_wire_contract_stable 1`] = `
     },
     "required": [
       "downloadId",
-    ],
-    "type": "object",
-  },
-  "delete-nextcloud-account": {
-    "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "additionalProperties": false,
-    "properties": {
-      "username": {
-        "pattern": "^[a-z][a-z0-9]{0,31}$",
-        "type": "string",
-      },
-    },
-    "required": [
-      "username",
     ],
     "type": "object",
   },
@@ -365,20 +353,6 @@ exports[`job contract > should_keep_the_wire_contract_stable 1`] = `
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "additionalProperties": false,
     "properties": {},
-    "type": "object",
-  },
-  "provision-nextcloud-account": {
-    "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "additionalProperties": false,
-    "properties": {
-      "username": {
-        "pattern": "^[a-z][a-z0-9]{0,31}$",
-        "type": "string",
-      },
-    },
-    "required": [
-      "username",
-    ],
     "type": "object",
   },
   "provision-rtorrent": {

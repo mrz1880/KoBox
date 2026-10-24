@@ -90,7 +90,6 @@ const FR: Readonly<Record<string, string>> = {
   'Download it again (default)': 'Le retélécharger (par défaut)',
   'Copy the files, so they get their own': 'Copier les fichiers, chacun a les siens',
   'Share the same files on disk': 'Partager les mêmes fichiers sur le disque',
-  'Create their Nextcloud account': 'Créer son compte Nextcloud',
   active: 'actif',
   suspended: 'suspendu',
   'Nothing measured yet. The hourly pass writes this down.':
@@ -155,9 +154,7 @@ const FR: Readonly<Record<string, string>> = {
   'recycling.tradeoff':
     'Copier dépense du disque pour économiser de la bande passante, et chaque membre garde ses propres octets : son quota continue de dire ce qu’il dit. Partager ne dépense presque rien et casse justement cela : les mêmes blocs sont comptés une seule fois, pour celui à qui le système de fichiers les attribue, et un membre qui supprime son torrent ne libère rien tant qu’un autre pointe encore dessus. Ce réglage ne vaut que pour les ajouts à venir.',
   'nextcloud.what':
-    'Donne à {name} un compte Nextcloud avec ses trois dossiers rTorrent à la racine, pour que le client de bureau puisse y déposer un fichier torrent depuis sa propre machine. Les membres sont des utilisateurs ordinaires ; seuls les administrateurs du portail administrent Nextcloud.',
-  'nextcloud.password':
-    'Le mot de passe Nextcloud est le sien et lui est envoyé par mail. KoBox ne garde le mot de passe du portail que sous forme d’empreinte et n’a rien à réutiliser : prétendre que les deux sont identiques serait mentir sur leur rapport.',
+    '{name} se connecte à Nextcloud et au partage réseau avec le mot de passe du portail : son compte Nextcloud est créé avec, ses trois dossiers rTorrent à la racine, et suit chacun de ses changements. Les membres sont des utilisateurs ordinaires ; seuls les administrateurs du portail administrent Nextcloud.',
   'storage.using': 'Utilise {used} Gio sur {allowance} Gio',
   'storage.measured': 'mesuré le {at}',
   'role.what':
@@ -190,9 +187,7 @@ const EN: Readonly<Record<string, string>> = {
   'recycling.tradeoff':
     'Copy spends disk to save bandwidth, and every member still holds their own bytes, so their quota keeps meaning what it says. Sharing spends almost nothing, and breaks that: the same blocks are counted once, for whoever the filesystem happens to attribute them to, and one member deleting their torrent frees nothing while another still points at the files. Changing this affects future adds only.',
   'nextcloud.what':
-    'Gives {name} a Nextcloud account with their three rTorrent folders at its root, so the desktop client can drop a torrent file in from their own machine. Members are ordinary Nextcloud users; only portal admins administer it.',
-  'nextcloud.password':
-    'The Nextcloud password is its own and is mailed to them. KoBox keeps the portal password as a hash and has nothing to reuse, so pretending the two are the same would be a lie about how they relate.',
+    '{name} signs in to Nextcloud and to the network share with their portal password: their Nextcloud account is created with it, their three rTorrent folders at its root, and follows every change of it. Members are ordinary Nextcloud users; only portal admins administer it.',
   'storage.using': 'Using {used} GiB of {allowance} GiB',
   'storage.measured': 'measured {at}',
   'role.what':

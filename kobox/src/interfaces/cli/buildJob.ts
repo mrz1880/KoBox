@@ -1,6 +1,6 @@
 import { parseJob, type Job } from '../../application/jobs/contract.js';
 import type { Password } from '../../domain/user/Password.js';
-import type { PasswordHasherPort } from '../../domain/user/ports.js';
+import type { PasswordSealerPort } from '../../domain/user/ports.js';
 
 const BYTES_PER_GIB = 1024 ** 3;
 
@@ -12,21 +12,22 @@ export interface CreateUserInput {
   readonly role?: string;
 }
 
-// The unprivileged side of the seam: plaintext is hashed here and dies here;
-// parseJob validates the payload before it ever reaches the queue.
+// The unprivileged side of the seam: plaintext is sealed here for the root
+// worker and dies here; parseJob validates the payload before it ever reaches
+// the queue.
 export const buildJob = {
   async createUser(
     input: CreateUserInput,
     password: Password,
-    hasher: PasswordHasherPort,
+    sealer: PasswordSealerPort,
   ): Promise<Job> {
-    const passwordHash = (await hasher.hash(password)).value;
+    const sealedPassword = await sealer.seal(password);
     return parseJob('create-user', {
       username: input.username,
       email: input.email,
       quotaBytes: Math.round(input.quotaGib * BYTES_PER_GIB),
       proxyPort: input.proxyPort,
-      passwordHash,
+      sealedPassword,
       ...(input.role !== undefined && { role: input.role }),
     });
   },
@@ -34,10 +35,10 @@ export const buildJob = {
   async changePassword(
     input: { username: string },
     password: Password,
-    hasher: PasswordHasherPort,
+    sealer: PasswordSealerPort,
   ): Promise<Job> {
-    const passwordHash = (await hasher.hash(password)).value;
-    return parseJob('change-password', { username: input.username, passwordHash });
+    const sealedPassword = await sealer.seal(password);
+    return parseJob('change-password', { username: input.username, sealedPassword });
   },
 
   deleteUser(input: { username: string }): Job {
@@ -81,14 +82,6 @@ export const buildJob = {
 
   applyMailRelay(): Job {
     return parseJob('apply-mail-relay', {});
-  },
-
-  deleteNextcloudAccount(input: { username: string }): Job {
-    return parseJob('delete-nextcloud-account', input);
-  },
-
-  provisionNextcloudAccount(input: { username: string }): Job {
-    return parseJob('provision-nextcloud-account', input);
   },
 
   setSshKey(input: { username: string; key: string }): Job {

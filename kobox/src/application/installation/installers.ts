@@ -905,8 +905,8 @@ class NfsInstaller implements ComponentInstaller {
   }
 }
 
-// Samba (KEEP from prod): user-level [homes] shares. Passwords are set
-// out-of-band via `kobox set-samba-password` — never through the DB or a job.
+// Samba (KEEP from prod): user-level [homes] shares. A member's password is
+// their portal password, handed to smbpasswd by SmbpasswdLogin.
 class SambaInstaller implements ComponentInstaller {
   readonly name = 'samba';
 

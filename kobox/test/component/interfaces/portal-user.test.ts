@@ -108,6 +108,31 @@ describe('self password change', () => {
     expect(world.queue.jobs).toHaveLength(0);
   });
 
+  it('should_refuse_a_new_password_too_long_to_reach_every_service_without_crashing', async () => {
+    const response = await world.server.inject({
+      method: 'POST',
+      url: '/password',
+      headers: { cookie: user.cookie, 'content-type': 'application/x-www-form-urlencoded' },
+      payload: form({ _csrf: user.csrf, current: '8chars!!', next: 'x'.repeat(101) }),
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.body).toContain('at most 100 characters');
+    expect(world.queue.jobs).toHaveLength(0);
+  });
+
+  it('should_call_an_impossible_current_password_incorrect_rather_than_crash', async () => {
+    const response = await world.server.inject({
+      method: 'POST',
+      url: '/password',
+      headers: { cookie: user.cookie, 'content-type': 'application/x-www-form-urlencoded' },
+      payload: form({ _csrf: user.csrf, current: 'y'.repeat(120), next: 'a-fresh-password' }),
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.body).toContain('current password is incorrect');
+  });
+
   it('should_enqueue_change_password_for_self_when_current_matches', async () => {
     const response = await world.server.inject({
       method: 'POST',
@@ -121,8 +146,9 @@ describe('self password change', () => {
     expect(job?.type).toBe('change-password');
     if (job?.type === 'change-password') {
       expect(job.payload.username).toBe('alice');
-      expect(job.payload.passwordHash.startsWith('$6$')).toBe(true);
       expect(JSON.stringify(job.payload)).not.toContain('a-fresh-password');
+      // sealed for the worker, which opens it back to what was typed
+      expect((await world.passwords.open(job.payload.sealedPassword)).reveal()).toBe('a-fresh-password');
     }
   });
 

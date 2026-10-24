@@ -31,7 +31,12 @@ import type {
   TrackerRepository,
   UserAddressRepository,
 } from '../../domain/tracker/ports.js';
-import type { HealthProbePort, PasswordHasherPort, UserRepository } from '../../domain/user/ports.js';
+import type {
+  HealthProbePort,
+  PasswordHasherPort,
+  PasswordSealerPort,
+  UserRepository,
+} from '../../domain/user/ports.js';
 import type { Logger } from '../../infrastructure/logging/logger.js';
 import { buildGuards, SESSION_COOKIE } from './guards.js';
 import type { DiagnosticsRepositoryPort } from '../../application/maintenance/DiagnosticsPort.js';
@@ -64,6 +69,9 @@ export interface PortalServerDeps {
   readonly users: UserRepository;
   readonly queue: JobQueuePort;
   readonly hasher: PasswordHasherPort;
+  // the public half of the host key: the portal seals a new password for the
+  // worker and can never open one back
+  readonly passwords: PasswordSealerPort;
   readonly trackers: TrackerRepository;
   readonly blocklists: BlocklistRepository;
   readonly addresses: UserAddressRepository;

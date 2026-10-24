@@ -10,9 +10,7 @@ import { InMemoryDiagnosticsRepository } from '../../../src/infrastructure/persi
 import { InMemorySpeedtestRepository } from '../../../src/infrastructure/persistence/InMemorySpeedtestRepository.js';
 import type { ClaimedJob, JobQueuePort } from '../../../src/application/jobs/JobQueuePort.js';
 import { InfoHash } from '../../../src/domain/torrent/InfoHash.js';
-import { HashedPassword } from '../../../src/domain/user/HashedPassword.js';
 import { Password } from '../../../src/domain/user/Password.js';
-import type { PasswordHasherPort } from '../../../src/domain/user/ports.js';
 import { Username } from '../../../src/domain/user/Username.js';
 import { IpAddress } from '../../../src/domain/shared/IpAddress.js';
 import { Blocklist } from '../../../src/domain/tracker/Blocklist.js';
@@ -80,6 +78,11 @@ import {
 } from '../../../src/interfaces/useCases.js';
 import { InMemoryDebridAccountRepository } from '../../../src/infrastructure/persistence/InMemoryDebridAccountRepository.js';
 import { InMemoryDebridDownloadRepository } from '../../../src/infrastructure/persistence/InMemoryDebridDownloadRepository.js';
+import { FakePasswordCipher } from '../../../src/infrastructure/system/fakes/FakePasswordCipher.js';
+import { FakePasswordHasher } from '../../../src/infrastructure/system/fakes/FakePasswordHasher.js';
+import { FakeServiceLogin } from '../../../src/infrastructure/system/fakes/FakeServiceLogin.js';
+import { NextcloudLogin } from '../../../src/application/user/NextcloudLogin.js';
+import { WhenInstalled } from '../../../src/application/user/WhenInstalled.js';
 import { FakeNextcloud } from '../../../src/infrastructure/system/fakes/FakeNextcloud.js';
 import { InMemoryComponentRegistry } from '../../../src/infrastructure/persistence/InMemoryComponentRegistry.js';
 import { ComponentName } from '../../../src/domain/installation/ComponentName.js';
@@ -146,18 +149,6 @@ class InMemoryJobQueue implements JobQueuePort {
   }
 }
 
-class FakePasswordHasher implements PasswordHasherPort {
-  hash(password: Password): Promise<HashedPassword> {
-    return Promise.resolve(
-      HashedPassword.parse(`$6$fakesalt$${'x'.repeat(20)}${String(password.reveal().length)}`),
-    );
-  }
-
-  async verify(password: Password, hash: HashedPassword): Promise<boolean> {
-    return (await this.hash(password)).value === hash.value;
-  }
-}
-
 const alice = Username.parse('alice');
 
 interface World {
@@ -189,7 +180,8 @@ interface World {
   syncTransfers: InMemorySyncTransferRepository;
   mailTransport: RecordingMailTransport;
   worker: JobWorker;
-  hasher: FakePasswordHasher;
+  passwords: FakePasswordCipher;
+  samba: FakeServiceLogin;
   credentials: InMemoryPortalCredentialsRepository;
 }
 
@@ -237,6 +229,8 @@ let world: World;
 beforeEach(() => {
   const outbox = new InMemoryMailOutbox();
   const nextcloud = new FakeNextcloud();
+  const samba = new FakeServiceLogin();
+  const passwords = new FakePasswordCipher();
   const components = new InMemoryComponentRegistry();
   const repo = new InMemoryUserRepository();
   const accounts = new FakeSystemAccounts();
@@ -257,7 +251,15 @@ beforeEach(() => {
     nextcloud,
     components,
     outbox,
-    newPassword: () => Password.parse('nextcloud-generated-pass'),
+    hasher: new FakePasswordHasher(),
+    logins: [
+      new WhenInstalled(ComponentName.parse('samba'), components, samba),
+      new WhenInstalled(
+        ComponentName.parse('nextcloud'),
+        components,
+        new NextcloudLogin({ nextcloud, credentials }),
+      ),
+    ],
     sshKeys: new InMemorySshKeyRepository(),
     authorizedKeys: { write: () => Promise.resolve(), clear: () => Promise.resolve() },
     sftp,
@@ -456,7 +458,8 @@ beforeEach(() => {
     identity,
     dyndns,
     pki,
-    hasher: new FakePasswordHasher(),
+    passwords,
+    samba,
     ipset,
     outbox,
     mailTransport,
@@ -473,6 +476,7 @@ beforeEach(() => {
       outbox,
       ddlUseCases,
       syncUseCases,
+      passwords,
     ),
   };
 });
@@ -486,7 +490,7 @@ async function enqueueCreateAlice(): Promise<number> {
       proxyPort: 8080,
     },
     Password.parse('s3cretpw'),
-    world.hasher,
+    world.passwords,
   );
   return world.queue.enqueue(job);
 }
@@ -550,7 +554,8 @@ describe('CLI enqueue -> root worker loop (the privilege seam)', () => {
 
     await world.worker.drain();
 
-    expect(world.nextcloud.users).toContain('alice');
+    // with the password the member signs in to the portal with, not one of its own
+    expect(world.nextcloud.passwordOf(alice)).toBe('s3cretpw');
     expect(world.nextcloud.mounts.map((m) => m.label)).toEqual([
       'rTorrent Complete',
       'rTorrent Torrents',

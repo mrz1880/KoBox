@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { JOB_TYPES, jobPayloadSchemas, parseJob } from '../../src/application/jobs/contract.js';
 
-const HASH = '$6$testsalt$0123456789abcdefghijklmnopqrstuv';
+// shaped like an RSA-4096 OAEP block in base64: 684 characters
+const SEALED = `${'A'.repeat(682)}==`;
 
 describe('job contract', () => {
   it('should_expose_a_closed_set_of_job_types', () => {
@@ -13,8 +14,6 @@ describe('job contract', () => {
       'set-user-quota',
       'set-user-role',
       'sample-disk-usage',
-      'provision-nextcloud-account',
-      'delete-nextcloud-account',
       'apply-mail-relay',
       'set-ssh-key',
       'remove-ssh-key',
@@ -79,7 +78,7 @@ describe('job contract', () => {
       email: 'alice@example.org',
       quotaBytes: 1,
       proxyPort: 8080,
-      passwordHash: HASH,
+      sealedPassword: SEALED,
     };
 
     const plain = parseJob('create-user', payload);
@@ -164,7 +163,7 @@ describe('job contract', () => {
       email: 'alice@example.org',
       quotaBytes: 412 * 1024 ** 3,
       proxyPort: 8080,
-      passwordHash: HASH,
+      sealedPassword: SEALED,
     });
 
     expect(job.type).toBe('create-user');
@@ -180,7 +179,7 @@ describe('job contract', () => {
       accountType: 'plex',
       quotaBytes: 1,
       proxyPort: 8080,
-      passwordHash: HASH,
+      sealedPassword: SEALED,
     });
 
     expect(job.type).toBe('create-user');
@@ -194,7 +193,7 @@ describe('job contract', () => {
         email: 'alice@example.org',
         quotaBytes: 1,
         proxyPort: 8080,
-        passwordHash: HASH,
+        sealedPassword: SEALED,
         extra: 1,
       }),
     ).toThrow();
@@ -208,7 +207,14 @@ describe('job contract', () => {
     expect(() => parseJob('suspend-user', { username: 'Tony Z; rm -rf /' })).toThrow();
     expect(() => parseJob('suspend-user', { username: 'root' })).toThrow();
     expect(() =>
-      parseJob('change-password', { username: 'alice', passwordHash: 'plaintext' }),
+      parseJob('change-password', { username: 'alice', sealedPassword: 'plaintextpassword' }),
+    ).toThrow();
+    // the hash the portal used to send is no longer how a password travels
+    expect(() =>
+      parseJob('change-password', {
+        username: 'alice',
+        passwordHash: '$6$testsalt$0123456789abcdefghijklmnopqrstuv',
+      }),
     ).toThrow();
     expect(() =>
       parseJob('create-user', {
@@ -216,7 +222,7 @@ describe('job contract', () => {
         email: 'not-an-email',
           quotaBytes: 1,
         proxyPort: 8080,
-        passwordHash: HASH,
+        sealedPassword: SEALED,
       }),
     ).toThrow();
   });

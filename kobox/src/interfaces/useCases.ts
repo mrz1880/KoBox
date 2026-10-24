@@ -90,7 +90,6 @@ import { RenderOpenVpn } from '../application/security/RenderOpenVpn.js';
 import { ResolveDynDns } from '../application/security/ResolveDynDns.js';
 import type { SecuritySettings } from '../application/security/settings.js';
 import { ChangePassword } from '../application/user/ChangePassword.js';
-import { DeleteNextcloudAccount, ProvisionNextcloudAccount } from '../application/user/ProvisionNextcloudAccount.js';
 import { RemoveSshKey, SetSshKey } from '../application/user/SetSshKey.js';
 import { SampleDiskUsage } from '../application/user/SampleDiskUsage.js';
 import { SetUserQuota } from '../application/user/SetUserQuota.js';
@@ -144,10 +143,11 @@ import type { PortalCredentialsPort, SessionStorePort } from '../domain/portal/p
 import type { PortAllocatorPort } from '../domain/user/PortAllocatorPort.js';
 import type { NextcloudPort } from '../domain/installation/NextcloudPort.js';
 import type { ComponentRegistry } from '../domain/installation/ports.js';
-import type { Password } from '../domain/user/Password.js';
 import type {
   HealthProbePort,
   NotificationPort,
+  PasswordHasherPort,
+  ServiceLoginPort,
   AuthorizedKeysPort,
   DiskUsageRepository,
   SshKeyRepository,
@@ -166,7 +166,6 @@ export interface UseCaseDeps {
   readonly nextcloud: NextcloudPort;
   readonly components: ComponentRegistry;
   readonly outbox: MailOutboxPort;
-  readonly newPassword: () => Password;
   readonly sshKeys: SshKeyRepository;
   readonly authorizedKeys: AuthorizedKeysPort;
   readonly sftp: SftpPort;
@@ -177,6 +176,9 @@ export interface UseCaseDeps {
   readonly sessions: SessionStorePort;
   // delete-user must not leave the user's sealed debrid key behind
   readonly debridAccounts: DebridAccountRepository;
+  readonly hasher: PasswordHasherPort;
+  // every service keeping its own copy of a member's password
+  readonly logins: readonly ServiceLoginPort[];
   readonly clock: () => string;
 }
 
@@ -187,8 +189,6 @@ export interface UseCases {
   readonly setUserQuota: SetUserQuota;
   readonly changeRole: ChangeRole;
   readonly sampleDiskUsage: SampleDiskUsage;
-  readonly provisionNextcloudAccount: ProvisionNextcloudAccount;
-  readonly deleteNextcloudAccount: DeleteNextcloudAccount;
   readonly setSshKey: SetSshKey;
   readonly removeSshKey: RemoveSshKey;
   readonly suspendUser: SuspendUser;
@@ -203,8 +203,6 @@ export function buildUseCases(deps: UseCaseDeps): UseCases {
     setUserQuota: new SetUserQuota(deps),
     changeRole: new ChangeRole(deps),
     sampleDiskUsage: new SampleDiskUsage({ ...deps, samples: deps.diskSamples }),
-    provisionNextcloudAccount: new ProvisionNextcloudAccount(deps),
-    deleteNextcloudAccount: new DeleteNextcloudAccount(deps),
     setSshKey: new SetSshKey({ ...deps, keys: deps.sshKeys, authorizedKeys: deps.authorizedKeys }),
     removeSshKey: new RemoveSshKey({ ...deps, keys: deps.sshKeys, authorizedKeys: deps.authorizedKeys }),
     suspendUser: new SuspendUser(deps),

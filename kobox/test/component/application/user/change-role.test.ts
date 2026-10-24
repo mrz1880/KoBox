@@ -4,6 +4,7 @@ import { PortalLoginMissingError, UserNotFoundError } from '../../../../src/appl
 import { ComponentName } from '../../../../src/domain/installation/ComponentName.js';
 import { Language } from '../../../../src/domain/portal/Language.js';
 import { EmailAddress } from '../../../../src/domain/user/EmailAddress.js';
+import { Password } from '../../../../src/domain/user/Password.js';
 import { HashedPassword } from '../../../../src/domain/user/HashedPassword.js';
 import { ProxyPort, RtorrentPort, ScgiPort } from '../../../../src/domain/user/Port.js';
 import { Quota } from '../../../../src/domain/user/Quota.js';
@@ -75,7 +76,7 @@ describe('ChangeRole', () => {
   it('should_take_a_demoted_member_out_of_the_nextcloud_admins', async () => {
     await credentials.save({ username: alice, passwordHash: aHash, role: 'admin' }, now);
     await components.markInstalled(ComponentName.parse('nextcloud'), undefined, now);
-    await nextcloud.ensureUser(alice);
+    await nextcloud.setUserPassword(alice, Password.parse('correct horse battery'));
     await nextcloud.setAdmin(alice, true);
 
     await changeRole.execute({ username: alice, role: 'user' });

@@ -12,10 +12,8 @@ import type {
 } from '../../../../src/application/migration/MysbSourcePort.js';
 import { CreateUser } from '../../../../src/application/user/CreateUser.js';
 import { SuspendUser } from '../../../../src/application/user/SuspendUser.js';
-import { HashedPassword } from '../../../../src/domain/user/HashedPassword.js';
 import { Password } from '../../../../src/domain/user/Password.js';
 import { RtorrentPort, ScgiPort } from '../../../../src/domain/user/Port.js';
-import type { PasswordHasherPort } from '../../../../src/domain/user/ports.js';
 import type { PortAllocatorPort } from '../../../../src/domain/user/PortAllocatorPort.js';
 import { PortAlreadyClaimedError } from '../../../../src/domain/user/PortAllocatorPort.js';
 import { Username } from '../../../../src/domain/user/Username.js';
@@ -31,20 +29,9 @@ import { InMemoryUserRepository } from '../../../../src/infrastructure/persisten
 import { FakeNotifications } from '../../../../src/infrastructure/system/fakes/FakeNotifications.js';
 import { FakeQuota } from '../../../../src/infrastructure/system/fakes/FakeQuota.js';
 import { FakeServiceControl } from '../../../../src/infrastructure/system/fakes/FakeServiceControl.js';
+import { FakePasswordHasher } from '../../../../src/infrastructure/system/fakes/FakePasswordHasher.js';
 import { FakeSftp } from '../../../../src/infrastructure/system/fakes/FakeSftp.js';
 import { FakeSystemAccounts } from '../../../../src/infrastructure/system/fakes/FakeSystemAccounts.js';
-
-const FIXED_HASH = HashedPassword.parse('$6$importsalt$0123456789abcdefghijklmnopqrstuvwxyzABCDE');
-
-class FakeHasher implements PasswordHasherPort {
-  hash(_password: Password): Promise<HashedPassword> {
-    return Promise.resolve(FIXED_HASH);
-  }
-
-  verify(_password: Password, _hash: HashedPassword): Promise<boolean> {
-    return Promise.resolve(true);
-  }
-}
 
 class RecordingQueue implements JobQueuePort {
   readonly jobs: Job[] = [];
@@ -197,6 +184,8 @@ function buildWorld(source: MysbSource) {
   const allocator = new SequentialPortAllocator();
   const clock = (): string => '2026-07-26 12:00:00';
   const createUser = new CreateUser({
+    hasher: new FakePasswordHasher(),
+    logins: [],
     repo: users,
     accounts,
     quota,
@@ -225,7 +214,6 @@ function buildWorld(source: MysbSource) {
     torrents,
     addresses,
     bindings: addresses,
-    hasher: new FakeHasher(),
     newTemporaryPassword: () => Password.parse('temp-secret-9x'),
     outbox,
     queue,
