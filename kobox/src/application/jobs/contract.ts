@@ -163,7 +163,8 @@ export const jobPayloadSchemas = {
       email: z.string().regex(new RegExp(EMAIL_PATTERN.source, 'i')),
       quotaBytes: z.number().int().nonnegative(),
       proxyPort: z.number().int().min(1).max(65535),
-      sealedPassword: sealedPasswordField,
+      // absent for an invited member, who chooses it through their link
+      sealedPassword: sealedPasswordField.optional(),
       // portal capability level; provisioning is identical either way
       role: z.enum(ROLES).default('user'),
     }),

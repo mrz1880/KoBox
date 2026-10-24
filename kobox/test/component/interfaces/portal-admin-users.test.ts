@@ -71,7 +71,7 @@ describe('admin user creation', () => {
       expect(job.payload.username).toBe('carol');
       expect(JSON.stringify(job.payload)).not.toContain('brand-new-password');
       // sealed for the worker, which opens it back to what was typed
-      expect((await world.passwords.open(job.payload.sealedPassword)).reveal()).toBe('brand-new-password');
+      expect((await world.passwords.open(job.payload.sealedPassword ?? '')).reveal()).toBe('brand-new-password');
       expect(job.payload.role).toBe('user');
     }
   });

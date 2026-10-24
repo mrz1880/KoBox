@@ -23,7 +23,9 @@ export interface CreateUserCommand {
   readonly email: EmailAddress;
   readonly quota: Quota;
   readonly proxyPort: ProxyPort;
-  readonly password: Password;
+  // absent for an invited member: the account stays locked, and the share and
+  // Nextcloud wait, until they choose one through their invitation link
+  readonly password?: Password;
   readonly role: Role;
   // Phase 7 import: preserve a legacy user's exact ports instead of allocating
   // fresh ones (keeps their in-flight torrents on the same SCGI/rtorrent ports).
@@ -93,8 +95,11 @@ export class CreateUser {
     try {
       await accounts.createAccount(user.username);
       accountCreated = true;
-      const passwordHash = await hasher.hash(command.password);
-      await accounts.setPassword(user.username, passwordHash);
+      const { password } = command;
+      const passwordHash = password === undefined ? undefined : await hasher.hash(password);
+      if (passwordHash !== undefined) {
+        await accounts.setPassword(user.username, passwordHash);
+      }
       await quota.setQuota(user.username, user.quota);
       await sftp.enableChrootAccess(user.username);
       const saved = await repo.save(user);
@@ -102,15 +107,17 @@ export class CreateUser {
       await credentials.save(
         {
           username: user.username,
-          passwordHash,
+          ...(passwordHash !== undefined && { passwordHash }),
           role: command.role,
           mustChangePassword: command.mustChangePassword === true,
         },
         clock(),
       );
       // one password for everything: the share and Nextcloud open with it too
-      for (const login of logins) {
-        await login.setPassword(user.username, command.password);
+      if (password !== undefined) {
+        for (const login of logins) {
+          await login.setPassword(user.username, password);
+        }
       }
       await notifications.notify(event);
       return saved;
