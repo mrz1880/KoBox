@@ -2,6 +2,7 @@ import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import { Cidr, InvalidCidrError } from '../../../../src/domain/security/Cidr.js';
 import { IpAddress } from '../../../../src/domain/shared/IpAddress.js';
+import { VpnHost } from '../../../../src/domain/user/VpnHost.js';
 
 const ipIntArb = fc.nat({ max: 0xffffffff });
 const prefixArb = fc.integer({ min: 0, max: 32 });
@@ -100,4 +101,13 @@ describe('Cidr', () => {
       }),
     );
   });
+
+  it('should_place_a_member_host_inside_the_tunnel', () => {
+    expect(Cidr.parse('10.0.1.0/24').addressOf(VpnHost.parse(7))).toBe('10.0.1.7');
+  });
+
+  it('should_refuse_a_host_the_network_cannot_hold', () => {
+    expect(() => Cidr.parse('10.0.1.0/28').addressOf(VpnHost.parse(20))).toThrow(InvalidCidrError);
+  });
 });
+
