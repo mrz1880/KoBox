@@ -197,6 +197,13 @@
       "when": 1792847606329,
       "tag": "0027_invited-member-without-password",
       "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "6",
+      "when": 1792847751325,
+      "tag": "0028_password-links",
+      "breakpoints": true
     }
   ]
 }

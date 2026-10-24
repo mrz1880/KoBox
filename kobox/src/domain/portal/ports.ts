@@ -1,3 +1,4 @@
+import type { PasswordLink } from './PasswordLink.js';
 import type { HashedPassword } from '../user/HashedPassword.js';
 import type { Username } from '../user/Username.js';
 import type { Language } from './Language.js';
@@ -66,4 +67,17 @@ export interface LoginAttemptsPort {
 export interface SessionTokenPort {
   generate(): string;
   hashToken(token: string): string;
+}
+
+// The links members follow to choose their password. `now` on save is when a
+// new link was issued (what the hourly limit counts), or when a used one was
+// written back.
+export interface PasswordLinkRepository {
+  save(link: PasswordLink, now: string): Promise<void>;
+  findByTokenHash(tokenHash: string): Promise<PasswordLink | undefined>;
+  // a new link replaces whatever the member still had open
+  closeOpen(username: Username, now: string): Promise<void>;
+  countIssuedSince(username: Username, since: string): Promise<number>;
+  latest(username: Username): Promise<PasswordLink | undefined>;
+  deleteForUser(username: Username): Promise<void>;
 }
