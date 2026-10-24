@@ -686,6 +686,7 @@ export function buildContainer(name: string): Container {
     components,
     outbox,
     hasher: new OpensslPasswordHasher(runner),
+    links: new SqlitePasswordLinkRepository(db),
     // one password for every service: each one keeping its own copy is here
     logins: [
       new WhenInstalled(ComponentName.parse('samba'), components, new SmbpasswdLogin(runner)),
@@ -870,7 +871,6 @@ export function buildContainer(name: string): Container {
       trackerUseCases,
       securityUseCases,
       maintenanceUseCases,
-      outbox,
       ddlUseCases,
       syncUseCases,
       passwords,

@@ -83,6 +83,7 @@ import { FakePasswordHasher } from '../../../src/infrastructure/system/fakes/Fak
 import { FakeServiceLogin } from '../../../src/infrastructure/system/fakes/FakeServiceLogin.js';
 import { NextcloudLogin } from '../../../src/application/user/NextcloudLogin.js';
 import { WhenInstalled } from '../../../src/application/user/WhenInstalled.js';
+import { InMemoryPasswordLinkRepository } from '../../../src/infrastructure/persistence/InMemoryPasswordLinkRepository.js';
 import { FakeNextcloud } from '../../../src/infrastructure/system/fakes/FakeNextcloud.js';
 import { InMemoryComponentRegistry } from '../../../src/infrastructure/persistence/InMemoryComponentRegistry.js';
 import { ComponentName } from '../../../src/domain/installation/ComponentName.js';
@@ -252,6 +253,7 @@ beforeEach(() => {
     components,
     outbox,
     hasher: new FakePasswordHasher(),
+    links: new InMemoryPasswordLinkRepository(),
     logins: [
       new WhenInstalled(ComponentName.parse('samba'), components, samba),
       new WhenInstalled(
@@ -473,7 +475,6 @@ beforeEach(() => {
       trackerUseCases,
       securityUseCases,
       maintenanceUseCases,
-      outbox,
       ddlUseCases,
       syncUseCases,
       passwords,
@@ -508,16 +509,15 @@ describe('CLI enqueue -> root worker loop (the privilege seam)', () => {
     expect(await world.services.isUserServiceRunning(alice)).toBe(false);
   });
 
-  it('should_enqueue_a_welcome_mail_without_any_password_in_it', async () => {
+  // the portal's invitation is the member's first mail: a second one from the
+  // worker would arrive alongside it, saying less
+  it('should_leave_the_member_their_invitation_as_the_only_mail', async () => {
     await enqueueCreateAlice();
 
     await world.worker.drain();
 
     const recent = await world.outbox.listRecent(10);
-    const welcome = recent.find((mail) => mail.subject.includes('ready'));
-    expect(welcome?.recipient).toBe('alice@example.org');
-    expect(welcome?.body).toContain('alice');
-    expect(welcome?.body).not.toContain('s3cretpw');
+    expect(recent.filter((mail) => mail.recipient === 'alice@example.org')).toEqual([]);
   });
 
   it('should_chain_the_user_blocklist_filter_render_after_provisioning', async () => {

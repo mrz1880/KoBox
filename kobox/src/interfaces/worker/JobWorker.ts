@@ -1,6 +1,5 @@
 import { parseJob, type Job } from '../../application/jobs/contract.js';
 import type { JobQueuePort } from '../../application/jobs/JobQueuePort.js';
-import type { MailOutboxPort } from '../../application/maintenance/MailOutboxPort.js';
 import { LoggableService, ManagedService } from '../../domain/maintenance/ManagedService.js';
 import { parseRole } from '../../domain/portal/Role.js';
 import { DynDnsHost } from '../../domain/security/DynDnsHost.js';
@@ -55,7 +54,6 @@ export class JobWorker {
     private readonly trackers: TrackerUseCases,
     private readonly security: SecurityUseCases,
     private readonly maintenance: MaintenanceUseCases,
-    private readonly outbox: MailOutboxPort,
     private readonly ddl: DdlUseCases,
     private readonly sync: SyncUseCases,
     // the private half of the host key: only the root worker can open a
@@ -101,24 +99,6 @@ export class JobWorker {
       await this.queue.enqueue(parseJob('provision-rtorrent', { username: job.payload.username }));
       // Phase 3 debt #2: client cert issuance rides the same seam
       await this.queue.enqueue(parseJob('provision-vpn-user', { username: job.payload.username }));
-      // welcome mail through the durable outbox — never a password in it
-      await this.outbox.enqueue(
-        {
-          recipient: job.payload.email,
-          subject: 'Your KoBox account is ready',
-          body: [
-            `Hello ${job.payload.username},`,
-            '',
-            'Your seedbox account has been created. Sign in to the portal with',
-            'your username and the password you were given, then change it from',
-            'the "Password" page.',
-            '',
-            'The same password opens Nextcloud and the network share, and',
-            'changing it on the portal changes it there too.',
-          ].join('\n'),
-        },
-        nowStamp(),
-      );
     }
     if (job.type === 'delete-user') {
       await this.queue.enqueue(

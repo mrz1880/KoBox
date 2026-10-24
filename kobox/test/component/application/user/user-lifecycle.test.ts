@@ -22,6 +22,8 @@ import type { PortAllocatorPort } from '../../../../src/domain/user/PortAllocato
 import { PortAlreadyClaimedError } from '../../../../src/domain/user/PortAllocatorPort.js';
 import { Quota } from '../../../../src/domain/user/Quota.js';
 import { Username } from '../../../../src/domain/user/Username.js';
+import { InMemoryPasswordLinkRepository } from '../../../../src/infrastructure/persistence/InMemoryPasswordLinkRepository.js';
+import { PasswordLink } from '../../../../src/domain/portal/PasswordLink.js';
 import { InMemoryPortalCredentialsRepository } from '../../../../src/infrastructure/persistence/InMemoryPortalCredentialsRepository.js';
 import { InMemoryDebridAccountRepository } from '../../../../src/infrastructure/persistence/InMemoryDebridAccountRepository.js';
 import { InMemoryPortalSessionRepository } from '../../../../src/infrastructure/persistence/InMemoryPortalSessionRepository.js';
@@ -118,6 +120,7 @@ interface World {
   sessions: InMemoryPortalSessionRepository;
   debridAccounts: InMemoryDebridAccountRepository;
   hasher: FakePasswordHasher;
+  links: InMemoryPasswordLinkRepository;
   samba: FakeServiceLogin;
   nextcloud: FakeServiceLogin;
   createUser: CreateUser;
@@ -144,13 +147,14 @@ beforeEach(() => {
   const debridAccounts = new InMemoryDebridAccountRepository();
   const diskSamples = new InMemoryDiskUsageRepository();
   const hasher = new FakePasswordHasher();
+  const links = new InMemoryPasswordLinkRepository();
   const samba = new FakeServiceLogin();
   const nextcloud = new FakeServiceLogin();
   const allocator = new SequentialPortAllocator();
   const clock = (): string => '2026-07-25 10:00:00';
   const deps = {
     repo, accounts, quota, sftp, services, notifications, credentials, sessions,
-    debridAccounts, clock, hasher, logins: [samba, nextcloud],
+    debridAccounts, clock, hasher, logins: [samba, nextcloud], links,
   };
   world = {
     ...deps,
@@ -388,6 +392,18 @@ describe('DeleteUser', () => {
     expect(world.nextcloud.passwordOf(alice)).toBeUndefined();
   });
 
+  it('should_not_let_a_password_link_outlive_the_member', async () => {
+    await world.createUser.execute(createUserCommand());
+    await world.links.save(
+      PasswordLink.issue({ username: alice, purpose: 'reset', tokenHash: 'a'.repeat(64), now: '2026-07-25 10:00:00' }),
+      '2026-07-25 10:00:00',
+    );
+
+    await world.deleteUser.execute({ username: alice });
+
+    expect(await world.links.latest(alice)).toBeUndefined();
+  });
+
   it('should_reject_deleting_an_unknown_user', async () => {
     await expect(world.deleteUser.execute({ username: alice })).rejects.toThrow(UserNotFoundError);
   });
@@ -425,6 +441,18 @@ describe('ChangePassword', () => {
 
     expect(world.samba.passwordOf(alice)).toBe(newPassword.reveal());
     expect(world.nextcloud.passwordOf(alice)).toBe(newPassword.reveal());
+  });
+
+  it('should_close_the_link_still_open_once_the_password_is_changed', async () => {
+    await world.createUser.execute(createUserCommand());
+    await world.links.save(
+      PasswordLink.issue({ username: alice, purpose: 'reset', tokenHash: 'a'.repeat(64), now: '2026-07-25 09:59:00' }),
+      '2026-07-25 09:59:00',
+    );
+
+    await world.changePassword.execute({ username: alice, password: Password.parse('a brand new one') });
+
+    expect((await world.links.latest(alice))?.isOpen('2026-07-25 10:00:01')).toBe(false);
   });
 
   it('should_keep_the_language_the_member_chose', async () => {

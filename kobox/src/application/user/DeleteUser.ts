@@ -1,5 +1,9 @@
 import type { DebridAccountRepository } from '../../domain/ddl/ports.js';
-import type { PortalCredentialsPort, SessionStorePort } from '../../domain/portal/ports.js';
+import type {
+  PasswordLinkRepository,
+  PortalCredentialsPort,
+  SessionStorePort,
+} from '../../domain/portal/ports.js';
 import type { Username } from '../../domain/user/Username.js';
 import type {
   NotificationPort,
@@ -25,6 +29,7 @@ interface Deps {
   readonly sessions: SessionStorePort;
   readonly debridAccounts: DebridAccountRepository;
   readonly logins: readonly ServiceLoginPort[];
+  readonly links: PasswordLinkRepository;
 }
 
 export class DeleteUser {
@@ -49,6 +54,8 @@ export class DeleteUser {
     await accounts.deleteAccount(user.username);
     await sessions.deleteForUser(user.username);
     await credentials.delete(user.username);
+    // a link to choose the password of an account that is gone
+    await this.deps.links.deleteForUser(user.username);
     // their sealed debrid key must not outlive the account
     await debridAccounts.remove(user.username);
     await repo.delete(user.username);
