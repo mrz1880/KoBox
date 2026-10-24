@@ -9,8 +9,7 @@ import { Login } from '../../../src/application/portal/Login.js';
 import { Logout } from '../../../src/application/portal/Logout.js';
 import type { DebridApiKey } from '../../../src/domain/ddl/DebridApiKey.js';
 import type { DebridKeyEncryptorPort } from '../../../src/domain/ddl/ports.js';
-import { HashedPassword } from '../../../src/domain/user/HashedPassword.js';
-import type { Password } from '../../../src/domain/user/Password.js';
+import { Password } from '../../../src/domain/user/Password.js';
 import { Username } from '../../../src/domain/user/Username.js';
 import { RtorrentPort, ScgiPort } from '../../../src/domain/user/Port.js';
 import { Label } from '../../../src/domain/torrent/Label.js';
@@ -24,7 +23,7 @@ import type { ConfigDocument } from '../../../src/domain/installation/ConfigDocu
 import type { RemotePasswordSealerPort } from '../../../src/domain/sync/ports.js';
 import type { RemotePassword } from '../../../src/domain/sync/RemotePassword.js';
 import { SetSyncDestination } from '../../../src/application/sync/SetSyncDestination.js';
-import type { PasswordHasherPort } from '../../../src/domain/user/ports.js';
+import { FakePasswordHasher } from '../../../src/infrastructure/system/fakes/FakePasswordHasher.js';
 import { FakePasswordCipher } from '../../../src/infrastructure/system/fakes/FakePasswordCipher.js';
 import { FakeHealthProbe } from '../../../src/infrastructure/system/fakes/FakeHealthProbe.js';
 import { InMemoryBlocklistRepository } from '../../../src/infrastructure/persistence/InMemoryBlocklistRepository.js';
@@ -88,21 +87,7 @@ class NoProfiles implements VpnProfileStorePort {
   }
 }
 
-// FakeHasher output for the 8-character test password
-const GOOD_HASH = HashedPassword.parse(`$6$fakesalt$${'x'.repeat(20)}8`);
 export const TEST_PASSWORD = '8chars!!';
-
-export class FakeHasher implements PasswordHasherPort {
-  hash(password: Password): Promise<HashedPassword> {
-    return Promise.resolve(
-      HashedPassword.parse(`$6$fakesalt$${'x'.repeat(20)}${String(password.reveal().length)}`),
-    );
-  }
-
-  async verify(password: Password, hash: HashedPassword): Promise<boolean> {
-    return (await this.hash(password)).value === hash.value;
-  }
-}
 
 // Records enqueued jobs; the portal never consumes them, so claiming is out.
 export class RecordingQueue implements JobQueuePort {
@@ -178,7 +163,8 @@ export async function buildPortalWorld(
   const sessions = new InMemoryPortalSessionRepository();
   const attempts = new InMemoryLoginAttemptsRepository();
   const tokens = new FakeSessionTokens();
-  const hasher = new FakeHasher();
+  const hasher = new FakePasswordHasher();
+  const goodHash = await hasher.hash(Password.parse(TEST_PASSWORD));
   const passwords = new FakePasswordCipher();
   const queue = new RecordingQueue();
   const outbox = new InMemoryMailOutbox();
@@ -247,7 +233,7 @@ export async function buildPortalWorld(
   });
   await users.save(new UserBuilder().build());
   await credentials.save(
-    { username: Username.parse('alice'), passwordHash: GOOD_HASH, role: 'user' },
+    { username: Username.parse('alice'), passwordHash: goodHash, role: 'user' },
     NOW,
   );
   // alice runs an instance with one category, the shape every member has
@@ -266,7 +252,7 @@ export async function buildPortalWorld(
       .build(),
   );
   await credentials.save(
-    { username: Username.parse('boss'), passwordHash: GOOD_HASH, role: 'admin' },
+    { username: Username.parse('boss'), passwordHash: goodHash, role: 'admin' },
     NOW,
   );
   return { server, users, credentials, sessions, queue, outbox, downloads, debridAccounts, media, fairUse, diagnostics, instances, diskSamples, sshKeys, components, mailRelay, siteSettings, destinations, transfers, passwords };
