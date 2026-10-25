@@ -1,7 +1,8 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import type { JobQueuePort } from '../../../application/jobs/JobQueuePort.js';
-import type { PortalCredentialsPort } from '../../../domain/portal/ports.js';
+import type { PortalCredentials, PortalCredentialsPort } from '../../../domain/portal/ports.js';
+import type { SeedboxUser } from '../../../domain/user/SeedboxUser.js';
 import { ROLES } from '../../../domain/portal/Role.js';
 import { USERNAME_PATTERN } from '../../../domain/user/Username.js';
 import { Username } from '../../../domain/user/Username.js';
@@ -50,11 +51,28 @@ const ACTION_WORDS: Readonly<Record<string, string>> = {
   resume: 'Restoring',
 };
 
+// A login with no password yet: they have not followed their invitation.
+function awaitsInvitation(login: PortalCredentials | undefined): boolean {
+  return login !== undefined && login.passwordHash === undefined;
+}
+
 export function registerAdminUserRoutes(
   server: FastifyInstance,
   deps: AdminUsersDeps,
   guards: Guards,
 ): void {
+  // the members who have not followed their invitation: a login, no password
+  const invitedAmong = async (users: readonly SeedboxUser[]): Promise<ReadonlySet<string>> => {
+    const invited = new Set<string>();
+    for (const user of users) {
+      const login = await deps.credentials.find(user.username);
+      if (awaitsInvitation(login)) {
+        invited.add(user.username.value);
+      }
+    }
+    return invited;
+  };
+
   server.get('/admin/users', async (request, reply) => {
     const session = await guards.requireAdmin(request, reply);
     if (session === undefined) {
@@ -63,7 +81,7 @@ export function registerAdminUserRoutes(
     const users = await deps.users.listAll();
     return reply
       .type('text/html')
-      .send(adminUsersPage(users, viewerOf(session), flashOf(request)));
+      .send(adminUsersPage(users, await invitedAmong(users), viewerOf(session), flashOf(request)));
   });
 
   server.post('/admin/users', async (request, reply) => {
@@ -73,9 +91,11 @@ export function registerAdminUserRoutes(
     }
     const parsed = createUserSchema.safeParse(request.body);
     if (!parsed.success) {
-      return reply.code(400).type('text/html').send(
-        adminUsersPage(await deps.users.listAll(), viewerOf(session), undefined),
-      );
+      const users = await deps.users.listAll();
+      return reply
+        .code(400)
+        .type('text/html')
+        .send(adminUsersPage(users, await invitedAmong(users), viewerOf(session), undefined));
     }
     // nobody types the member's password: they choose it through the link
     let invitation: { readonly url: string };
@@ -112,8 +132,7 @@ export function registerAdminUserRoutes(
     const instance = await deps.instances.findByUsername(user.username);
     const usage = await deps.diskSamples.find(user.username);
     const login = await deps.credentials.find(user.username);
-    // no password yet: they have not followed their invitation
-    const access = login !== undefined && login.passwordHash === undefined ? 'invited' : 'active';
+    const access = awaitsInvitation(login) ? 'invited' : 'active';
     return reply
       .type('text/html')
       .send(
