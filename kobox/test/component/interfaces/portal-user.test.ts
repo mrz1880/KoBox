@@ -84,7 +84,7 @@ describe('role-routed home', () => {
   it('should_show_a_fleet_summary_to_an_admin', async () => {
     const response = await world.server.inject({
       method: 'GET',
-      url: '/',
+      url: '/admin',
       headers: { cookie: admin.cookie },
     });
 

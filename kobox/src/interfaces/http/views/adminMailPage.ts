@@ -50,5 +50,6 @@ tested is a relay you find out about on the day it matters.</p>
   <button type="submit">${viewer.t('Send me a test message')}</button>
 </form>`,
     viewer,
+    'admin',
   );
 }

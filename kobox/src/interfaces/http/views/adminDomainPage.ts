@@ -38,5 +38,6 @@ the name must already resolve to this machine, and someone must run
 <span class="mono">kobox install</span> on it. Saving here does neither. The
 renewal afterwards is automatic and needs nobody.</p>`,
     viewer,
+    'admin',
   );
 }

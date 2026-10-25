@@ -79,6 +79,7 @@ ${flash(message)}
   <button type="submit">Add hostname</button>
 </form>`,
     viewer,
+    'admin',
   );
 }
 
@@ -174,5 +175,6 @@ ${flash(message)}
 <h2>Recent events</h2>
 ${eventBlocks}`,
     viewer,
+    'admin',
   );
 }

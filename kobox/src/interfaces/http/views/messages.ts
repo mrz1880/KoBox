@@ -7,7 +7,16 @@ import type { Language } from '../../../domain/portal/Language.js';
 const FR: Readonly<Record<string, string>> = {
   // navigation
   Home: 'Accueil',
-  'My media': 'Mes fichiers',
+  'My media': 'Mes médias',
+  'My files': 'Mes fichiers',
+  'My seedbox': 'Ma seedbox',
+  Administration: 'Administration',
+  Members: 'Membres',
+  'Network & security': 'Réseau et sécurité',
+  System: 'Système',
+  Troubleshooting: 'Dépannage',
+  Menu: 'Menu',
+  Space: 'Espace',
   Downloads: 'Téléchargements',
   Folders: 'Dossiers',
   Account: 'Mon compte',
