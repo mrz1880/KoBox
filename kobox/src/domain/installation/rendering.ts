@@ -823,6 +823,66 @@ export function renderRutorrentConfig(): RenderedFile {
   };
 }
 
+// The ratio groups members are offered in ruTorrent, in place of its own eight
+// alike ones (ratio0 to ratio7). A group stops a torrent once its ratio reaches
+// the percentage, or once it has seeded that many hours; never erases anything.
+// A ratio that cannot be reached (1000x) leaves a group to its duration alone.
+interface RatioGroup {
+  readonly name: string;
+  readonly ratioPercent: number;
+  readonly seedHours?: number;
+}
+
+const UNREACHABLE_RATIO_PERCENT = 100_000;
+
+const RATIO_GROUPS: readonly RatioGroup[] = [
+  { name: 'Privé : ratio 1 ou 3 jours', ratioPercent: 100, seedHours: 72 },
+  { name: 'Privé exigeant : ratio 2 ou 7 jours', ratioPercent: 200, seedHours: 168 },
+  { name: 'Public : ratio 1', ratioPercent: 100 },
+  { name: 'Court : 24 h', ratioPercent: UNREACHABLE_RATIO_PERCENT, seedHours: 24 },
+];
+
+// Run as the web server for one member (REMOTE_USER), through ruTorrent's own
+// ratio code, so the groups land where and how ruTorrent keeps them. It writes
+// only over ruTorrent's untouched defaults: a member who changed any group
+// keeps theirs, now and on every later run.
+export function renderRutorrentRatioOffer(): RenderedFile {
+  const groups = RATIO_GROUPS.map(
+    (group) =>
+      `  ['action' => RAT_STOP, 'name' => '${group.name}', 'min' => ${String(group.ratioPercent)}, 'max' => ${String(group.ratioPercent)}, 'upload' => 0, 'time' => ${String(group.seedHours ?? -1)}],`,
+  );
+  return {
+    path: '/usr/local/share/kobox/rutorrent-ratios.php',
+    content: [
+      '<?php',
+      '// KoBox-managed — DO NOT EDIT (rendered declaratively).',
+      // a ruTorrent release without its ratio plugin: nothing to offer
+      `if (!is_file('${RUTORRENT_DIR}/plugins/ratio/ratio.php')) {`,
+      '  exit(0);',
+      '}',
+      `chdir('${RUTORRENT_DIR}/plugins/ratio');`,
+      "require_once 'ratio.php';",
+      '$ratio = rRatio::load();',
+      'foreach ($ratio->rat as $i => $group) {',
+      "  $untouched = $group['name'] === 'ratio' . $i && $group['min'] == 100 && $group['max'] == 300",
+      "    && $group['upload'] == 0.1 && $group['time'] == -1 && $group['action'] == RAT_STOP;",
+      '  if (!$untouched) {',
+      '    exit(0);',
+      '  }',
+      '}',
+      '$ratio->rat = [',
+      ...groups,
+      '];',
+      '$ratio->pad();',
+      '(new rCache())->set($ratio);',
+      '',
+    ].join('\n'),
+    mode: '0644',
+    owner: 'root',
+    group: 'root',
+  };
+}
+
 // Plugins this box cannot run, switched off rather than left to show an error
 // at every load. dump needs dumptorrent, which no Debian release packages.
 const DISABLED_RUTORRENT_PLUGINS = ['dump'];

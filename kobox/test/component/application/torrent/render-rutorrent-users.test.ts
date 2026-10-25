@@ -35,6 +35,16 @@ describe('RenderRutorrentUsers', () => {
     expect(profiles.ensured).toEqual(['alice', 'bob']);
   });
 
+  // ruTorrent's eight alike groups said nothing: every member is offered
+  // KoBox's, which keep a member's own choice once they made one
+  it('should_offer_every_active_member_ratio_groups_that_say_what_they_do', async () => {
+    const { profiles, useCase } = await world();
+
+    await useCase.execute();
+
+    expect(profiles.offeredRatioGroups).toEqual(['alice', 'bob']);
+  });
+
   it('should_render_the_rpc_include_and_a_config_per_user', async () => {
     const { files, useCase } = await world();
 

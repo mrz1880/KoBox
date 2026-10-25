@@ -1,5 +1,8 @@
 import { WEB_SERVER_USER } from '../../domain/installation/platform.js';
-import { rutorrentProfilesDir } from '../../domain/installation/rendering.js';
+import {
+  renderRutorrentRatioOffer,
+  rutorrentProfilesDir,
+} from '../../domain/installation/rendering.js';
 import type { RutorrentProfilePort } from '../../domain/torrent/ports.js';
 import type { Username } from '../../domain/user/Username.js';
 import { runOrThrow, type CommandRunner } from './CommandRunner.js';
@@ -23,5 +26,19 @@ export class RutorrentProfileAdapter implements RutorrentProfilePort {
     for (const [command, ...args] of steps) {
       await runOrThrow(this.runner, { command, args });
     }
+  }
+
+  // ruTorrent finds a member's settings by REMOTE_USER, and the web server owns
+  // the folder they live in: the script runs as it, for that member only
+  async offerRatioGroups(username: Username): Promise<void> {
+    const script = renderRutorrentRatioOffer().path;
+    // laid down with ruTorrent: no ruTorrent on this box, nothing to offer
+    if ((await this.runner.run({ command: 'test', args: ['-f', script] })).exitCode !== 0) {
+      return;
+    }
+    await runOrThrow(this.runner, {
+      command: 'runuser',
+      args: ['-u', WEB_SERVER_USER, '--', 'env', `REMOTE_USER=${username.value}`, 'php', script],
+    });
   }
 }
