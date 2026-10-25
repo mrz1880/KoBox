@@ -38,6 +38,17 @@ describe('admin health screen', () => {
     expect(response.statusCode).toBe(403);
   });
 
+  // the menu no longer lists Monitoring: Health is where an admin finds it
+  it('should_lead_to_the_monitoring_of_the_machine', async () => {
+    const response = await world.server.inject({
+      method: 'GET',
+      url: '/admin/health',
+      headers: { cookie: admin.cookie },
+    });
+
+    expect(response.body).toContain('href="/monitoring"');
+  });
+
   it('should_show_service_probes_and_component_registry', async () => {
     const response = await world.server.inject({
       method: 'GET',
