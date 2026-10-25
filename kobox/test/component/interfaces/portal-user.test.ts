@@ -681,6 +681,20 @@ describe('ruTorrent iframe', () => {
     const cookie = [response.headers['set-cookie']].flat().find((line) => line?.startsWith('Language='));
     expect(cookie).toMatch(/^Language=fr; Path=\//);
   });
+
+  // a member who never chose kept their browser's language in ruTorrent: the
+  // portal's English default overrode it, so without a choice it hands over
+  // nothing, and takes back a cookie it once set
+  it('should_leave_rutorrent_to_the_browsers_language_when_none_was_chosen', async () => {
+    const response = await world.server.inject({
+      method: 'GET',
+      url: '/rutorrent',
+      headers: { cookie: user.cookie },
+    });
+
+    const cookie = [response.headers['set-cookie']].flat().find((line) => line?.startsWith('Language='));
+    expect(cookie).toMatch(/^Language=; Max-Age=0; Path=\//);
+  });
 });
 
 describe('categories and sending', () => {
