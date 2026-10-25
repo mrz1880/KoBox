@@ -48,11 +48,11 @@ kobox install-status
 kobox doctor
 ```
 
-Create the first administrator (the password is read from standard input):
+Invite the first administrator. The command prints the invitation link, valid 7 days and once:
+open it to choose the password, even before the box can send mail.
 
 ```sh
-read -rs PASSWORD && printf '%s' "$PASSWORD" \
-  | kobox create-user alice --email alice@example.org --admin
+kobox invite-member alice --email alice@example.org --admin
 ```
 
 The portal answers on `https://<your-host>:8189`.
@@ -137,11 +137,11 @@ kobox install-status
 kobox doctor
 ```
 
-Crée le premier administrateur (le mot de passe est lu sur l'entrée standard) :
+Invite le premier administrateur. La commande affiche le lien d'invitation, valable 7 jours et une
+seule fois : ouvre-le pour choisir le mot de passe, même avant que la box sache envoyer des mails.
 
 ```sh
-read -rs PASSWORD && printf '%s' "$PASSWORD" \
-  | kobox create-user alice --email alice@example.org --admin
+kobox invite-member alice --email alice@example.org --admin
 ```
 
 Le portail répond sur `https://<ton-hôte>:8189`.

@@ -89,7 +89,9 @@ program
   .option('--quota-gib <number>', 'disk quota in GiB', '500')
   .option('--proxy-port <port>', 'shared proxy port', '8080')
   .option('--admin', 'grant the portal admin role')
-  .description('create a seedbox user (password read from stdin)')
+  .description(
+    'create a seedbox user with a password you set, read from stdin (scripts and tests: invite-member lets them choose their own)',
+  )
   .action(async (username: string, options: Record<string, string>) => {
     const { direct } = program.opts<GlobalOptions>();
     const password = await readPassword();
@@ -119,6 +121,25 @@ program
     );
     const id = await c.queue.enqueue(job);
     await done(c, `job ${String(id)} enqueued: create-user ${username}`);
+  });
+
+program
+  .command('invite-member')
+  .argument('<username>')
+  .requiredOption('--email <email>')
+  .option('--quota-gib <number>', 'disk quota in GiB', '500')
+  .option('--admin', 'grant the portal admin role')
+  .description('invite a member, who chooses their own password through the link mailed to them')
+  .action(async (username: string, options: Record<string, string>) => {
+    const c = container();
+    const invitation = await c.inviteMember.execute({
+      username: Username.parse(username),
+      email: EmailAddress.parse(options.email ?? ''),
+      quota: Quota.gib(Number(options.quotaGib ?? '500')),
+      role: options.admin === undefined ? 'user' : 'admin',
+    });
+    // the link opens the account: printed for the operator, never logged
+    await done(c, `invitation sent to ${username}; the link, valid 7 days and once: ${invitation.url}`);
   });
 
 const USERNAME_JOB_BUILDERS = {
