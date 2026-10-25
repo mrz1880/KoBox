@@ -106,6 +106,12 @@ describe('Cidr', () => {
     expect(Cidr.parse('10.0.1.0/24').addressOf(VpnHost.parse(7))).toBe('10.0.1.7');
   });
 
+  // OpenVPN's server directive gives the box the first address of the tunnel,
+  // where members reach Samba and NFS
+  it('should_give_the_box_the_first_address_of_the_tunnel', () => {
+    expect(Cidr.parse('10.0.1.0/24').firstAddress()).toBe('10.0.1.1');
+  });
+
   it('should_refuse_a_host_the_network_cannot_hold', () => {
     expect(() => Cidr.parse('10.0.1.0/28').addressOf(VpnHost.parse(20))).toThrow(InvalidCidrError);
   });

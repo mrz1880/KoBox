@@ -81,6 +81,7 @@ import { SqliteBlocklistRepository } from '../infrastructure/persistence/SqliteB
 import { SqliteJobQueue } from '../infrastructure/persistence/SqliteJobQueue.js';
 import { SqliteLoginAttemptsRepository } from '../infrastructure/persistence/SqliteLoginAttemptsRepository.js';
 import { SiteSettingsWithInstallDefault } from '../infrastructure/persistence/SiteSettingsWithInstallDefault.js';
+import { subnetOf } from '../domain/security/vpn.js';
 import { SqliteSiteSettingsRepository } from '../infrastructure/persistence/SqliteSiteSettingsRepository.js';
 import { SqliteMailRelayRepository } from '../infrastructure/persistence/SqliteMailRelayRepository.js';
 import { SqliteSshKeyRepository } from '../infrastructure/persistence/SqliteSshKeyRepository.js';
@@ -559,6 +560,7 @@ export interface PortalContainer {
   readonly diskSamples: SqliteDiskUsageRepository;
   readonly mailRelay: SqliteMailRelayRepository;
   readonly siteSettings: SiteSettingsWithInstallDefault;
+  readonly boxInVpn: string;
   readonly saveMailRelay: SaveMailRelay;
   readonly sshKeys: SqliteSshKeyRepository;
   readonly destinations: SqliteSyncDestinationRepository;
@@ -648,6 +650,8 @@ export function buildPortalContainer(name: string): PortalContainer {
     diskSamples: new SqliteDiskUsageRepository(db),
     mailRelay,
     siteSettings: siteSettings(db),
+    // members reach Samba and NFS at the box's address in the usual tunnel
+    boxInVpn: subnetOf('tun-gw', securitySettings().vpn).firstAddress(),
     // the PUBLIC half only: the portal and the CLI store a relay the same way
     saveMailRelay: new SaveMailRelay({ settings: mailRelay, sealer: remotePasswordCipher() }),
     passwords: passwordCipher(),

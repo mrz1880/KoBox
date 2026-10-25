@@ -56,6 +56,7 @@ async function main(): Promise<void> {
     instances: container.instances,
     diskSamples: container.diskSamples,
     mailRelay: container.mailRelay,
+    boxInVpn: container.boxInVpn,
     siteSettings: container.siteSettings,
     saveMailRelay: container.saveMailRelay,
     sshKeys: container.sshKeys,

@@ -237,6 +237,7 @@ export async function buildPortalWorld(
     instances,
     diskSamples,
     mailRelay,
+    boxInVpn: '10.0.0.1',
     siteSettings,
     saveMailRelay: new SaveMailRelay({ settings: mailRelay, sealer: new FakeRemoteSealer() }),
     sshKeys,

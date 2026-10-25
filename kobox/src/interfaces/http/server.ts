@@ -111,6 +111,7 @@ export interface PortalServerDeps {
   readonly instances: TorrentInstanceRepository;
   readonly diskSamples: DiskUsageRepository;
   readonly mailRelay: MailRelayRepository;
+  readonly boxInVpn: string;
   readonly siteSettings: SiteSettingsRepository;
   readonly saveMailRelay: SaveMailRelay;
   readonly sshKeys: SshKeyRepository;
