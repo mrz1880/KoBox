@@ -480,14 +480,13 @@ ${facts.hasAppToken
 export interface FileAccessFacts {
   readonly username: string;
   readonly nextcloudInstalled: boolean;
-  readonly sftpHost?: string;
+  readonly sftpHost: string;
   // the box's own address in the usual tunnel, where the network share lives
   readonly boxInVpn: string;
 }
 
 // Every way to reach one's files, simplest first, all with the portal login.
 export function filesPage(viewer: Viewer, facts: FileAccessFacts): string {
-  const sftp = facts.sftpHost ?? 'this box';
   return page(
     'My files',
     html`<h1>${viewer.t('My files')}</h1>
@@ -506,7 +505,7 @@ export function filesPage(viewer: Viewer, facts: FileAccessFacts): string {
 <div class="choice">
   <h3>SFTP</h3>
   <p>For FileZilla, Cyberduck or rsync, and for large transfers.</p>
-  <p class="mono">sftp://${facts.username}@${sftp}</p>
+  <p class="mono">sftp://${facts.username}@${facts.sftpHost}</p>
 </div>
 <div class="choice">
   <h3>Network share</h3>
