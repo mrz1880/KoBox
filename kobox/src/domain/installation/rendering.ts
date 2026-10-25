@@ -479,6 +479,13 @@ export function renderNginxVhost(settings: NginxVhostSettings): RenderedFile {
       '        proxy_set_header Content-Length "";',
       '        proxy_set_header X-Original-URI $request_uri;',
       '    }',
+      // never refuses: it only names who is signed in, for Nextcloud
+      '    location = /internal/auth/session {',
+      '        internal;',
+      `        proxy_pass ${portal}/internal/auth/session;`,
+      '        proxy_pass_request_body off;',
+      '        proxy_set_header Content-Length "";',
+      '    }',
       '',
       '    # the SSR portal (application auth, sessions, CSRF)',
       '    location / {',
@@ -702,11 +709,15 @@ export function renderRutorrentUserConfig(user: RutorrentUserWiring): RenderedFi
 // Nextcloud is a PHP application like ruTorrent, served from its own prefix
 // behind the same portal session. Its own front controller does the routing, so
 // this is a plain fastcgi block rather than the per-user SCGI wiring above.
-// Nextcloud's reference layout for a sub-directory install. No auth_request:
-// Nextcloud authenticates its own clients, and the desktop and mobile apps send
-// Nextcloud credentials that the portal session check would refuse. PHP gets
-// the path after the script (remote.php/dav/..., index.php/login), which the
-// apps and the web interface both depend on.
+// Nextcloud's reference layout for a sub-directory install. Nextcloud
+// authenticates its own clients: the desktop and mobile apps send Nextcloud
+// credentials that the portal session check would refuse, so the only check
+// here is the one that never refuses. It names the member signed in to the
+// portal, and Nextcloud's SSO app opens their session from that name: it
+// believes it without checking, so KOBOX_PORTAL_USER is set here and nowhere
+// else, and a client cannot reach it (requests only produce HTTP_* names).
+// PHP gets the path after the script (remote.php/dav/..., index.php/login),
+// which the apps and the web interface both depend on.
 export function renderNextcloudSite(): RenderedFile {
   return {
     path: '/etc/nginx/kobox.d/nextcloud.conf',
@@ -734,9 +745,12 @@ export function renderNextcloudSite(): RenderedFile {
       '        fastcgi_split_path_info ^(.+?\\.php)(/.*)$;',
       '        set $path_info $fastcgi_path_info;',
       '        try_files $fastcgi_script_name =404;',
+      '        auth_request /internal/auth/session;',
+      '        auth_request_set $kobox_portal_user $upstream_http_x_kobox_user;',
       '        include fastcgi_params;',
       '        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;',
       '        fastcgi_param PATH_INFO $path_info;',
+      '        fastcgi_param KOBOX_PORTAL_USER $kobox_portal_user;',
       '        fastcgi_param HTTPS on;',
       '        fastcgi_param modHeadersAvailable true;',
       '        fastcgi_intercept_errors on;',

@@ -42,6 +42,12 @@ server {
         proxy_set_header Content-Length "";
         proxy_set_header X-Original-URI $request_uri;
     }
+    location = /internal/auth/session {
+        internal;
+        proxy_pass http://127.0.0.1:8190/internal/auth/session;
+        proxy_pass_request_body off;
+        proxy_set_header Content-Length "";
+    }
 
     # the SSR portal (application auth, sessions, CSRF)
     location / {
