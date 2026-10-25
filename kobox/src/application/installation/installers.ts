@@ -510,6 +510,18 @@ class RutorrentInstaller implements ComponentInstaller {
   }
 }
 
+// Nextcloud's SSO app is installed with both its release and its checksum,
+// never one of them. The portal asks here too, to know whether its Nextcloud
+// link can open the session of the member signed in.
+export function nextcloudSsoRelease(pins: {
+  readonly nextcloudSsoUrl?: string;
+  readonly nextcloudSsoSha256?: string;
+}): { readonly url: string; readonly sha256: string } | undefined {
+  return pins.nextcloudSsoUrl === undefined || pins.nextcloudSsoSha256 === undefined
+    ? undefined
+    : { url: pins.nextcloudSsoUrl, sha256: pins.nextcloudSsoSha256 };
+}
+
 class NextcloudInstaller implements ComponentInstaller {
   readonly name = 'nextcloud';
 
@@ -597,14 +609,15 @@ class NextcloudInstaller implements ComponentInstaller {
   // Nextcloud still works and asks for the password: a note, not a failure.
   private async trustPortalSignIn(): Promise<string | undefined> {
     const { host, artifacts, files, install, nextcloud } = this.ctx;
-    if (install.nextcloudSsoUrl === undefined || install.nextcloudSsoSha256 === undefined) {
+    const release = nextcloudSsoRelease(install);
+    if (release === undefined) {
       return 'Nextcloud asks for the password again: set KOBOX_NEXTCLOUD_SSO_URL and KOBOX_NEXTCLOUD_SSO_SHA256 (its user_saml app), then re-run kobox install, to open it from the portal session';
     }
     const marker = await host.readFile(NEXTCLOUD_SSO_MARKER);
-    if (marker?.trim() !== install.nextcloudSsoSha256) {
+    if (marker?.trim() !== release.sha256) {
       await artifacts.fetchVerified(
-        install.nextcloudSsoUrl,
-        install.nextcloudSsoSha256,
+        release.url,
+        release.sha256,
         NEXTCLOUD_SSO_ARCHIVE,
       );
       await host.ensureDir(NEXTCLOUD_SSO_DIR, '0755');
@@ -612,7 +625,7 @@ class NextcloudInstaller implements ComponentInstaller {
       await files.apply([
         {
           path: NEXTCLOUD_SSO_MARKER,
-          content: `${install.nextcloudSsoSha256}\n`,
+          content: `${release.sha256}\n`,
           mode: '0644',
           owner: 'root',
           group: 'root',

@@ -480,6 +480,7 @@ ${facts.hasAppToken
 export interface FileAccessFacts {
   readonly username: string;
   readonly nextcloudInstalled: boolean;
+  readonly nextcloudHref: string;
   readonly sftpHost: string;
   // the box's own address in the usual tunnel, where the network share lives
   readonly boxInVpn: string;
@@ -499,7 +500,7 @@ export function filesPage(viewer: Viewer, facts: FileAccessFacts): string {
   ${facts.nextcloudInstalled
     ? html`<p>In the browser, or in the Nextcloud app on a phone or a computer.
   No VPN, nothing to set up on your network.</p>
-  <a class="action" href="/nextcloud/">Open Nextcloud</a>`
+  <a class="action" href="${facts.nextcloudHref}">Open Nextcloud</a>`
     : html`<p>Nextcloud is not installed on this box. Ask an administrator.</p>`}
 </div>
 <div class="choice">
