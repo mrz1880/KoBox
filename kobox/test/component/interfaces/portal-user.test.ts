@@ -660,6 +660,27 @@ describe('ruTorrent iframe', () => {
     expect(response.body).toContain('<iframe');
     expect(response.body).toContain('/ru/');
   });
+
+  // ruTorrent read its language from the browser: it follows the one the
+  // member chose on the portal, through the cookie ruTorrent itself reads
+  it('should_open_rutorrent_in_the_language_chosen_on_the_portal', async () => {
+    await world.server.inject({
+      method: 'POST',
+      url: '/access/language',
+      headers: { cookie: user.cookie, 'content-type': 'application/x-www-form-urlencoded' },
+      payload: form({ _csrf: user.csrf, language: 'fr' }),
+    });
+    const french = await loginAs(world, 'alice');
+
+    const response = await world.server.inject({
+      method: 'GET',
+      url: '/rutorrent',
+      headers: { cookie: french.cookie },
+    });
+
+    const cookie = [response.headers['set-cookie']].flat().find((line) => line?.startsWith('Language='));
+    expect(cookie).toMatch(/^Language=fr; Path=\//);
+  });
 });
 
 describe('categories and sending', () => {

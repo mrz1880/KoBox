@@ -12,3 +12,9 @@ canBeShutdowned = yes
 
 [dump]
 enabled = no
+
+[retrackers]
+enabled = no
+
+[extsearch]
+enabled = no

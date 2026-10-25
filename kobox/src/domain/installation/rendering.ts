@@ -906,9 +906,12 @@ export function renderRutorrentDefaultTheme(): RenderedFile {
   };
 }
 
-// Plugins this box cannot run, switched off rather than left to show an error
-// at every load. dump needs dumptorrent, which no Debian release packages.
-const DISABLED_RUTORRENT_PLUGINS = ['dump'];
+// Plugins switched off for every member:
+// - dump needs dumptorrent, which no Debian release packages: an error at every
+//   load otherwise;
+// - retrackers can add public trackers to a private torrent, which trackers ban;
+// - extsearch searches public sites.
+const DISABLED_RUTORRENT_PLUGINS = ['dump', 'retrackers', 'extsearch'];
 
 // ruTorrent reads one plugins.ini (a member's own replaces the global one
 // whole), so this one carries ruTorrent's default rights as it ships them, then

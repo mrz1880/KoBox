@@ -99,6 +99,11 @@ describe('installation rendering', () => {
 
     expect(file.path).toBe('/var/www/rutorrent/conf/plugins.ini');
     expect(file.content).toContain('[dump]\nenabled = no');
+    // retrackers can add public trackers to a private torrent; extsearch
+    // searches public sites
+    for (const plugin of ['retrackers', 'extsearch']) {
+      expect(file.content, plugin).toContain(`[${plugin}]\nenabled = no`);
+    }
     // a plugins.ini replaces ruTorrent's whole: its default rights come along
     expect(file.content).toContain('[default]\nenabled = user-defined');
     expectGolden('rutorrent-plugins.ini.golden', file.content);
