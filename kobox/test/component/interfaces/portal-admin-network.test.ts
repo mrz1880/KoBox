@@ -34,6 +34,21 @@ describe('admin addresses screen', () => {
     expect(response.body).toContain('home.example.org');
   });
 
+  // the page said the box stayed closed until an address opened it: the portal,
+  // Nextcloud, SFTP and the VPN are open to all, and an address is optional
+  it('should_say_what_works_without_an_address_and_what_one_opens', async () => {
+    const response = await world.server.inject({
+      method: 'GET',
+      url: '/admin/addresses',
+      headers: { cookie: admin.cookie },
+    });
+
+    expect(response.body).toContain('Optional');
+    expect(response.body).toContain('the portal, ruTorrent, Nextcloud, SFTP and the VPN');
+    expect(response.body).toContain('every port of the box');
+    expect(response.body).not.toContain('closed\nby default');
+  });
+
   it('should_enqueue_address_add_and_remove_jobs', async () => {
     const add = await world.server.inject({
       method: 'POST',

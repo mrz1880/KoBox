@@ -42,11 +42,14 @@ export function adminAddressesPage(
   return page(
     'Addresses',
     html`<h1>Member addresses</h1>
-<p class="muted">Where each member connects from. KoBox keeps the seedbox closed
-by default, so an address listed here is what opens it: the firewall accepts it,
-fail2ban stops counting its failures against it, and the NFS shares are offered
-to it. A member with no address here still reaches the portal and ruTorrent over
-the web. This is for the direct connections.</p>
+<p><span class="chip">Optional</span> A member needs no address here:
+the portal, ruTorrent, Nextcloud, SFTP and the VPN are open to all, behind their
+username and password. Unlike MySB, KoBox does not shut the web to undeclared addresses.</p>
+<p class="muted">An address listed here is a member's own fixed connection, such
+as their home, trusted beyond that: the firewall accepts it on
+every port of the box, ahead of the blocklists; fail2ban never bans it; and their
+folder is shared to it over NFS without the VPN. List only an address you trust
+that much.</p>
 <p class="muted">Use a <strong>DynDNS hostname</strong> when their home address
 changes, which it usually does. KoBox re-resolves it on a schedule and follows it
 without anyone touching the firewall; the last resolved address is shown so you
