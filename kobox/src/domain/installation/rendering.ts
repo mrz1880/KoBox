@@ -883,6 +883,26 @@ export function renderRutorrentRatioOffer(): RenderedFile {
   };
 }
 
+// The theme a member gets until they pick one in ruTorrent's settings: its dark
+// blue sits with the portal around it. The theme plugin loads this file after
+// its own conf.php, so ruTorrent's release stays as it ships.
+const DEFAULT_RUTORRENT_THEME = 'MaterialDesign';
+
+export function renderRutorrentDefaultTheme(): RenderedFile {
+  return {
+    path: `${RUTORRENT_DIR}/plugins/theme/conf.local.php`,
+    content: [
+      '<?php',
+      '// KoBox-managed — DO NOT EDIT (rendered declaratively).',
+      `$defaultTheme = "${DEFAULT_RUTORRENT_THEME}";`,
+      '',
+    ].join('\n'),
+    mode: '0644',
+    owner: 'root',
+    group: 'root',
+  };
+}
+
 // Plugins this box cannot run, switched off rather than left to show an error
 // at every load. dump needs dumptorrent, which no Debian release packages.
 const DISABLED_RUTORRENT_PLUGINS = ['dump'];

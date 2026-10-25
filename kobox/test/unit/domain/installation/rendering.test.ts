@@ -24,6 +24,7 @@ import {
   renderRutorrentConfig,
   renderRutorrentPlugins,
   renderRutorrentRatioOffer,
+  renderRutorrentDefaultTheme,
   renderShellinaboxDefault,
   renderSmbConf,
   renderRutorrentUserConfig,
@@ -428,6 +429,16 @@ describe('installation rendering', () => {
     // a ruTorrent release without its ratio plugin: nothing to offer, no failure
     expect(script).toContain("if (!is_file('/var/www/rutorrent/plugins/ratio/ratio.php')) {\n  exit(0);\n}");
     expectGolden('rutorrent-ratios.php.golden', script);
+  });
+
+  // ruTorrent's light default sat oddly inside the dark portal: MaterialDesign
+  // is the default, and a member who picked a theme in its settings keeps theirs
+  it('should_make_material_design_the_default_rutorrent_theme', () => {
+    const file = renderRutorrentDefaultTheme();
+
+    expect(file.path).toBe('/var/www/rutorrent/plugins/theme/conf.local.php');
+    expect(file.content).toContain('$defaultTheme = "MaterialDesign";');
+    expectGolden('rutorrent-theme.conf.local.php.golden', file.content);
   });
 
   it('should_render_the_global_rutorrent_config_golden', () => {
