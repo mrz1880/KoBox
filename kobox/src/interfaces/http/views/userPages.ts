@@ -477,6 +477,48 @@ ${facts.hasAppToken
     : html``}`;
 }
 
+export interface FileAccessFacts {
+  readonly username: string;
+  readonly nextcloudInstalled: boolean;
+  readonly sftpHost?: string;
+  // the box's own address in the usual tunnel, where the network share lives
+  readonly boxInVpn: string;
+}
+
+// Every way to reach one's files, simplest first, all with the portal login.
+export function filesPage(viewer: Viewer, facts: FileAccessFacts): string {
+  const sftp = facts.sftpHost ?? 'this box';
+  return page(
+    'My files',
+    html`<h1>${viewer.t('My files')}</h1>
+<p class="lead">Three ways to reach your files. All of them take your username,
+<span class="mono">${facts.username}</span>, and the password you use here.</p>
+<div class="choices">
+<div class="choice pick">
+  <span class="tag">Simplest</span>
+  <h3>Nextcloud</h3>
+  ${facts.nextcloudInstalled
+    ? html`<p>In the browser, or in the Nextcloud app on a phone or a computer.
+  No VPN, nothing to set up on your network.</p>
+  <a class="action" href="/nextcloud/">Open Nextcloud</a>`
+    : html`<p>Nextcloud is not installed on this box. Ask an administrator.</p>`}
+</div>
+<div class="choice">
+  <h3>SFTP</h3>
+  <p>For FileZilla, Cyberduck or rsync, and for large transfers.</p>
+  <p class="mono">sftp://${facts.username}@${sftp}</p>
+</div>
+<div class="choice">
+  <h3>Network share</h3>
+  <p>Samba, like a local disk. Connect the VPN with the usual profile first
+  (<a href="/access">Account</a>), then open:</p>
+  <p class="mono">smb://${facts.boxInVpn}/${facts.username}</p>
+</div>
+</div>`,
+    viewer,
+  );
+}
+
 export function accessPage(viewer: Viewer, facts: AccessFacts): string {
   const choices = VPN_CHOICES.map(
     (choice) => html`<div class="choice${choice.usual === true ? ' pick' : ''}">

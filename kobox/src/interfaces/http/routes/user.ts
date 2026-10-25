@@ -48,6 +48,7 @@ import { flashOf, redirectWithFlash, viewerOf, type Guards } from '../guards.js'
 import {
   accessPage,
   adminHomePage,
+  filesPage,
   downloadsPage,
   mediaPage,
   mediaWatchPage,
@@ -153,6 +154,8 @@ export interface UserRoutesDeps {
   readonly now: () => string;
   readonly sshKeys: SshKeyRepository;
   readonly components: ComponentRegistry;
+  // the box's own address in the usual tunnel, where the network share lives
+  readonly boxInVpn: string;
   readonly users: UserRepository;
   readonly fairUse: FairUseRepository;
   readonly queue: JobQueuePort;
@@ -192,6 +195,13 @@ async function signalRowFor(
   };
 }
 
+// The name members reach the box by over SFTP: only known when the operator
+// configured one, so a page shows it rather than guessing.
+function sftpHostName(): string | undefined {
+  const host = process.env.KOBOX_VPN_REMOTE;
+  return host === undefined || host === '' ? undefined : host;
+}
+
 export function registerUserRoutes(
   server: FastifyInstance,
   deps: UserRoutesDeps,
@@ -212,6 +222,23 @@ export function registerUserRoutes(
       .send(
         userHomePage(user, viewerOf(session), await signalRowFor(deps, user), flashOf(request)),
       );
+  });
+
+  server.get('/files', async (request, reply) => {
+    const session = await guards.requireSession(request, reply);
+    if (session === undefined) {
+      return;
+    }
+    const nextcloud = await deps.components.get(ComponentName.parse('nextcloud'));
+    const sftpHost = sftpHostName();
+    return reply.type('text/html').send(
+      filesPage(viewerOf(session), {
+        username: session.username.value,
+        nextcloudInstalled: nextcloud?.state.value === 'installed',
+        ...(sftpHost !== undefined && { sftpHost }),
+        boxInVpn: deps.boxInVpn,
+      }),
+    );
   });
 
   // Where administration opens: the whole fleet at a glance.
@@ -689,13 +716,12 @@ export function registerUserRoutes(
     if (user === undefined) {
       return reply.code(303).header('location', '/login').send();
     }
-    const sftpHost = process.env.KOBOX_VPN_REMOTE;
+    const sftpHost = sftpHostName();
     return reply.type('text/html').send(
       accessPage(viewerOf(session), {
         username: user.username.value,
         hasAppToken: (await deps.credentials.find(session.username))?.appTokenHash !== undefined,
-        // only shown when the operator configured a reachable name for the box
-        ...(sftpHost !== undefined && sftpHost !== '' && { sftpHost }),
+        ...(sftpHost !== undefined && { sftpHost }),
         rtorrentPort: user.rtorrentPort.value,
         ...(await (async () => {
           const stored = await deps.sshKeys.find(session.username);

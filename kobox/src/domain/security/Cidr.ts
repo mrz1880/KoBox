@@ -68,6 +68,11 @@ export class Cidr {
   }
 
   // A member's address in this tunnel: the same host number in every tunnel.
+  // The box's own address in a tunnel: OpenVPN's server directive takes it.
+  firstAddress(): string {
+    return intToIp((this.network + 1) >>> 0);
+  }
+
   addressOf(host: VpnHost): string {
     const size = (~this.mask >>> 0) + 1;
     if (host.value >= size - 1) {
