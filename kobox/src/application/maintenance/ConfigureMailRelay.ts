@@ -1,5 +1,9 @@
 import type { InstallHostPort, SystemdPort } from '../../domain/installation/ports.js';
-import type { RemotePasswordOpenerPort } from '../../domain/sync/ports.js';
+import type { RemotePassword } from '../../domain/sync/RemotePassword.js';
+import type {
+  RemotePasswordOpenerPort,
+  RemotePasswordSealerPort,
+} from '../../domain/sync/ports.js';
 import type { ManagedFilesPort } from '../../domain/shared/files.js';
 
 const SASL_PASSWD = '/etc/postfix/sasl_passwd';
@@ -86,6 +90,32 @@ export interface MailRelaySettings {
 export interface MailRelayRepository {
   get(): Promise<MailRelaySettings | undefined>;
   save(settings: MailRelaySettings): Promise<void>;
+}
+
+// The one way a relay gets configured, from the settings page or the command
+// line: stored with its password sealed, so the page shows what the box uses
+// and the box can re-apply it. Applying it is the caller's next step.
+export class SaveMailRelay {
+  constructor(
+    private readonly deps: {
+      readonly settings: MailRelayRepository;
+      readonly sealer: RemotePasswordSealerPort;
+    },
+  ) {}
+
+  async execute(input: {
+    readonly host: string;
+    readonly port: number;
+    readonly user: string;
+    readonly password: RemotePassword;
+  }): Promise<void> {
+    await this.deps.settings.save({
+      host: input.host,
+      port: input.port,
+      user: input.user,
+      sealedPassword: await this.deps.sealer.seal(input.password),
+    });
+  }
 }
 
 // The worker side of the settings screen: read what the portal stored, open the
