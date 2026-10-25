@@ -128,6 +128,7 @@ export function adminHealthPage(
     'Health',
     html`<h1>${viewer.t('Health')}</h1>
 ${flash(message)}
+<p class="links"><a href="/monitoring">Monitoring of the machine: CPU, memory, network, disks</a></p>
 <h2>Service probes</h2>
 <table>
   <thead><tr><th>Probe</th><th>State</th><th>${viewer.t('Detail')}</th></tr></thead>
