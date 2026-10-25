@@ -1,4 +1,4 @@
-import { DEBIAN_RELEASE, PHP_FPM } from './platform.js';
+import { DEBIAN_RELEASE, PHP_FPM, RUTORRENT_DIR } from './platform.js';
 import { PORTAL_USER_VARIABLE } from './NextcloudPort.js';
 import { DomainError } from '../shared/DomainError.js';
 import type { RenderedFile } from '../shared/files.js';
@@ -501,7 +501,7 @@ export function renderNginxVhost(settings: NginxVhostSettings): RenderedFile {
       '    location /ru/ {',
       '        auth_request /internal/auth;',
       '        auth_request_set $kobox_user $upstream_http_x_kobox_user;',
-      '        alias /var/www/rutorrent/;',
+      `        alias ${RUTORRENT_DIR}/;`,
       // ruTorrent 5.x ships index.html; 4.x shipped index.php. Naming only one
       // of them makes nginx fall through to a directory listing, which it
       // refuses — a 403 on the very first visit.
@@ -519,7 +519,7 @@ export function renderNginxVhost(settings: NginxVhostSettings): RenderedFile {
       '        auth_request /internal/auth;',
       '        auth_request_set $kobox_user $upstream_http_x_kobox_user;',
       '        include fastcgi_params;',
-      '        fastcgi_param SCRIPT_FILENAME /var/www/rutorrent/$1;',
+      `        fastcgi_param SCRIPT_FILENAME ${RUTORRENT_DIR}/$1;`,
       '        fastcgi_param REMOTE_USER $kobox_user;',
       `        fastcgi_pass unix:${PHP_FPM.socket};`,
       '    }',
@@ -692,7 +692,7 @@ export function renderRutorrentUsersInclude(users: readonly RutorrentUserWiring[
 // binds that user's SCGI mount so ruTorrent talks to their own rtorrent.
 export function renderRutorrentUserConfig(user: RutorrentUserWiring): RenderedFile {
   return {
-    path: `/var/www/rutorrent/conf/users/${user.username}/config.php`,
+    path: `${RUTORRENT_DIR}/conf/users/${user.username}/config.php`,
     content: [
       '<?php',
       '// KoBox-managed — DO NOT EDIT (rendered declaratively).',
@@ -803,11 +803,11 @@ export function rutorrentProfilesDir(): string {
 // ($throttleMaxSpeed, $do_diagnostic, $pathToExternals...) and loads
 // config.local.php last: KoBox writes only what it changes, there. Per-member
 // SCGI wiring lives in conf/users/<member>/config.php.
-export const RUTORRENT_OWN_CONFIG = '/var/www/rutorrent/conf/config.php';
+export const RUTORRENT_OWN_CONFIG = `${RUTORRENT_DIR}/conf/config.php`;
 
 export function renderRutorrentConfig(): RenderedFile {
   return {
-    path: '/var/www/rutorrent/conf/config.local.php',
+    path: `${RUTORRENT_DIR}/conf/config.local.php`,
     content: [
       '<?php',
       '// KoBox-managed — DO NOT EDIT (rendered declaratively).',
@@ -832,7 +832,7 @@ const DISABLED_RUTORRENT_PLUGINS = ['dump'];
 // the plugins switched off.
 export function renderRutorrentPlugins(): RenderedFile {
   return {
-    path: '/var/www/rutorrent/conf/plugins.ini',
+    path: `${RUTORRENT_DIR}/conf/plugins.ini`,
     content: [
       ';; KoBox-managed — DO NOT EDIT (rendered declaratively).',
       '[default]',
