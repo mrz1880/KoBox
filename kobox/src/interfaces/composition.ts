@@ -63,7 +63,6 @@ import type { SecurityNotificationPort } from '../domain/security/ports.js';
 import type { TrackerNotificationPort } from '../domain/tracker/ports.js';
 import type { NotificationPort, PasswordSealerPort } from '../domain/user/ports.js';
 import { ComponentName } from '../domain/installation/ComponentName.js';
-import type { SiteSettings } from '../domain/installation/ports.js';
 import { NextcloudLogin } from '../application/user/NextcloudLogin.js';
 import {
   InviteMember,
@@ -81,6 +80,7 @@ import { KoboxDatabase } from '../infrastructure/persistence/db.js';
 import { SqliteBlocklistRepository } from '../infrastructure/persistence/SqliteBlocklistRepository.js';
 import { SqliteJobQueue } from '../infrastructure/persistence/SqliteJobQueue.js';
 import { SqliteLoginAttemptsRepository } from '../infrastructure/persistence/SqliteLoginAttemptsRepository.js';
+import { SiteSettingsWithInstallDefault } from '../infrastructure/persistence/SiteSettingsWithInstallDefault.js';
 import { SqliteSiteSettingsRepository } from '../infrastructure/persistence/SqliteSiteSettingsRepository.js';
 import { SqliteMailRelayRepository } from '../infrastructure/persistence/SqliteMailRelayRepository.js';
 import { SqliteSshKeyRepository } from '../infrastructure/persistence/SqliteSshKeyRepository.js';
@@ -212,8 +212,16 @@ function debridKeyCipher(): RsaDebridKeyCipher {
 // What an admin set in the interface wins over the environment: the screen is
 // the newer, discoverable way to say it, and KOBOX_LE_* stays valid for anyone
 // who already scripted an install.
-function publicDomain(site: SiteSettings | undefined): string | undefined {
-  return site?.domain ?? process.env.KOBOX_LE_DOMAIN;
+// What an admin stored under Domain, else what the box was installed with.
+function siteSettings(db: KoboxDatabase): SiteSettingsWithInstallDefault {
+  const domain = process.env.KOBOX_LE_DOMAIN;
+  const email = process.env.KOBOX_LE_EMAIL;
+  return new SiteSettingsWithInstallDefault(
+    new SqliteSiteSettingsRepository(db),
+    domain !== undefined && domain !== '' && email !== undefined && email !== ''
+      ? { domain, email }
+      : undefined,
+  );
 }
 
 // Where a member reaches the portal, for the links in their mail: the public
@@ -221,7 +229,7 @@ function publicDomain(site: SiteSettings | undefined): string | undefined {
 function portalAddress(db: KoboxDatabase): PortalAddressPort {
   return {
     baseUrl: async () =>
-      `https://${publicDomain(await new SqliteSiteSettingsRepository(db).get()) ?? hostname()}`,
+      `https://${(await siteSettings(db).get())?.domain ?? hostname()}`,
   };
 }
 
@@ -341,9 +349,9 @@ export async function buildInstallation(
   const aria2RpcSecret = process.env.KOBOX_ARIA2_RPC_SECRET;
   const ddlStagingDir = process.env.KOBOX_DDL_STAGING;
   const quotaFs = process.env.KOBOX_QUOTA_FS;
-  const site = await new SqliteSiteSettingsRepository(c.db).get();
-  const leDomain = publicDomain(site);
-  const leEmail = site?.email ?? process.env.KOBOX_LE_EMAIL;
+  const site = await siteSettings(c.db).get();
+  const leDomain = site?.domain;
+  const leEmail = site?.email;
   const acmeUrl = process.env.KOBOX_ACME_URL;
   const installPki = new EasyRsaPkiAdapter(runner, process.env.KOBOX_VPN_PKI ?? DEFAULT_PKI_DIR);
   const ctx: InstallerContext = {
@@ -550,7 +558,7 @@ export interface PortalContainer {
   readonly instances: SqliteTorrentInstanceRepository;
   readonly diskSamples: SqliteDiskUsageRepository;
   readonly mailRelay: SqliteMailRelayRepository;
-  readonly siteSettings: SqliteSiteSettingsRepository;
+  readonly siteSettings: SiteSettingsWithInstallDefault;
   readonly saveMailRelay: SaveMailRelay;
   readonly sshKeys: SqliteSshKeyRepository;
   readonly destinations: SqliteSyncDestinationRepository;
@@ -639,7 +647,7 @@ export function buildPortalContainer(name: string): PortalContainer {
     instances: new SqliteTorrentInstanceRepository(db),
     diskSamples: new SqliteDiskUsageRepository(db),
     mailRelay,
-    siteSettings: new SqliteSiteSettingsRepository(db),
+    siteSettings: siteSettings(db),
     // the PUBLIC half only: the portal and the CLI store a relay the same way
     saveMailRelay: new SaveMailRelay({ settings: mailRelay, sealer: remotePasswordCipher() }),
     passwords: passwordCipher(),
