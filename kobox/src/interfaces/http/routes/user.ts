@@ -205,6 +205,9 @@ function sftpHostName(): string | undefined {
   return host === undefined || host === '' ? undefined : host;
 }
 
+// The cookie ruTorrent's lang/langs.js reads its language from.
+const RUTORRENT_LANGUAGE_COOKIE = 'Language';
+
 export function registerUserRoutes(
   server: FastifyInstance,
   deps: UserRoutesDeps,
@@ -801,6 +804,19 @@ export function registerUserRoutes(
     if (session === undefined) {
       return;
     }
-    return reply.type('text/html').send(rutorrentPage(viewerOf(session), flashOf(request)));
+    const viewer = viewerOf(session);
+    return (
+      reply
+        // ruTorrent reads its language from this cookie, before the browser's:
+        // it opens in the member's portal language. Read by its script, so
+        // never httpOnly; it holds a language, nothing else.
+        .setCookie(RUTORRENT_LANGUAGE_COOKIE, viewer.language.value, {
+          secure: true,
+          sameSite: 'lax',
+          path: '/',
+        })
+        .type('text/html')
+        .send(rutorrentPage(viewer, flashOf(request)))
+    );
   });
 }
