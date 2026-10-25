@@ -130,6 +130,15 @@ export class FakeInstallHost implements ManagedFilesPort, InstallHostPort, Artif
     return Promise.resolve();
   }
 
+  readonly groups: string[] = [];
+
+  ensureGroup(name: string): Promise<void> {
+    if (!this.groups.includes(name)) {
+      this.groups.push(name);
+    }
+    return Promise.resolve();
+  }
+
   setOwnership(path: string, owner: string, group: string, mode: string): Promise<void> {
     this.ownership.set(path, { owner, group, mode });
     return Promise.resolve();

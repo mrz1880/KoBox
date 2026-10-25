@@ -218,6 +218,8 @@ class KoboxCoreInstaller implements ComponentInstaller {
     const { host, files, systemd, install } = this.ctx;
     // the non-root identity the SSR portal runs under (Phase 6)
     await host.ensureServiceAccount(PORTAL_GROUP);
+    // before any member exists: what belongs to all of them is chowned to it
+    await host.ensureGroup(MEMBERS_GROUP);
     await host.ensureDir('/etc/kobox', '0755');
     // the DB is shared: the root worker writes, the portal (kobox-portal group)
     // reads and writes sessions/credentials. 2770 + setgid keeps new WAL/-shm
