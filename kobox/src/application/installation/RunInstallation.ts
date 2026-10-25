@@ -16,6 +16,7 @@ export const CONVERGENCE_JOBS = [
   'render-whitelist',
   'render-openvpn',
   'render-nfs-exports',
+  'render-rutorrent-users',
 ] as const;
 
 export type ConvergenceJobType = (typeof CONVERGENCE_JOBS)[number];

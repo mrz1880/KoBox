@@ -803,16 +803,16 @@ describe('rutorrent installer', () => {
   });
 
   it('should_give_php_a_private_profile_directory_outside_the_web_root', async () => {
-    // php-fpm runs as www-data and writes every member's settings and uploaded
-    // torrents there; nobody else needs to list it.
+    // php-fpm (www-data) writes every member's settings there, and each member's
+    // own rTorrent must reach their folder too: ruTorrent asks it to run its
+    // external checks and leave the answer in that folder. Members traverse,
+    // they do not list; each member's folder is theirs alone (RenderRutorrentUsers).
     await installer(world, 'rutorrent').install();
 
-    expect(world.host.dirs.get('/var/lib/rutorrent')).toBe('0750');
-    expect(world.host.chowned).toContainEqual({
-      path: '/var/lib/rutorrent',
-      owner: 'www-data',
-      group: 'www-data',
-    });
+    for (const dir of ['/var/lib/rutorrent', '/var/lib/rutorrent/users']) {
+      expect(world.host.dirs.get(dir), dir).toBe('0710');
+      expect(world.host.chowned).toContainEqual({ path: dir, owner: 'www-data', group: 'kobox-users' });
+    }
   });
 });
 

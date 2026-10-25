@@ -81,6 +81,16 @@ describe('installation rendering', () => {
     expect(conf).toContain('return 301 https://$host$request_uri;');
   });
 
+  // ruTorrent creates a member's profile folders with $profileMask, 0777 when
+  // unset: everybody on the box could rewrite another member's settings
+  it('should_keep_rutorrent_profiles_to_their_member_and_the_web_server', () => {
+    const conf = renderRutorrentConfig().content;
+
+    expect(conf).toContain('$profileMask = 0770;');
+    // read by getplugins.php and the plugins' init: unset, it warns on every load
+    expect(conf).toContain('$do_diagnostic = true;');
+  });
+
   it('should_turn_http2_on_with_the_directive_nginx_1_26_expects', () => {
     // `listen ... http2` is deprecated since nginx 1.25 and warns on every reload
     const conf = renderNginxVhost({ portalPort: 8189 }).content;

@@ -14,3 +14,7 @@ export const PHP_FPM = {
 // The account nginx and PHP-FPM run as: what serves ruTorrent, Nextcloud and
 // the media a member streams, and so what has to reach into member trees.
 export const WEB_SERVER_USER = 'www-data';
+
+// Every member's system account is in this group: what all members, and only
+// them, may reach.
+export const MEMBERS_GROUP = 'kobox-users';

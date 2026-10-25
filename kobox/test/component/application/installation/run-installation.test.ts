@@ -120,6 +120,8 @@ describe('RunInstallation', () => {
       'render-openvpn',
       // a member's exports follow their VPN address: an upgrade re-renders them
       'render-nfs-exports',
+      // and each member's ruTorrent wiring, profile folder included
+      'render-rutorrent-users',
     ]);
     expect(world.drained).toBe(1);
     expect((await world.registry.get(ComponentName.parse('sshd')))?.state.value).toBe('installed');
@@ -228,6 +230,8 @@ describe('RunInstallation', () => {
       'render-openvpn',
       // a member's exports follow their VPN address: an upgrade re-renders them
       'render-nfs-exports',
+      // and each member's ruTorrent wiring, profile folder included
+      'render-rutorrent-users',
     ]);
   });
 });

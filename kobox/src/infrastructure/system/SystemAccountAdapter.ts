@@ -1,10 +1,10 @@
+import { MEMBERS_GROUP } from '../../domain/installation/platform.js';
 import type { HashedPassword } from '../../domain/user/HashedPassword.js';
 import type { SystemAccountPort } from '../../domain/user/ports.js';
 import type { Username } from '../../domain/user/Username.js';
 import { runAllowing, runOrThrow, type CommandRunner } from './CommandRunner.js';
 import { homeOf } from '../../domain/user/homeDirectory.js';
 
-export const KOBOX_USERS_GROUP = 'kobox-users';
 
 // groupdel's exit status for a group that does not exist
 const GROUP_DOES_NOT_EXIST = 6;
@@ -13,10 +13,10 @@ export class SystemAccountAdapter implements SystemAccountPort {
   constructor(private readonly runner: CommandRunner) {}
 
   async createAccount(username: Username): Promise<void> {
-    await runOrThrow(this.runner, { command: 'groupadd', args: ['-f', KOBOX_USERS_GROUP] });
+    await runOrThrow(this.runner, { command: 'groupadd', args: ['-f', MEMBERS_GROUP] });
     await runOrThrow(this.runner, {
       command: 'useradd',
-      args: ['-m', '-d', homeOf(username), '-s', '/bin/bash', '-G', KOBOX_USERS_GROUP, username.value],
+      args: ['-m', '-d', homeOf(username), '-s', '/bin/bash', '-G', MEMBERS_GROUP, username.value],
     });
     // 0711, set explicitly rather than inherited from the distribution default:
     // nginx must TRAVERSE the home to stream a media file the portal authorised,
