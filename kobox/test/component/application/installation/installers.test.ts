@@ -823,6 +823,12 @@ describe('rutorrent installer', () => {
     );
   });
 
+  it('should_lay_down_the_answer_the_disk_meter_gets_its_quota_from', async () => {
+    await installer(world, 'rutorrent').install();
+
+    expect(world.host.contentAt('/usr/local/share/kobox/rutorrent-quota.php')).toContain('kobox-quota.json');
+  });
+
   it('should_say_where_unrar_comes_from_rather_than_fail_without_it', async () => {
     // only non-free has the unrar that opens RAR5; a box whose sources KoBox
     // does not manage may not list it

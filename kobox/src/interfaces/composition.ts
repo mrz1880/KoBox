@@ -103,6 +103,7 @@ import { CryptoSessionTokens } from '../infrastructure/system/CryptoSessionToken
 import { SqliteSyncTransferRepository } from '../infrastructure/persistence/SqliteSyncTransferRepository.js';
 import { RsyncOverSshTransfer } from '../infrastructure/system/RsyncOverSshTransfer.js';
 import { FsLocalFileFacts } from '../infrastructure/system/FsLocalFileFacts.js';
+import { RutorrentQuotaGauges } from '../infrastructure/system/RutorrentQuotaGauges.js';
 import { RsaRemotePasswordCipher } from '../infrastructure/system/RsaRemotePasswordCipher.js';
 import { SaveMailRelay } from '../application/maintenance/ConfigureMailRelay.js';
 import { SetSyncDestination } from '../application/sync/SetSyncDestination.js';
@@ -723,6 +724,8 @@ export function buildContainer(name: string): Container {
     accounts: new SystemAccountAdapter(runner),
     quota,
     diskSamples: new SqliteDiskUsageRepository(db),
+    // ruTorrent's disk meter shows each member their quota from these
+    quotaGauges: new RutorrentQuotaGauges(new RtorrentConfigAdapter(runner)),
     nextcloud,
     components,
     outbox,

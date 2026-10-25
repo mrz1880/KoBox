@@ -1,5 +1,6 @@
 import type {
   DiskUsageRepository,
+  QuotaGaugePort,
   QuotaPort,
   UserRepository,
 } from '../../domain/user/ports.js';
@@ -8,6 +9,7 @@ interface Deps {
   readonly repo: UserRepository;
   readonly quota: QuotaPort;
   readonly samples: DiskUsageRepository;
+  readonly gauges: QuotaGaugePort;
   readonly clock: () => string;
 }
 
@@ -26,6 +28,7 @@ export class SampleDiskUsage {
         continue;
       }
       await this.deps.samples.save({ username: user.username, used, sampledAt: at });
+      await this.deps.gauges.show(user.username, used, user.quota);
     }
   }
 }

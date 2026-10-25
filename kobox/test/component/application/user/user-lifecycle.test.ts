@@ -33,6 +33,7 @@ import { FakePasswordHasher } from '../../../../src/infrastructure/system/fakes/
 import { FakeServiceLogin } from '../../../../src/infrastructure/system/fakes/FakeServiceLogin.js';
 import { FakeNotifications } from '../../../../src/infrastructure/system/fakes/FakeNotifications.js';
 import { FakeQuota } from '../../../../src/infrastructure/system/fakes/FakeQuota.js';
+import { FakeQuotaGauges } from '../../../../src/infrastructure/system/fakes/FakeQuotaGauges.js';
 import { FakeServiceControl } from '../../../../src/infrastructure/system/fakes/FakeServiceControl.js';
 import { FakeSftp } from '../../../../src/infrastructure/system/fakes/FakeSftp.js';
 import { FakeSystemAccounts } from '../../../../src/infrastructure/system/fakes/FakeSystemAccounts.js';
@@ -131,6 +132,7 @@ interface World {
   setUserQuota: SetUserQuota;
   sampleDiskUsage: SampleDiskUsage;
   diskSamples: InMemoryDiskUsageRepository;
+  gauges: FakeQuotaGauges;
 }
 
 let world: World;
@@ -146,6 +148,7 @@ beforeEach(() => {
   const sessions = new InMemoryPortalSessionRepository();
   const debridAccounts = new InMemoryDebridAccountRepository();
   const diskSamples = new InMemoryDiskUsageRepository();
+  const gauges = new FakeQuotaGauges();
   const hasher = new FakePasswordHasher();
   const links = new InMemoryPasswordLinkRepository();
   const samba = new FakeServiceLogin();
@@ -166,8 +169,9 @@ beforeEach(() => {
     suspendUser: new SuspendUser(deps),
     resumeUser: new ResumeUser(deps),
     setUserQuota: new SetUserQuota(deps),
-    sampleDiskUsage: new SampleDiskUsage({ ...deps, samples: diskSamples }),
+    sampleDiskUsage: new SampleDiskUsage({ ...deps, samples: diskSamples, gauges }),
     diskSamples,
+    gauges,
   };
 });
 
@@ -629,5 +633,16 @@ describe('SampleDiskUsage', () => {
     const sample = await world.diskSamples.find(alice);
     expect(sample?.used.toGib()).toBe(37);
     expect(sample?.sampledAt).toBe('2026-07-25 10:00:00');
+  });
+
+  // ruTorrent's own meter showed the whole disk's free space: each member's
+  // gauge is given what they hold against their own quota instead
+  it('should_show_each_member_what_they_hold_against_their_quota', async () => {
+    await world.createUser.execute(createUserCommand());
+    world.quota.setUsageForTest(alice, Quota.gib(37));
+
+    await world.sampleDiskUsage.execute();
+
+    expect(world.gauges.shown).toEqual([{ username: 'alice', usedGib: 37, quotaGib: 412 }]);
   });
 });

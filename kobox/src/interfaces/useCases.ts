@@ -152,6 +152,7 @@ import type {
   ServiceLoginPort,
   AuthorizedKeysPort,
   DiskUsageRepository,
+  QuotaGaugePort,
   SshKeyRepository,
   QuotaPort,
   ServiceControlPort,
@@ -165,6 +166,7 @@ export interface UseCaseDeps {
   readonly accounts: SystemAccountPort;
   readonly quota: QuotaPort;
   readonly diskSamples: DiskUsageRepository;
+  readonly quotaGauges: QuotaGaugePort;
   readonly nextcloud: NextcloudPort;
   readonly components: ComponentRegistry;
   readonly outbox: MailOutboxPort;
@@ -205,7 +207,11 @@ export function buildUseCases(deps: UseCaseDeps): UseCases {
     changePassword: new ChangePassword(deps),
     setUserQuota: new SetUserQuota(deps),
     changeRole: new ChangeRole(deps),
-    sampleDiskUsage: new SampleDiskUsage({ ...deps, samples: deps.diskSamples }),
+    sampleDiskUsage: new SampleDiskUsage({
+      ...deps,
+      samples: deps.diskSamples,
+      gauges: deps.quotaGauges,
+    }),
     setSshKey: new SetSshKey({ ...deps, keys: deps.sshKeys, authorizedKeys: deps.authorizedKeys }),
     removeSshKey: new RemoveSshKey({ ...deps, keys: deps.sshKeys, authorizedKeys: deps.authorizedKeys }),
     suspendUser: new SuspendUser(deps),

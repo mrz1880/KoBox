@@ -36,6 +36,7 @@ import {
   renderNextcloudSite,
   renderRutorrentConfig,
   renderRutorrentPlugins,
+  renderRutorrentQuotaAnswer,
   renderRutorrentRatioOffer,
   renderRutorrentDefaultTheme,
   RUTORRENT_OWN_CONFIG,
@@ -510,8 +511,7 @@ class RutorrentInstaller implements ComponentInstaller {
       renderRutorrentConfig(),
       renderRutorrentPlugins(),
       renderRutorrentRatioOffer(),
-      renderRutorrentDefaultTheme(),
-    ]);
+      renderRutorrentDefaultTheme(), renderRutorrentQuotaAnswer()]);
     return installed(undefined, unrar);
   }
 

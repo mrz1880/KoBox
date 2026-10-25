@@ -40,6 +40,7 @@ import { FakeAnnouncerSink } from '../../../src/infrastructure/system/fakes/Fake
 import { FakeNotifications } from '../../../src/infrastructure/system/fakes/FakeNotifications.js';
 import { FakeQuota } from '../../../src/infrastructure/system/fakes/FakeQuota.js';
 import { FakeInstallHost } from '../../../src/infrastructure/system/fakes/FakeInstallHost.js';
+import { FakeQuotaGauges } from '../../../src/infrastructure/system/fakes/FakeQuotaGauges.js';
 import { InMemoryMailRelayRepository } from '../../../src/infrastructure/persistence/InMemoryMailRelayRepository.js';
 import type { RemotePasswordOpenerPort } from '../../../src/domain/sync/ports.js';
 import { RemotePassword } from '../../../src/domain/sync/RemotePassword.js';
@@ -250,6 +251,7 @@ beforeEach(() => {
     accounts,
     quota,
     diskSamples: new InMemoryDiskUsageRepository(),
+    quotaGauges: new FakeQuotaGauges(),
     nextcloud,
     components,
     outbox,

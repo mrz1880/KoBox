@@ -23,6 +23,8 @@ import {
   renderPortalUnit,
   renderRutorrentConfig,
   renderRutorrentPlugins,
+  renderQuotaGauge,
+  renderRutorrentQuotaAnswer,
   renderRutorrentRatioOffer,
   renderRutorrentDefaultTheme,
   renderShellinaboxDefault,
@@ -452,6 +454,42 @@ describe('installation rendering', () => {
     expect(file.path).toBe('/var/www/rutorrent/plugins/theme/conf.local.php');
     expect(file.content).toContain('$defaultTheme = "MaterialDesign";');
     expectGolden('rutorrent-theme.conf.local.php.golden', file.content);
+  });
+
+  // ruTorrent's disk meter showed the whole disk: it reads, for each member,
+  // their quota in its own format, total and free, from their profile folder
+  it('should_hand_the_disk_meter_a_members_quota_in_its_own_format', () => {
+    const gib = 1024 ** 3;
+    const file = renderQuotaGauge('alice', 37 * gib, 412 * gib);
+
+    expect(file.path).toBe('/var/lib/rutorrent/users/alice/kobox-quota.json');
+    expect(JSON.parse(file.content)).toEqual({ total: 412 * gib, free: 375 * gib });
+    // read by the web server for that member only
+    expect([file.mode, file.owner, file.group]).toEqual(['0640', 'www-data', 'alice']);
+  });
+
+  it('should_never_show_less_than_nothing_free_to_a_member_over_quota', () => {
+    const file = renderQuotaGauge('alice', 500, 400);
+
+    expect(JSON.parse(file.content)).toEqual({ total: 400, free: 0 });
+  });
+
+  it('should_answer_the_disk_meter_from_the_members_own_gauge', () => {
+    const file = renderRutorrentQuotaAnswer();
+
+    expect(file.path).toBe('/usr/local/share/kobox/rutorrent-quota.php');
+    expect(file.content).toContain("FileUtil::getProfilePath() . '/kobox-quota.json'");
+    expect(file.content).toContain("CachedEcho::send($answer, 'application/json');");
+    expectGolden('rutorrent-quota.php.golden', file.content);
+  });
+
+  it('should_route_the_disk_meter_to_the_quota_answer_behind_the_session_check', () => {
+    const vhost = renderNginxVhost({ portalPort: 8189 }).content;
+    const block = /location = \/ru\/plugins\/diskspace\/action\.php \{[^}]*\}/.exec(vhost)?.[0] ?? '';
+
+    expect(block).toContain('auth_request /internal/auth;');
+    expect(block).toContain('fastcgi_param SCRIPT_FILENAME /usr/local/share/kobox/rutorrent-quota.php;');
+    expect(block).toContain('fastcgi_param REMOTE_USER $kobox_user;');
   });
 
   it('should_render_the_global_rutorrent_config_golden', () => {
