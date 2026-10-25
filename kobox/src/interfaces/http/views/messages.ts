@@ -9,7 +9,6 @@ const FR: Readonly<Record<string, string>> = {
   Home: 'Accueil',
   'My media': 'Mes fichiers',
   Downloads: 'Téléchargements',
-  Sending: 'Envoi',
   Folders: 'Dossiers',
   Account: 'Mon compte',
   'Sign out': 'Se déconnecter',

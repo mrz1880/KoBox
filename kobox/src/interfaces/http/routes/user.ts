@@ -274,7 +274,7 @@ export function registerUserRoutes(
     return redirectWithFlash(reply, '/password', 'Password change under way — it takes a few seconds.');
   });
 
-  // The folders a member actually has, read from their instance. "Sending" and
+  // The folders a member actually has, read from their instance. Folders and
   // "Download a link" must never disagree about what exists.
   // aria2 is the engine behind every debrid download. Reading its install state
   // once per page beats letting each link discover the absence on its own.

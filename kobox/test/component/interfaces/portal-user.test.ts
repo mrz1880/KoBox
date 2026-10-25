@@ -94,6 +94,17 @@ describe('role-routed home', () => {
   });
 });
 
+describe('the folders page', () => {
+  // members look for their categories under that name, not under "Sending",
+  // which is only what happens to a folder once a download finishes
+  it('should_be_called_folders_in_the_menu', async () => {
+    const response = await world.server.inject({ method: 'GET', url: '/', headers: { cookie: user.cookie } });
+
+    expect(response.body).toContain('<a href="/sync">Folders</a>');
+    expect(response.body).not.toContain('>Sending<');
+  });
+});
+
 describe('self password change', () => {
   it('should_reject_a_wrong_current_password_without_enqueueing', async () => {
     const response = await world.server.inject({
@@ -317,7 +328,7 @@ describe('debrid downloads', () => {
   });
 
   it('should_route_a_download_to_any_folder_the_member_actually_has', async () => {
-    // "Sending" lists the member's real folders while this form accepted a
+    // the Folders page lists the member's real folders while this form accepted a
     // closed films|series enum: a member with a Divers folder could sync it and
     // never download into it
     const response = await world.server.inject({

@@ -302,13 +302,13 @@ function detailCell(download: DebridDownload): RawHtml {
   return html`<span class="path">${download.sourceLink.value}</span>`;
 }
 
-// The member's own folders, the same list "Sending" shows. A closed films|series
+// The member's own folders, the same list the Folders page shows. A closed films|series
 // enum used to live here, so a member with a Divers folder could sync it and
 // never download into it.
 function folderChoice(folders: readonly Label[]): RawHtml {
   if (folders.length === 0) {
     return html`<p class="muted">You have no folders yet. Create one under
-<a href="/sync">Sending</a> and it will show up here.</p>`;
+<a href="/sync">Folders</a> and it will show up here.</p>`;
   }
   const options = folders.map((folder) => html`<option value="${folder.value}">${folder.value}</option>`);
   return html`<select id="category" name="category">${options}</select>`;
@@ -569,7 +569,7 @@ export function mediaPage(
 ${flash(message)}
 ${sections.length === 0
       ? html`<p class="muted">You have no folders yet. Create one under
-<a href="/sync">Sending</a>, and what lands in it shows up here.</p>`
+<a href="/sync">Folders</a>, and what lands in it shows up here.</p>`
       : html`${sections}`}`,
     viewer,
   );

@@ -95,6 +95,8 @@ describe('InviteMember', () => {
     // French unless the member chose otherwise, and no password, ever
     expect(mail?.subject).toContain('Bienvenue');
     expect(mail?.body).toContain('Nextcloud');
+    // first thing to do once in: make the folders downloads are sorted into
+    expect(mail?.body).toContain('Dossiers');
   });
 
   it('should_refuse_a_username_that_is_taken', async () => {

@@ -55,7 +55,7 @@ export function syncPage(
 </tr>`,
   );
   return page(
-    'Sending',
+    'Folders',
     html`<h1>Your folders</h1>
 <p class="muted">A folder is what you sort your downloads into. Drop a torrent in
 a folder's watch directory and what comes out lands in that folder — and, if you
