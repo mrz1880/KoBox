@@ -156,6 +156,9 @@ export interface UserRoutesDeps {
   readonly components: ComponentRegistry;
   // the box's own address in the usual tunnel, where the network share lives
   readonly boxInVpn: string;
+  // Nextcloud's SSO app is in place: it opens the session of the member signed
+  // in here, but only from its own login page
+  readonly nextcloudSignsInFromPortal: boolean;
   readonly users: UserRepository;
   readonly fairUse: FairUseRepository;
   readonly queue: JobQueuePort;
@@ -234,6 +237,13 @@ export function registerUserRoutes(
       filesPage(viewerOf(session), {
         username: session.username.value,
         nextcloudInstalled: nextcloud?.state.value === 'installed',
+        nextcloudHref: deps.nextcloudSignsInFromPortal
+          ? // its login page reads the name nginx passes, then goes back to a
+            // page of a domain Nextcloud trusts, the one the member came by
+            `/nextcloud/index.php/apps/user_saml/saml/login?originalUrl=${encodeURIComponent(
+              `https://${request.hostname}/nextcloud/index.php/apps/files/`,
+            )}`
+          : '/nextcloud/',
         // without a configured name, the one the portal was opened by is the box
         sftpHost: sftpHostName() ?? request.hostname,
         boxInVpn: deps.boxInVpn,

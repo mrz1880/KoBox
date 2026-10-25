@@ -238,6 +238,7 @@ export async function buildPortalWorld(
     diskSamples,
     mailRelay,
     boxInVpn: '10.0.0.1',
+    nextcloudSignsInFromPortal: false,
     siteSettings,
     saveMailRelay: new SaveMailRelay({ settings: mailRelay, sealer: new FakeRemoteSealer() }),
     sshKeys,

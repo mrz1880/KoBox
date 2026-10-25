@@ -30,6 +30,29 @@ describe('the My files page', () => {
     expect(response.body).toContain('alice');
   });
 
+  // Nextcloud's SSO app opens a session only from its own login page: the plain
+  // /nextcloud/ link showed the password form to a member signed in here
+  it('should_open_nextcloud_through_its_portal_sign_in_when_the_box_has_it', async () => {
+    world = await buildPortalWorld({ nextcloudSignsInFromPortal: true });
+    member = await loginAs(world, 'alice');
+    await world.components.markInstalled(
+      ComponentName.parse('nextcloud'),
+      undefined,
+      '2026-10-25 12:00:00',
+    );
+
+    const response = await world.server.inject({
+      method: 'GET',
+      url: '/files',
+      headers: { cookie: member.cookie, host: 'box.example.net' },
+    });
+
+    const target = encodeURIComponent('https://box.example.net/nextcloud/index.php/apps/files/');
+    expect(response.body).toContain(
+      `href="/nextcloud/index.php/apps/user_saml/saml/login?originalUrl=${target}"`,
+    );
+  });
+
   it('should_say_nextcloud_is_missing_rather_than_link_to_nothing', async () => {
     const body = (await filesPage()).body;
 

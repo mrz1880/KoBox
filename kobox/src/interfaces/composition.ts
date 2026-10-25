@@ -4,7 +4,11 @@ import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { parseJob } from '../application/jobs/contract.js';
 import { ImportFromMysb } from '../application/migration/ImportFromMysb.js';
-import { buildInstallers, type InstallerContext } from '../application/installation/installers.js';
+import {
+  buildInstallers,
+  nextcloudSsoRelease,
+  type InstallerContext,
+} from '../application/installation/installers.js';
 import { RunInstallation } from '../application/installation/RunInstallation.js';
 import { UninstallComponents } from '../application/installation/UninstallComponents.js';
 import { COMPONENT_CATALOG } from '../domain/installation/catalog.js';
@@ -561,6 +565,7 @@ export interface PortalContainer {
   readonly mailRelay: SqliteMailRelayRepository;
   readonly siteSettings: SiteSettingsWithInstallDefault;
   readonly boxInVpn: string;
+  readonly nextcloudSignsInFromPortal: boolean;
   readonly saveMailRelay: SaveMailRelay;
   readonly sshKeys: SqliteSshKeyRepository;
   readonly destinations: SqliteSyncDestinationRepository;
@@ -652,6 +657,8 @@ export function buildPortalContainer(name: string): PortalContainer {
     siteSettings: siteSettings(db),
     // members reach Samba and NFS at the box's address in the usual tunnel
     boxInVpn: subnetOf('tun-gw', securitySettings().vpn).firstAddress(),
+    // pinned, the nextcloud component installs it with Nextcloud itself
+    nextcloudSignsInFromPortal: nextcloudSsoRelease(artifactPinsFrom(process.env)) !== undefined,
     // the PUBLIC half only: the portal and the CLI store a relay the same way
     saveMailRelay: new SaveMailRelay({ settings: mailRelay, sealer: remotePasswordCipher() }),
     passwords: passwordCipher(),
