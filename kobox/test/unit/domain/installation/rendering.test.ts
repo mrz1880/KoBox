@@ -22,6 +22,7 @@ import {
   renderPortalEnv,
   renderPortalUnit,
   renderRutorrentConfig,
+  renderRutorrentPlugins,
   renderShellinaboxDefault,
   renderSmbConf,
   renderRutorrentUserConfig,
@@ -87,6 +88,18 @@ describe('installation rendering', () => {
     const conf = renderRutorrentConfig().content;
 
     expect(conf).toContain('$profileMask = 0770;');
+  });
+
+  // dump needs dumptorrent, which no Debian release packages: left on, it is
+  // an error at every load for a plugin nobody can use
+  it('should_switch_off_the_plugins_this_box_cannot_run_and_keep_the_default_rights', () => {
+    const file = renderRutorrentPlugins();
+
+    expect(file.path).toBe('/var/www/rutorrent/conf/plugins.ini');
+    expect(file.content).toContain('[dump]\nenabled = no');
+    // a plugins.ini replaces ruTorrent's whole: its default rights come along
+    expect(file.content).toContain('[default]\nenabled = user-defined');
+    expectGolden('rutorrent-plugins.ini.golden', file.content);
   });
 
   it('should_turn_http2_on_with_the_directive_nginx_1_26_expects', () => {

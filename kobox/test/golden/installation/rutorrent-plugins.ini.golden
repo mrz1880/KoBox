@@ -1,0 +1,14 @@
+;; KoBox-managed — DO NOT EDIT (rendered declaratively).
+[default]
+enabled = user-defined
+canChangeToolbar = yes
+canChangeMenu = yes
+canChangeOptions = yes
+canChangeTabs = yes
+canChangeColumns = yes
+canChangeStatusBar = yes
+canChangeCategory = yes
+canBeShutdowned = yes
+
+[dump]
+enabled = no

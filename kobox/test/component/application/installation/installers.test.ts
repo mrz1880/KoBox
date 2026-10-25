@@ -850,6 +850,7 @@ describe('rutorrent installer', () => {
     // in the file that config.php loads last
     expect(world.host.contentAt('/var/www/rutorrent/conf/config.local.php')).toContain('$profileMask');
     expect(world.host.contentAt('/var/www/rutorrent/conf/config.php')).toBeUndefined();
+    expect(world.host.contentAt('/var/www/rutorrent/conf/plugins.ini')).toContain('[dump]');
 
     await installer(world, 'rutorrent').install();
 
