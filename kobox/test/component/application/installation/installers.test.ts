@@ -179,6 +179,14 @@ beforeEach(() => {
 });
 
 describe('kobox-core installer', () => {
+  // on a fresh box no member exists yet, and the folders that belong to all of
+  // them (ruTorrent's profiles) are chowned to this group during the install
+  it('should_create_the_members_group_before_any_member_exists', async () => {
+    await installer(world, 'kobox-core').install();
+
+    expect(world.host.groups).toContain('kobox-users');
+  });
+
   it('should_create_dirs_render_units_and_activate_the_worker', async () => {
     const outcome = await installer(world, 'kobox-core').install();
 

@@ -172,6 +172,11 @@ export class InstallHostAdapter implements InstallHostPort {
     );
   }
 
+  async ensureGroup(name: string): Promise<void> {
+    // -f: succeed, changing nothing, when the group already exists
+    await runOrThrow(this.runner, { command: 'groupadd', args: ['-f', name], timeoutMs: HOST_TIMEOUT_MS });
+  }
+
   async setOwnership(path: string, owner: string, group: string, mode: string): Promise<void> {
     await chmod(path, parseInt(mode, 8));
     if (process.geteuid?.() !== 0) {

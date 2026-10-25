@@ -193,6 +193,16 @@ describe('InstallHostAdapter (fs side)', () => {
     expect(runner.calls[2]?.stdin).toContain('main_mailer_type');
   });
 
+  it('should_create_a_group_and_leave_an_existing_one_as_it_is', async () => {
+    const runner = new RecordingRunner();
+
+    await new InstallHostAdapter(runner).ensureGroup('kobox-users');
+
+    expect(runner.calls.map((call) => [call.command, ...call.args])).toEqual([
+      ['groupadd', '-f', 'kobox-users'],
+    ]);
+  });
+
   it('should_leave_a_quota_already_enforced_alone_on_a_second_install', async () => {
     // quotacheck refuses a filesystem whose quota is live ("might damage the
     // file"): the second `kobox install` on the first production box died here
