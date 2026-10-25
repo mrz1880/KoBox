@@ -15,6 +15,7 @@ const WORKER = 'dist/interfaces/worker/main.js';
 const PORTAL = 'dist/interfaces/http/main.js';
 const ADMIN = 'bossadmin';
 const MEMBER = 'e2eportaluser';
+const CLI_MEMBER = 'e2eclimember';
 const PORT = 8199;
 const BASE = `http://127.0.0.1:${String(PORT)}`;
 const PASSWORD = 's3cretpw!';
@@ -115,6 +116,7 @@ describe.skipIf(!onDebianAsRoot)('E2E: portal login -> create user -> member sel
     }
     cleanupUser(ADMIN);
     cleanupUser(MEMBER);
+    cleanupUser(CLI_MEMBER);
 
     // Fixture PKI tree (easy-rsa shape): this E2E exercises the PORTAL, not VPN
     // cert issuance (that is security-network's job) — real easy-rsa is absent
@@ -147,6 +149,7 @@ describe.skipIf(!onDebianAsRoot)('E2E: portal login -> create user -> member sel
     portal?.kill('SIGTERM');
     cleanupUser(ADMIN);
     cleanupUser(MEMBER);
+    cleanupUser(CLI_MEMBER);
   });
 
   it('should_reject_a_wrong_password_and_accept_the_admin', async () => {
@@ -207,6 +210,31 @@ describe.skipIf(!onDebianAsRoot)('E2E: portal login -> create user -> member sel
     expect(sh('getent', ['shadow', MEMBER]).split(':')[1]).toMatch(/^\$(6|y)\$/);
     // and the link is spent
     expect(await (await fetch(`${BASE}${linkPath ?? ''}`)).text()).toContain('no longer works');
+  });
+
+  // the command line invited the way the portal does: nobody types the
+  // member's password, they choose it through the link the box mails them
+  it('should_invite_a_member_from_the_command_line_who_then_chooses_their_password', async () => {
+    const output = kobox(['invite-member', CLI_MEMBER, '--email', `${CLI_MEMBER}@example.org`, '--quota-gib', '10']);
+    const linkPath = /\/password-link\/[0-9a-f]{64}/.exec(output)?.[0];
+    expect(linkPath, 'the command prints the invitation link').toBeDefined();
+
+    let guard = 0;
+    while (guard < 20 && !existsSync(`/home/${CLI_MEMBER}/.rtorrent.rc`)) {
+      drainQueue();
+      guard += 1;
+    }
+    expect(userExists(CLI_MEMBER)).toBe(true);
+    expect(await login(CLI_MEMBER)).toBeUndefined();
+
+    const chosen = await fetch(`${BASE}${linkPath ?? ''}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: `password=${encodeURIComponent(PASSWORD)}&confirm=${encodeURIComponent(PASSWORD)}`,
+    });
+    expect(await chosen.text()).toContain('Password saved');
+    drainQueue();
+    expect(await login(CLI_MEMBER)).toBeDefined();
   });
 
   it('should_let_a_download_client_in_with_a_token_and_keep_the_password_out', async () => {

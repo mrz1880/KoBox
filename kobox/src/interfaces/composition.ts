@@ -73,6 +73,7 @@ import {
   RequestPasswordReset,
   SendPasswordLink,
   SetPasswordFromLink,
+  type PasswordLinkDeps,
   type PortalAddressPort,
 } from '../application/portal/PasswordLinks.js';
 import { SqlitePasswordLinkRepository } from '../infrastructure/persistence/SqlitePasswordLinkRepository.js';
@@ -495,6 +496,7 @@ export interface Container {
   readonly securityUseCases: SecurityUseCases;
   readonly maintenanceUseCases: MaintenanceUseCases;
   readonly saveMailRelay: SaveMailRelay;
+  readonly inviteMember: InviteMember;
   readonly outbox: SqliteMailOutbox;
   readonly ddlUseCases: DdlUseCases;
   readonly downloader: Aria2Adapter;
@@ -586,6 +588,23 @@ export interface PortalContainer {
   readonly setPasswordFromLink: SetPasswordFromLink;
 }
 
+// What invitations and forgotten passwords need, for the portal and the
+// command line alike: mint the link, mail it, seal the chosen password for the
+// worker.
+function passwordLinkDeps(
+  db: KoboxDatabase,
+  stores: Pick<PasswordLinkDeps, 'users' | 'credentials' | 'outbox' | 'queue'>,
+): PasswordLinkDeps {
+  return {
+    ...stores,
+    links: new SqlitePasswordLinkRepository(db),
+    passwords: passwordCipher(),
+    tokens: new CryptoSessionTokens(),
+    address: portalAddress(db),
+    clock: nowStamp,
+  };
+}
+
 export function buildPortalContainer(name: string): PortalContainer {
   const logger = createLogger(name);
   const db = KoboxDatabase.open(process.env.KOBOX_DB ?? DEFAULT_DB_PATH);
@@ -598,19 +617,12 @@ export function buildPortalContainer(name: string): PortalContainer {
   const portalCredentialsRepo = new SqlitePortalCredentialsRepository(db);
   const portalAttempts = new SqliteLoginAttemptsRepository(db);
   const users = new SqliteUserRepository(db);
-  // what invitations and forgotten passwords need: the portal mints the link,
-  // mails it, and seals the chosen password for the worker
-  const linkDeps = {
+  const linkDeps = passwordLinkDeps(db, {
     users,
     credentials: portalCredentialsRepo,
-    links: new SqlitePasswordLinkRepository(db),
     outbox: new SqliteMailOutbox(db),
     queue,
-    passwords: passwordCipher(),
-    tokens: new CryptoSessionTokens(),
-    address: portalAddress(db),
-    clock: nowStamp,
-  };
+  });
   return {
     db,
     logger,
@@ -894,6 +906,8 @@ export function buildContainer(name: string): Container {
     securityUseCases,
     maintenanceUseCases,
     saveMailRelay: new SaveMailRelay({ settings: mailRelay, sealer: remotePasswordCipher() }),
+    // the same invitation the portal sends: nobody types the member's password
+    inviteMember: new InviteMember(passwordLinkDeps(db, { users: repo, credentials, outbox, queue })),
     outbox,
     queue,
     worker: new JobWorker(

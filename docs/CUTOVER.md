@@ -57,15 +57,14 @@ Set up what the box needs before members arrive, each covered in `docs/OPS.md`:
 
 ## 3. Create the accounts
 
-One per member, password on stdin:
+One invitation per member: they choose their own password through the link mailed to them,
+which the command also prints (valid 7 days, once).
 
 ```sh
-printf '%s' '<initial password>' | kobox create-user <member> --email <address> \
-  [--quota-gib <n>] [--admin]
+kobox invite-member <member> --email <address> [--quota-gib <n>] [--admin]
 ```
 
-Or from the admin console's Users page. Hand each member their initial password through a channel
-you trust and ask them to change it on first login (`/password`). Create your own admin account
+Or from the admin console's Members page. Create your own admin account
 first and run through §6 with it before creating the others.
 
 ## 4. Recreate each member's settings

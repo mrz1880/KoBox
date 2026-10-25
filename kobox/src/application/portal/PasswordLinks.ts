@@ -49,7 +49,7 @@ export class MemberSuspendedError extends DomainError {
   }
 }
 
-interface Deps {
+export interface PasswordLinkDeps {
   readonly users: UserRepository;
   readonly credentials: PortalCredentialsPort;
   readonly links: PasswordLinkRepository;
@@ -64,7 +64,7 @@ interface Deps {
 // Mints a link, replaces whatever the member still had open, and mails it.
 // Returns the link itself, which only an invitation ever shows to an admin.
 async function mailPasswordLink(
-  deps: Deps,
+  deps: PasswordLinkDeps,
   member: {
     readonly username: Username;
     readonly email: EmailAddress;
@@ -105,7 +105,7 @@ async function mailPasswordLink(
 // An admin opens an account for someone: everything is created at once, with
 // no password, and the member chooses theirs through the link.
 export class InviteMember {
-  constructor(private readonly deps: Deps) {}
+  constructor(private readonly deps: PasswordLinkDeps) {}
 
   async execute(command: {
     readonly username: Username;
@@ -138,7 +138,7 @@ export class InviteMember {
 // An invitation again for a member who never chose a password, a reset for
 // one who did. Only the invitation's link comes back, for an admin to pass on.
 export class SendPasswordLink {
-  constructor(private readonly deps: Deps) {}
+  constructor(private readonly deps: PasswordLinkDeps) {}
 
   async execute(
     username: Username,
@@ -165,7 +165,7 @@ export class SendPasswordLink {
 // "Forgot your password?": a username or an address in, a mail out if it
 // names an active member, and the very same silence in every other case.
 export class RequestPasswordReset {
-  constructor(private readonly deps: Deps) {}
+  constructor(private readonly deps: PasswordLinkDeps) {}
 
   async execute(identifier: string): Promise<void> {
     const user = await this.memberNamed(identifier.trim());
@@ -202,7 +202,7 @@ export class RequestPasswordReset {
 // The member chose a password on the link's page: the link closes, and the
 // password goes to the root worker sealed, which applies it everywhere.
 export class SetPasswordFromLink {
-  constructor(private readonly deps: Deps) {}
+  constructor(private readonly deps: PasswordLinkDeps) {}
 
   // For the page that asks for the password: looking does not use the link,
   // so a mail scanner that opens it first cannot burn it.
