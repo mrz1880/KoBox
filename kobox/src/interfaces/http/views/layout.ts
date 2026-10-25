@@ -201,38 +201,46 @@ export interface Viewer {
   readonly t: Translate;
 }
 
-const ADMIN_NAV: readonly (readonly [string, string])[] = [
-  ['/', 'Overview'],
-  ['/admin/users', 'Users'],
-  ['/admin/trackers', 'Trackers'],
-  ['/admin/blocklists', 'Blocklists'],
-  ['/admin/addresses', 'Addresses'],
-  ['/admin/fair-use', 'Fair use'],
-  ['/admin/health', 'Health'],
-  ['/admin/logs', 'Logs'],
-  ['/admin/packages', 'Updates'],
-  ['/admin/config', 'Config'],
-  ['/admin/mails', 'Mails'],
-  ['/admin/mail-relay', 'Mail relay'],
-  ['/admin/domain', 'Domain'],
-  ['/monitoring', 'Monitoring'],
-  ['/rutorrent', 'ruTorrent'],
-];
+// Two spaces, never one replacing the other: an admin is a member too, and the
+// administration menu used to hide their own files, folders and account.
+export type Space = 'seedbox' | 'admin';
 
 // Ordered by how often a person needs it, not by how the system is organised.
 // VPN profiles, ports and the password live behind "Account": needed rarely,
 // and putting them in the main bar made the technical look mandatory.
-const USER_NAV: readonly (readonly [string, string])[] = [
+const SEEDBOX_NAV: readonly (readonly [string, string])[] = [
   ['/', 'Home'],
   ['/rutorrent', 'Torrents'],
+  ['/files', 'My files'],
   ['/media', 'My media'],
   ['/sync', 'Folders'],
   ['/downloads', 'Download a link'],
   ['/access', 'Account'],
 ];
 
-export function page(title: string, body: RawHtml, viewer?: Viewer): string {
-  const nav = viewer === undefined ? [] : viewer.role === 'admin' ? ADMIN_NAV : USER_NAV;
+// One entry per job an admin comes to do; the pages behind each are grouped
+// on its own page rather than lined up in the bar.
+const ADMIN_NAV: readonly (readonly [string, string])[] = [
+  ['/admin', 'Overview'],
+  ['/admin/users', 'Members'],
+  ['/admin/network', 'Network & security'],
+  ['/admin/system', 'System'],
+  ['/admin/health', 'Health'],
+  ['/admin/troubleshooting', 'Troubleshooting'],
+];
+
+const SPACES: readonly (readonly [string, string])[] = [
+  ['/', 'My seedbox'],
+  ['/admin', 'Administration'],
+];
+
+export function page(
+  title: string,
+  body: RawHtml,
+  viewer?: Viewer,
+  space: Space = 'seedbox',
+): string {
+  const nav = space === 'admin' ? ADMIN_NAV : SEEDBOX_NAV;
   const document = html`<!doctype html>
 <html lang="${viewer?.language.value ?? 'en'}">
 <head>
@@ -246,7 +254,13 @@ export function page(title: string, body: RawHtml, viewer?: Viewer): string {
   <span class="brand">KOBOX</span>
   ${viewer === undefined
     ? undefined
-    : html`<nav>${nav.map(([href, label]) => html`<a href="${href}">${viewer.t(label)}</a>`)}</nav>
+    : html`${viewer.role === 'admin'
+        ? html`<nav aria-label="Space">${SPACES.map(
+            ([href, label]) =>
+              html`<a href="${href}"${(href === '/admin') === (space === 'admin') ? raw(' aria-current="page"') : undefined}>${viewer.t(label)}</a>`,
+          )}</nav>`
+        : undefined}
+  <nav aria-label="Menu">${nav.map(([href, label]) => html`<a href="${href}">${viewer.t(label)}</a>`)}</nav>
   <form class="inline" method="post" action="/logout">
     <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
     <button class="ghost" type="submit">${viewer.t('Sign out')} (${viewer.username})</button>

@@ -64,6 +64,7 @@ ${flash(message)}
   <tbody>${rows}</tbody>
 </table>`,
     viewer,
+    'admin',
   );
 }
 
@@ -129,5 +130,6 @@ ${flash(message)}
   <tbody>${rows}</tbody>
 </table>`,
     viewer,
+    'admin',
   );
 }

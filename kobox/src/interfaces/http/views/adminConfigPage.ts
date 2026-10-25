@@ -54,5 +54,6 @@ password, the VPN keys — are not listed and cannot be reached from here.</p>
 ${selected === undefined ? html`` : viewer_(selected, found)}
 ${index(selected)}`,
     viewer,
+    'admin',
   );
 }

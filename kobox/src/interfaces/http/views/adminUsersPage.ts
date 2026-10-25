@@ -59,6 +59,7 @@ ${flash(message)}
   <button type="submit">${viewer.t('Create user')}</button>
 </form>`,
     viewer,
+    'admin',
   );
 }
 
@@ -224,5 +225,6 @@ ${flash(message)}
   <button type="submit">${viewer.t(access === 'invited' ? 'Resend the invitation' : 'Send a reset link')}</button>
 </form>`,
     viewer,
+    'admin',
   );
 }

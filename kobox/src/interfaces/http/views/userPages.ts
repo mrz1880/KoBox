@@ -210,6 +210,7 @@ ${loudestFirst.map((row) => signalStrip({ ...row, scaleBytes, linked: true }))}
 <a href="/admin/fair-use">Fair use</a> ·
 <a href="/admin/health">Health</a></p>`,
     viewer,
+    'admin',
   );
 }
 
@@ -625,5 +626,6 @@ export function monitoringPage(viewer: Viewer, available: boolean): string {
   the reason each one gave.</p>
 </section>`,
     viewer,
+    'admin',
   );
 }

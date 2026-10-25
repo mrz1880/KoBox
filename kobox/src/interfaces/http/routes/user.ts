@@ -197,20 +197,11 @@ export function registerUserRoutes(
   deps: UserRoutesDeps,
   guards: Guards,
 ): void {
-  // Role-routed home: fleet overview for admins, personal workstation for users.
+  // Everyone's own seedbox, admins included: an admin is a member too.
   server.get('/', async (request, reply) => {
     const session = await guards.requireSession(request, reply);
     if (session === undefined) {
       return;
-    }
-    if (session.role === 'admin') {
-      const rows: FleetRow[] = [];
-      for (const user of await deps.users.listAll()) {
-        rows.push(await signalRowFor(deps, user));
-      }
-      return reply
-        .type('text/html')
-        .send(adminHomePage(rows, viewerOf(session), flashOf(request)));
     }
     const user = await deps.users.findByUsername(session.username);
     if (user === undefined) {
@@ -221,6 +212,21 @@ export function registerUserRoutes(
       .send(
         userHomePage(user, viewerOf(session), await signalRowFor(deps, user), flashOf(request)),
       );
+  });
+
+  // Where administration opens: the whole fleet at a glance.
+  server.get('/admin', async (request, reply) => {
+    const session = await guards.requireAdmin(request, reply);
+    if (session === undefined) {
+      return;
+    }
+    const rows: FleetRow[] = [];
+    for (const user of await deps.users.listAll()) {
+      rows.push(await signalRowFor(deps, user));
+    }
+    return reply
+      .type('text/html')
+      .send(adminHomePage(rows, viewerOf(session), flashOf(request)));
   });
 
   server.get('/password', async (request, reply) => {

@@ -423,7 +423,7 @@ describe('the admin console in French', () => {
     });
 
     expect(response.body).toContain('Créer un membre');
-    expect(response.body).toContain('Listes de blocage');
+    expect(response.body).toContain('Réseau et sécurité');
   });
 
   it('should_render_the_long_explanations_in_english_rather_than_their_key', async () => {

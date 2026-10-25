@@ -46,6 +46,7 @@ something this portal is allowed to do.</p>
 ${flash(message)}
 ${cards}`,
     viewer,
+    'admin',
   );
 }
 
@@ -95,5 +96,6 @@ ${lines.length === 0
   <tbody>${lines.map((line) => html`<tr><td class="mono">${line}</td></tr>`)}</tbody>
 </table>`}`,
     viewer,
+    'admin',
   );
 }
