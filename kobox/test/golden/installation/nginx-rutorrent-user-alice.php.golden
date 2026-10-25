@@ -3,3 +3,4 @@
 $scgi_port = 51101;
 $scgi_host = '127.0.0.1';
 $XMLRPCMountPoint = '/RPC-ALICE';
+$topDirectory = '/home/alice/';

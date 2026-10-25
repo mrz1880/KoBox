@@ -379,6 +379,14 @@ describe('installation rendering', () => {
     expectGolden('nginx-rutorrent-user-alice.php.golden', file.content);
   });
 
+  // ruTorrent runs as the web server, a member of every member's group: bounded
+  // by /home alone, its folder picker listed another member's downloads
+  it('should_keep_a_members_rutorrent_inside_their_own_home', () => {
+    const file = renderRutorrentUserConfig({ username: 'alice', scgiPort: 51101 });
+
+    expect(file.content).toContain("$topDirectory = '/home/alice/';");
+  });
+
   it('should_switch_to_the_lets_encrypt_paths_once_a_cert_was_issued', () => {
     const file = renderNginxVhost({
       portalPort: 8189,
