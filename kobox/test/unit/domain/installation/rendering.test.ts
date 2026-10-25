@@ -87,8 +87,6 @@ describe('installation rendering', () => {
     const conf = renderRutorrentConfig().content;
 
     expect(conf).toContain('$profileMask = 0770;');
-    // read by getplugins.php and the plugins' init: unset, it warns on every load
-    expect(conf).toContain('$do_diagnostic = true;');
   });
 
   it('should_turn_http2_on_with_the_directive_nginx_1_26_expects', () => {
@@ -274,6 +272,8 @@ describe('installation rendering', () => {
 
     expect(sources?.content).toContain('Suites: trixie trixie-updates');
     expect(sources?.content).toContain('Suites: trixie-security');
+    // unrar, the only one that opens RAR5 archives, lives in non-free
+    expect(sources?.content).toContain('Components: main contrib non-free non-free-firmware');
     expectGolden('debian.sources.golden', sources?.content ?? '');
   });
 
@@ -367,7 +367,8 @@ describe('installation rendering', () => {
 
   it('should_render_the_global_rutorrent_config_golden', () => {
     const file = renderRutorrentConfig();
-    expect(file.path).toBe('/var/www/rutorrent/conf/config.php');
+    // ruTorrent's config.php loads it last: KoBox's overrides, nothing more
+    expect(file.path).toBe('/var/www/rutorrent/conf/config.local.php');
     expectGolden('rutorrent-config.php.golden', file.content);
   });
 

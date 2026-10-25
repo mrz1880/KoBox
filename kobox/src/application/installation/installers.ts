@@ -29,6 +29,7 @@ import {
   renderPortalUnit,
   renderNextcloudSite,
   renderRutorrentConfig,
+  RUTORRENT_OWN_CONFIG,
   RUTORRENT_PROFILE_DIR,
   rutorrentProfilesDir,
   renderShellinaboxDefault,
@@ -430,6 +431,11 @@ class RtorrentInstaller implements ComponentInstaller {
   }
 }
 
+// What ruTorrent's plugins have rTorrent or the web server run: mediainfo,
+// screenshots (ffmpeg), spectrogram (sox), _cloudflare (python + cloudscraper).
+// A missing one is an error at every load and leaves its plugin off.
+const RUTORRENT_PLUGIN_TOOLS = ['mediainfo', 'ffmpeg', 'sox', 'python-is-python3', 'python3-cloudscraper'];
+
 class RutorrentInstaller implements ComponentInstaller {
   readonly name = 'rutorrent';
 
@@ -444,13 +450,26 @@ class RutorrentInstaller implements ComponentInstaller {
           'no ruTorrent release pinned — set KOBOX_RUTORRENT_URL and KOBOX_RUTORRENT_SHA256, then re-run kobox install',
       };
     }
-    await packages.ensureInstalled(['php-fpm', 'php-cli', 'unzip']);
+    await packages.ensureInstalled(['php-fpm', 'php-cli', 'unzip', ...RUTORRENT_PLUGIN_TOOLS]);
+    // unrar opens RAR5 archives and only non-free has it: a box whose apt
+    // sources KoBox does not manage may not list it, and that is no reason to
+    // leave ruTorrent uninstalled
+    let unrar: string | undefined;
+    if (await packages.isAvailable('unrar')) {
+      await packages.ensureInstalled(['unrar']);
+    } else {
+      unrar =
+        'unrar is not available: enable the non-free component (or re-run kobox install --manage-apt-sources), then re-run kobox install, for the unpack plugin';
+    }
     // ruTorrent IS a PHP application: without the pool running, nginx answers
     // 403 on the very first visit. apt enables the unit but does not start it,
     // so `now` is what makes ruTorrent work today rather than after a reboot.
     await systemd.enable(PHP_FPM.unit, { now: true });
     const marker = await host.readFile(RUTORRENT_MARKER);
-    if (marker?.trim() !== install.rutorrentSha256) {
+    // earlier KoBox versions replaced ruTorrent's own config.php: put it back
+    const ownConfig = await host.readFile(RUTORRENT_OWN_CONFIG);
+    const overwritten = ownConfig?.includes('KoBox-managed') === true;
+    if (marker?.trim() !== install.rutorrentSha256 || overwritten) {
       await artifacts.fetchVerified(install.rutorrentUrl, install.rutorrentSha256, RUTORRENT_ARCHIVE);
       await host.ensureDir(RUTORRENT_DIR, '0755');
       await host.extractArchive(RUTORRENT_ARCHIVE, RUTORRENT_DIR, 'inside-one-directory');
@@ -472,7 +491,7 @@ class RutorrentInstaller implements ComponentInstaller {
       await host.chown(dir, WEB_SERVER_USER, MEMBERS_GROUP);
     }
     await files.apply([renderRutorrentConfig()]);
-    return installed();
+    return installed(undefined, unrar);
   }
 
   async uninstall(): Promise<void> {

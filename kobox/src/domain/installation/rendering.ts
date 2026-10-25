@@ -364,7 +364,8 @@ export function renderAptSources(): readonly RenderedFile[] {
       'Types: deb',
       `URIs: ${uri}`,
       `Suites: ${suites}`,
-      'Components: main contrib non-free-firmware',
+      // non-free: unrar, the only one that opens RAR5 archives (ruTorrent's unpack)
+      'Components: main contrib non-free non-free-firmware',
       'Signed-By: /usr/share/keyrings/debian-archive-keyring.pgp',
     ].join('\n');
   return [
@@ -783,24 +784,22 @@ export function rutorrentProfilesDir(): string {
   return `${RUTORRENT_PROFILE_DIR}/users`;
 }
 
-// Global ruTorrent settings only — per-user profiles and their SCGI wiring
-// belong to the portal/auth slice (Phase 6).
+// ruTorrent's own conf/config.php holds every default its plugins read
+// ($throttleMaxSpeed, $do_diagnostic, $pathToExternals...) and loads
+// config.local.php last: KoBox writes only what it changes, there. Per-member
+// SCGI wiring lives in conf/users/<member>/config.php.
+export const RUTORRENT_OWN_CONFIG = '/var/www/rutorrent/conf/config.php';
+
 export function renderRutorrentConfig(): RenderedFile {
   return {
-    path: '/var/www/rutorrent/conf/config.php',
+    path: '/var/www/rutorrent/conf/config.local.php',
     content: [
       '<?php',
       '// KoBox-managed — DO NOT EDIT (rendered declaratively).',
       `$topDirectory = '${HOME_BASE}';`,
       `$profilePath = '${RUTORRENT_PROFILE_DIR}';`,
-      "$scgi_port = 5000;",
-      "$scgi_host = '127.0.0.1';",
-      "$XMLRPCMountPoint = '/RPC2';",
-      '$saveUploadedTorrents = true;',
-      '$overwriteUploadedTorrents = false;',
       // a member's profile folders: them and the web server, nobody else
       '$profileMask = 0770;',
-      '$do_diagnostic = true;',
       '',
     ].join('\n'),
     mode: '0640',
