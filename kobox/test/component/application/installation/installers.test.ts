@@ -807,6 +807,14 @@ describe('rutorrent installer', () => {
     }
   });
 
+  it('should_lay_down_the_ratio_groups_members_are_offered', async () => {
+    await installer(world, 'rutorrent').install();
+
+    expect(world.host.contentAt('/usr/local/share/kobox/rutorrent-ratios.php')).toContain(
+      'Privé : ratio 1 ou 3 jours',
+    );
+  });
+
   it('should_say_where_unrar_comes_from_rather_than_fail_without_it', async () => {
     // only non-free has the unrar that opens RAR5; a box whose sources KoBox
     // does not manage may not list it

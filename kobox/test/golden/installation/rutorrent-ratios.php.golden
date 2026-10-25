@@ -1,0 +1,23 @@
+<?php
+// KoBox-managed — DO NOT EDIT (rendered declaratively).
+if (!is_file('/var/www/rutorrent/plugins/ratio/ratio.php')) {
+  exit(0);
+}
+chdir('/var/www/rutorrent/plugins/ratio');
+require_once 'ratio.php';
+$ratio = rRatio::load();
+foreach ($ratio->rat as $i => $group) {
+  $untouched = $group['name'] === 'ratio' . $i && $group['min'] == 100 && $group['max'] == 300
+    && $group['upload'] == 0.1 && $group['time'] == -1 && $group['action'] == RAT_STOP;
+  if (!$untouched) {
+    exit(0);
+  }
+}
+$ratio->rat = [
+  ['action' => RAT_STOP, 'name' => 'Privé : ratio 1 ou 3 jours', 'min' => 100, 'max' => 100, 'upload' => 0, 'time' => 72],
+  ['action' => RAT_STOP, 'name' => 'Privé exigeant : ratio 2 ou 7 jours', 'min' => 200, 'max' => 200, 'upload' => 0, 'time' => 168],
+  ['action' => RAT_STOP, 'name' => 'Public : ratio 1', 'min' => 100, 'max' => 100, 'upload' => 0, 'time' => -1],
+  ['action' => RAT_STOP, 'name' => 'Court : 24 h', 'min' => 100000, 'max' => 100000, 'upload' => 0, 'time' => 24],
+];
+$ratio->pad();
+(new rCache())->set($ratio);

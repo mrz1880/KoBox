@@ -36,6 +36,7 @@ import {
   renderNextcloudSite,
   renderRutorrentConfig,
   renderRutorrentPlugins,
+  renderRutorrentRatioOffer,
   RUTORRENT_OWN_CONFIG,
   RUTORRENT_PROFILE_DIR,
   rutorrentProfilesDir,
@@ -504,7 +505,7 @@ class RutorrentInstaller implements ComponentInstaller {
       await host.ensureDir(dir, '0710');
       await host.chown(dir, WEB_SERVER_USER, MEMBERS_GROUP);
     }
-    await files.apply([renderRutorrentConfig(), renderRutorrentPlugins()]);
+    await files.apply([renderRutorrentConfig(), renderRutorrentPlugins(), renderRutorrentRatioOffer()]);
     return installed(undefined, unrar);
   }
 

@@ -10,9 +10,13 @@ import { RutorrentProfileAdapter } from '../../../../src/infrastructure/system/R
 class RecordingRunner implements CommandRunner {
   readonly calls: CommandRequest[] = [];
 
+  // test -f answers whether the ratio script is on this box
+  constructor(private readonly scriptPresent = true) {}
+
   run(request: CommandRequest): Promise<CommandResult> {
     this.calls.push(request);
-    return Promise.resolve({ stdout: '', stderr: '', exitCode: 0 });
+    const missing = request.command === 'test' && !this.scriptPresent;
+    return Promise.resolve({ stdout: '', stderr: '', exitCode: missing ? 1 : 0 });
   }
 }
 
@@ -31,5 +35,28 @@ describe('RutorrentProfileAdapter', () => {
       ['chmod', '-R', 'g+rwX,o-rwx', dir],
       ['find', dir, '-type', 'd', '-exec', 'chmod', 'g+s', '{}', '+'],
     ]);
+  });
+
+  it('should_offer_the_ratio_groups_as_the_web_server_for_that_member_only', async () => {
+    const runner = new RecordingRunner();
+
+    await new RutorrentProfileAdapter(runner).offerRatioGroups(Username.parse('alice'));
+
+    // ruTorrent finds a member's settings by REMOTE_USER, and writes them as
+    // the web server, which owns the profile folder
+    expect(runner.calls.map((call) => [call.command, ...call.args])).toEqual([
+      ['test', '-f', '/usr/local/share/kobox/rutorrent-ratios.php'],
+      ['runuser', '-u', 'www-data', '--', 'env', 'REMOTE_USER=alice', 'php', '/usr/local/share/kobox/rutorrent-ratios.php'],
+    ]);
+  });
+
+  // ruTorrent not installed (unpinned): nothing to offer, and no reason to
+  // fail the preparation of a member
+  it('should_offer_nothing_where_ruTorrent_is_not_installed', async () => {
+    const runner = new RecordingRunner(false);
+
+    await new RutorrentProfileAdapter(runner).offerRatioGroups(Username.parse('alice'));
+
+    expect(runner.calls.map((call) => call.command)).toEqual(['test']);
   });
 });

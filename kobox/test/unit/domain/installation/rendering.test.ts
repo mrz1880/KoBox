@@ -23,6 +23,7 @@ import {
   renderPortalUnit,
   renderRutorrentConfig,
   renderRutorrentPlugins,
+  renderRutorrentRatioOffer,
   renderShellinaboxDefault,
   renderSmbConf,
   renderRutorrentUserConfig,
@@ -400,6 +401,33 @@ describe('installation rendering', () => {
     expect(file.content.startsWith('#!/bin/sh\n')).toBe(true);
     expect(file.content).toContain('systemctl reload nginx');
     expectGolden('certbot-deploy-hook.golden', file.content);
+  });
+
+  // ruTorrent ships eight groups named ratio0 to ratio7, all alike: members got
+  // groups that say what they do, and only those who never changed their own
+  it('should_offer_ratio_groups_that_say_what_they_do_only_over_untouched_defaults', () => {
+    const file = renderRutorrentRatioOffer();
+    const script = file.content;
+
+    expect(file.path).toBe('/usr/local/share/kobox/rutorrent-ratios.php');
+    expect(file.mode).toBe('0644');
+    for (const name of [
+      'Privé : ratio 1 ou 3 jours',
+      'Privé exigeant : ratio 2 ou 7 jours',
+      'Public : ratio 1',
+      'Court : 24 h',
+    ]) {
+      expect(script).toContain(`'name' => '${name}'`);
+    }
+    expect(script).toContain("'min' => 100, 'max' => 100, 'upload' => 0, 'time' => 72");
+    // every group stops the torrent: nothing is ever erased on its own
+    expect(script).not.toMatch(/RAT_ERASE/);
+    // a member who changed any group keeps theirs
+    expect(script).toContain("\$group['name'] === 'ratio' . \$i");
+    expect(script).toContain('if (!$untouched) {\n    exit(0);');
+    // a ruTorrent release without its ratio plugin: nothing to offer, no failure
+    expect(script).toContain("if (!is_file('/var/www/rutorrent/plugins/ratio/ratio.php')) {\n  exit(0);\n}");
+    expectGolden('rutorrent-ratios.php.golden', script);
   });
 
   it('should_render_the_global_rutorrent_config_golden', () => {

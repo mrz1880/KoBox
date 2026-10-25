@@ -38,6 +38,7 @@ export class RenderRutorrentUsers {
     await files.apply(rendered);
     for (const user of active) {
       await profiles.ensureProfile(user.username);
+      await profiles.offerRatioGroups(user.username);
     }
     await reload.reloadNginx();
   }
