@@ -162,6 +162,31 @@ describe('admin user lifecycle actions', () => {
     expect(world.queue.jobs).toHaveLength(0);
   });
 
+  // "Create user" did not say it sent an invitation, nor did the list say who
+  // had not followed theirs yet
+  it('should_offer_to_invite_a_member_and_say_what_happens_next', async () => {
+    const body = (
+      await world.server.inject({ method: 'GET', url: '/admin/users', headers: { cookie: admin.cookie } })
+    ).body;
+
+    expect(body).toContain('Invite a member');
+    expect(body).not.toContain('Create user');
+    expect(body).toContain('link to choose their password');
+  });
+
+  it('should_list_who_has_not_followed_their_invitation_with_a_way_to_send_it_again', async () => {
+    await world.users.save(new UserBuilder().withUsername('dave').withScgiPort(51190).withRtorrentPort(45090).build());
+    await world.credentials.save({ username: Username.parse('dave'), role: 'user' }, NOW);
+
+    const body = (
+      await world.server.inject({ method: 'GET', url: '/admin/users', headers: { cookie: admin.cookie } })
+    ).body;
+
+    const row = /<tr>\s*<td><a href="\/admin\/users\/dave">[\s\S]*?<\/tr>/.exec(body)?.[0] ?? '';
+    expect(row).toContain('invited');
+    expect(row).toContain('action="/admin/users/dave/password-link"');
+  });
+
   it('should_show_an_invited_member_their_invitation_again', async () => {
     await world.users.save(new UserBuilder().withUsername('dave').withScgiPort(51190).withRtorrentPort(45090).build());
     await world.credentials.save({ username: Username.parse('dave'), role: 'user' }, NOW);
@@ -422,7 +447,7 @@ describe('the admin console in French', () => {
       headers: { cookie: french.cookie },
     });
 
-    expect(response.body).toContain('Créer un membre');
+    expect(response.body).toContain('Inviter un membre');
     expect(response.body).toContain('Réseau et sécurité');
   });
 

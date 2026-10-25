@@ -60,7 +60,6 @@ const FR: Readonly<Record<string, string>> = {
   'French (Français)': 'Français',
 
   // admin navigation
-  Users: 'Membres',
   Trackers: 'Trackers',
   Blocklists: 'Listes de blocage',
   Addresses: 'Adresses',
@@ -78,7 +77,10 @@ const FR: Readonly<Record<string, string>> = {
   Email: 'Adresse mail',
   Quota: 'Quota',
   SCGI: 'SCGI',
-  'Create user': 'Créer un membre',
+  'Invite a member': 'Inviter un membre',
+  'Send the invitation': 'Envoyer l’invitation',
+  'Send the link again': 'Renvoyer le lien',
+  invited: 'invité',
   'Quota (GiB)': 'Quota (Gio)',
   'Portal role': 'Rôle sur le portail',
   Suspend: 'Suspendre',
@@ -144,6 +146,8 @@ const FR: Readonly<Record<string, string>> = {
   // lookup key, and reflowing the English would silently orphan its translation
   'members.intro':
     'Toutes les personnes ayant un compte sur la machine. En créer un provisionne un vrai compte système, sa propre instance rTorrent sur son propre port, un répertoire personnel avec un quota et un profil VPN, puis lui envoie par mail un lien pour choisir son mot de passe ; personne d’autre ne le connaît. Le port SCGI est celui auquel parle son ruTorrent ; il est affiché parce que c’est ce dont vous avez besoin quand quelque chose cloche, et il est conservé en cas de migration.',
+  'members.invite':
+    'Il reçoit un mail avec un lien pour choisir son mot de passe, valable 7 jours ; la page suivante vous le donne aussi, pour le lui envoyer vous-même. Son compte reste fermé tant qu’il ne l’a pas utilisé.',
   'members.suspend':
     'Suspendre est réversible et coupe l’accès sans toucher au moindre fichier : les transferts s’arrêtent, les données restent. Supprimer ne l’est pas.',
   'trackers.public.why':
@@ -183,6 +187,8 @@ const FR: Readonly<Record<string, string>> = {
 const EN: Readonly<Record<string, string>> = {
   'members.intro':
     'Everyone with an account on the box. Creating one provisions a real system account, its own rTorrent instance on its own port, a home directory with a quota, and a VPN profile, then mails them a link to choose their password; nobody else ever knows it. SCGI is the port their ruTorrent talks to; it is shown because it is what you need when something is wrong, and it is preserved if they are ever migrated.',
+  'members.invite':
+    'They get a mail with a link to choose their password, valid 7 days; the next page gives you the link too, to send it yourself. Their account stays closed until they use it.',
   'members.suspend':
     'Suspending is reversible and cuts access without touching a single file: their transfers stop, their data stays. Deleting is not reversible.',
   'trackers.public.why':

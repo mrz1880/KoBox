@@ -18,8 +18,19 @@ function statusChip(user: SeedboxUser, viewer: Viewer): RawHtml {
     : html`<span class="chip ok">${viewer.t('active')}</span>`;
 }
 
+// someone who has not chosen a password yet: their link is what lets them in
+function invitationChip(name: string, viewer: Viewer): RawHtml {
+  return html`<span class="chip warn">${viewer.t('invited')}</span>
+<form class="inline" method="post" action="/admin/users/${name}/password-link">
+  <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
+  <button class="ghost" type="submit">${viewer.t('Send the link again')}</button>
+</form>`;
+}
+
 export function adminUsersPage(
   users: readonly SeedboxUser[],
+  // the members who have not followed their invitation yet
+  invited: ReadonlySet<string>,
   viewer: Viewer,
   message?: string,
 ): string {
@@ -29,12 +40,14 @@ export function adminUsersPage(
   <td>${user.email.value}</td>
   <td class="num">${user.quota.toGib()} GiB</td>
   <td class="num">${user.scgiPort.value}</td>
-  <td>${statusChip(user, viewer)}</td>
+  <td>${invited.has(user.username.value)
+    ? invitationChip(user.username.value, viewer)
+    : statusChip(user, viewer)}</td>
 </tr>`,
   );
   return page(
-    'Users',
-    html`<h1>${viewer.t('Users')}</h1>
+    'Members',
+    html`<h1>${viewer.t('Members')}</h1>
 <p class="muted">${viewer.t('members.intro')}</p>
 <p class="muted">${viewer.t('members.suspend')}</p>
 ${flash(message)}
@@ -45,7 +58,8 @@ ${flash(message)}
   <tbody>${rows}</tbody>
 </table>
 
-<h2>${viewer.t('Create user')}</h2>
+<h2>${viewer.t('Invite a member')}</h2>
+<p class="muted">${viewer.t('members.invite')}</p>
 <form class="card" method="post" action="/admin/users">
   <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
   <label for="username">Username</label>
@@ -56,7 +70,7 @@ ${flash(message)}
   <input id="quotaGib" name="quotaGib" type="number" min="1" value="412">
   <label for="role">${viewer.t('Portal role')}</label>
   <select id="role" name="role">${roleOptions('user')}</select>
-  <button type="submit">${viewer.t('Create user')}</button>
+  <button type="submit">${viewer.t('Send the invitation')}</button>
 </form>`,
     viewer,
     'admin',
