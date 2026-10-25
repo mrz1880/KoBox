@@ -158,6 +158,24 @@ kobox install
 Nextcloud 35 needs PHP 8.3 or later; Debian 13 ships 8.4. The admin password
 is a secret: it reaches the worker's environment only, never the portal's.
 
+A member signed in to the portal opens Nextcloud already signed in, through
+Nextcloud's SSO app (`user_saml`) in its environment-variable mode. Pin it too,
+or Nextcloud asks for the password again (the install says so, nothing fails):
+
+```
+# user_saml 8.4.0 (Nextcloud 32 to 36), sha256 computed 2026-10-25 from the release tarball
+export KOBOX_NEXTCLOUD_SSO_URL=https://github.com/nextcloud-releases/user_saml/releases/download/v8.4.0/user_saml-v8.4.0.tar.gz
+export KOBOX_NEXTCLOUD_SSO_SHA256=5e52d153fc3972f7c426d06cc9b7d8159ac5c3201b831d4e2e763214d5381793
+```
+
+nginx asks the portal who is signed in before every Nextcloud request (a check
+that never refuses) and hands the name to PHP as `KOBOX_PORTAL_USER`, the one
+variable the app opens sessions from. Nextcloud believes that name without
+checking it, so nothing but nginx may set it: a client cannot, as its headers
+only reach PHP as `HTTP_*`. No Nextcloud account is ever created that way, and
+the desktop and mobile apps keep signing in with their own credentials.
+Signing out of the portal does not end a Nextcloud session already open.
+
 A member signs in to Nextcloud with their portal password. Their account is
 created with it, their three rTorrent folders mounted at its root (dropping a
 `.torrent` into Watch starts the download), and every password change on the

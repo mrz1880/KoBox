@@ -1,4 +1,5 @@
 import { MEMBERS_GROUP, PHP_FPM, WEB_SERVER_USER } from '../../domain/installation/platform.js';
+import { PORTAL_USER_VARIABLE } from '../../domain/installation/NextcloudPort.js';
 import type { NextcloudPort } from '../../domain/installation/NextcloudPort.js';
 import type { ComponentNameValue } from '../../domain/installation/ComponentName.js';
 import type {
@@ -70,6 +71,10 @@ export interface InstallSettings {
   readonly nextcloudUrl?: string;
   readonly nextcloudSha256?: string;
   readonly nextcloudAdminPassword?: string;
+  // Nextcloud's SSO app, which opens the session of the member signed in to the
+  // portal — unset = Nextcloud asks for the password again, and says so
+  readonly nextcloudSsoUrl?: string;
+  readonly nextcloudSsoSha256?: string;
   readonly rutorrentUrl?: string;
   readonly rutorrentSha256?: string;
   // release pin for the vendored NanoMon binary (env-driven, same rationale as
@@ -187,6 +192,10 @@ const NEXTCLOUD_DIR = '/var/www/nextcloud';
 const NEXTCLOUD_DATA = '/var/lib/nextcloud/data';
 const NEXTCLOUD_MARKER = `${NEXTCLOUD_DIR}/.kobox-artifact-sha256`;
 const NEXTCLOUD_ARCHIVE = '/var/tmp/kobox/nextcloud.tar.bz2';
+const NEXTCLOUD_SSO_APP = 'user_saml';
+const NEXTCLOUD_SSO_DIR = `${NEXTCLOUD_DIR}/apps/${NEXTCLOUD_SSO_APP}`;
+const NEXTCLOUD_SSO_MARKER = `${NEXTCLOUD_SSO_DIR}/.kobox-artifact-sha256`;
+const NEXTCLOUD_SSO_ARCHIVE = '/var/tmp/kobox/user_saml.tar.gz';
 const RUTORRENT_DIR = '/var/www/rutorrent';
 const RUTORRENT_MARKER = `${RUTORRENT_DIR}/.kobox-artifact-sha256`;
 const RUTORRENT_ARCHIVE = '/var/tmp/kobox/rutorrent.tar.gz';
@@ -577,9 +586,43 @@ class NextcloudInstaller implements ComponentInstaller {
       host: install.letsencrypt?.domain ?? (await host.hostname()),
       port: this.ctx.security.portalPort,
     });
+    const signIn = await this.trustPortalSignIn();
     await files.apply([renderNextcloudSite()]);
     await systemd.reloadOrRestart('nginx');
-    return installed();
+    return installed(undefined, signIn);
+  }
+
+  // A member signed in to the portal opens Nextcloud already signed in, through
+  // Nextcloud's SSO app reading the name nginx passes. Without the app pinned,
+  // Nextcloud still works and asks for the password: a note, not a failure.
+  private async trustPortalSignIn(): Promise<string | undefined> {
+    const { host, artifacts, files, install, nextcloud } = this.ctx;
+    if (install.nextcloudSsoUrl === undefined || install.nextcloudSsoSha256 === undefined) {
+      return 'Nextcloud asks for the password again: set KOBOX_NEXTCLOUD_SSO_URL and KOBOX_NEXTCLOUD_SSO_SHA256 (its user_saml app), then re-run kobox install, to open it from the portal session';
+    }
+    const marker = await host.readFile(NEXTCLOUD_SSO_MARKER);
+    if (marker?.trim() !== install.nextcloudSsoSha256) {
+      await artifacts.fetchVerified(
+        install.nextcloudSsoUrl,
+        install.nextcloudSsoSha256,
+        NEXTCLOUD_SSO_ARCHIVE,
+      );
+      await host.ensureDir(NEXTCLOUD_SSO_DIR, '0755');
+      await host.extractArchive(NEXTCLOUD_SSO_ARCHIVE, NEXTCLOUD_SSO_DIR, 'inside-one-directory');
+      await files.apply([
+        {
+          path: NEXTCLOUD_SSO_MARKER,
+          content: `${install.nextcloudSsoSha256}\n`,
+          mode: '0644',
+          owner: 'root',
+          group: 'root',
+        },
+      ]);
+      await host.chown(NEXTCLOUD_SSO_DIR, WEB_SERVER_USER, WEB_SERVER_USER);
+    }
+    await nextcloud.enableApp(NEXTCLOUD_SSO_APP);
+    await nextcloud.trustPortalSignIn(PORTAL_USER_VARIABLE);
+    return undefined;
   }
 
   async uninstall(): Promise<void> {

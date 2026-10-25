@@ -16,6 +16,8 @@ describe('artifactPinsFrom', () => {
       KOBOX_NEXTCLOUD_URL: 'https://example.net/nextcloud.tar.bz2',
       KOBOX_NEXTCLOUD_SHA256: 'd'.repeat(64),
       KOBOX_NEXTCLOUD_ADMIN_PASSWORD: 'chosen-by-the-operator',
+      KOBOX_NEXTCLOUD_SSO_URL: 'https://example.net/user_saml.tar.gz',
+      KOBOX_NEXTCLOUD_SSO_SHA256: 'e'.repeat(64),
     });
 
     expect(pins).toEqual({
@@ -28,6 +30,8 @@ describe('artifactPinsFrom', () => {
       nextcloudUrl: 'https://example.net/nextcloud.tar.bz2',
       nextcloudSha256: 'd'.repeat(64),
       nextcloudAdminPassword: 'chosen-by-the-operator',
+      nextcloudSsoUrl: 'https://example.net/user_saml.tar.gz',
+      nextcloudSsoSha256: 'e'.repeat(64),
     });
   });
 

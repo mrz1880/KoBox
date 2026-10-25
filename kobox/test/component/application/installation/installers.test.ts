@@ -79,7 +79,12 @@ function buildWorld(overrides?: {
   quotaFs?: string;
   rutorrentPin?: 'none';
   nanomonPin?: 'none';
-  nextcloud?: { url: string; sha256: string; adminPassword?: string };
+  nextcloud?: {
+    url: string;
+    sha256: string;
+    adminPassword?: string;
+    sso?: { url: string; sha256: string };
+  };
   aria2Pin?: 'none';
   speedtestPin?: 'none';
   letsencrypt?: { domain: string; email: string; acmeUrl?: string };
@@ -134,6 +139,10 @@ function buildWorld(overrides?: {
         nextcloudSha256: overrides.nextcloud.sha256,
         ...(overrides.nextcloud.adminPassword !== undefined && {
           nextcloudAdminPassword: overrides.nextcloud.adminPassword,
+        }),
+        ...(overrides.nextcloud.sso !== undefined && {
+          nextcloudSsoUrl: overrides.nextcloud.sso.url,
+          nextcloudSsoSha256: overrides.nextcloud.sso.sha256,
         }),
       }),
       ...(overrides?.nanomonPin !== 'none' && {
@@ -1026,6 +1035,56 @@ describe('nextcloud installer', () => {
     if (outcome.state === 'skipped') {
       expect(outcome.reason).toContain('KOBOX_NEXTCLOUD_ADMIN_PASSWORD');
     }
+  });
+
+  // a member signed in to the portal opens Nextcloud already signed in
+  it('should_let_nextcloud_open_the_session_of_the_member_signed_in_to_the_portal', async () => {
+    const pinned = buildWorld({
+      nextcloud: {
+        url: 'https://example.net/nc.tar.bz2',
+        sha256: 'd'.repeat(64),
+        adminPassword: 'chosen-by-the-operator',
+        sso: { url: 'https://example.net/user_saml.tar.gz', sha256: 'e'.repeat(64) },
+      },
+    });
+
+    const outcome = await installer(pinned, 'nextcloud').install();
+
+    expect(outcome.state).toBe('installed');
+    expect(pinned.host.fetched).toContainEqual(['https://example.net/user_saml.tar.gz', 'e'.repeat(64)]);
+    expect(pinned.host.extracted.map(([, dest]) => dest)).toContain('/var/www/nextcloud/apps/user_saml');
+    expect(pinned.nextcloud.enabledApps).toContain('user_saml');
+    // the name nginx alone sets, from the portal session
+    expect(pinned.nextcloud.portalSignIn).toBe('KOBOX_PORTAL_USER');
+  });
+
+  it('should_fetch_the_sso_app_once_per_pinned_release', async () => {
+    const pinned = buildWorld({
+      nextcloud: {
+        url: 'https://example.net/nc.tar.bz2',
+        sha256: 'd'.repeat(64),
+        adminPassword: 'chosen-by-the-operator',
+        sso: { url: 'https://example.net/user_saml.tar.gz', sha256: 'e'.repeat(64) },
+      },
+    });
+    await installer(pinned, 'nextcloud').install();
+
+    await installer(pinned, 'nextcloud').install();
+
+    const ssoFetches = pinned.host.fetched.filter(([url]) => url.endsWith('user_saml.tar.gz'));
+    expect(ssoFetches).toHaveLength(1);
+  });
+
+  it('should_say_how_to_get_the_portal_sign_in_rather_than_skip_nextcloud', async () => {
+    const pinned = buildWorld({
+      nextcloud: { url: 'https://example.net/nc.tar.bz2', sha256: 'd'.repeat(64), adminPassword: 'chosen-by-the-operator' },
+    });
+
+    const outcome = await installer(pinned, 'nextcloud').install();
+
+    expect(outcome.state).toBe('installed');
+    expect(outcome.state === 'installed' && outcome.detail).toContain('KOBOX_NEXTCLOUD_SSO_URL');
+    expect(pinned.nextcloud.enabledApps).not.toContain('user_saml');
   });
 
   it('should_install_the_decompressor_its_own_release_needs', async () => {

@@ -10,6 +10,11 @@ export const NEXTCLOUD_MOUNTS: readonly { readonly label: string; readonly under
   { label: 'rTorrent Watch', under: 'rtorrent/watch' },
 ];
 
+// The server variable nginx fills with the member signed in to the portal, and
+// the one Nextcloud opens sessions from. Nextcloud believes it without checking
+// it, which is why it is named here once: nginx sets it, nothing else can.
+export const PORTAL_USER_VARIABLE = 'KOBOX_PORTAL_USER';
+
 // Everything here shells out to `occ`, which is Nextcloud's only supported
 // non-interactive interface. It runs as the web user, never as root: occ
 // refuses to run as root and would leave files nobody can read if it did.
@@ -17,6 +22,10 @@ export interface NextcloudPort {
   isInstalled(): Promise<boolean>;
   install(adminUser: string, adminPassword: string): Promise<void>;
   enableApp(app: string): Promise<void>;
+  // with the SSO app enabled: open the session of the member named in this
+  // server variable, create no account, and keep Nextcloud's own sign-in page
+  // for everyone else (its desktop and mobile apps included)
+  trustPortalSignIn(variable: string): Promise<void>;
   // the public name and port it is reached on, under /nextcloud over HTTPS:
   // Nextcloud refuses any request whose host it was not told to trust
   serveAt(address: { readonly host: string; readonly port: number }): Promise<void>;

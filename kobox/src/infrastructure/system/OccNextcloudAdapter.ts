@@ -47,6 +47,28 @@ export class OccNextcloudAdapter implements NextcloudPort {
     await runOrThrow(this.runner, this.occ(['app:enable', app]));
   }
 
+  // user_saml in its environment-variable mode. Its settings are untyped on
+  // purpose (no --type): it reads some of them both as a flag and as a number.
+  // Provider 1 is the one it reads the variable's name from; a fresh install
+  // has none, and saml:config:set says so by failing.
+  async trustPortalSignIn(variable: string): Promise<void> {
+    const settings: readonly (readonly [string, string])[] = [
+      ['type', 'environment-variable'],
+      // a portal member without a Nextcloud account gets an error, not an account
+      ['general-require_provisioned_account', '1'],
+      // nobody signed in to the portal still gets Nextcloud's own sign-in page
+      ['general-nextcloud_login_form', '1'],
+    ];
+    for (const [key, value] of settings) {
+      await runOrThrow(this.runner, this.occ(['config:app:set', 'user_saml', key, `--value=${value}`]));
+    }
+    const mapVariable = this.occ(['saml:config:set', `--general-uid_mapping=${variable}`, '1']);
+    if ((await this.runner.run(mapVariable)).exitCode !== 0) {
+      await runOrThrow(this.runner, this.occ(['saml:config:create']));
+      await runOrThrow(this.runner, mapVariable);
+    }
+  }
+
   async serveAt(address: { readonly host: string; readonly port: number }): Promise<void> {
     const settings: readonly (readonly string[])[] = [
       // index 0 stays localhost: occ and the box itself still reach it that way
