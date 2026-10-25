@@ -120,9 +120,33 @@ describe('installation rendering', () => {
 
   it('should_let_nextcloud_clients_authenticate_themselves', () => {
     // the portal session stood in front of /nextcloud/: the desktop and
-    // mobile apps send their own Nextcloud credentials and never got through
+    // mobile apps send their own Nextcloud credentials and never got through.
+    // The only check left there is the one that never refuses.
     const conf = renderNextcloudSite().content;
-    expect(conf).not.toContain('auth_request');
+    const checks = [...conf.matchAll(/auth_request (\S+);/g)].map((match) => match[1]);
+    expect(checks).toEqual(['/internal/auth/session']);
+  });
+
+  // a member signed in to the portal opens Nextcloud already signed in
+  it('should_hand_nextcloud_the_member_signed_in_to_the_portal', () => {
+    const conf = renderNextcloudSite().content;
+
+    expect(conf).toContain('auth_request_set $kobox_portal_user $upstream_http_x_kobox_user;');
+    expect(conf).toContain('fastcgi_param KOBOX_PORTAL_USER $kobox_portal_user;');
+  });
+
+  // Nextcloud believes this name without checking it: no other line may set
+  // it, and fastcgi_params never does (a client only reaches HTTP_* names)
+  it('should_set_the_portal_user_for_nextcloud_in_one_place_only', () => {
+    const conf = renderNextcloudSite().content;
+
+    expect(conf.match(/KOBOX_PORTAL_USER/g)).toHaveLength(1);
+  });
+
+  it('should_route_the_session_check_to_the_portal_inside_the_vhost', () => {
+    const vhost = renderNginxVhost({ portalPort: 8189 }).content;
+
+    expect(vhost).toMatch(/location = \/internal\/auth\/session \{\n\s+internal;\n\s+proxy_pass http:\/\/127\.0\.0\.1:\d+\/internal\/auth\/session;/);
   });
 
   it('should_hand_the_path_after_a_php_script_to_nextcloud', () => {
