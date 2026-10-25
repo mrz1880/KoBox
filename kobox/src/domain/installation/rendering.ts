@@ -808,6 +808,37 @@ export function renderRutorrentConfig(): RenderedFile {
   };
 }
 
+// Plugins this box cannot run, switched off rather than left to show an error
+// at every load. dump needs dumptorrent, which no Debian release packages.
+const DISABLED_RUTORRENT_PLUGINS = ['dump'];
+
+// ruTorrent reads one plugins.ini (a member's own replaces the global one
+// whole), so this one carries ruTorrent's default rights as it ships them, then
+// the plugins switched off.
+export function renderRutorrentPlugins(): RenderedFile {
+  return {
+    path: '/var/www/rutorrent/conf/plugins.ini',
+    content: [
+      ';; KoBox-managed — DO NOT EDIT (rendered declaratively).',
+      '[default]',
+      'enabled = user-defined',
+      'canChangeToolbar = yes',
+      'canChangeMenu = yes',
+      'canChangeOptions = yes',
+      'canChangeTabs = yes',
+      'canChangeColumns = yes',
+      'canChangeStatusBar = yes',
+      'canChangeCategory = yes',
+      'canBeShutdowned = yes',
+      ...DISABLED_RUTORRENT_PLUGINS.flatMap((plugin) => ['', `[${plugin}]`, 'enabled = no']),
+      '',
+    ].join('\n'),
+    mode: '0644',
+    owner: 'root',
+    group: 'root',
+  };
+}
+
 // Fresh-box ownership of the two stock bind files (diff-only writes via
 // ManagedFilesPort). The include wires the Phase 2 blacklist zones in.
 export function renderBindLocal(): RenderedFile {
