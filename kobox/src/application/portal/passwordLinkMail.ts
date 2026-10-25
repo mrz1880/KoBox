@@ -21,6 +21,9 @@ const TEXTS: Record<'fr' | 'en', Record<PasswordLinkPurpose, MailText>> = {
         'Ce lien sert une seule fois et reste valable 7 jours.',
         '',
         'Ce même mot de passe ouvre le portail, Nextcloud et le partage réseau.',
+        '',
+        'Une fois connecté, commence par créer tes dossiers (Films, Series...) dans',
+        "la page Dossiers du portail : c'est là que tes téléchargements seront rangés.",
       ],
     },
     reset: {
@@ -50,6 +53,9 @@ const TEXTS: Record<'fr' | 'en', Record<PasswordLinkPurpose, MailText>> = {
         'This link works once and for 7 days.',
         '',
         'The same password opens the portal, Nextcloud and the network share.',
+        '',
+        'Once in, start by creating your folders (Films, Series...) on the',
+        "portal's Folders page: that is where your downloads are sorted.",
       ],
     },
     reset: {

@@ -226,7 +226,7 @@ const USER_NAV: readonly (readonly [string, string])[] = [
   ['/', 'Home'],
   ['/rutorrent', 'Torrents'],
   ['/media', 'My media'],
-  ['/sync', 'Sending'],
+  ['/sync', 'Folders'],
   ['/downloads', 'Download a link'],
   ['/access', 'Account'],
 ];
