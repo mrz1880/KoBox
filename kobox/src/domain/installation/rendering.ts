@@ -1,4 +1,4 @@
-import { DEBIAN_RELEASE, PHP_FPM, RUTORRENT_DIR } from './platform.js';
+import { DEBIAN_RELEASE, PHP_FPM, RUTORRENT_DIR, WEB_SERVER_USER } from './platform.js';
 import { PORTAL_USER_VARIABLE } from './NextcloudPort.js';
 import { DomainError } from '../shared/DomainError.js';
 import type { RenderedFile } from '../shared/files.js';
@@ -515,6 +515,18 @@ export function renderNginxVhost(settings: NginxVhostSettings): RenderedFile {
       '        deny all;',
       '    }',
       '',
+      // ruTorrent's disk meter asks this one address for the space it shows:
+      // KoBox answers it with the member's quota, behind the same session
+      // check, and ruTorrent's own files stay as they ship
+      '    location = /ru/plugins/diskspace/action.php {',
+      '        auth_request /internal/auth;',
+      '        auth_request_set $kobox_user $upstream_http_x_kobox_user;',
+      '        include fastcgi_params;',
+      `        fastcgi_param SCRIPT_FILENAME ${RUTORRENT_QUOTA_ANSWER};`,
+      '        fastcgi_param REMOTE_USER $kobox_user;',
+      `        fastcgi_pass unix:${PHP_FPM.socket};`,
+      '    }',
+      '',
       '    location ~ ^/ru/(.+\\.php)$ {',
       '        auth_request /internal/auth;',
       '        auth_request_set $kobox_user $upstream_http_x_kobox_user;',
@@ -800,6 +812,43 @@ export const RUTORRENT_PROFILE_DIR = '/var/lib/rutorrent';
 // ruTorrent's own layout under it: one folder per member, in users/.
 export function rutorrentProfilesDir(): string {
   return `${RUTORRENT_PROFILE_DIR}/users`;
+}
+
+// What ruTorrent's disk meter shows a member: their quota, in the meter's own
+// format (total and free bytes), not the whole disk's free space. Written by
+// the root worker after each disk usage sample, read by the web server for
+// that member only.
+export function renderQuotaGauge(username: string, usedBytes: number, quotaBytes: number): RenderedFile {
+  return {
+    path: `${rutorrentProfilesDir()}/${username}/kobox-quota.json`,
+    content: `${JSON.stringify({ total: quotaBytes, free: Math.max(0, quotaBytes - usedBytes) })}\n`,
+    mode: '0640',
+    owner: WEB_SERVER_USER,
+    group: username,
+  };
+}
+
+const RUTORRENT_QUOTA_ANSWER = '/usr/local/share/kobox/rutorrent-quota.php';
+
+// Served in place of plugins/diskspace/action.php: the member's own gauge, or
+// nothing known yet (total 0, which the meter leaves empty).
+export function renderRutorrentQuotaAnswer(): RenderedFile {
+  return {
+    path: RUTORRENT_QUOTA_ANSWER,
+    content: [
+      '<?php',
+      '// KoBox-managed — DO NOT EDIT (rendered declaratively).',
+      `chdir('${RUTORRENT_DIR}/plugins/diskspace');`,
+      `require_once '${RUTORRENT_DIR}/php/util.php';`,
+      "$gauge = FileUtil::getProfilePath() . '/kobox-quota.json';",
+      `$answer = is_readable($gauge) ? file_get_contents($gauge) : '{"total":0,"free":0}';`,
+      "CachedEcho::send($answer, 'application/json');",
+      '',
+    ].join('\n'),
+    mode: '0644',
+    owner: 'root',
+    group: 'root',
+  };
 }
 
 // ruTorrent's own conf/config.php holds every default its plugins read

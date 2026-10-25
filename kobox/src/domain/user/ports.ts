@@ -41,6 +41,12 @@ export interface DiskUsageSample {
   readonly sampledAt: string;
 }
 
+// What a member's own tools show of the space they hold: ruTorrent's meter
+// read the whole disk, so each member's gauge is given their quota instead.
+export interface QuotaGaugePort {
+  show(username: Username, used: Quota, quota: Quota): Promise<void>;
+}
+
 export interface DiskUsageRepository {
   save(sample: DiskUsageSample): Promise<void>;
   find(username: Username): Promise<DiskUsageSample | undefined>;

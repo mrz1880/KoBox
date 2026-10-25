@@ -1,0 +1,7 @@
+<?php
+// KoBox-managed — DO NOT EDIT (rendered declaratively).
+chdir('/var/www/rutorrent/plugins/diskspace');
+require_once '/var/www/rutorrent/php/util.php';
+$gauge = FileUtil::getProfilePath() . '/kobox-quota.json';
+$answer = is_readable($gauge) ? file_get_contents($gauge) : '{"total":0,"free":0}';
+CachedEcho::send($answer, 'application/json');
