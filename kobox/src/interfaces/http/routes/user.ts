@@ -804,19 +804,17 @@ export function registerUserRoutes(
     if (session === undefined) {
       return;
     }
-    const viewer = viewerOf(session);
-    return (
-      reply
-        // ruTorrent reads its language from this cookie, before the browser's:
-        // it opens in the member's portal language. Read by its script, so
-        // never httpOnly; it holds a language, nothing else.
-        .setCookie(RUTORRENT_LANGUAGE_COOKIE, viewer.language.value, {
-          secure: true,
-          sameSite: 'lax',
-          path: '/',
-        })
-        .type('text/html')
-        .send(rutorrentPage(viewer, flashOf(request)))
-    );
+    // ruTorrent reads its language from this cookie, before the browser's. It
+    // is set only to a language the member chose on the portal: without a
+    // choice the portal's English default would override their browser, so it
+    // is taken back instead. Read by ruTorrent's script, so never httpOnly.
+    const chosen = (await deps.credentials.find(session.username))?.language;
+    const cookie = { secure: true, sameSite: 'lax', path: '/' } as const;
+    if (chosen === undefined) {
+      reply.clearCookie(RUTORRENT_LANGUAGE_COOKIE, cookie);
+    } else {
+      reply.setCookie(RUTORRENT_LANGUAGE_COOKIE, chosen.value, cookie);
+    }
+    return reply.type('text/html').send(rutorrentPage(viewerOf(session), flashOf(request)));
   });
 }
