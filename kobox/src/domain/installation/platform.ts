@@ -15,6 +15,9 @@ export const PHP_FPM = {
 // the media a member streams, and so what has to reach into member trees.
 export const WEB_SERVER_USER = 'www-data';
 
+// Where the vendored ruTorrent release is extracted and served from.
+export const RUTORRENT_DIR = '/var/www/rutorrent';
+
 // Every member's system account is in this group: what all members, and only
 // them, may reach.
 export const MEMBERS_GROUP = 'kobox-users';

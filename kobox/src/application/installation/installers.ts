@@ -1,4 +1,9 @@
-import { MEMBERS_GROUP, PHP_FPM, WEB_SERVER_USER } from '../../domain/installation/platform.js';
+import {
+  MEMBERS_GROUP,
+  PHP_FPM,
+  RUTORRENT_DIR,
+  WEB_SERVER_USER,
+} from '../../domain/installation/platform.js';
 import { PORTAL_USER_VARIABLE } from '../../domain/installation/NextcloudPort.js';
 import type { NextcloudPort } from '../../domain/installation/NextcloudPort.js';
 import type { ComponentNameValue } from '../../domain/installation/ComponentName.js';
@@ -196,7 +201,6 @@ const NEXTCLOUD_SSO_APP = 'user_saml';
 const NEXTCLOUD_SSO_DIR = `${NEXTCLOUD_DIR}/apps/${NEXTCLOUD_SSO_APP}`;
 const NEXTCLOUD_SSO_MARKER = `${NEXTCLOUD_SSO_DIR}/.kobox-artifact-sha256`;
 const NEXTCLOUD_SSO_ARCHIVE = '/var/tmp/kobox/user_saml.tar.gz';
-const RUTORRENT_DIR = '/var/www/rutorrent';
 const RUTORRENT_MARKER = `${RUTORRENT_DIR}/.kobox-artifact-sha256`;
 const RUTORRENT_ARCHIVE = '/var/tmp/kobox/rutorrent.tar.gz';
 const NANOMON_BIN = '/usr/local/bin/nanomon';
