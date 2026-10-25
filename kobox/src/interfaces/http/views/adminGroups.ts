@@ -28,7 +28,7 @@ export const NETWORK_AND_SECURITY: AdminGroup = {
       title: 'Trusted addresses',
       tag: 'Optional',
       blurb:
-        "A member's fixed addresses, such as their home connection. From them they pass the firewall and can mount their folder over NFS without the VPN. Without any, everything else works: the portal, Nextcloud, SFTP and the VPN.",
+        "A member's fixed addresses, such as their home connection, trusted on every port of the box and for NFS without the VPN. Without any, everything works: the portal, ruTorrent, Nextcloud, SFTP and the VPN.",
     },
     {
       href: '/admin/trackers',
