@@ -9,6 +9,7 @@ import { dirname, join } from 'node:path';
 import { promisify } from 'node:util';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { ConfigDocument } from '../../src/domain/installation/ConfigDocument.js';
+import { renderNextcloudSite } from '../../src/domain/installation/rendering.js';
 
 // The Phase 4 product: a fresh Debian 13 container becomes a full KoBox box
 // through bootstrap/install.sh alone, then `create user -> everything works`
@@ -381,6 +382,47 @@ describe.skipIf(!onDebianAsRoot)('E2E: fresh Debian 13 -> bootstrap -> full stac
       sh('runuser', ['-u', 'nobody', '--', 'touch', `${dir}/.intruder`], { stdio: 'pipe' }),
     ).toThrow();
     rmSync(`${dir}/.probe`);
+  });
+
+  // PHP is told who is signed in to the portal, by nginx alone: a member who
+  // also sends someone else's name must still be seen as themselves
+  it('should_tell_php_the_member_signed_in_never_a_name_the_client_sends', async () => {
+    const jar = join(mkdtempSync(join(tmpdir(), 'kobox-e2e-')), 'cookies');
+    sh('curl', ['-sk', '-c', jar, '-o', '/dev/null', '--data-urlencode', `username=${USER}`,
+      '--data-urlencode', 'password=s3cretpw', 'https://127.0.0.1:8189/login']);
+    const forged = ['-u', 'someoneelse:x', '-H', 'X-Kobox-User: someoneelse',
+      '-H', 'Kobox-Portal-User: someoneelse'];
+
+    // ruTorrent: fastcgi_params also fills REMOTE_USER from the client's own
+    // Authorization header, before the line that sets the portal's member
+    const ruProbe = '/var/www/rutorrent/kobox-whoami.php';
+    writeFileSync(ruProbe, '<?php echo $_SERVER["REMOTE_USER"] ?? "";');
+    try {
+      expect(sh('curl', ['-sk', '-b', jar, ...forged, 'https://127.0.0.1:8189/ru/kobox-whoami.php'])).toBe(USER);
+    } finally {
+      rmSync(ruProbe);
+    }
+
+    // Nextcloud, through the very site KoBox renders, its front controller
+    // replaced by a probe (the component is not pinned in this suite)
+    const site = renderNextcloudSite();
+    mkdirSync('/var/www/nextcloud', { recursive: true });
+    writeFileSync('/var/www/nextcloud/index.php', '<?php echo "[", $_SERVER["KOBOX_PORTAL_USER"] ?? "", "]";');
+    writeFileSync(site.path, site.content);
+    sh('systemctl', ['reload', 'nginx']);
+    try {
+      // a reload swaps workers asynchronously: wait for the new site to answer
+      await waitFor('nextcloud site', () =>
+        sh('curl', ['-sk', 'https://127.0.0.1:8189/nextcloud/index.php']).startsWith('['), 15_000);
+      const signedIn = sh('curl', ['-sk', '-b', jar, ...forged, 'https://127.0.0.1:8189/nextcloud/index.php']);
+      expect(signedIn).toBe(`[${USER}]`);
+      const anonymous = sh('curl', ['-sk', ...forged, 'https://127.0.0.1:8189/nextcloud/index.php']);
+      expect(anonymous).toBe('[]');
+    } finally {
+      rmSync(site.path);
+      rmSync('/var/www/nextcloud', { recursive: true });
+      sh('systemctl', ['reload', 'nginx']);
+    }
   });
 
   it('should_challenge_a_download_client_through_the_real_nginx', () => {
