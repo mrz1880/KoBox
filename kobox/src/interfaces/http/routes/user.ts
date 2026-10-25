@@ -230,12 +230,12 @@ export function registerUserRoutes(
       return;
     }
     const nextcloud = await deps.components.get(ComponentName.parse('nextcloud'));
-    const sftpHost = sftpHostName();
     return reply.type('text/html').send(
       filesPage(viewerOf(session), {
         username: session.username.value,
         nextcloudInstalled: nextcloud?.state.value === 'installed',
-        ...(sftpHost !== undefined && { sftpHost }),
+        // without a configured name, the one the portal was opened by is the box
+        sftpHost: sftpHostName() ?? request.hostname,
         boxInVpn: deps.boxInVpn,
       }),
     );

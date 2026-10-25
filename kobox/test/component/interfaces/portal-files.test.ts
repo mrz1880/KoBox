@@ -43,4 +43,15 @@ describe('the My files page', () => {
 
     expect(body).toContain('smb://10.0.0.1/alice');
   });
+
+  // without a configured name, the name the portal was opened by is the box
+  it('should_give_the_sftp_address_by_the_name_the_portal_was_reached_by', async () => {
+    const response = await world.server.inject({
+      method: 'GET',
+      url: '/files',
+      headers: { cookie: member.cookie, host: 'box.example.net' },
+    });
+
+    expect(response.body).toContain('sftp://alice@box.example.net');
+  });
 });
