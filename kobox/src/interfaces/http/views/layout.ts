@@ -1,4 +1,5 @@
 import type { Language } from '../../../domain/portal/Language.js';
+import { NETWORK_AND_SECURITY, SYSTEM, TROUBLESHOOTING } from './adminGroups.js';
 import type { Translate } from './messages.js';
 import type { Role } from '../../../domain/portal/Role.js';
 import { html, raw, type RawHtml } from '../html.js';
@@ -218,15 +219,15 @@ const SEEDBOX_NAV: readonly (readonly [string, string])[] = [
   ['/access', 'Account'],
 ];
 
-// One entry per job an admin comes to do; the pages behind each are grouped
-// on its own page rather than lined up in the bar.
+// One entry per job an admin comes to do; the pages behind a group are listed
+// on that group's page (adminGroups.ts) rather than lined up in the bar.
 const ADMIN_NAV: readonly (readonly [string, string])[] = [
   ['/admin', 'Overview'],
   ['/admin/users', 'Members'],
-  ['/admin/network', 'Network & security'],
-  ['/admin/system', 'System'],
+  [NETWORK_AND_SECURITY.path, NETWORK_AND_SECURITY.title],
+  [SYSTEM.path, SYSTEM.title],
   ['/admin/health', 'Health'],
-  ['/admin/troubleshooting', 'Troubleshooting'],
+  [TROUBLESHOOTING.path, TROUBLESHOOTING.title],
 ];
 
 const SPACES: readonly (readonly [string, string])[] = [

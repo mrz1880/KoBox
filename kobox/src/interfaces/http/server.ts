@@ -54,6 +54,7 @@ import { registerAdminNetworkRoutes } from './routes/adminNetwork.js';
 import { registerAdminOpsRoutes } from './routes/adminOps.js';
 import { registerAdminTrackerRoutes } from './routes/adminTrackers.js';
 import { registerAdminDomainRoutes } from './routes/adminDomain.js';
+import { registerAdminGroupRoutes } from './routes/adminGroups.js';
 import { registerAdminMailRoutes } from './routes/adminMail.js';
 import { registerAdminUserRoutes } from './routes/adminUsers.js';
 import { registerPasswordLinkRoutes } from './routes/passwordLinks.js';
@@ -296,6 +297,7 @@ export function buildPortalServer(deps: PortalServerDeps): FastifyInstance {
   registerAdminUserRoutes(server, deps, guards);
   registerPasswordLinkRoutes(server, deps);
   registerAdminMailRoutes(server, deps, guards);
+  registerAdminGroupRoutes(server, guards);
   registerAdminDomainRoutes(server, deps, guards);
   registerAdminTrackerRoutes(server, deps, guards);
   registerAdminNetworkRoutes(server, deps, guards);
