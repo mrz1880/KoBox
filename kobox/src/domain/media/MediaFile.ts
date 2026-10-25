@@ -52,6 +52,11 @@ interface MediaFileProps {
 // One file the worker saw in a user's completed downloads. The portal reads
 // these rows instead of the filesystem, which is what lets it keep no disk
 // access at all (ProtectHome=yes stays on).
+export type Playback = 'in-browser' | 'download-only' | 'not-a-video';
+
+const BROWSER_CONTAINERS: readonly string[] = ['mp4', 'm4v', 'webm', 'ogg', 'ogv'];
+const OTHER_VIDEO_CONTAINERS: readonly string[] = ['mkv', 'avi', 'ts', 'm2ts', 'mov', 'wmv', 'flv', 'mpg', 'mpeg'];
+
 export class MediaFile {
   readonly id?: number;
   readonly username: Username;
@@ -73,10 +78,14 @@ export class MediaFile {
     return new MediaFile(props);
   }
 
-  // Browsers play a container they understand; the rest is offered as a
-  // download instead of a player that would simply show a black rectangle.
-  get isBrowserPlayable(): boolean {
-    return ['mp4', 'm4v', 'webm', 'ogg', 'ogv'].includes(this.extension);
+  // Browsers play a container they understand. A video in another one (MKV,
+  // AVI...) is offered as a download, with the reason, instead of a player
+  // that would show a black rectangle; nothing is ever re-encoded.
+  get playback(): Playback {
+    if (BROWSER_CONTAINERS.includes(this.extension)) {
+      return 'in-browser';
+    }
+    return OTHER_VIDEO_CONTAINERS.includes(this.extension) ? 'download-only' : 'not-a-video';
   }
 
   get extension(): string {

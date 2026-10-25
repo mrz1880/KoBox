@@ -552,6 +552,25 @@ describe('my media', () => {
     expect(response.body).toContain('/media/file?path=films/Container.mkv');
   });
 
+  // a member saw only "Download" beside their films and could not tell why
+  it('should_say_beside_each_video_whether_it_plays_here_and_why_not', async () => {
+    await give(alice, 'films/Playable.mp4', 'films/Container.mkv', 'films/Container.nfo');
+
+    const body = (
+      await world.server.inject({ method: 'GET', url: '/media', headers: { cookie: user.cookie } })
+    ).body;
+    // the one row holding that name: no other <tr> may start in between
+    const row = (name: string) =>
+      new RegExp(`<tr>(?:(?!<tr>)[^])*?${name}[^]*?</tr>`).exec(body)?.[0] ?? '';
+
+    expect(row('Playable.mp4')).toContain('Plays here');
+    expect(row('Container.mkv')).toContain('Download to watch');
+    expect(row('Container.mkv')).toContain('MKV');
+    expect(row('Container.nfo')).not.toMatch(/Plays here|Download to watch/);
+    // and the page says once which files play in the browser
+    expect(body).toContain('MP4 and WebM videos play in the browser');
+  });
+
   it('should_hand_the_bytes_to_nginx_instead_of_reading_them', async () => {
     await give(alice, 'films/Some.Film.mkv');
 

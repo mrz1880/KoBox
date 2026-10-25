@@ -567,6 +567,20 @@ function formatSize(bytes: number): string {
 // The end of the journey: what actually landed, ready to watch or take away.
 // Grouped by the folder the file came down into, because that is how people
 // think about it — not by the flat table the database happens to hold.
+// Said beside each video, so nobody wonders why one has no player: nothing is
+// re-encoded, and most releases come in a container browsers do not open.
+function playbackNote(file: MediaFile, viewer: Viewer): RawHtml | undefined {
+  switch (file.playback) {
+    case 'in-browser':
+      return html`<span class="chip ok">${viewer.t('Plays here')}</span>`;
+    case 'download-only':
+      return html`<span class="chip warn">${viewer.t('Download to watch')}</span>
+<span class="muted">${viewer.t('{container}: browsers do not play it', { container: file.extension.toUpperCase() })}</span>`;
+    case 'not-a-video':
+      return undefined;
+  }
+}
+
 export function mediaPage(
   viewer: Viewer,
   files: readonly MediaFile[],
@@ -593,15 +607,16 @@ export function mediaPage(
 <p class="muted">${viewer.t('Empty for now.')}</p>`
           : html`<h2>${category}</h2>
 <table>
-  <thead><tr><th>${viewer.t('File')}</th><th>${viewer.t('Size')}</th><th></th></tr></thead>
+  <thead><tr><th>${viewer.t('File')}</th><th>${viewer.t('Size')}</th><th>${viewer.t('In the browser')}</th><th></th></tr></thead>
   <tbody>${items.map(
     (file) => html`<tr>
   <td class="path">${file.path.name}</td>
   <td class="num">${formatSize(file.sizeBytes)}</td>
-  <td>${file.isBrowserPlayable
+  <td>${playbackNote(file, viewer)}</td>
+  <td>${file.playback === 'in-browser'
       ? html`<a href="/media/watch?path=${file.path.value}">${viewer.t('Watch')}</a> ·
         <a href="/media/file?path=${file.path.value}" download>${viewer.t('Download')}</a>`
-      : html`<a href="/media/file?path=${file.path.value}" download>Download</a>`}</td>
+      : html`<a href="/media/file?path=${file.path.value}" download>${viewer.t('Download')}</a>`}</td>
 </tr>`,
   )}</tbody>
 </table>`,
@@ -610,6 +625,7 @@ export function mediaPage(
     'My media',
     html`<h1>${viewer.t('My media')}</h1>
 ${flash(message)}
+<p class="lead">${viewer.t('media.playback')}</p>
 ${sections.length === 0
       ? html`<p class="muted">You have no folders yet. Create one under
 <a href="/sync">Folders</a>, and what lands in it shows up here.</p>`
