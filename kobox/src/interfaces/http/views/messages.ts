@@ -9,6 +9,18 @@ const FR: Readonly<Record<string, string>> = {
   Home: 'Accueil',
   'My media': 'Mes médias',
   'My files': 'Mes fichiers',
+  'Your seedbox at a glance': 'Ta seedbox en un coup d’œil',
+  'Nextcloud, SFTP, network share': 'Nextcloud, SFTP, partage réseau',
+  'Watch in the browser': 'Regarder dans le navigateur',
+  'Your categories': 'Tes catégories',
+  'Through AllDebrid': 'Via AllDebrid',
+  'Password, VPN, keys': 'Mot de passe, VPN, clés',
+  'What needs you': 'Ce qui demande une action',
+  'Invite, quotas, roles': 'Inviter, quotas, rôles',
+  'Addresses, trackers, blocklists': 'Adresses, trackers, listes de blocage',
+  'Mail, domain, updates': 'Mails, domaine, mises à jour',
+  'Services and monitoring': 'Services et monitoring',
+  'Logs, generated files': 'Journaux, fichiers générés',
   'My seedbox': 'Ma seedbox',
   Administration: 'Administration',
   Members: 'Membres',
@@ -146,6 +158,8 @@ const FR: Readonly<Record<string, string>> = {
   // lookup key, and reflowing the English would silently orphan its translation
   'members.intro':
     'Toutes les personnes ayant un compte sur la machine. En créer un provisionne un vrai compte système, sa propre instance rTorrent sur son propre port, un répertoire personnel avec un quota et un profil VPN, puis lui envoie par mail un lien pour choisir son mot de passe ; personne d’autre ne le connaît. Le port SCGI est celui auquel parle son ruTorrent ; il est affiché parce que c’est ce dont vous avez besoin quand quelque chose cloche, et il est conservé en cas de migration.',
+  'admin.band':
+    'Administration : les réglages de toute la box et de tous les membres. Ce que vous changez ici concerne tout le monde.',
   'members.invite':
     'Il reçoit un mail avec un lien pour choisir son mot de passe, valable 7 jours ; la page suivante vous le donne aussi, pour le lui envoyer vous-même. Son compte reste fermé tant qu’il ne l’a pas utilisé.',
   'members.suspend':
@@ -187,6 +201,8 @@ const FR: Readonly<Record<string, string>> = {
 const EN: Readonly<Record<string, string>> = {
   'members.intro':
     'Everyone with an account on the box. Creating one provisions a real system account, its own rTorrent instance on its own port, a home directory with a quota, and a VPN profile, then mails them a link to choose their password; nobody else ever knows it. SCGI is the port their ruTorrent talks to; it is shown because it is what you need when something is wrong, and it is preserved if they are ever migrated.',
+  'admin.band':
+    'Administration: the settings of the whole box and of every member. What you change here affects everyone.',
   'members.invite':
     'They get a mail with a link to choose their password, valid 7 days; the next page gives you the link too, to send it yourself. Their account stays closed until they use it.',
   'members.suspend':

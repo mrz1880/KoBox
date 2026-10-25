@@ -4,21 +4,19 @@ import type { Translate } from './messages.js';
 import type { Role } from '../../../domain/portal/Role.js';
 import { html, raw, type RawHtml } from '../html.js';
 
-// One sober stylesheet, no build step, no external assets. Light/dark via
-// prefers-color-scheme; mono for telemetry values.
+// One sober stylesheet, no build step, no external assets. Dark only for now;
+// mono for telemetry values.
 const STYLES = `
 :root {
-  --bg: #efebe2; --panel: #fbfaf6; --line: #d8d2c4; --ink: #1b242e;
-  --muted: #5c6672; --teal: #0e8fa6; --amber: #b26f14; --danger: #a33338;
-  --green: #2f7d54;
+  color-scheme: dark;
+  --bg: #0e131a; --panel: #151d28; --raised: #1b2533; --line: #26313f; --ink: #e8edf3;
+  --muted: #93a1b1; --teal: #37b0c4; --amber: #eba23c; --danger: #e4575c;
+  --green: #5fb98a;
+  /* the colour of the space being read: teal for one's seedbox, amber for administration */
+  --space: var(--teal);
+  --on-accent: #0e131a;
 }
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #0e131a; --panel: #151d28; --line: #26313f; --ink: #e8edf3;
-    --muted: #93a1b1; --teal: #37b0c4; --amber: #eba23c; --danger: #e4575c;
-    --green: #5fb98a;
-  }
-}
+body.admin { --space: var(--amber); }
 * { box-sizing: border-box; }
 body {
   margin: 0; background: var(--bg); color: var(--ink);
@@ -26,18 +24,45 @@ body {
 }
 a { color: var(--teal); }
 header {
-  display: flex; flex-wrap: wrap; gap: 0.5rem 1.25rem; align-items: baseline;
-  padding: 0.75rem 1.25rem; border-bottom: 1px solid var(--line);
-  background: var(--panel);
+  display: flex; flex-wrap: wrap; gap: 0.75rem 1.5rem; align-items: center;
+  padding: 0.75rem 1.5rem; border-bottom: 1px solid var(--line); background: var(--panel);
 }
-header .brand { font-weight: 700; letter-spacing: 0.08em; }
-header nav { display: flex; flex-wrap: wrap; gap: 1rem; }
-header nav a { text-decoration: none; color: var(--muted); }
-header nav a:hover, header nav a:focus { color: var(--teal); }
-header form { margin-left: auto; }
-main { max-width: 72rem; margin: 0 auto; padding: 1.25rem; }
-h1 { font-size: 1.3rem; } h2 { font-size: 1.05rem; margin-top: 2rem; }
-table { border-collapse: collapse; width: 100%; background: var(--panel); }
+header .brand { font-family: ui-monospace, monospace; font-weight: 700; letter-spacing: 0.12em; }
+header .spacer { flex: 1; }
+/* the two spaces as one segmented switch: which one you are in is never a guess */
+nav.spaces { display: flex; gap: 3px; padding: 3px; border-radius: 10px; background: var(--bg); border: 1px solid var(--line); }
+nav.spaces a {
+  display: inline-flex; align-items: center; min-height: 2.25rem; padding: 0 0.9rem;
+  border-radius: 8px; text-decoration: none; color: var(--muted); font-weight: 600;
+}
+nav.spaces a:hover, nav.spaces a:focus { color: var(--ink); }
+nav.spaces a[aria-current="page"] { background: var(--space); color: var(--on-accent); }
+.band {
+  padding: 0.5rem 1.5rem; font-size: 0.88rem; color: var(--ink);
+  background: color-mix(in srgb, var(--amber) 16%, var(--bg));
+  border-bottom: 1px solid color-mix(in srgb, var(--amber) 45%, var(--line));
+}
+.band strong { color: var(--amber); }
+/* side menu + content; the menu stacks above the content on a phone */
+.shell {
+  display: flex; flex-wrap: wrap; gap: 1.5rem; align-items: flex-start;
+  max-width: 80rem; margin: 0 auto; padding: 1.5rem;
+}
+nav.menu { flex: 1 1 13rem; max-width: 16rem; display: flex; flex-direction: column; gap: 0.25rem; }
+nav.menu a {
+  display: block; padding: 0.55rem 0.85rem; border-radius: 10px; border: 1px solid transparent;
+  text-decoration: none; color: var(--ink);
+}
+nav.menu a .label { display: block; font-weight: 600; }
+nav.menu a .hint { display: block; font-size: 0.8rem; color: var(--muted); }
+nav.menu a:hover, nav.menu a:focus { background: var(--panel); }
+nav.menu a[aria-current="page"] {
+  background: var(--panel); border-color: var(--line); box-shadow: inset 3px 0 0 var(--space);
+}
+main { flex: 999 1 35rem; min-width: 0; }
+h1 { font-size: 1.75rem; margin: 0 0 1rem; } h2 { font-size: 1.1rem; margin-top: 2rem; }
+.lead { color: var(--muted); }
+table { border-collapse: collapse; width: 100%; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
 th, td {
   text-align: left; padding: 0.55rem 0.7rem; border-bottom: 1px solid var(--line);
   /* top-aligned: a wrapped cell must not float its neighbours to the middle */
@@ -50,8 +75,8 @@ tr.current td { background: var(--panel); font-weight: 600; }
 /* Diagnostics: a captured excerpt and the panel that frames it. The excerpt
    scrolls inside its own box — a 200-line journal must not stretch the page. */
 .panel {
-  border: 1px solid var(--line); border-radius: 6px; background: var(--panel);
-  padding: 0.9rem 1rem; margin: 0.6rem 0;
+  border: 1px solid var(--line); border-radius: 12px; background: var(--panel);
+  padding: 1rem 1.25rem; margin: 0.75rem 0;
 }
 .panel .eyebrow { display: flex; gap: 0.6rem; align-items: baseline; }
 .panel .lead { font-size: 1.05rem; margin: 0.3rem 0 0.6rem; }
@@ -73,8 +98,8 @@ td.when {
   border: 1px solid var(--line); border-radius: 3px; padding: 0 0.3rem; margin-right: 0.35rem;
 }
 form.card, div.card {
-  background: var(--panel); border: 1px solid var(--line); border-radius: 6px;
-  padding: 1rem 1.25rem; margin: 1rem 0; max-width: 34rem;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+  padding: 1.1rem 1.25rem; margin: 1rem 0; max-width: 36rem;
 }
 label { display: block; margin: 0.6rem 0 0.15rem; color: var(--muted); font-size: 0.85rem; }
 /* a checkbox reads as a sentence, not as a field: the box sits with its words
@@ -88,38 +113,40 @@ label { display: block; margin: 0.6rem 0 0.15rem; color: var(--muted); font-size
 label.check { display: flex; align-items: center; gap: 0.5rem; color: var(--ink); font-size: 0.95rem; }
 label.check input { width: auto; margin: 0; }
 input, select {
-  width: 100%; padding: 0.45rem 0.6rem; border: 1px solid var(--line);
-  border-radius: 4px; background: var(--bg); color: var(--ink); font: inherit;
+  width: 100%; min-height: 2.75rem; padding: 0.45rem 0.75rem; border: 1px solid var(--line);
+  border-radius: 8px; background: var(--bg); color: var(--ink); font: inherit;
 }
 button {
-  margin-top: 0.9rem; padding: 0.45rem 1.1rem; border: 1px solid var(--teal);
-  border-radius: 4px; background: var(--teal); color: #fff; font: inherit; cursor: pointer;
+  margin-top: 0.9rem; min-height: 2.75rem; padding: 0.45rem 1.2rem; border: 1px solid var(--teal);
+  border-radius: 8px; background: var(--teal); color: var(--on-accent); font: inherit;
+  font-weight: 600; cursor: pointer;
 }
 button.ghost { background: transparent; color: var(--teal); }
 button.danger { background: var(--danger); border-color: var(--danger); }
-form.inline { display: inline; } form.inline button { margin: 0; padding: 0.2rem 0.7rem; font-size: 0.85rem; }
-.flash { border-left: 3px solid var(--green); background: var(--panel); padding: 0.6rem 1rem; margin: 1rem 0; }
+form.inline { display: inline; } form.inline button { margin: 0; min-height: 2.25rem; padding: 0.2rem 0.8rem; font-size: 0.85rem; }
+.flash { border-left: 3px solid var(--green); background: var(--panel); border-radius: 8px; padding: 0.7rem 1rem; margin: 1rem 0; }
 .error { border-left-color: var(--danger); }
 .muted { color: var(--muted); font-size: 0.85rem; }
 .links { margin-top: 1.5rem; }
 
 /* A choice, presented as a choice: cards side by side, each carrying the one
    sentence that tells you whether it is the one you want. */
-.choices { display: grid; gap: 0.75rem; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); margin: 1rem 0; }
+.choices { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); margin: 1rem 0; }
 .choice {
-  display: flex; flex-direction: column; gap: 0.5rem;
-  background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 1rem;
+  display: flex; flex-direction: column; gap: 0.5rem; min-height: 8rem;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 1.1rem;
 }
-.choice.pick { border-color: var(--teal); }
-.choice h3 { margin: 0; font-size: 0.95rem; }
-.choice p { margin: 0; color: var(--muted); font-size: 0.85rem; flex: 1; }
+.choice.pick { border: 2px solid var(--teal); }
+.choice h3 { margin: 0; font-size: 1.05rem; }
+.choice p { margin: 0; color: var(--muted); font-size: 0.88rem; flex: 1; }
 .choice .tag {
   align-self: flex-start; font-size: 0.66rem; letter-spacing: 0.12em; text-transform: uppercase;
   color: var(--teal); font-weight: 700;
 }
 .choice a.action {
-  align-self: flex-start; text-decoration: none; font-weight: 600; font-size: 0.88rem;
-  border: 1px solid var(--teal); color: var(--teal); border-radius: 4px; padding: 0.35rem 0.8rem;
+  align-self: flex-start; display: inline-flex; align-items: center; min-height: 2.5rem;
+  text-decoration: none; font-weight: 600; font-size: 0.9rem;
+  border: 1px solid var(--teal); color: var(--teal); border-radius: 8px; padding: 0 0.95rem;
 }
 .choice a.action:hover, .choice a.action:focus { background: var(--teal); color: var(--bg); }
 .facts { display: grid; gap: 0.35rem 1.5rem; grid-template-columns: auto 1fr; margin: 0.5rem 0 0; }
@@ -141,7 +168,7 @@ form.inline { display: inline; } form.inline button { margin: 0; padding: 0.2rem
 .strip {
   display: grid; gap: 0.25rem 1rem; align-items: center;
   grid-template-columns: auto minmax(6rem, 10rem) 1fr auto;
-  padding: 0.7rem 1rem; border: 1px solid var(--line); border-radius: 6px;
+  padding: 0.75rem 1rem; border: 1px solid var(--line); border-radius: 12px;
   background: var(--panel); margin: 0.4rem 0;
 }
 .strip + .strip { margin-top: 0.4rem; }
@@ -169,7 +196,7 @@ form.inline { display: inline; } form.inline button { margin: 0; padding: 0.2rem
 .vu i.zone { background: color-mix(in srgb, var(--danger) 18%, var(--line)); }
 .ribbon {
   display: flex; flex-wrap: wrap; gap: 0.6rem 2rem; align-items: baseline;
-  padding: 0.9rem 1.25rem; border: 1px solid var(--line); border-radius: 6px;
+  padding: 1rem 1.25rem; border: 1px solid var(--line); border-radius: 12px;
   background: var(--panel);
 }
 .ribbon .metric { display: flex; flex-direction: column; gap: 0.15rem; }
@@ -188,7 +215,7 @@ form.inline { display: inline; } form.inline button { margin: 0; padding: 0.2rem
 .chip.ok { color: var(--green); border-color: var(--green); }
 .chip.warn { color: var(--amber); border-color: var(--amber); }
 .chip.bad { color: var(--danger); border-color: var(--danger); }
-iframe.app { width: 100%; height: calc(100vh - 8rem); border: 1px solid var(--line); border-radius: 6px; background: #fff; }
+iframe.app { width: 100%; height: calc(100vh - 10rem); border: 1px solid var(--line); border-radius: 12px; background: var(--panel); }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 `;
 
@@ -209,25 +236,28 @@ export type Space = 'seedbox' | 'admin';
 // Ordered by how often a person needs it, not by how the system is organised.
 // VPN profiles, ports and the password live behind "Account": needed rarely,
 // and putting them in the main bar made the technical look mandatory.
-const SEEDBOX_NAV: readonly (readonly [string, string])[] = [
-  ['/', 'Home'],
-  ['/rutorrent', 'Torrents'],
-  ['/files', 'My files'],
-  ['/media', 'My media'],
-  ['/sync', 'Folders'],
-  ['/downloads', 'Download a link'],
-  ['/access', 'Account'],
+// [href, label, the line under it]
+type MenuEntry = readonly [string, string, string];
+
+const SEEDBOX_NAV: readonly MenuEntry[] = [
+  ['/', 'Home', 'Your seedbox at a glance'],
+  ['/rutorrent', 'Torrents', 'ruTorrent'],
+  ['/files', 'My files', 'Nextcloud, SFTP, network share'],
+  ['/media', 'My media', 'Watch in the browser'],
+  ['/sync', 'Folders', 'Your categories'],
+  ['/downloads', 'Download a link', 'Through AllDebrid'],
+  ['/access', 'Account', 'Password, VPN, keys'],
 ];
 
 // One entry per job an admin comes to do; the pages behind a group are listed
 // on that group's page (adminGroups.ts) rather than lined up in the bar.
-const ADMIN_NAV: readonly (readonly [string, string])[] = [
-  ['/admin', 'Overview'],
-  ['/admin/users', 'Members'],
-  [NETWORK_AND_SECURITY.path, NETWORK_AND_SECURITY.title],
-  [SYSTEM.path, SYSTEM.title],
-  ['/admin/health', 'Health'],
-  [TROUBLESHOOTING.path, TROUBLESHOOTING.title],
+const ADMIN_NAV: readonly MenuEntry[] = [
+  ['/admin', 'Overview', 'What needs you'],
+  ['/admin/users', 'Members', 'Invite, quotas, roles'],
+  [NETWORK_AND_SECURITY.path, NETWORK_AND_SECURITY.title, NETWORK_AND_SECURITY.hint],
+  [SYSTEM.path, SYSTEM.title, SYSTEM.hint],
+  ['/admin/health', 'Health', 'Services and monitoring'],
+  [TROUBLESHOOTING.path, TROUBLESHOOTING.title, TROUBLESHOOTING.hint],
 ];
 
 const SPACES: readonly (readonly [string, string])[] = [
@@ -250,26 +280,39 @@ export function page(
 <title>${viewer === undefined ? title : viewer.t(title)}, KoBox</title>
 <style>${raw(STYLES)}</style>
 </head>
-<body>
+<body${space === 'admin' ? raw(' class="admin"') : undefined}>
 <header>
   <span class="brand">KOBOX</span>
   ${viewer === undefined
     ? undefined
     : html`${viewer.role === 'admin'
-        ? html`<nav aria-label="Space">${SPACES.map(
+        ? html`<nav aria-label="Space" class="spaces">${SPACES.map(
             ([href, label]) =>
               html`<a href="${href}"${(href === '/admin') === (space === 'admin') ? raw(' aria-current="page"') : undefined}>${viewer.t(label)}</a>`,
           )}</nav>`
         : undefined}
-  <nav aria-label="Menu">${nav.map(([href, label]) => html`<a href="${href}">${viewer.t(label)}</a>`)}</nav>
+  <span class="spacer"></span>
   <form class="inline" method="post" action="/logout">
     <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
     <button class="ghost" type="submit">${viewer.t('Sign out')} (${viewer.username})</button>
   </form>`}
 </header>
+${viewer !== undefined && space === 'admin'
+    ? html`<div class="band">${viewer.t('admin.band')}</div>`
+    : undefined}
+<div class="shell">
+${viewer === undefined
+    ? undefined
+    : html`<nav aria-label="Menu" class="menu">${nav.map(
+        ([href, label, hint]) =>
+          // the page names itself with its entry's label: that is how the
+          // entry being read is found, without the page passing its path
+          html`<a href="${href}"${label === title ? raw(' aria-current="page"') : undefined}><span class="label">${viewer.t(label)}</span><span class="hint">${viewer.t(hint)}</span></a>`,
+      )}</nav>`}
 <main>
 ${body}
 </main>
+</div>
 </body>
 </html>
 `;

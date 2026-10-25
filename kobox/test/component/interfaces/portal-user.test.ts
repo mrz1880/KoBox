@@ -100,7 +100,7 @@ describe('the folders page', () => {
   it('should_be_called_folders_in_the_menu', async () => {
     const response = await world.server.inject({ method: 'GET', url: '/', headers: { cookie: user.cookie } });
 
-    expect(response.body).toContain('<a href="/sync">Folders</a>');
+    expect(response.body).toMatch(/<a href="\/sync"[^>]*><span class="label">Folders<\/span>/);
     expect(response.body).not.toContain('>Sending<');
   });
 });
