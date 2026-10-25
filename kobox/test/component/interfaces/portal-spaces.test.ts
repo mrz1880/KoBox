@@ -17,7 +17,7 @@ async function get(url: string, session: AgentSession) {
 
 // the hrefs of one labelled <nav>, in order; [] when the page has none
 function linksOf(body: string, label: string): string[] {
-  const nav = new RegExp(`<nav aria-label="${label}">([\\s\\S]*?)</nav>`).exec(body);
+  const nav = new RegExp(`<nav aria-label="${label}"[^>]*>([\\s\\S]*?)</nav>`).exec(body);
   return [...(nav?.[1] ?? '').matchAll(/href="([^"]+)"/g)].map((match) => match[1] ?? '');
 }
 
@@ -61,6 +61,24 @@ describe('the two spaces of the portal', () => {
     const body = (await get('/admin/users', admin)).body;
 
     expect(linksOf(body, 'Menu')).toEqual(ADMIN_MENU);
+  });
+
+  // what you change there touches everyone: the page says so before you do
+  it('should_warn_that_administration_affects_the_whole_box', async () => {
+    expect((await get('/admin/users', admin)).body).toContain('affects everyone');
+    expect((await get('/', admin)).body).not.toContain('affects everyone');
+  });
+
+  it('should_say_under_each_menu_entry_what_it_is_for', async () => {
+    const body = (await get('/', member)).body;
+
+    expect(body).toContain('Nextcloud, SFTP, network share');
+  });
+
+  it('should_mark_the_menu_entry_of_the_page_being_read', async () => {
+    const body = (await get('/admin/users', admin)).body;
+
+    expect(body).toMatch(/<a href="\/admin\/users" aria-current="page">/);
   });
 
   it('should_keep_a_member_out_of_the_overview', async () => {

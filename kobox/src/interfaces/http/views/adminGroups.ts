@@ -8,6 +8,8 @@ interface GroupEntry {
 export interface AdminGroup {
   readonly path: string;
   readonly title: string;
+  // the line under its menu entry
+  readonly hint: string;
   readonly intro: string;
   readonly entries: readonly GroupEntry[];
 }
@@ -18,6 +20,7 @@ export interface AdminGroup {
 export const NETWORK_AND_SECURITY: AdminGroup = {
   path: '/admin/network',
   title: 'Network & security',
+  hint: 'Addresses, trackers, blocklists',
   intro: 'Who reaches the box and how, and what rTorrent talks to.',
   entries: [
     {
@@ -49,6 +52,7 @@ export const NETWORK_AND_SECURITY: AdminGroup = {
 export const SYSTEM: AdminGroup = {
   path: '/admin/system',
   title: 'System',
+  hint: 'Mail, domain, updates',
   intro: 'What the box needs to run and to reach people.',
   entries: [
     {
@@ -77,6 +81,7 @@ export const SYSTEM: AdminGroup = {
 export const TROUBLESHOOTING: AdminGroup = {
   path: '/admin/troubleshooting',
   title: 'Troubleshooting',
+  hint: 'Logs, generated files',
   intro: 'To understand a problem. Nothing here changes the box.',
   entries: [
     {
