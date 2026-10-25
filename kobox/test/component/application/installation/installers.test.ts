@@ -787,6 +787,29 @@ describe('rutorrent installer', () => {
     expect(unpinned.host.fetched).toHaveLength(0);
   });
 
+  // ruTorrent's plugins have rTorrent or the web server run these: a missing
+  // one shows as an error at every load and its plugin stays off
+  it('should_install_what_its_plugins_run', async () => {
+    const outcome = await installer(world, 'rutorrent').install();
+
+    expect(outcome.state).toBe('installed');
+    for (const pkg of ['mediainfo', 'ffmpeg', 'sox', 'python-is-python3', 'python3-cloudscraper', 'unrar']) {
+      expect(world.packages.installed, pkg).toContain(pkg);
+    }
+  });
+
+  it('should_say_where_unrar_comes_from_rather_than_fail_without_it', async () => {
+    // only non-free has the unrar that opens RAR5; a box whose sources KoBox
+    // does not manage may not list it
+    world.packages.markUnavailable('unrar');
+
+    const outcome = await installer(world, 'rutorrent').install();
+
+    expect(outcome.state).toBe('installed');
+    expect(world.packages.installed).not.toContain('unrar');
+    expect(outcome.state === 'installed' && outcome.detail).toContain('non-free');
+  });
+
   it('should_start_php_now_rather_than_leaving_it_for_the_next_reboot', async () => {
     // ruTorrent is a PHP application. Enabling the unit without starting it
     // leaves it working only after the box is rebooted — seen on a real
@@ -796,6 +819,25 @@ describe('rutorrent installer', () => {
     expect(world.systemd.log).toContain('enable-now php8.4-fpm');
   });
 
+  it('should_restore_rutorrents_own_config_where_kobox_once_overwrote_it', async () => {
+    // earlier versions replaced config.php with a few lines of their own, and
+    // the throttle plugin died on a default that file no longer held
+    await installer(world, 'rutorrent').install();
+    await world.host.ensureFile({
+      path: '/var/www/rutorrent/conf/config.php',
+      content: '<?php\n// KoBox-managed: DO NOT EDIT\n$scgi_port = 5000;\n',
+      mode: '0640',
+      owner: 'root',
+      group: 'www-data',
+    });
+
+    await installer(world, 'rutorrent').install();
+
+    // fetched and extracted again, though the pinned release did not change
+    expect(world.host.fetched).toHaveLength(2);
+    expect(world.host.extracted).toHaveLength(2);
+  });
+
   it('should_fetch_verify_extract_once_and_render_the_global_config', async () => {
     await installer(world, 'rutorrent').install();
 
@@ -803,7 +845,11 @@ describe('rutorrent installer', () => {
       ['https://releases.example.net/rutorrent-4.3.9.tar.gz', 'a'.repeat(64)],
     ]);
     expect(world.host.extracted).toHaveLength(1);
-    expect(world.host.contentAt('/var/www/rutorrent/conf/config.php')).toContain('$scgi_host');
+    // ruTorrent's own config.php holds every default its plugins read
+    // ($throttleMaxSpeed, $do_diagnostic...): KoBox writes only its overrides,
+    // in the file that config.php loads last
+    expect(world.host.contentAt('/var/www/rutorrent/conf/config.local.php')).toContain('$profileMask');
+    expect(world.host.contentAt('/var/www/rutorrent/conf/config.php')).toBeUndefined();
 
     await installer(world, 'rutorrent').install();
 
