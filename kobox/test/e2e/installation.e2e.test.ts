@@ -370,6 +370,19 @@ describe.skipIf(!onDebianAsRoot)('E2E: fresh Debian 13 -> bootstrap -> full stac
     expect(plain).toBe('301 https://127.0.0.1/');
   });
 
+  it('should_let_the_members_own_rtorrent_reach_their_rutorrent_profile_and_nobody_else', async () => {
+    // ruTorrent has the member's rTorrent run its external checks (php for the
+    // RSS plugin) and leave the answer here: unreachable, the plugin breaks
+    const dir = `/var/lib/rutorrent/users/${USER}`;
+    await waitFor('profile folder', () => existsSync(dir));
+    expect(sh('stat', ['-c', '%a %U:%G', dir]).trim()).toBe(`2770 www-data:${USER}`);
+    sh('runuser', ['-u', USER, '--', 'touch', `${dir}/.probe`]);
+    expect(() =>
+      sh('runuser', ['-u', 'nobody', '--', 'touch', `${dir}/.intruder`], { stdio: 'pipe' }),
+    ).toThrow();
+    rmSync(`${dir}/.probe`);
+  });
+
   it('should_challenge_a_download_client_through_the_real_nginx', () => {
     // this is the door Sonarr and Radarr knock on, before they send a token
     const headers = sh('curl', [

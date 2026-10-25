@@ -81,3 +81,11 @@ export interface UserScriptRunnerPort {
 export interface AnnouncerSink {
   publish(announcers: readonly Announcer[], privacy: 'public' | 'private'): Promise<void>;
 }
+
+// A member's ruTorrent profile folder (settings, the answers to its external
+// checks): readable and writable by the member's own rTorrent and by the web
+// server, by nobody else. Idempotent, and it repairs a folder left too open.
+export interface RutorrentProfilePort {
+  ensureProfile(username: Username): Promise<void>;
+}
+

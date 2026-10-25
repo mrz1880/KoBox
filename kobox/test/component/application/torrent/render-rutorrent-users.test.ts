@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { RenderRutorrentUsers } from '../../../../src/application/torrent/RenderRutorrentUsers.js';
 import { InMemoryUserRepository } from '../../../../src/infrastructure/persistence/InMemoryUserRepository.js';
 import { FakeNetworkServices } from '../../../../src/infrastructure/system/fakes/FakeNetworkServices.js';
+import { FakeRutorrentProfiles } from '../../../../src/infrastructure/system/fakes/FakeRutorrentProfiles.js';
 import { FakeRtorrentConfig } from '../../../../src/infrastructure/system/fakes/FakeRtorrentConfig.js';
 import { UserBuilder } from '../../../builders/UserBuilder.js';
 
@@ -13,10 +14,27 @@ async function world() {
   await users.save(
     new UserBuilder().withUsername('bob').withScgiPort(51102).withRtorrentPort(45001).build(),
   );
-  return { users, files, reload, useCase: new RenderRutorrentUsers({ users, files, reload }) };
+  const profiles = new FakeRutorrentProfiles();
+  return {
+    users,
+    files,
+    reload,
+    profiles,
+    useCase: new RenderRutorrentUsers({ users, files, reload, profiles }),
+  };
 }
 
 describe('RenderRutorrentUsers', () => {
+  // the folder where ruTorrent keeps a member's settings, and where it has the
+  // member's own rTorrent leave the answer to its checks: theirs alone
+  it('should_give_every_active_member_a_profile_folder_of_their_own', async () => {
+    const { profiles, useCase } = await world();
+
+    await useCase.execute();
+
+    expect(profiles.ensured).toEqual(['alice', 'bob']);
+  });
+
   it('should_render_the_rpc_include_and_a_config_per_user', async () => {
     const { files, useCase } = await world();
 
@@ -47,7 +65,8 @@ describe('RenderRutorrentUsers', () => {
     const files = new FakeRtorrentConfig();
     const reload = new FakeNetworkServices();
     await users.save(new UserBuilder().withUsername('alice').withScgiPort(51101).suspended());
-    const useCase = new RenderRutorrentUsers({ users, files, reload });
+    const profiles = new FakeRutorrentProfiles();
+    const useCase = new RenderRutorrentUsers({ users, files, reload, profiles });
 
     await useCase.execute();
 

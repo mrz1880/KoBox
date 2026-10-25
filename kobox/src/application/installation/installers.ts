@@ -1,4 +1,4 @@
-import { PHP_FPM, WEB_SERVER_USER } from '../../domain/installation/platform.js';
+import { MEMBERS_GROUP, PHP_FPM, WEB_SERVER_USER } from '../../domain/installation/platform.js';
 import type { NextcloudPort } from '../../domain/installation/NextcloudPort.js';
 import type { ComponentNameValue } from '../../domain/installation/ComponentName.js';
 import type {
@@ -30,6 +30,7 @@ import {
   renderNextcloudSite,
   renderRutorrentConfig,
   RUTORRENT_PROFILE_DIR,
+  rutorrentProfilesDir,
   renderShellinaboxDefault,
   renderSmbConf,
   renderSshdDropin,
@@ -461,8 +462,13 @@ class RutorrentInstaller implements ComponentInstaller {
         },
       ]);
     }
-    await host.ensureDir(RUTORRENT_PROFILE_DIR, '0750');
-    await host.chown(RUTORRENT_PROFILE_DIR, WEB_SERVER_USER, WEB_SERVER_USER);
+    // php-fpm writes every member's settings here, and each member's own
+    // rTorrent reaches their folder too (ruTorrent has it run its external
+    // checks and leave the answer there): members traverse, they do not list
+    for (const dir of [RUTORRENT_PROFILE_DIR, rutorrentProfilesDir()]) {
+      await host.ensureDir(dir, '0710');
+      await host.chown(dir, WEB_SERVER_USER, MEMBERS_GROUP);
+    }
     await files.apply([renderRutorrentConfig()]);
     return installed();
   }

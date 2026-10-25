@@ -7,3 +7,5 @@ $scgi_host = '127.0.0.1';
 $XMLRPCMountPoint = '/RPC2';
 $saveUploadedTorrents = true;
 $overwriteUploadedTorrents = false;
+$profileMask = 0770;
+$do_diagnostic = true;

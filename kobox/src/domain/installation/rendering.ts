@@ -778,6 +778,11 @@ export function renderCertbotDeployHook(): RenderedFile {
 // files). Out of the /var/www tree on purpose: no web server can serve it.
 export const RUTORRENT_PROFILE_DIR = '/var/lib/rutorrent';
 
+// ruTorrent's own layout under it: one folder per member, in users/.
+export function rutorrentProfilesDir(): string {
+  return `${RUTORRENT_PROFILE_DIR}/users`;
+}
+
 // Global ruTorrent settings only — per-user profiles and their SCGI wiring
 // belong to the portal/auth slice (Phase 6).
 export function renderRutorrentConfig(): RenderedFile {
@@ -793,6 +798,9 @@ export function renderRutorrentConfig(): RenderedFile {
       "$XMLRPCMountPoint = '/RPC2';",
       '$saveUploadedTorrents = true;',
       '$overwriteUploadedTorrents = false;',
+      // a member's profile folders: them and the web server, nobody else
+      '$profileMask = 0770;',
+      '$do_diagnostic = true;',
       '',
     ].join('\n'),
     mode: '0640',

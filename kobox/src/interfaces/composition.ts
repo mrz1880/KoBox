@@ -76,6 +76,7 @@ import { SqlitePasswordLinkRepository } from '../infrastructure/persistence/Sqli
 import { WhenInstalled } from '../application/user/WhenInstalled.js';
 import { RsaPasswordCipher } from '../infrastructure/system/RsaPasswordCipher.js';
 import { SmbpasswdLogin } from '../infrastructure/system/SmbpasswdLogin.js';
+import { RutorrentProfileAdapter } from '../infrastructure/system/RutorrentProfileAdapter.js';
 import { KoboxDatabase } from '../infrastructure/persistence/db.js';
 import { SqliteBlocklistRepository } from '../infrastructure/persistence/SqliteBlocklistRepository.js';
 import { SqliteJobQueue } from '../infrastructure/persistence/SqliteJobQueue.js';
@@ -737,6 +738,7 @@ export function buildContainer(name: string): Container {
     templates: loadRtorrentTemplates(),
     settings: { koboxBin: process.env.KOBOX_BIN ?? DEFAULT_KOBOX_BIN },
     nginx: networkServices,
+    rutorrentProfiles: new RutorrentProfileAdapter(runner),
     mediaScanner: new FsMediaScanner(),
     media: mediaRepo,
     clock: nowStamp,

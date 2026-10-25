@@ -84,6 +84,7 @@ import { FakeServiceLogin } from '../../../src/infrastructure/system/fakes/FakeS
 import { NextcloudLogin } from '../../../src/application/user/NextcloudLogin.js';
 import { WhenInstalled } from '../../../src/application/user/WhenInstalled.js';
 import { InMemoryPasswordLinkRepository } from '../../../src/infrastructure/persistence/InMemoryPasswordLinkRepository.js';
+import { FakeRutorrentProfiles } from '../../../src/infrastructure/system/fakes/FakeRutorrentProfiles.js';
 import { FakeNextcloud } from '../../../src/infrastructure/system/fakes/FakeNextcloud.js';
 import { InMemoryComponentRegistry } from '../../../src/infrastructure/persistence/InMemoryComponentRegistry.js';
 import { ComponentName } from '../../../src/domain/installation/ComponentName.js';
@@ -302,6 +303,7 @@ beforeEach(() => {
     templates: loadRtorrentTemplates(),
     settings: { koboxBin: '/usr/local/bin/kobox' },
     nginx: new FakeNetworkServices(),
+    rutorrentProfiles: new FakeRutorrentProfiles(),
     mediaScanner: { scan: () => Promise.resolve([]) },
     media: new InMemoryMediaRepository(),
     clock: () => '2026-07-25 10:00:00',

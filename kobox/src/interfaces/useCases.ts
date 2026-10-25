@@ -1,3 +1,4 @@
+import type { RutorrentProfilePort } from '../domain/torrent/ports.js';
 import { DiscardDebridDownload } from '../application/ddl/DiscardDebridDownload.js';
 import { PollDebridDownloads } from '../application/ddl/PollDebridDownloads.js';
 import { RequestDebridDownload } from '../application/ddl/RequestDebridDownload.js';
@@ -280,6 +281,7 @@ export function buildMaintenanceUseCases(deps: MaintenanceUseCaseDeps): Maintena
 
 export interface TorrentUseCaseDeps {
   readonly users: UserRepository;
+  readonly rutorrentProfiles: RutorrentProfilePort;
   readonly mediaScanner: MediaScanPort;
   readonly media: MediaRepository;
   readonly clock: () => string;
@@ -433,6 +435,7 @@ export function buildTorrentUseCases(deps: TorrentUseCaseDeps): TorrentUseCases 
       users: deps.users,
       files: deps.config,
       reload: deps.nginx,
+      profiles: deps.rutorrentProfiles,
     }),
     restart: new RestartRtorrentInstance({ users: deps.users, services: deps.services }),
     indexMedia: new IndexUserMedia({
