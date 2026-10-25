@@ -293,6 +293,19 @@ export function buildPortalServer(deps: PortalServerDeps): FastifyInstance {
     return reply.header('x-kobox-user', session.username.value).code(204).send();
   });
 
+  // Who is signed in to the portal, for Nextcloud: nginx asks before every
+  // Nextcloud request and hands the name to Nextcloud, which opens that member's
+  // session. Never a refusal, since Nextcloud's own sign-in page and its apps go
+  // through here too; and the cookie only, never a client's credentials, which
+  // for Nextcloud's apps are Nextcloud's own and prove nothing here.
+  server.get('/internal/auth/session', async (request, reply) => {
+    const session = await guards.sessionOf(request);
+    if (session === undefined || session.mustChangePassword) {
+      return reply.code(204).send();
+    }
+    return reply.header('x-kobox-user', session.username.value).code(204).send();
+  });
+
   registerUserRoutes(server, deps, guards);
   registerAdminUserRoutes(server, deps, guards);
   registerPasswordLinkRoutes(server, deps);
