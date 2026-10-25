@@ -245,7 +245,7 @@ describe.skipIf(!onDebianAsRoot)('E2E: security & network — the user-h slice',
     await drainQueue();
     expect(dbRow('SELECT * FROM fair_use_state WHERE username = ?', USER)?.level).toBe('alerted');
     const alert = ntfyReceived.at(-1);
-    expect(alert?.title).toContain('abnormal SSH auth rate');
+    expect(alert?.title).toContain('Abnormal SSH sign-in rate');
     expect(alert?.body).toContain(USER);
 
     // still flooding -> the throttle engages for real
