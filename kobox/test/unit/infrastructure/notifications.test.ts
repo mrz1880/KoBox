@@ -7,7 +7,7 @@ import { NtfyChannel } from '../../../src/infrastructure/notifications/NtfyChann
 import { OutboxEmailChannel } from '../../../src/infrastructure/notifications/OutboxEmailChannel.js';
 import { SendmailTransport } from '../../../src/infrastructure/notifications/SendmailTransport.js';
 import { InMemoryMailOutbox } from '../../../src/infrastructure/persistence/InMemoryMailOutbox.js';
-import { formatEvent } from '../../../src/infrastructure/notifications/formatEvent.js';
+import { formatEvent, type AnyDomainEvent } from '../../../src/infrastructure/notifications/formatEvent.js';
 import type {
   CommandRequest,
   CommandResult,
@@ -45,14 +45,69 @@ class RecordingRunner implements CommandRunner {
   }
 }
 
+const context = {
+  box: 'box.example.org',
+  portalUrl: 'https://box.example.org',
+  at: '2026-10-25 09:12:03',
+};
+
+// One of each event: a new one added to the union and not here fails the
+// exhaustiveness of formatEvent at compile time, not here.
+const EVERY_EVENT: readonly AnyDomainEvent[] = [
+  { type: 'UserCreated', username: 'alice' },
+  { type: 'UserDeleted', username: 'alice' },
+  { type: 'PasswordChanged', username: 'alice' },
+  { type: 'UserSuspended', username: 'alice' },
+  { type: 'UserResumed', username: 'alice' },
+  { type: 'TrackerDiscovered', host: 'tracker.example.org' },
+  { type: 'TrackerDied', host: 'tracker.example.org' },
+  { type: 'TrackerCertRenewed', host: 'tracker.example.org', expiresOn: '2027-01-24' },
+  { type: 'BlocklistUpdateFailed', author: 'bluetack', name: 'level1' },
+  { type: 'FairUseBreached', username: 'alice', metric: 'egress', observedBps: 90_000_000, limitBps: 50_000_000 },
+  { type: 'AbnormalAuthRate', username: 'alice', perHour: 82, limitPerHour: 30 },
+  { type: 'ServiceUnhealthy', username: 'alice', detail: 'rtorrent-alice is not running' },
+  { type: 'UserThrottled', username: 'alice', rateBps: 5_000_000 },
+  { type: 'FairUseRecovered', username: 'alice' },
+  { type: 'DynDnsAddressChanged', username: 'alice', host: 'dyn.example.org', oldIp: '203.0.113.9', newIp: '198.51.100.7' },
+  { type: 'FirewallApplied', outcome: 'rolled-back' },
+];
+
 describe('formatEvent', () => {
+  it.each(EVERY_EVENT.map((event) => [event.type, event] as const))(
+    'should_say_what_happened_when_and_where_for_%s',
+    (type, event) => {
+      const formatted = formatEvent(event, context);
+
+      // a sentence, not the bare name of the event
+      expect(formatted.title).not.toContain(type);
+      expect(formatted.body).not.toBe(type);
+      expect(formatted.body.split('\n').length).toBeGreaterThan(3);
+      expect(formatted.body).toContain('2026-10-25 09:12:03 UTC');
+      expect(formatted.body).toContain('box.example.org');
+      expect(formatted.body).toMatch(/https:\/\/box\.example\.org\/\S+/);
+    },
+  );
+
+  it('should_send_an_admin_to_the_page_of_the_member_concerned', () => {
+    const formatted = formatEvent({ type: 'UserSuspended', username: 'alice' }, context);
+
+    expect(formatted.title).toBe('[box.example.org] Member suspended: alice');
+    expect(formatted.body).toContain('https://box.example.org/admin/users/alice');
+  });
+
+  it('should_tell_what_a_password_change_took_with_it', () => {
+    const body = formatEvent({ type: 'PasswordChanged', username: 'alice' }, context).body;
+
+    expect(body).toContain('portal, SFTP, Samba and Nextcloud');
+    // the app token goes with the old password: Sonarr and Radarr need a new one
+    expect(body).toContain('app token');
+  });
+
   it('should_give_fair_use_incidents_high_priority', () => {
-    const formatted = formatEvent({
-      type: 'AbnormalAuthRate',
-      username: 'user-h',
-      perHour: 82,
-      limitPerHour: 30,
-    });
+    const formatted = formatEvent(
+      { type: 'AbnormalAuthRate', username: 'user-h', perHour: 82, limitPerHour: 30 },
+      context,
+    );
     expect(formatted.priority).toBe('high');
     expect(formatted.title).toContain('user-h');
     expect(formatted.body).toContain('82');
@@ -60,13 +115,16 @@ describe('formatEvent', () => {
   });
 
   it('should_keep_routine_events_at_default_priority', () => {
-    const formatted = formatEvent({ type: 'UserCreated', username: 'alice' });
+    const formatted = formatEvent({ type: 'UserCreated', username: 'alice' }, context);
     expect(formatted.priority).toBe('default');
     expect(formatted.title).toContain('alice');
   });
 
   it('should_describe_a_throttle_with_its_rate', () => {
-    const formatted = formatEvent({ type: 'UserThrottled', username: 'user-h', rateBps: 5_000_000 });
+    const formatted = formatEvent(
+      { type: 'UserThrottled', username: 'user-h', rateBps: 5_000_000 },
+      context,
+    );
     expect(formatted.priority).toBe('high');
     expect(formatted.body).toContain('5 Mbit/s');
   });
@@ -172,6 +230,7 @@ describe('MultiChannelNotifier', () => {
         new EmailChannel(runner, 'admin@example.org'),
       ],
       logger,
+      () => Promise.resolve(context),
     );
 
     await notifier.notify({ type: 'AbnormalAuthRate', username: 'user-h', perHour: 82, limitPerHour: 30 });
@@ -187,6 +246,7 @@ describe('MultiChannelNotifier', () => {
     const notifier = new MultiChannelNotifier(
       [failing, new DiscordChannel(discord.fetch, 'https://discord.example.net/api/webhooks/x/y')],
       logger,
+      () => Promise.resolve(context),
     );
 
     await expect(

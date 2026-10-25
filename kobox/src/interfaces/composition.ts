@@ -234,6 +234,7 @@ function nowStamp(): string {
 function buildNotifier(
   logger: Logger,
   outbox: SqliteMailOutbox,
+  db: KoboxDatabase,
 ): NotificationPort & TrackerNotificationPort & SecurityNotificationPort {
   const channels: NotificationChannel[] = [];
   const ntfyUrl = process.env.KOBOX_NTFY_URL;
@@ -249,7 +250,11 @@ function buildNotifier(
     channels.push(new OutboxEmailChannel(outbox, email, nowStamp));
   }
   return channels.length > 0
-    ? new MultiChannelNotifier(channels, logger)
+    ? new MultiChannelNotifier(channels, logger, async () => {
+        // the box is named the way its members reach it
+        const portalUrl = await portalAddress(db).baseUrl();
+        return { box: new URL(portalUrl).host, portalUrl, at: nowStamp() };
+      })
     : new ConsoleNotificationAdapter(logger);
 }
 
@@ -669,7 +674,7 @@ export function buildContainer(name: string): Container {
       });
   const services = new SystemdServiceControlAdapter(runner);
   const outbox = new SqliteMailOutbox(db);
-  const notifications = buildNotifier(logger, outbox);
+  const notifications = buildNotifier(logger, outbox, db);
   const credentials = new SqlitePortalCredentialsRepository(db);
   const sessions = new SqlitePortalSessionRepository(db);
   const loginAttempts = new SqliteLoginAttemptsRepository(db);
