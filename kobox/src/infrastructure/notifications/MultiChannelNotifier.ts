@@ -2,7 +2,12 @@ import type { SecurityNotificationPort } from '../../domain/security/ports.js';
 import type { TrackerNotificationPort } from '../../domain/tracker/ports.js';
 import type { NotificationPort } from '../../domain/user/ports.js';
 import type { Logger } from '../logging/logger.js';
-import { formatEvent, type AnyDomainEvent, type NotificationChannel } from './formatEvent.js';
+import {
+  formatEvent,
+  type AnyDomainEvent,
+  type NotificationChannel,
+  type NotificationContext,
+} from './formatEvent.js';
 
 // The real multi-channel NotificationPort (frozen channels: ntfy + email +
 // Discord). Fan-out is best-effort per channel: a dead webhook must never
@@ -13,10 +18,13 @@ export class MultiChannelNotifier
   constructor(
     private readonly channels: readonly NotificationChannel[],
     private readonly logger: Logger,
+    // which box, which portal, what time: asked per message, the domain set in
+    // the console can change while the worker runs
+    private readonly context: () => Promise<NotificationContext>,
   ) {}
 
   async notify(event: AnyDomainEvent): Promise<void> {
-    const message = formatEvent(event);
+    const message = formatEvent(event, await this.context());
     for (const channel of this.channels) {
       try {
         await channel.send(message);
