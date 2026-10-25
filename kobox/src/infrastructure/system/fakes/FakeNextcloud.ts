@@ -29,6 +29,14 @@ export class FakeNextcloud implements NextcloudPort {
     return Promise.resolve();
   }
 
+  // the server variable Nextcloud was told to open sessions from
+  portalSignIn: string | undefined;
+
+  trustPortalSignIn(variable: string): Promise<void> {
+    this.portalSignIn = variable;
+    return Promise.resolve();
+  }
+
   enableApp(app: string): Promise<void> {
     this.enabledApps.push(app);
     return Promise.resolve();

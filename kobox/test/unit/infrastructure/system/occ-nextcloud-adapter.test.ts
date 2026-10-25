@@ -77,3 +77,51 @@ describe('OccNextcloudAdapter', () => {
     expect(runner.occArgs()).toEqual(['user:info alice']);
   });
 });
+
+// saml:config:set exits 1 for a provider that does not exist yet
+class SamlProviderRunner extends RecordingRunner {
+  private providerExists: boolean;
+
+  constructor(providerExists: boolean) {
+    super();
+    this.providerExists = providerExists;
+  }
+
+  override run(request: CommandRequest): Promise<CommandResult> {
+    this.calls.push(request);
+    const subcommand = request.args[5];
+    if (subcommand === 'saml:config:create') {
+      this.providerExists = true;
+    }
+    const missing = subcommand === 'saml:config:set' && !this.providerExists;
+    return Promise.resolve({ stdout: '', stderr: '', exitCode: missing ? 1 : 0 });
+  }
+}
+
+describe('opening Nextcloud from the portal session', () => {
+  it('should_open_sessions_from_the_variable_create_no_account_and_keep_the_sign_in_page', async () => {
+    const runner = new SamlProviderRunner(true);
+
+    await new OccNextcloudAdapter(runner).trustPortalSignIn('KOBOX_PORTAL_USER');
+
+    expect(runner.occArgs()).toEqual([
+      'config:app:set user_saml type --value=environment-variable',
+      'config:app:set user_saml general-require_provisioned_account --value=1',
+      'config:app:set user_saml general-nextcloud_login_form --value=1',
+      'saml:config:set --general-uid_mapping=KOBOX_PORTAL_USER 1',
+    ]);
+  });
+
+  // the app reads its settings from provider 1, which a fresh install lacks
+  it('should_create_the_provider_the_app_reads_on_a_fresh_install', async () => {
+    const runner = new SamlProviderRunner(false);
+
+    await new OccNextcloudAdapter(runner).trustPortalSignIn('KOBOX_PORTAL_USER');
+
+    expect(runner.occArgs().slice(3)).toEqual([
+      'saml:config:set --general-uid_mapping=KOBOX_PORTAL_USER 1',
+      'saml:config:create',
+      'saml:config:set --general-uid_mapping=KOBOX_PORTAL_USER 1',
+    ]);
+  });
+});

@@ -1,4 +1,5 @@
 import { DEBIAN_RELEASE, PHP_FPM } from './platform.js';
+import { PORTAL_USER_VARIABLE } from './NextcloudPort.js';
 import { DomainError } from '../shared/DomainError.js';
 import type { RenderedFile } from '../shared/files.js';
 import { HOME_BASE, homeOf } from '../user/homeDirectory.js';
@@ -714,7 +715,7 @@ export function renderRutorrentUserConfig(user: RutorrentUserWiring): RenderedFi
 // credentials that the portal session check would refuse, so the only check
 // here is the one that never refuses. It names the member signed in to the
 // portal, and Nextcloud's SSO app opens their session from that name: it
-// believes it without checking, so KOBOX_PORTAL_USER is set here and nowhere
+// believes it without checking, so PORTAL_USER_VARIABLE is set here and nowhere
 // else, and a client cannot reach it (requests only produce HTTP_* names).
 // PHP gets the path after the script (remote.php/dav/..., index.php/login),
 // which the apps and the web interface both depend on.
@@ -750,7 +751,7 @@ export function renderNextcloudSite(): RenderedFile {
       '        include fastcgi_params;',
       '        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;',
       '        fastcgi_param PATH_INFO $path_info;',
-      '        fastcgi_param KOBOX_PORTAL_USER $kobox_portal_user;',
+      `        fastcgi_param ${PORTAL_USER_VARIABLE} $kobox_portal_user;`,
       '        fastcgi_param HTTPS on;',
       '        fastcgi_param modHeadersAvailable true;',
       '        fastcgi_intercept_errors on;',

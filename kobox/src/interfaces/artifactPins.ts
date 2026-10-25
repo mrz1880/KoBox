@@ -16,6 +16,8 @@ export interface ArtifactPins {
   readonly nextcloudUrl?: string;
   readonly nextcloudSha256?: string;
   readonly nextcloudAdminPassword?: string;
+  readonly nextcloudSsoUrl?: string;
+  readonly nextcloudSsoSha256?: string;
 }
 
 const PINS: readonly (readonly [keyof ArtifactPins, string])[] = [
@@ -28,6 +30,8 @@ const PINS: readonly (readonly [keyof ArtifactPins, string])[] = [
   ['nextcloudUrl', 'KOBOX_NEXTCLOUD_URL'],
   ['nextcloudSha256', 'KOBOX_NEXTCLOUD_SHA256'],
   ['nextcloudAdminPassword', 'KOBOX_NEXTCLOUD_ADMIN_PASSWORD'],
+  ['nextcloudSsoUrl', 'KOBOX_NEXTCLOUD_SSO_URL'],
+  ['nextcloudSsoSha256', 'KOBOX_NEXTCLOUD_SSO_SHA256'],
 ];
 
 // An empty string is treated as absent: an unset variable and one exported to
