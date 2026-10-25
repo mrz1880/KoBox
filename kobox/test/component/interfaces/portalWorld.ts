@@ -32,6 +32,7 @@ import { InMemoryComponentRegistry } from '../../../src/infrastructure/persisten
 import { InMemorySyncTransferRepository } from '../../../src/infrastructure/persistence/InMemorySyncTransferRepository.js';
 import { InMemorySyncDestinationRepository } from '../../../src/infrastructure/persistence/InMemorySyncDestinationRepository.js';
 import { InMemorySiteSettingsRepository } from '../../../src/infrastructure/persistence/InMemorySiteSettingsRepository.js';
+import { SaveMailRelay } from '../../../src/application/maintenance/ConfigureMailRelay.js';
 import { InMemoryMailRelayRepository } from '../../../src/infrastructure/persistence/InMemoryMailRelayRepository.js';
 import { InMemorySshKeyRepository } from '../../../src/infrastructure/persistence/InMemorySshKeyRepository.js';
 import { InMemoryDiskUsageRepository } from '../../../src/infrastructure/persistence/InMemoryDiskUsageRepository.js';
@@ -237,7 +238,7 @@ export async function buildPortalWorld(
     diskSamples,
     mailRelay,
     siteSettings,
-    sealer: new FakeRemoteSealer(),
+    saveMailRelay: new SaveMailRelay({ settings: mailRelay, sealer: new FakeRemoteSealer() }),
     sshKeys,
     destinations,
     transfers,

@@ -57,7 +57,7 @@ async function main(): Promise<void> {
     diskSamples: container.diskSamples,
     mailRelay: container.mailRelay,
     siteSettings: container.siteSettings,
-    sealer: container.sealer,
+    saveMailRelay: container.saveMailRelay,
     sshKeys: container.sshKeys,
     destinations: container.destinations,
     transfers: container.transfers,

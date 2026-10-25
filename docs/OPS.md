@@ -77,9 +77,11 @@ printf '%s' 'the-password' | kobox configure-mail-relay \
   --host smtp.example.net --port 587 --user relay-login
 ```
 
-Direct root command (no job — the secret never enters the DB): writes
-`/etc/postfix/sasl_passwd` (0600) + `postmap`, sets `relayhost`/SASL/TLS via
-`postconf`, reloads Postfix.
+Direct root command, the same path as the Mail relay page: it stores the relay
+with its password sealed by the host key (so the page shows the relay in use and
+the box can re-apply it), then writes `/etc/postfix/sasl_passwd` (0600) +
+`postmap`, sets `relayhost`/SASL/TLS via `postconf` and reloads Postfix. The
+password never travels in a job.
 
 ## Let's Encrypt
 

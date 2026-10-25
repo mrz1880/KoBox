@@ -21,13 +21,10 @@ import { Password } from '../../domain/user/Password.js';
 import { ProxyPort } from '../../domain/user/Port.js';
 import { Quota } from '../../domain/user/Quota.js';
 import { Username } from '../../domain/user/Username.js';
-import { ConfigureMailRelay } from '../../application/maintenance/ConfigureMailRelay.js';
 import { RestoreBackup } from '../../application/maintenance/RestoreBackup.js';
 import { ProbeSeedboxHealth } from '../../application/user/ProbeSeedboxHealth.js';
 import { BackupHostAdapter } from '../../infrastructure/system/BackupHostAdapter.js';
 import { ExecFileRunner } from '../../infrastructure/system/CommandRunner.js';
-import { InstallHostAdapter } from '../../infrastructure/system/InstallHostAdapter.js';
-import { RtorrentConfigAdapter } from '../../infrastructure/system/RtorrentConfigAdapter.js';
 import { SystemdAdapter } from '../../infrastructure/system/SystemdAdapter.js';
 import { TorrentEventSpoolWriter } from '../../infrastructure/spool/TorrentEventSpool.js';
 import {
@@ -974,21 +971,18 @@ program
   .requiredOption('--user <login>', 'SASL login (password read from stdin)')
   .description('wire Postfix to an authenticated SMTP relay (direct root, secret stays on disk 0600)')
   .action(async (options: Record<string, string>) => {
-    // no container: this command touches Postfix only, never the database
-    const password = await readStdin();
-    const runner = new ExecFileRunner();
-    const configure = new ConfigureMailRelay({
-      files: new RtorrentConfigAdapter(runner),
-      host: new InstallHostAdapter(runner),
-      systemd: new SystemdAdapter(runner),
-    });
-    await configure.execute({
+    // stored the way the settings page stores it, so the page shows the relay
+    // the box uses, then applied at once (root: it opens the sealed password)
+    const password = RemotePassword.parse(await readStdin());
+    const c = container();
+    await c.saveMailRelay.execute({
       host: options.host ?? '',
       port: Number(options.port ?? '0'),
       user: options.user ?? '',
       password,
     });
-    process.stdout.write('postfix relay configured (sasl_passwd 0600, postmap, reload)\n');
+    await c.maintenanceUseCases.applyMailRelay.execute();
+    await done(c, 'postfix relay stored and configured (sasl_passwd 0600, postmap, reload)');
   });
 
 program

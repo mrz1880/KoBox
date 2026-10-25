@@ -98,6 +98,7 @@ import { SqliteSyncTransferRepository } from '../infrastructure/persistence/Sqli
 import { RsyncOverSshTransfer } from '../infrastructure/system/RsyncOverSshTransfer.js';
 import { FsLocalFileFacts } from '../infrastructure/system/FsLocalFileFacts.js';
 import { RsaRemotePasswordCipher } from '../infrastructure/system/RsaRemotePasswordCipher.js';
+import { SaveMailRelay } from '../application/maintenance/ConfigureMailRelay.js';
 import { SetSyncDestination } from '../application/sync/SetSyncDestination.js';
 import { SshRemoteProbe } from '../infrastructure/system/SshRemoteProbe.js';
 import { ContentRecyclerAdapter } from '../infrastructure/system/ContentRecyclerAdapter.js';
@@ -480,6 +481,7 @@ export interface Container {
   readonly trackerUseCases: TrackerUseCases;
   readonly securityUseCases: SecurityUseCases;
   readonly maintenanceUseCases: MaintenanceUseCases;
+  readonly saveMailRelay: SaveMailRelay;
   readonly outbox: SqliteMailOutbox;
   readonly ddlUseCases: DdlUseCases;
   readonly downloader: Aria2Adapter;
@@ -549,7 +551,7 @@ export interface PortalContainer {
   readonly diskSamples: SqliteDiskUsageRepository;
   readonly mailRelay: SqliteMailRelayRepository;
   readonly siteSettings: SqliteSiteSettingsRepository;
-  readonly sealer: RsaRemotePasswordCipher;
+  readonly saveMailRelay: SaveMailRelay;
   readonly sshKeys: SqliteSshKeyRepository;
   readonly destinations: SqliteSyncDestinationRepository;
   readonly transfers: SqliteSyncTransferRepository;
@@ -573,6 +575,7 @@ export function buildPortalContainer(name: string): PortalContainer {
   const logger = createLogger(name);
   const db = KoboxDatabase.open(process.env.KOBOX_DB ?? DEFAULT_DB_PATH);
   const syncDestinations = new SqliteSyncDestinationRepository(db);
+  const mailRelay = new SqliteMailRelayRepository(db);
   // openssl + health probe only; nothing here mutates the host
   const runner = new ExecFileRunner();
   const queue = new SqliteJobQueue(db);
@@ -635,9 +638,10 @@ export function buildPortalContainer(name: string): PortalContainer {
     // what creates directories and changes a mode
     instances: new SqliteTorrentInstanceRepository(db),
     diskSamples: new SqliteDiskUsageRepository(db),
-    mailRelay: new SqliteMailRelayRepository(db),
+    mailRelay,
     siteSettings: new SqliteSiteSettingsRepository(db),
-    sealer: remotePasswordCipher(),
+    // the PUBLIC half only: the portal and the CLI store a relay the same way
+    saveMailRelay: new SaveMailRelay({ settings: mailRelay, sealer: remotePasswordCipher() }),
     passwords: passwordCipher(),
     sshKeys: new SqliteSshKeyRepository(db),
     destinations: syncDestinations,
@@ -800,6 +804,7 @@ export function buildContainer(name: string): Container {
   });
   const speedtestRepo = new SqliteSpeedtestRepository(db);
   const diagnosticsRepo = new SqliteDiagnosticsRepository(db);
+  const mailRelay = new SqliteMailRelayRepository(db);
   const maintenanceUseCases = buildMaintenanceUseCases({
     outbox,
     transport: new SendmailTransport(runner),
@@ -811,7 +816,7 @@ export function buildContainer(name: string): Container {
     logs: new JournaldLogAdapter(runner),
     packageUpdates: new AptUpdateAdapter(runner),
     diagnostics: diagnosticsRepo,
-    mailRelay: new SqliteMailRelayRepository(db),
+    mailRelay,
     opener: remotePasswordCipher(),
     files: new RtorrentConfigAdapter(runner),
     installHost: new InstallHostAdapter(runner),
@@ -869,6 +874,7 @@ export function buildContainer(name: string): Container {
     trackerUseCases,
     securityUseCases,
     maintenanceUseCases,
+    saveMailRelay: new SaveMailRelay({ settings: mailRelay, sealer: remotePasswordCipher() }),
     outbox,
     queue,
     worker: new JobWorker(

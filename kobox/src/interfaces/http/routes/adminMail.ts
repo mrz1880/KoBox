@@ -1,9 +1,11 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import type { JobQueuePort } from '../../../application/jobs/JobQueuePort.js';
-import type { MailRelayRepository } from '../../../application/maintenance/ConfigureMailRelay.js';
+import type {
+  MailRelayRepository,
+  SaveMailRelay,
+} from '../../../application/maintenance/ConfigureMailRelay.js';
 import type { MailOutboxPort } from '../../../application/maintenance/MailOutboxPort.js';
-import type { RemotePasswordSealerPort } from '../../../domain/sync/ports.js';
 import { RemotePassword } from '../../../domain/sync/RemotePassword.js';
 import type { UserRepository } from '../../../domain/user/ports.js';
 import { buildJob } from '../../cli/buildJob.js';
@@ -21,7 +23,7 @@ const relaySchema = z.object({
 export interface AdminMailDeps {
   readonly queue: JobQueuePort;
   readonly mailRelay: MailRelayRepository;
-  readonly sealer: RemotePasswordSealerPort;
+  readonly saveMailRelay: SaveMailRelay;
   readonly outbox: MailOutboxPort;
   readonly users: UserRepository;
   readonly now: () => string;
@@ -64,12 +66,11 @@ export function registerAdminMailRoutes(
     }
     // sealed here, opened only by the root worker: the portal can lock this
     // box, it can never read back what it locked
-    const sealedPassword = await deps.sealer.seal(RemotePassword.parse(parsed.data.password));
-    await deps.mailRelay.save({
+    await deps.saveMailRelay.execute({
       host: parsed.data.host,
       port: parsed.data.port,
       user: parsed.data.user,
-      sealedPassword,
+      password: RemotePassword.parse(parsed.data.password),
     });
     // the job carries no secret at all, only "apply what is stored"
     await deps.queue.enqueue(buildJob.applyMailRelay());

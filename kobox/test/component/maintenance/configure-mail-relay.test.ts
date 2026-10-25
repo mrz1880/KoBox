@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { ConfigureMailRelay } from '../../../src/application/maintenance/ConfigureMailRelay.js';
+import {
+  ApplyStoredMailRelay,
+  ConfigureMailRelay,
+  SaveMailRelay,
+} from '../../../src/application/maintenance/ConfigureMailRelay.js';
+import { RemotePassword } from '../../../src/domain/sync/RemotePassword.js';
+import { InMemoryMailRelayRepository } from '../../../src/infrastructure/persistence/InMemoryMailRelayRepository.js';
 import { FakeInstallHost } from '../../../src/infrastructure/system/fakes/FakeInstallHost.js';
 import { FakeSystemd } from '../../../src/infrastructure/system/fakes/FakeSystemd.js';
 
@@ -72,5 +78,48 @@ describe('ConfigureMailRelay', () => {
     ).rejects.toThrow();
     await expect(configure.execute({ ...INPUT, port: 0 })).rejects.toThrow();
     await expect(configure.execute({ ...INPUT, user: 'bad user' })).rejects.toThrow();
+  });
+});
+
+// Reversible on purpose: these tests check what is stored and applied, not
+// that a real seal is opaque
+const SEAL = 'sealed:';
+const sealer = { seal: (password: RemotePassword) => Promise.resolve(SEAL + password.reveal()) };
+const opener = {
+  open: (sealed: string) => Promise.resolve(RemotePassword.parse(sealed.slice(SEAL.length))),
+};
+
+describe('SaveMailRelay', () => {
+  // the settings page reads what is stored: a relay wired from the command line
+  // without being stored showed "No relay configured yet" on a box that mailed
+  it('should_store_the_relay_the_settings_page_shows_with_its_password_sealed', async () => {
+    const settings = new InMemoryMailRelayRepository();
+
+    await new SaveMailRelay({ settings, sealer }).execute({
+      ...INPUT,
+      password: RemotePassword.parse(INPUT.password),
+    });
+
+    expect(await settings.get()).toEqual({
+      host: 'smtp.example.net',
+      port: 587,
+      user: 'relay-login',
+      sealedPassword: 'sealed:s3cret relay pass',
+    });
+  });
+
+  it('should_leave_postfix_wired_to_what_it_stored_once_applied', async () => {
+    const settings = new InMemoryMailRelayRepository();
+    const { host, configure } = world();
+    await new SaveMailRelay({ settings, sealer }).execute({
+      ...INPUT,
+      password: RemotePassword.parse(INPUT.password),
+    });
+
+    await new ApplyStoredMailRelay({ settings, opener, configure }).execute();
+
+    expect(host.contentAt('/etc/postfix/sasl_passwd')).toBe(
+      '[smtp.example.net]:587 relay-login:s3cret relay pass\n',
+    );
   });
 });
