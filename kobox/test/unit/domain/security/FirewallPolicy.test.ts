@@ -104,6 +104,17 @@ describe('renderFirewallRules', () => {
     expectGolden('firewall.rules.golden', file.content);
   });
 
+  it('should_keep_ssh_open_to_all_while_no_address_is_declared', () => {
+    // a fresh box is reached over SSH by whoever installs it
+    const undeclared = users.map((user) => ({ ...user, addresses: [] }));
+    for (const content of [
+      renderFirewallRules(policyWith([])).content,
+      renderFirewallRules(policyWith(undeclared)).content,
+    ]) {
+      expect(content).toContain('-A INPUT -p tcp --dport 22 -j ACCEPT');
+    }
+  });
+
   it('should_always_preserve_loopback_established_and_ssh_even_with_no_users', () => {
     // Anti-lockout by construction: there is no API to omit these three rules.
     const content = renderFirewallRules(policyWith([])).content;
@@ -115,6 +126,21 @@ describe('renderFirewallRules', () => {
     const loIndex = lines.findIndex((line) => line === '-A INPUT -i lo -j ACCEPT');
     expect(loIndex).toBeGreaterThan(-1);
     expect(loIndex).toBeLessThan(sshIndex);
+  });
+
+  it('should_answer_ssh_only_from_declared_addresses_and_the_vpn_once_an_address_is_declared', () => {
+    // option 2 of the access policy: the web stays open to all, SSH and SFTP
+    // (the most attacked door) answer only declared addresses and the tunnels
+    const lines = renderFirewallRules(policyWith(users)).content.split('\n');
+
+    expect(lines).not.toContain('-A INPUT -p tcp --dport 22 -j ACCEPT');
+    for (const subnet of ['10.0.0.0/24', '10.0.1.0/24', '10.0.2.0/24']) {
+      expect(lines).toContain(`-A INPUT -s ${subnet} -p tcp --dport 22 -j ACCEPT`);
+    }
+    // declared addresses are trusted for every port, SSH included
+    expect(lines).toContain(
+      '-A INPUT -s 198.51.100.9 -m comment --comment "kobox:trusted:bob" -j ACCEPT',
+    );
   });
 
   it('should_default_deny_input_and_forward_but_never_block_output', () => {
@@ -135,9 +161,9 @@ describe('renderFirewallRules', () => {
     const establishedIndex = lines.indexOf(
       '-A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT',
     );
-    const sshIndex = lines.indexOf('-A INPUT -p tcp --dport 22 -j ACCEPT');
+    const portalIndex = lines.indexOf('-A INPUT -p tcp --dport 8189 -j ACCEPT');
     expect(dropIndex).toBeGreaterThan(establishedIndex);
-    expect(dropIndex).toBeLessThan(sshIndex); // blocklisted IPs never reach services
+    expect(dropIndex).toBeLessThan(portalIndex); // blocklisted IPs never reach services
   });
 
   it('should_omit_the_match_set_rule_when_the_kernel_lacks_ipset', () => {

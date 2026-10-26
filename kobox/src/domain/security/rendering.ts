@@ -53,7 +53,11 @@ export function renderFirewallRules(policy: FirewallPolicy): RenderedFile {
     ...(policy.blocklistSet
       ? ['-A INPUT -m set --match-set kobox-bl src -j DROP']
       : []),
-    `-A INPUT -p tcp --dport ${String(policy.sshPort)} -j ACCEPT`,
+    ...(policy.sshOpenToAll
+      ? [`-A INPUT -p tcp --dport ${String(policy.sshPort)} -j ACCEPT`]
+      : subnets.map(
+          (subnet) => `-A INPUT -s ${subnet.value} -p tcp --dport ${String(policy.sshPort)} -j ACCEPT`,
+        )),
     `-A INPUT -p tcp --dport ${String(policy.portalPort)} -j ACCEPT`,
     '-A INPUT -p tcp --dport 80 -j ACCEPT',
     `-A INPUT -p tcp --dport ${String(HTTPS_PORT)} -j ACCEPT`,
