@@ -144,8 +144,12 @@ describe('WatchDirAdapter', () => {
     await adapter.ensureLayout(alice, [WatchDir.root(), WatchDir.labeled(Label.parse('films'))]);
 
     const lines = runner.lines();
-    for (const path of ['rtorrent', 'rtorrent/config.d', 'rtorrent/complete/films', 'rtorrent/torrents/films']) {
+    for (const path of ['rtorrent', 'rtorrent/complete/films', 'rtorrent/torrents/films']) {
       expect(lines).toContain(`install -d -o alice -g alice -m 0750 /home/alice/${path}`);
+    }
+    // what only rtorrent reads stays out of the web server's reach
+    for (const path of ['rtorrent/config.d', 'logs']) {
+      expect(lines).toContain(`install -d -o alice -g alice -m 0700 /home/alice/${path}`);
     }
     // setgid: a file the web server drops keeps the member's group
     expect(lines).toContain('install -d -o alice -g alice -m 2770 /home/alice/rtorrent/watch/films');
