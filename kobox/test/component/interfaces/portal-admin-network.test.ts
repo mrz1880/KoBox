@@ -44,7 +44,7 @@ describe('admin addresses screen', () => {
     });
 
     expect(response.body).toContain('The portal, ruTorrent, Nextcloud and the VPN are open to all');
-    expect(response.body).toContain('SSH and SFTP answer only the addresses below and the VPN');
+    expect(response.body).toContain('SSH and SFTP answer only the addresses and hostnames below and the VPN');
     expect(response.body).toContain('href="/access"');
     expect(response.body).toContain('every port of the box');
     expect(response.body).not.toContain('closed\nby default');
