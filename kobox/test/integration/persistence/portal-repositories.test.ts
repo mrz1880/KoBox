@@ -73,6 +73,25 @@ describe('SqlitePortalCredentialsRepository', () => {
     expect(found?.twoStepPending?.value).toBe('JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP');
   });
 
+  // turning it on happens on a login that exists already: the update must
+  // write it as the first save does
+  it('should_keep_two_step_sign_in_turned_on_for_an_existing_login', async () => {
+    const repo = new SqlitePortalCredentialsRepository(db);
+    await repo.save({ username: ALICE, passwordHash: HASH, role: 'admin' }, '2026-10-26 10:00:00');
+
+    await repo.save(
+      {
+        username: ALICE,
+        passwordHash: HASH,
+        role: 'admin',
+        twoStep: { secret: TotpSecret.parse('GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ'), lastStep: 7 },
+      },
+      '2026-10-26 10:01:00',
+    );
+
+    expect((await repo.find(ALICE))?.twoStep?.lastStep).toBe(7);
+  });
+
   it('should_return_undefined_for_an_unknown_username', async () => {
     const repo = new SqlitePortalCredentialsRepository(db);
 

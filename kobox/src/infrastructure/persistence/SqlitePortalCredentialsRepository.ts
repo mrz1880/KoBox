@@ -37,32 +37,23 @@ export class SqlitePortalCredentialsRepository implements PortalCredentialsPort 
   }
 
   save(credentials: PortalCredentials, now: string): Promise<void> {
-    const mustChange = credentials.mustChangePassword === true ? 1 : 0;
+    // one list for the insert and the update: two copies drifted, and the
+    // update forgot the two-step fields
+    const fields = {
+      passwordHash: credentials.passwordHash?.value ?? null,
+      role: credentials.role,
+      mustChangePassword: credentials.mustChangePassword === true ? 1 : 0,
+      appTokenHash: credentials.appTokenHash ?? null,
+      language: credentials.language?.value ?? null,
+      twoStepSecret: credentials.twoStep?.secret.value ?? null,
+      twoStepLastStep: credentials.twoStep?.lastStep ?? null,
+      twoStepPending: credentials.twoStepPending?.value ?? null,
+      updatedAt: now,
+    };
     this.db.orm
       .insert(portalCredentials)
-      .values({
-        username: credentials.username.value,
-        passwordHash: credentials.passwordHash?.value ?? null,
-        role: credentials.role,
-        mustChangePassword: mustChange,
-        appTokenHash: credentials.appTokenHash ?? null,
-        language: credentials.language?.value ?? null,
-        twoStepSecret: credentials.twoStep?.secret.value ?? null,
-        twoStepLastStep: credentials.twoStep?.lastStep ?? null,
-        twoStepPending: credentials.twoStepPending?.value ?? null,
-        updatedAt: now,
-      })
-      .onConflictDoUpdate({
-        target: portalCredentials.username,
-        set: {
-          passwordHash: credentials.passwordHash?.value ?? null,
-          role: credentials.role,
-          mustChangePassword: mustChange,
-          appTokenHash: credentials.appTokenHash ?? null,
-          language: credentials.language?.value ?? null,
-          updatedAt: now,
-        },
-      })
+      .values({ username: credentials.username.value, ...fields })
+      .onConflictDoUpdate({ target: portalCredentials.username, set: fields })
       .run();
     return Promise.resolve();
   }
