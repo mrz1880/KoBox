@@ -34,8 +34,8 @@ describe('admin addresses screen', () => {
     expect(response.body).toContain('home.example.org');
   });
 
-  // the page said the box stayed closed until an address opened it: the portal,
-  // Nextcloud, SFTP and the VPN are open to all, and an address is optional
+  // the web and the VPN are open to all; SSH and SFTP answer declared
+  // addresses and the VPN only, and members declare their own from Account
   it('should_say_what_works_without_an_address_and_what_one_opens', async () => {
     const response = await world.server.inject({
       method: 'GET',
@@ -43,8 +43,9 @@ describe('admin addresses screen', () => {
       headers: { cookie: admin.cookie },
     });
 
-    expect(response.body).toContain('Optional');
-    expect(response.body).toContain('the portal, ruTorrent, Nextcloud, SFTP and the VPN');
+    expect(response.body).toContain('The portal, ruTorrent, Nextcloud and the VPN are open to all');
+    expect(response.body).toContain('SSH and SFTP answer only the addresses below and the VPN');
+    expect(response.body).toContain('href="/access"');
     expect(response.body).toContain('every port of the box');
     expect(response.body).not.toContain('closed\nby default');
   });
