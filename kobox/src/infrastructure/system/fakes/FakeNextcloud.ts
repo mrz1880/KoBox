@@ -1,4 +1,7 @@
-import type { NextcloudPort } from '../../../domain/installation/NextcloudPort.js';
+import type {
+  NextcloudPort,
+  NextcloudSystemValue,
+} from '../../../domain/installation/NextcloudPort.js';
 import type { Password } from '../../../domain/user/Password.js';
 import type { Username } from '../../../domain/user/Username.js';
 
@@ -34,6 +37,22 @@ export class FakeNextcloud implements NextcloudPort {
 
   trustPortalSignIn(variable: string): Promise<void> {
     this.portalSignIn = variable;
+    return Promise.resolve();
+  }
+
+  readonly disabledApps: string[] = [];
+
+  disableApp(app: string): Promise<void> {
+    this.disabledApps.push(app);
+    return Promise.resolve();
+  }
+
+  readonly systemValues = new Map<string, string>();
+
+  setSystemValues(values: readonly NextcloudSystemValue[]): Promise<void> {
+    for (const { key, value } of values) {
+      this.systemValues.set(key, value);
+    }
     return Promise.resolve();
   }
 

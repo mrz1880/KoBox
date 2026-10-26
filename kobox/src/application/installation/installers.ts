@@ -4,7 +4,11 @@ import {
   RUTORRENT_DIR,
   WEB_SERVER_USER,
 } from '../../domain/installation/platform.js';
-import { PORTAL_USER_VARIABLE } from '../../domain/installation/NextcloudPort.js';
+import {
+  NEXTCLOUD_SYSTEM_VALUES,
+  NEXTCLOUD_UNUSED_APPS,
+  PORTAL_USER_VARIABLE,
+} from '../../domain/installation/NextcloudPort.js';
 import type { NextcloudPort } from '../../domain/installation/NextcloudPort.js';
 import type { ComponentNameValue } from '../../domain/installation/ComponentName.js';
 import type {
@@ -33,6 +37,7 @@ import {
   renderNfsConf,
   renderPortalEnv,
   renderPortalUnit,
+  renderNextcloudPhp,
   renderNextcloudSite,
   renderRutorrentConfig,
   renderRutorrentPlugins,
@@ -570,9 +575,15 @@ class NextcloudInstaller implements ComponentInstaller {
       'php-intl',
       'php-bcmath',
       'php-gmp',
+      // the memory cache and the image library its admin page asks for
+      'php-apcu',
+      'php-imagick',
       'unzip',
     ]);
     await systemd.enable(PHP_FPM.unit, { now: true });
+    if ((await files.apply(renderNextcloudPhp())).length > 0) {
+      await systemd.reloadOrRestart(PHP_FPM.unit);
+    }
     const marker = await host.readFile(NEXTCLOUD_MARKER);
     if (marker?.trim() !== install.nextcloudSha256) {
       await artifacts.fetchVerified(
@@ -604,6 +615,10 @@ class NextcloudInstaller implements ComponentInstaller {
     // external storage is how a member's rtorrent folders appear at the root of
     // their Nextcloud; without this app the mounts silently do nothing
     await nextcloud.enableApp('files_external');
+    await nextcloud.setSystemValues(NEXTCLOUD_SYSTEM_VALUES);
+    for (const app of NEXTCLOUD_UNUSED_APPS) {
+      await nextcloud.disableApp(app);
+    }
     // the name the portal is served on; without one, the machine's own
     await nextcloud.serveAt({
       host: install.letsencrypt?.domain ?? (await host.hostname()),

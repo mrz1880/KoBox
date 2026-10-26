@@ -147,4 +147,22 @@ describe('opening Nextcloud from the portal session', () => {
 
     expect(runner.occArgs()).toEqual(['user:info alice']);
   });
+
+  // typed, or occ stores an integer setting as a string Nextcloud then ignores
+  it('should_set_each_system_value_with_its_type_and_disable_an_app', async () => {
+    const runner = new RecordingRunner();
+    const adapter = new OccNextcloudAdapter(runner);
+
+    await adapter.setSystemValues([
+      { key: 'maintenance_window_start', value: '1', type: 'integer' },
+      { key: 'default_phone_region', value: 'FR', type: 'string' },
+    ]);
+    await adapter.disableApp('app_api');
+
+    expect(runner.occArgs()).toEqual([
+      'config:system:set maintenance_window_start --value=1 --type=integer',
+      'config:system:set default_phone_region --value=FR --type=string',
+      'app:disable app_api',
+    ]);
+  });
 });

@@ -127,6 +127,40 @@ describe('installation rendering', () => {
     expect(renderNextcloudSite().content).toContain(socket);
   });
 
+  // modHeadersAvailable tells Nextcloud the web server sends these, so it does
+  // not: without them its admin page listed every one as missing
+  it('should_send_the_security_headers_nextcloud_leaves_to_the_web_server', () => {
+    const conf = renderNextcloudSite().content;
+
+    for (const header of [
+      'add_header Referrer-Policy "no-referrer" always;',
+      'add_header X-Content-Type-Options "nosniff" always;',
+      'add_header X-Frame-Options "SAMEORIGIN" always;',
+      'add_header X-Permitted-Cross-Domain-Policies "none" always;',
+      'add_header X-Robots-Tag "noindex, nofollow" always;',
+      'add_header Strict-Transport-Security "max-age=15552000" always;',
+      'fastcgi_hide_header X-Powered-By;',
+    ]) {
+      expect(conf, header).toContain(header);
+    }
+  });
+
+  // browsers refuse a JavaScript module served as anything but JavaScript
+  it('should_serve_javascript_modules_as_javascript', () => {
+    expect(renderNextcloudSite().content).toMatch(
+      /location ~ \\\.mjs\$ \{\s+default_type text\/javascript;/,
+    );
+  });
+
+  // CalDAV, CardDAV and webfinger clients ask the root of the domain
+  it('should_send_well_known_lookups_to_nextcloud', () => {
+    const conf = renderNextcloudSite().content;
+
+    expect(conf).toContain('location = /.well-known/carddav { return 301 /nextcloud/remote.php/dav/; }');
+    expect(conf).toContain('location = /.well-known/caldav { return 301 /nextcloud/remote.php/dav/; }');
+    expect(conf).toContain('location ^~ /.well-known/ { return 301 /nextcloud/index.php$request_uri; }');
+  });
+
   it('should_let_nextcloud_clients_authenticate_themselves', () => {
     // the portal session stood in front of /nextcloud/: the desktop and
     // mobile apps send their own Nextcloud credentials and never got through.

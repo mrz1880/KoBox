@@ -1109,6 +1109,26 @@ describe('nextcloud installer', () => {
     expect(pinned.nextcloud.enabledApps).not.toContain('user_saml');
   });
 
+  // what Nextcloud's admin page listed as wrong with the box, set by KoBox
+  // rather than by hand on one server
+  it('should_give_nextcloud_the_php_and_settings_its_admin_page_asks_for', async () => {
+    const pinned = buildWorld({
+      nextcloud: { url: 'https://example.net/nc.tar.bz2', sha256: 'd'.repeat(64), adminPassword: 'chosen-by-the-operator' },
+    });
+
+    await installer(pinned, 'nextcloud').install();
+
+    expect(pinned.packages.installed).toEqual(expect.arrayContaining(['php-apcu', 'php-imagick']));
+    expect(pinned.host.contentAt('/etc/php/8.4/fpm/conf.d/90-kobox.ini')).toContain('memory_limit = 512M');
+    expect(pinned.host.contentAt('/etc/php/8.4/fpm/pool.d/zz-kobox.conf')).toContain('clear_env = no');
+    // occ runs on the command line: APCu has to be on there too, or every occ
+    // call fails once Nextcloud is told to cache with it
+    expect(pinned.host.contentAt('/etc/php/8.4/cli/conf.d/90-kobox.ini')).toContain('apc.enable_cli = 1');
+    expect(pinned.nextcloud.systemValues.get('memcache.local')).toBe('\\OC\\Memcache\\APCu');
+    expect(pinned.nextcloud.systemValues.get('default_phone_region')).toBe('FR');
+    expect(pinned.nextcloud.disabledApps).toContain('app_api');
+  });
+
   it('should_install_the_decompressor_its_own_release_needs', async () => {
     // Nextcloud ships .tar.bz2 and a minimal Debian has no bzip2, so without
     // this the extraction fails on a fresh box with "bzip2: not found". Nothing
