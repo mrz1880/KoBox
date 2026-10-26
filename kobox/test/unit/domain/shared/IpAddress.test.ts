@@ -38,6 +38,29 @@ describe('IpAddress', () => {
     expect(IpAddress.parse('192.0.2.10').isUsable).toBe(true);
   });
 
+  it('should_tell_an_address_internet_traffic_can_come_from_from_one_it_cannot', () => {
+    // private, loopback, link-local, carrier-grade NAT, multicast and reserved
+    // ranges never show up as the source of a connection from the internet
+    for (const raw of [
+      '10.1.2.3',
+      '172.16.0.1',
+      '172.31.255.255',
+      '192.168.1.20',
+      '127.0.0.1',
+      '0.0.0.0',
+      '169.254.1.1',
+      '100.64.0.1',
+      '100.127.255.255',
+      '224.0.0.1',
+      '255.255.255.255',
+    ]) {
+      expect(IpAddress.parse(raw).isPublic, raw).toBe(false);
+    }
+    for (const raw of ['198.51.100.40', '172.32.0.1', '100.128.0.1', '9.255.255.255', '11.0.0.1']) {
+      expect(IpAddress.parse(raw).isPublic, raw).toBe(true);
+    }
+  });
+
   it('property_any_valid_dotted_quad_parses_and_round_trips', () => {
     fc.assert(
       fc.property(validIpArb, (raw) => {
