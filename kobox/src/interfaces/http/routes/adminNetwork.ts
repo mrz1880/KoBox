@@ -3,7 +3,7 @@ import { z } from 'zod';
 import type { JobQueuePort } from '../../../application/jobs/JobQueuePort.js';
 import { DynDnsHost } from '../../../domain/security/DynDnsHost.js';
 import type { DynDnsBindingRepository, FairUseRepository } from '../../../domain/security/ports.js';
-import { IPV4_PATTERN } from '../../../domain/shared/IpAddress.js';
+import { IPV4_PATTERN, IpAddress } from '../../../domain/shared/IpAddress.js';
 import type { UserAddressRepository } from '../../../domain/tracker/ports.js';
 import { USERNAME_PATTERN } from '../../../domain/user/Username.js';
 import type { UserRepository } from '../../../domain/user/ports.js';
@@ -105,6 +105,14 @@ export function registerAdminNetworkRoutes(
       const parsed = addressSchema.safeParse(request.body);
       if (!parsed.success) {
         return reply.code(400).send();
+      }
+      // removal stays open to any address, so one added before this check goes
+      if (action === 'add' && !IpAddress.parse(parsed.data.ipv4).isPublic) {
+        return redirectWithFlash(
+          reply,
+          '/admin/addresses',
+          `${parsed.data.ipv4} is a private address: no connection from the internet comes from it.`,
+        );
       }
       await deps.queue.enqueue(build(parsed.data));
       return redirectWithFlash(reply, '/admin/addresses', `${action === 'add' ? 'Adding' : 'Removing'} the address.`);
