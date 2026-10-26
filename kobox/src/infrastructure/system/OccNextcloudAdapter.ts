@@ -1,5 +1,9 @@
 import { WEB_SERVER_USER } from '../../domain/installation/platform.js';
-import { NEXTCLOUD_MOUNTS, type NextcloudPort } from '../../domain/installation/NextcloudPort.js';
+import {
+  NEXTCLOUD_MOUNTS,
+  type NextcloudPort,
+  type NextcloudSystemValue,
+} from '../../domain/installation/NextcloudPort.js';
 import type { FileIndexPort } from '../../domain/torrent/ports.js';
 import type { Password } from '../../domain/user/Password.js';
 import type { Username } from '../../domain/user/Username.js';
@@ -42,6 +46,20 @@ export class OccNextcloudAdapter implements NextcloudPort, FileIndexPort {
         '--data-dir=/var/lib/nextcloud/data',
       ]),
     );
+  }
+
+  // occ answers 0 for an app that was not enabled
+  async disableApp(app: string): Promise<void> {
+    await runOrThrow(this.runner, this.occ(['app:disable', app]));
+  }
+
+  async setSystemValues(values: readonly NextcloudSystemValue[]): Promise<void> {
+    for (const { key, value, type } of values) {
+      await runOrThrow(
+        this.runner,
+        this.occ(['config:system:set', key, `--value=${value}`, `--type=${type}`]),
+      );
+    }
   }
 
   async enableApp(app: string): Promise<void> {

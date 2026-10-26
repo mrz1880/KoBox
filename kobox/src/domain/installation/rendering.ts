@@ -1,4 +1,10 @@
-import { DEBIAN_RELEASE, PHP_FPM, RUTORRENT_DIR, WEB_SERVER_USER } from './platform.js';
+import {
+  DEBIAN_RELEASE,
+  PHP_FPM,
+  PHP_SETTINGS,
+  RUTORRENT_DIR,
+  WEB_SERVER_USER,
+} from './platform.js';
 import { PORTAL_USER_VARIABLE } from './NextcloudPort.js';
 import { DomainError } from '../shared/DomainError.js';
 import type { RenderedFile } from '../shared/files.js';
@@ -734,15 +740,48 @@ export function renderRutorrentUserConfig(user: RutorrentUserWiring): RenderedFi
 // else, and a client cannot reach it (requests only produce HTTP_* names).
 // PHP gets the path after the script (remote.php/dav/..., index.php/login),
 // which the apps and the web interface both depend on.
+// PHP as Nextcloud's admin page asks for it. memory_limit and the opcache
+// buffer apply to every PHP site here, ruTorrent included, which only gains.
+// clear_env = no lets PHP see the system PATH; apc.enable_cli keeps occ working
+// once Nextcloud caches with APCu.
+export function renderNextcloudPhp(): readonly RenderedFile[] {
+  const file = (path: string, lines: readonly string[]): RenderedFile => ({
+    path,
+    content: [`;${MANAGED_HEADER.slice(1)}`, ...lines, ''].join('\n'),
+    mode: '0644',
+    owner: 'root',
+    group: 'root',
+  });
+  return [
+    file(PHP_SETTINGS.fpm, ['memory_limit = 512M', 'opcache.interned_strings_buffer = 16']),
+    file(PHP_SETTINGS.cli, ['memory_limit = 512M', 'apc.enable_cli = 1']),
+    file(PHP_SETTINGS.pool, ['[www]', 'clear_env = no']),
+  ];
+}
+
 export function renderNextcloudSite(): RenderedFile {
   return {
     path: '/etc/nginx/kobox.d/nextcloud.conf',
     content: [
       MANAGED_HEADER,
+      // CalDAV, CardDAV and webfinger clients ask the root of the domain
+      'location = /.well-known/carddav { return 301 /nextcloud/remote.php/dav/; }',
+      'location = /.well-known/caldav { return 301 /nextcloud/remote.php/dav/; }',
+      'location ^~ /.well-known/ { return 301 /nextcloud/index.php$request_uri; }',
+      '',
       'location ^~ /nextcloud {',
       // root, not alias: the tree is /var/www/nextcloud and nested regex
       // locations resolve against root reliably
       '    root /var/www;',
+      // modHeadersAvailable below tells Nextcloud these come from here, so it
+      // sends none itself. No inner location adds a header, so all inherit.
+      '    add_header Referrer-Policy "no-referrer" always;',
+      '    add_header X-Content-Type-Options "nosniff" always;',
+      '    add_header X-Frame-Options "SAMEORIGIN" always;',
+      '    add_header X-Permitted-Cross-Domain-Policies "none" always;',
+      '    add_header X-Robots-Tag "noindex, nofollow" always;',
+      '    add_header Strict-Transport-Security "max-age=15552000" always;',
+      '    fastcgi_hide_header X-Powered-By;',
       '    client_max_body_size 512M;',
       '    client_body_timeout 300s;',
       '    fastcgi_buffers 64 4K;',
@@ -774,7 +813,13 @@ export function renderNextcloudSite(): RenderedFile {
       `        fastcgi_pass unix:${PHP_FPM.socket};`,
       '    }',
       '',
-      '    location ~ \\.(?:css|js|mjs|svg|gif|png|jpg|ico|wasm|tflite|map|ogg|flac|woff2?)$ {',
+      // mime.types knows no .mjs, and browsers refuse a module served as
+      // anything but JavaScript
+      '    location ~ \\.mjs$ {',
+      '        default_type text/javascript;',
+      '        try_files $uri /nextcloud/index.php$request_uri;',
+      '    }',
+      '    location ~ \\.(?:css|js|svg|gif|png|jpg|ico|wasm|tflite|map|ogg|flac|woff2?)$ {',
       '        try_files $uri /nextcloud/index.php$request_uri;',
       '    }',
       '    location /nextcloud/remote {',

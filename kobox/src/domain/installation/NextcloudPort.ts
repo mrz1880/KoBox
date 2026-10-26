@@ -10,6 +10,25 @@ export const NEXTCLOUD_MOUNTS: readonly { readonly label: string; readonly under
   { label: 'rTorrent Watch', under: 'rtorrent/watch' },
 ];
 
+// What Nextcloud's own admin page asks of a box, as occ system values.
+export interface NextcloudSystemValue {
+  readonly key: string;
+  readonly value: string;
+  readonly type: 'string' | 'integer';
+}
+
+export const NEXTCLOUD_SYSTEM_VALUES: readonly NextcloudSystemValue[] = [
+  // a memory cache for one server: APCu, installed alongside
+  { key: 'memcache.local', value: '\\OC\\Memcache\\APCu', type: 'string' },
+  // heavy background jobs at 01:00 UTC rather than whenever
+  { key: 'maintenance_window_start', value: '1', type: 'integer' },
+  // phone numbers typed without +33 are French: the members are
+  { key: 'default_phone_region', value: 'FR', type: 'string' },
+];
+
+// Shipped enabled, of no use here, and its admin warning is noise.
+export const NEXTCLOUD_UNUSED_APPS: readonly string[] = ['app_api'];
+
 // The server variable nginx fills with the member signed in to the portal, and
 // the one Nextcloud opens sessions from. Nextcloud believes it without checking
 // it, which is why it is named here once: nginx sets it, nothing else can.
@@ -22,6 +41,9 @@ export interface NextcloudPort {
   isInstalled(): Promise<boolean>;
   install(adminUser: string, adminPassword: string): Promise<void>;
   enableApp(app: string): Promise<void>;
+  // an app that is not enabled is already where this leaves it
+  disableApp(app: string): Promise<void>;
+  setSystemValues(values: readonly NextcloudSystemValue[]): Promise<void>;
   // with the SSO app enabled: open the session of the member named in this
   // server variable, create no account, and keep Nextcloud's own sign-in page
   // for everyone else (its desktop and mobile apps included)

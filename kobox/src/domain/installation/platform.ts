@@ -6,6 +6,14 @@ export const DEBIAN_RELEASE = { versionId: '13', codename: 'trixie' } as const;
 // The PHP that release ships; ruTorrent and Nextcloud both run on its FPM pool.
 const PHP_VERSION = '8.4';
 
+// KoBox's own PHP settings, beside Debian's, so a package upgrade never
+// rewrites them. The pool file sorts last to override the stock www pool.
+export const PHP_SETTINGS = {
+  fpm: `/etc/php/${PHP_VERSION}/fpm/conf.d/90-kobox.ini`,
+  cli: `/etc/php/${PHP_VERSION}/cli/conf.d/90-kobox.ini`,
+  pool: `/etc/php/${PHP_VERSION}/fpm/pool.d/zz-kobox.conf`,
+} as const;
+
 export const PHP_FPM = {
   unit: `php${PHP_VERSION}-fpm`,
   socket: `/run/php/php${PHP_VERSION}-fpm.sock`,
