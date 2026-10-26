@@ -46,6 +46,12 @@ export interface WatchDirPort {
   ensureLayout(username: Username, watchDirs: readonly WatchDir[]): Promise<void>;
 }
 
+// Moves a .torrent the member dropped into a watch folder to where it is kept
+// once added (torrents/ of the same category).
+export interface TorrentFilingPort {
+  file(torrentFile: string, folder: string): Promise<void>;
+}
+
 // What keeps its own index of a member's folders (Nextcloud) and does not see
 // the ones made behind its back until told to look again.
 export interface FileIndexPort {

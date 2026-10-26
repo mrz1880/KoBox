@@ -132,6 +132,14 @@ export class TorrentInstance {
     return this.watchDirs.some((dir) => torrentFile.startsWith(`${dir.watchPath(home)}/`));
   }
 
+  // Where a .torrent dropped into a watch folder is filed once added: the
+  // torrents/ folder of the same category. Only a file sitting directly in one
+  // of this member's watch folders has one.
+  torrentsFolderFor(torrentFile: string, home: string): string | undefined {
+    const parent = torrentFile.slice(0, torrentFile.lastIndexOf('/'));
+    return this.watchDirs.find((dir) => dir.watchPath(home) === parent)?.torrentsPath(home);
+  }
+
   private props(): TorrentInstanceProps {
     return {
       username: this.username,

@@ -71,6 +71,18 @@ describe('TorrentInstance', () => {
     expect(instance.startsOnceAdmitted(file, '/home/alice/')).toBe(starts);
   });
 
+  // MySB moved the .torrent out of watch once added, into torrents/ under the
+  // same folder: watch is a drop box, torrents/ is the record
+  it.each([
+    ['/home/alice/rtorrent/watch/films/x.torrent', '/home/alice/rtorrent/torrents/films'],
+    ['/home/alice/rtorrent/watch/x.torrent', '/home/alice/rtorrent/torrents'],
+    ['/home/alice/rtorrent/watch/series/x.torrent', undefined],
+    ['/home/alice/elsewhere/x.torrent', undefined],
+  ])('should_file_a_dropped_torrent_under_torrents_in_its_folder: %s', (file, folder) => {
+    const instance = provisioned().addWatchDir(Label.parse('films')).instance;
+    expect(instance.torrentsFolderFor(file, '/home/alice/')).toBe(folder);
+  });
+
   it('should_restore_from_persistence_without_emitting_events', () => {
     const restored = TorrentInstance.restore({
       username: Username.parse('bob'),

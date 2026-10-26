@@ -21,6 +21,7 @@ import {
 import { CertbotAdapter } from '../infrastructure/system/CertbotAdapter.js';
 import { ConfigCheckAdapter } from '../infrastructure/system/ConfigCheckAdapter.js';
 import { OccNextcloudAdapter } from '../infrastructure/system/OccNextcloudAdapter.js';
+import { MvTorrentFiling } from '../infrastructure/system/MvTorrentFiling.js';
 import { InstallHostAdapter } from '../infrastructure/system/InstallHostAdapter.js';
 import { SystemdAdapter } from '../infrastructure/system/SystemdAdapter.js';
 import { SystemFactsAdapter } from '../infrastructure/system/SystemFactsAdapter.js';
@@ -771,6 +772,7 @@ export function buildContainer(name: string): Container {
     config: new RtorrentConfigAdapter(runner),
     watchDirs: new WatchDirAdapter(runner),
     fileIndex: nextcloud,
+    filing: new MvTorrentFiling(runner),
     services,
     metainfo: new BencodeMetainfoAdapter(),
     control: new ScgiRtorrentControlAdapter(),
