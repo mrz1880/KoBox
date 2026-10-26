@@ -18,6 +18,14 @@ export class InMemoryPortalSessionRepository implements SessionStorePort {
     return Promise.resolve();
   }
 
+  markCodeEntered(id: string): Promise<void> {
+    const session = this.rows.get(id);
+    if (session !== undefined) {
+      this.rows.set(id, { ...session, awaitingCode: false });
+    }
+    return Promise.resolve();
+  }
+
   deleteForUser(username: Username): Promise<void> {
     for (const [id, session] of this.rows) {
       if (session.username.value === username.value) {

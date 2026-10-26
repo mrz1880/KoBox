@@ -16,6 +16,7 @@ export class SqlitePortalSessionRepository implements SessionStorePort {
         csrfToken: session.csrfToken,
         createdAt: session.createdAt,
         expiresAt: session.expiresAt,
+        awaitingCode: session.awaitingCode ? 1 : 0,
       })
       .run();
     return Promise.resolve();
@@ -32,11 +33,17 @@ export class SqlitePortalSessionRepository implements SessionStorePort {
       csrfToken: row.csrfToken,
       createdAt: row.createdAt,
       expiresAt: row.expiresAt,
+      awaitingCode: row.awaitingCode === 1,
     });
   }
 
   delete(id: string): Promise<void> {
     this.db.orm.delete(portalSessions).where(eq(portalSessions.id, id)).run();
+    return Promise.resolve();
+  }
+
+  markCodeEntered(id: string): Promise<void> {
+    this.db.orm.update(portalSessions).set({ awaitingCode: 0 }).where(eq(portalSessions.id, id)).run();
     return Promise.resolve();
   }
 

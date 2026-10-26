@@ -442,8 +442,52 @@ export interface AccessFacts {
   readonly sshKeyAddedAt?: string;
   // the member's own declared addresses only: nobody sees anyone else's
   readonly addresses: readonly string[];
+  readonly hasTwoStep: boolean;
   // where this request came from; absent over IPv6, which cannot be declared
   readonly currentAddress?: string;
+}
+
+function twoStepSection(viewer: Viewer, facts: AccessFacts): RawHtml {
+  return html`<h2 id="two-step">${viewer.t('Two-step sign-in')}</h2>
+<p class="muted">After your password, a 6-digit code from an app on your phone
+(Aegis, Google Authenticator, 1Password...). Someone who learns your password
+still cannot sign in. Administrators need it to open Administration.</p>
+${facts.hasTwoStep
+    ? html`<p><span class="chip ok">On</span></p>
+<form class="inline" method="post" action="/access/two-step/stop">
+  <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
+  <input name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" placeholder="current code" required>
+  <button type="submit" class="ghost">Turn it off</button>
+</form>`
+    : html`<form class="inline" method="post" action="/access/two-step/start">
+  <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
+  <button type="submit">Set it up</button>
+</form>`}`;
+}
+
+// The secret is shown on this one response and never again: the member adds
+// it to their app, then proves it with a first code.
+export function twoStepSetupPage(viewer: Viewer, username: string, secret: string): string {
+  const uri = `otpauth://totp/KoBox:${username}?secret=${secret}&issuer=KoBox`;
+  return page(
+    'Two-step sign-in',
+    html`<h1>${viewer.t('Two-step sign-in')}</h1>
+<section class="panel">
+  <p class="lead">Add this key to your authenticator app.</p>
+  <p class="mono">${secret.replace(/(.{4})/g, '$1 ').trim()}</p>
+  <p class="muted">On the phone that has the app, this link adds it directly:
+  <a href="${uri}">${uri}</a></p>
+</section>
+<form class="card" method="post" action="/access/two-step/confirm">
+  <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
+  <label for="code">Then type the code the app shows</label>
+  <input id="code" name="code" inputmode="numeric" autocomplete="one-time-code"
+    pattern="[0-9]{6}" maxlength="6" autofocus required>
+  <button type="submit">Turn it on</button>
+</form>
+<p class="links"><a href="/access">Not now</a></p>`,
+    viewer,
+  );
 }
 
 // SSH and SFTP answer only declared addresses and the VPN, so a member whose
@@ -618,6 +662,8 @@ export function accessPage(viewer: Viewer, facts: AccessFacts): string {
 <p class="muted">Your SFTP password is the one you use here.</p>
 
 ${appTokenSection(viewer, facts)}
+
+${twoStepSection(viewer, facts)}
 
 ${addressesSection(viewer, facts)}
 

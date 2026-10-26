@@ -1,3 +1,4 @@
+import type { Role } from './Role.js';
 // Portal auth policy constants and pure timestamp helpers. Timestamps follow
 // the codebase-wide 'YYYY-MM-DD HH:MM:SS' UTC convention (lexicographically
 // ordered, so string comparison is chronological comparison).
@@ -21,4 +22,10 @@ export function sessionExpiry(now: string): string {
 
 export function isLocked(lockedUntil: string | undefined, now: string): boolean {
   return lockedUntil !== undefined && lockedUntil > now;
+}
+
+// An admin account opens every member's settings, so it signs in with a
+// two-step code as well as a password; for a member it is their choice.
+export function secondStepRequired(role: Role): boolean {
+  return role === 'admin';
 }

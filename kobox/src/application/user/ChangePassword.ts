@@ -61,6 +61,9 @@ export class ChangePassword {
         // a completed change clears any forced-reset requirement
         mustChangePassword: false,
         ...(existing?.language !== undefined && { language: existing.language }),
+        // the authenticator app still holds the same secret: a new password
+        // leaves two-step sign-in on
+        ...(existing?.twoStep !== undefined && { twoStep: existing.twoStep }),
       },
       clock(),
     );

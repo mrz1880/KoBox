@@ -2,6 +2,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { TotpSecret } from '../../../src/domain/portal/TotpSecret.js';
 import { HashedPassword } from '../../../src/domain/user/HashedPassword.js';
 import { Username } from '../../../src/domain/user/Username.js';
 import { KoboxDatabase } from '../../../src/infrastructure/persistence/db.js';
@@ -24,6 +25,7 @@ const SESSION = {
   csrfToken: 'b'.repeat(64),
   createdAt: '2026-07-25 10:00:00',
   expiresAt: '2026-08-01 10:00:00',
+  awaitingCode: false,
 } as const;
 
 beforeEach(() => {
@@ -45,6 +47,30 @@ describe('SqlitePortalCredentialsRepository', () => {
     const found = await repo.find(ALICE);
     expect(found?.role).toBe('admin');
     expect(found?.passwordHash).toBeUndefined();
+  });
+
+  // the two-step secret, the one waiting for its first code, and the last
+  // code's step, which is what refuses a code used twice
+  it('should_keep_the_two_step_secrets_and_the_last_step_used', async () => {
+    const repo = new SqlitePortalCredentialsRepository(db);
+    await repo.save(
+      {
+        username: ALICE,
+        passwordHash: HASH,
+        role: 'admin',
+        twoStep: {
+          secret: TotpSecret.parse('GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ'),
+          lastStep: 37037036,
+        },
+        twoStepPending: TotpSecret.parse('JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP'),
+      },
+      '2026-10-26 10:00:00',
+    );
+
+    const found = await repo.find(ALICE);
+    expect(found?.twoStep?.secret.value).toBe('GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ');
+    expect(found?.twoStep?.lastStep).toBe(37037036);
+    expect(found?.twoStepPending?.value).toBe('JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP');
   });
 
   it('should_return_undefined_for_an_unknown_username', async () => {
@@ -121,6 +147,17 @@ describe('SqlitePortalSessionRepository', () => {
     expect(found?.username.value).toBe('alice');
     expect(found?.csrfToken).toBe(SESSION.csrfToken);
     expect(found?.expiresAt).toBe(SESSION.expiresAt);
+  });
+
+  // a password alone opens a session that opens nothing until the code
+  it('should_open_a_session_waiting_for_its_code_once_the_code_is_entered', async () => {
+    const repo = new SqlitePortalSessionRepository(db);
+    await repo.create({ ...SESSION, awaitingCode: true });
+    expect((await repo.find(SESSION.id))?.awaitingCode).toBe(true);
+
+    await repo.markCodeEntered(SESSION.id);
+
+    expect((await repo.find(SESSION.id))?.awaitingCode).toBe(false);
   });
 
   it('should_delete_a_session_by_id', async () => {

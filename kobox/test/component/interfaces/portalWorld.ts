@@ -63,6 +63,10 @@ import {
   type PortalServerDeps,
 } from '../../../src/interfaces/http/server.js';
 import { UserBuilder } from '../../builders/UserBuilder.js';
+import { FakeTotp } from '../../../src/infrastructure/system/fakes/FakeTotp.js';
+import { TotpSecret } from '../../../src/domain/portal/TotpSecret.js';
+import { EnterTwoStepCode } from '../../../src/application/portal/EnterTwoStepCode.js';
+import { TwoStepSetup } from '../../../src/application/portal/TwoStepSetup.js';
 
 export const NOW = '2026-07-25 10:00:00';
 
@@ -154,6 +158,7 @@ export interface PortalWorld {
   readonly sshKeys: InMemorySshKeyRepository;
   readonly addresses: InMemoryUserAddressRepository;
   readonly blocklists: InMemoryBlocklistRepository;
+  readonly totp: FakeTotp;
   readonly components: InMemoryComponentRegistry;
   readonly mailRelay: InMemoryMailRelayRepository;
   readonly siteSettings: InMemorySiteSettingsRepository;
@@ -195,7 +200,8 @@ export async function buildPortalWorld(
   const siteSettings = new InMemorySiteSettingsRepository();
   const destinations = new InMemorySyncDestinationRepository();
   const transfers = new InMemorySyncTransferRepository();
-  const authDeps = { users, credentials, sessions, attempts, tokens, hasher };
+  const totp = new FakeTotp();
+  const authDeps = { users, credentials, sessions, attempts, tokens, hasher, totp };
   const linkDeps = {
     users,
     credentials,
@@ -211,6 +217,9 @@ export async function buildPortalWorld(
     login: new Login(authDeps),
     logout: new Logout(authDeps),
     authenticate: new Authenticate(authDeps),
+    enterTwoStepCode: new EnterTwoStepCode(authDeps),
+    twoStepSetup: new TwoStepSetup(authDeps),
+    nowMs: () => Date.parse(`${NOW.replace(' ', 'T')}Z`),
     issueAppToken: new IssueAppToken({ credentials, tokens, clock: () => NOW }),
     authenticateApp: new AuthenticateApp({
       credentials,
@@ -282,10 +291,17 @@ export async function buildPortalWorld(
       .build(),
   );
   await credentials.save(
-    { username: Username.parse('boss'), passwordHash: goodHash, role: 'admin' },
+    // an admin opens Administration only with two-step sign-in: loginAs
+    // enters a fresh code for it
+    {
+      username: Username.parse('boss'),
+      passwordHash: goodHash,
+      role: 'admin',
+      twoStep: { secret: TotpSecret.parse('GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ') },
+    },
     NOW,
   );
-  return { server, users, credentials, sessions, queue, outbox, downloads, debridAccounts, media, fairUse, diagnostics, instances, diskSamples, sshKeys, addresses, blocklists, components, mailRelay, siteSettings, destinations, transfers, passwords };
+  return { server, users, credentials, sessions, queue, outbox, downloads, debridAccounts, media, fairUse, diagnostics, instances, diskSamples, sshKeys, addresses, blocklists, totp, components, mailRelay, siteSettings, destinations, transfers, passwords };
 }
 
 export interface AgentSession {
@@ -303,6 +319,14 @@ export async function loginAs(world: PortalWorld, username: string): Promise<Age
   const setCookie = response.headers['set-cookie'];
   const rawCookie = Array.isArray(setCookie) ? setCookie[0] : setCookie;
   const cookie = (rawCookie ?? '').split(';')[0] ?? '';
+  if (response.headers.location === '/login/code') {
+    await world.server.inject({
+      method: 'POST',
+      url: '/login/code',
+      payload: `code=${world.totp.freshCode()}`,
+      headers: { cookie, 'content-type': 'application/x-www-form-urlencoded' },
+    });
+  }
   const home = await world.server.inject({ method: 'GET', url: '/', headers: { cookie } });
   const csrf = /name="_csrf" value="([^"]+)"/.exec(home.body)?.[1] ?? '';
   return { cookie, csrf };

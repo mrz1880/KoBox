@@ -682,6 +682,24 @@ mutation enqueues a typed job the root worker executes.
   --auth-per-hour <n|clear> --throttle-bps <n|clear>` (also from the admin
   fair-use screen) — audited, per-field (`clear` resets to the install default).
 
+## Two-step sign-in
+
+After the password, the portal asks for a 6-digit code from an authenticator
+app (RFC 6238 TOTP). A session waiting for its code opens nothing: no page, and
+nginx's checks for ruTorrent and Nextcloud answer no.
+
+- Members turn it on in **Account** (the key is shown once, a first code
+  confirms it) and off with a current code.
+- Administrators need it: an admin without it is sent to Account before
+  Administration opens.
+- A code is accepted once: one at or before the last accepted step is refused.
+  Wrong codes count toward the same lockout as wrong passwords, and log the
+  same line fail2ban reads.
+- A lost phone: as root, `kobox reset-two-step <user>`, then the member sets
+  it up again.
+- Nextcloud's own sign-in (desktop and mobile apps) is not covered: those apps
+  sign in to Nextcloud with the password, not through the portal.
+
 ## A member's NAS through the VPN
 
 The VPN is optional: Nextcloud, the portal, ruTorrent, SFTP, the apps' RPC and

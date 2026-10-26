@@ -1,10 +1,6 @@
 import type { Role } from '../../domain/portal/Role.js';
-import {
-  isLocked,
-  lockExpiry,
-  MAX_LOGIN_FAILURES,
-  sessionExpiry,
-} from '../../domain/portal/policy.js';
+import { isLocked, sessionExpiry } from '../../domain/portal/policy.js';
+import { recordLoginFailure } from './loginFailures.js';
 import type {
   LoginAttemptsPort,
   PortalCredentialsPort,
@@ -28,7 +24,14 @@ export interface LoginCommand {
 }
 
 export type LoginResult =
-  | { readonly ok: true; readonly token: string; readonly csrfToken: string; readonly role: Role }
+  | {
+      readonly ok: true;
+      readonly token: string;
+      readonly csrfToken: string;
+      readonly role: Role;
+      // the session waits for a two-step code before it opens anything
+      readonly awaitingCode: boolean;
+    }
   | { readonly ok: false; readonly reason: 'invalid-credentials' | 'locked' | 'suspended' };
 
 interface Deps {
@@ -62,7 +65,7 @@ export class Login {
     // cannot be enumerated by timing.
     const ok = await hasher.verify(password, stored?.passwordHash ?? DUMMY_HASH);
     if (user === undefined || stored === undefined || !ok) {
-      await this.recordFailure(username, attempt?.failures ?? 0, now);
+      await recordLoginFailure(attempts, username, attempt?.failures ?? 0, now);
       return { ok: false, reason: 'invalid-credentials' };
     }
 
@@ -73,6 +76,7 @@ export class Login {
     }
 
     await attempts.clear(username);
+    const awaitingCode = stored.twoStep !== undefined;
     const token = tokens.generate();
     const csrfToken = tokens.generate();
     await sessions.create({
@@ -81,16 +85,9 @@ export class Login {
       csrfToken,
       createdAt: now,
       expiresAt: sessionExpiry(now),
+      // the password alone opens nothing for a member with two-step sign-in
+      awaitingCode,
     });
-    return { ok: true, token, csrfToken, role: stored.role };
-  }
-
-  private async recordFailure(username: Username, failures: number, now: string): Promise<void> {
-    const next = failures + 1;
-    await this.deps.attempts.save({
-      username,
-      failures: next,
-      ...(next >= MAX_LOGIN_FAILURES && { lockedUntil: lockExpiry(now) }),
-    });
+    return { ok: true, token, csrfToken, role: stored.role, awaitingCode };
   }
 }

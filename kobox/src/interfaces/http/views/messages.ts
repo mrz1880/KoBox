@@ -68,6 +68,7 @@ const FR: Readonly<Record<string, string>> = {
   'Change password': 'Changer de mot de passe',
   'Your own SSH key': 'Votre clé SSH',
   'Where you connect from': 'D’où tu te connectes',
+  'Two-step sign-in': 'Connexion en deux étapes',
   'Public key': 'Clé publique',
   'Install this key': 'Installer cette clé',
   'Remove it': 'La retirer',

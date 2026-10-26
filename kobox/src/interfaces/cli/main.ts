@@ -33,6 +33,7 @@ import {
   buildInstallation,
   buildMigrateFromMysb,
   buildUpgrade,
+  nowStamp,
   spoolDir,
   DEFAULT_DB_PATH,
   type Container,
@@ -40,6 +41,8 @@ import {
 import { buildJob } from './buildJob.js';
 import { readFileSync } from 'node:fs';
 import { loadWorkerEnvInto } from '../envSnapshot.js';
+import { TwoStepSetup } from '../../application/portal/TwoStepSetup.js';
+import { CryptoTotp } from '../../infrastructure/system/CryptoTotp.js';
 
 // before anything reads process.env: the CLI runs as root and must see the
 // box's own configuration, not just whatever the operator happened to export
@@ -141,6 +144,26 @@ program
     });
     // the link opens the account: printed for the operator, never logged
     await done(c, `invitation sent to ${username}; the link, valid 7 days and once: ${invitation.url}`);
+  });
+
+program
+  .command('reset-two-step')
+  .argument('<username>')
+  .description("turn a member's two-step sign-in off, for one who lost their phone")
+  .action(async (username: string) => {
+    const c = container();
+    // the code would be the proof, and the code is what was lost: root on
+    // the box is the authority here, as for every other recovery
+    const found = await new TwoStepSetup({ credentials: c.credentials, totp: new CryptoTotp() }).reset(
+      Username.parse(username),
+      nowStamp(),
+    );
+    await done(
+      c,
+      found
+        ? `two-step sign-in is off for ${username}; they set it up again from Account`
+        : `no portal login named ${username}`,
+    );
   });
 
 const USERNAME_JOB_BUILDERS = {
@@ -1029,7 +1052,7 @@ program
     const c = container();
     try {
       const upgrade = buildUpgrade(c);
-      const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
+      const now = nowStamp();
       if (options.rollback === true) {
         const report = await upgrade.rollback({ now });
         process.stdout.write(`rolled back to ${report.to} (${report.path})\n`);

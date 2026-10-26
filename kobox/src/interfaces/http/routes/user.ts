@@ -47,6 +47,7 @@ import { passwordField } from '../passwordField.js';
 import { flashOf, redirectWithFlash, viewerOf, type Guards } from '../guards.js';
 import {
   accessPage,
+  twoStepSetupPage,
   adminHomePage,
   filesPage,
   downloadsPage,
@@ -64,6 +65,7 @@ import { IPV4_PATTERN, IpAddress } from '../../../domain/shared/IpAddress.js';
 import { DEFAULT_TRANSFER_MAILS, TRANSFER_MAILS } from '../../../domain/sync/TransferMails.js';
 import type { BlocklistRepository, UserAddressRepository } from '../../../domain/tracker/ports.js';
 import { blocklistCoverage } from '../../../domain/tracker/BlocklistCoverage.js';
+import type { TwoStepSetup } from '../../../application/portal/TwoStepSetup.js';
 
 const categorySchema = z.object({ label: z.string().min(1).max(64) });
 const retrySchema = z.object({ id: z.coerce.number().int().positive() });
@@ -169,6 +171,8 @@ export interface UserRoutesDeps {
   readonly users: UserRepository;
   readonly addresses: UserAddressRepository;
   readonly blocklists: BlocklistRepository;
+  readonly twoStepSetup: TwoStepSetup;
+  readonly nowMs: () => number;
   readonly fairUse: FairUseRepository;
   readonly queue: JobQueuePort;
   readonly hasher: PasswordHasherPort;
@@ -412,6 +416,47 @@ export function registerUserRoutes(
     );
     return redirectWithFlash(reply, '/access', 'Address added.');
   });
+
+  const twoStepCodeSchema = z.object({ code: z.string().regex(/^[0-9]{6}$/) });
+
+  server.post('/access/two-step/start', async (request, reply) => {
+    const session = await guards.requireCsrf(request, reply);
+    if (session === undefined) {
+      return;
+    }
+    const secret = await deps.twoStepSetup.begin(session.username, deps.now());
+    if (secret === undefined) {
+      return reply.code(404).send();
+    }
+    return reply
+      .type('text/html')
+      .send(twoStepSetupPage(viewerOf(session), session.username.value, secret.value));
+  });
+
+  for (const [action, done, refused] of [
+    ['confirm', 'Two-step sign-in is on.', 'That code did not work. Set it up again.'],
+    ['stop', 'Two-step sign-in is off.', 'That code did not work: it stays on.'],
+  ] as const) {
+    server.post(`/access/two-step/${action}`, async (request, reply) => {
+      const session = await guards.requireCsrf(request, reply);
+      if (session === undefined) {
+        return;
+      }
+      const parsed = twoStepCodeSchema.safeParse(request.body);
+      const command = {
+        username: session.username,
+        code: parsed.success ? parsed.data.code : '',
+        now: deps.now(),
+        nowMs: deps.nowMs(),
+      };
+      const ok =
+        parsed.success &&
+        (action === 'confirm'
+          ? await deps.twoStepSetup.confirm(command)
+          : await deps.twoStepSetup.turnOff(command));
+      return redirectWithFlash(reply, '/access', ok ? done : refused);
+    });
+  }
 
   const addressSchema = z.object({ ipv4: z.string().max(15) });
 
@@ -814,6 +859,7 @@ export function registerUserRoutes(
           return stored === undefined ? {} : { sshKey: stored.key, sshKeyAddedAt: stored.addedAt };
         })()),
         ...(await addressFacts(session.username, request.ip)),
+        hasTwoStep: session.hasTwoStep,
       }),
     );
   });
@@ -843,6 +889,7 @@ export function registerUserRoutes(
         hasAppToken: true,
         freshToken: token.reveal(),
         ...(await addressFacts(session.username, request.ip)),
+        hasTwoStep: session.hasTwoStep,
       }),
     );
   });

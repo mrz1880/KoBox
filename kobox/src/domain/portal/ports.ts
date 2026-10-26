@@ -3,6 +3,7 @@ import type { HashedPassword } from '../user/HashedPassword.js';
 import type { Username } from '../user/Username.js';
 import type { Language } from './Language.js';
 import type { Role } from './Role.js';
+import type { TotpSecret } from './TotpSecret.js';
 
 // Portal login credentials: the same crypt(3) sha512 hash the system account
 // receives, mirrored by the ROOT WORKER on create-user/change-password (the
@@ -22,6 +23,17 @@ export interface PortalCredentials {
   readonly appTokenHash?: string;
   // the member's own choice of language; absent means English
   readonly language?: Language;
+  // two-step sign-in, once its first code confirmed it
+  readonly twoStep?: TwoStep;
+  // a secret shown to the member, waiting for that first code
+  readonly twoStepPending?: TotpSecret;
+}
+
+export interface TwoStep {
+  readonly secret: TotpSecret;
+  // the step of the last code accepted: a code at or before it is refused,
+  // so one seen over a shoulder cannot be used again
+  readonly lastStep?: number;
 }
 
 export interface PortalCredentialsPort {
@@ -39,12 +51,16 @@ export interface PortalSessionRecord {
   readonly csrfToken: string;
   readonly createdAt: string;
   readonly expiresAt: string;
+  // a password was proven, the two-step code not yet: the session opens
+  // nothing but the code page
+  readonly awaitingCode: boolean;
 }
 
 export interface SessionStorePort {
   create(session: PortalSessionRecord): Promise<void>;
   find(id: string): Promise<PortalSessionRecord | undefined>;
   delete(id: string): Promise<void>;
+  markCodeEntered(id: string): Promise<void>;
   deleteForUser(username: Username): Promise<void>;
   purgeExpired(now: string): Promise<number>;
 }
@@ -81,3 +97,13 @@ export interface PasswordLinkRepository {
   latest(username: Username): Promise<PasswordLink | undefined>;
   deleteForUser(username: Username): Promise<void>;
 }
+
+// Time-based one-time codes (RFC 6238: SHA-1, 6 digits, 30 seconds).
+export interface TotpPort {
+  newSecret(): TotpSecret;
+  // the time step a code belongs to, within one step either side of now, or
+  // undefined when it matches none: the step is what stops a code being
+  // replayed
+  stepOf(secret: TotpSecret, code: string, nowMs: number): number | undefined;
+}
+
