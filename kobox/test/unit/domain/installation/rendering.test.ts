@@ -458,6 +458,21 @@ describe('installation rendering', () => {
 
   // ruTorrent runs as the web server, a member of every member's group: bounded
   // by /home alone, its folder picker listed another member's downloads
+  // ruTorrent now runs as the member: a config only the web server could read
+  // left it on the default port, and it lost its rTorrent
+  it('should_let_the_member_and_only_them_read_their_rutorrent_config', () => {
+    const file = renderRutorrentUserConfig({ username: 'alice', scgiPort: 51101 });
+
+    expect([file.owner, file.group, file.mode]).toEqual(['root', 'alice', '0640']);
+  });
+
+  it('should_let_every_members_rutorrent_read_the_shared_config', () => {
+    const file = renderRutorrentConfig();
+
+    expect([file.owner, file.group, file.mode]).toEqual(['root', 'root', '0644']);
+    expect(file.content).not.toMatch(/pass|secret|key/i);
+  });
+
   it('should_keep_a_members_rutorrent_inside_their_own_home', () => {
     const file = renderRutorrentUserConfig({ username: 'alice', scgiPort: 51101 });
 

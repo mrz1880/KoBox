@@ -398,13 +398,15 @@ describe.skipIf(!onDebianAsRoot)('E2E: fresh Debian 13 -> bootstrap -> full stac
     const ruProbe = '/var/www/rutorrent/kobox-whoami.php';
     writeFileSync(
       ruProbe,
-      '<?php echo $_SERVER["REMOTE_USER"] ?? "", " as ", posix_getpwuid(posix_geteuid())["name"];',
+      '<?php $u = $_SERVER["REMOTE_USER"] ?? ""; echo $u, " as ", posix_getpwuid(posix_geteuid())["name"],' +
+        ' is_readable("/var/www/rutorrent/conf/users/$u/config.php") && is_readable("/var/www/rutorrent/conf/config.local.php") ? " reads its config" : "";',
     );
     try {
       // and it runs as that member, in their own pool, not as the web server
       // that every member's group lets in
       expect(sh('curl', ['-sk', '-b', jar, ...forged, 'https://127.0.0.1:8189/ru/kobox-whoami.php'])).toBe(
-        `${USER} as ${USER}`,
+        // the configs ruTorrent loads: unreadable, it lost its rTorrent
+        `${USER} as ${USER} reads its config`,
       );
     } finally {
       rmSync(ruProbe);

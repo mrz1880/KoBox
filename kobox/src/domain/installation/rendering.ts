@@ -724,14 +724,15 @@ export function renderRutorrentUserConfig(user: RutorrentUserWiring): RenderedFi
       `$scgi_port = ${String(user.scgiPort)};`,
       "$scgi_host = '127.0.0.1';",
       `$XMLRPCMountPoint = '/RPC-${user.username.toUpperCase()}';`,
-      // ruTorrent runs as the web server, in every member's group: bounded by
-      // /home alone, its folder picker would list another member's downloads
+      // bounded by /home alone, its folder picker would list the other
+      // homes, which their 0711 mode keeps closed anyway
       `$topDirectory = '${HOME_BASE}/${user.username}/';`,
       '',
     ].join('\n'),
+    // read by the member's own PHP pool, which ruTorrent now runs in
     mode: '0640',
     owner: 'root',
-    group: 'www-data',
+    group: user.username,
   };
 }
 
@@ -949,9 +950,10 @@ export function renderRutorrentConfig(): RenderedFile {
       '$profileMask = 0770;',
       '',
     ].join('\n'),
-    mode: '0640',
+    // no secret in it, and every member's PHP pool reads it
+    mode: '0644',
     owner: 'root',
-    group: 'www-data',
+    group: 'root',
   };
 }
 
