@@ -46,6 +46,12 @@ export interface WatchDirPort {
   ensureLayout(username: Username, watchDirs: readonly WatchDir[]): Promise<void>;
 }
 
+// What keeps its own index of a member's folders (Nextcloud) and does not see
+// the ones made behind its back until told to look again.
+export interface FileIndexPort {
+  refresh(username: Username): Promise<void>;
+}
+
 export interface TorrentMetainfo {
   readonly infoHash: InfoHash;
   readonly name: string;

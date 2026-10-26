@@ -1,4 +1,5 @@
 import type {
+  FileIndexPort,
   RtorrentConfigPort,
   TorrentInstanceRepository,
   WatchDirPort,
@@ -26,6 +27,7 @@ interface Deps {
   readonly instances: TorrentInstanceRepository;
   readonly config: RtorrentConfigPort;
   readonly watchDirs: WatchDirPort;
+  readonly fileIndex: FileIndexPort;
   readonly services: ServiceControlPort;
   readonly templates: RtorrentTemplates;
   readonly settings: RenderSettings;
@@ -38,7 +40,7 @@ export class RenderRtorrentConfig {
   constructor(private readonly deps: Deps) {}
 
   async execute(command: RenderRtorrentConfigCommand): Promise<RenderReport> {
-    const { instances, config, watchDirs, services, templates, settings } = this.deps;
+    const { instances, config, watchDirs, fileIndex, services, templates, settings } = this.deps;
 
     const instance = await instances.findByUsername(command.username);
     if (!instance) {
@@ -54,6 +56,8 @@ export class RenderRtorrentConfig {
       await services.restartUserService(instance.username);
       restarted = true;
     }
+    // last: the member's torrents come first if Nextcloud is the one that fails
+    await fileIndex.refresh(instance.username);
     return { changedFiles, restarted };
   }
 }

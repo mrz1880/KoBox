@@ -124,4 +124,27 @@ describe('opening Nextcloud from the portal session', () => {
       'saml:config:set --general-uid_mapping=KOBOX_PORTAL_USER 1',
     ]);
   });
+
+  // a folder made on disk stays out of Nextcloud's own index until it looks again
+  it('should_have_nextcloud_look_again_at_a_members_three_folders', async () => {
+    const runner = new RecordingRunner(['alice']);
+
+    await new OccNextcloudAdapter(runner).refresh(alice);
+
+    expect(runner.occArgs()).toEqual([
+      'user:info alice',
+      'files:scan --path=/alice/files/rTorrent Complete',
+      'files:scan --path=/alice/files/rTorrent Torrents',
+      'files:scan --path=/alice/files/rTorrent Watch',
+    ]);
+  });
+
+  // no Nextcloud on the box, or no account there yet: nothing to look at
+  it('should_leave_alone_a_member_nextcloud_does_not_know', async () => {
+    const runner = new RecordingRunner([]);
+
+    await new OccNextcloudAdapter(runner).refresh(alice);
+
+    expect(runner.occArgs()).toEqual(['user:info alice']);
+  });
 });

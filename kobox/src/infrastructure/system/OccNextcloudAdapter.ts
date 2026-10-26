@@ -1,5 +1,6 @@
 import { WEB_SERVER_USER } from '../../domain/installation/platform.js';
-import type { NextcloudPort } from '../../domain/installation/NextcloudPort.js';
+import { NEXTCLOUD_MOUNTS, type NextcloudPort } from '../../domain/installation/NextcloudPort.js';
+import type { FileIndexPort } from '../../domain/torrent/ports.js';
 import type { Password } from '../../domain/user/Password.js';
 import type { Username } from '../../domain/user/Username.js';
 import { runOrThrow, type CommandRunner } from './CommandRunner.js';
@@ -9,7 +10,7 @@ const OCC = '/var/www/nextcloud/occ';
 // occ takes its arguments as argv, never as a shell line, so a member's name
 // reaches it as one token whatever it contains. The Username value object has
 // already refused anything odd, and this keeps that guarantee end to end.
-export class OccNextcloudAdapter implements NextcloudPort {
+export class OccNextcloudAdapter implements NextcloudPort, FileIndexPort {
   constructor(private readonly runner: CommandRunner) {}
 
   private occ(args: readonly string[], env?: Readonly<Record<string, string>>) {
@@ -86,6 +87,21 @@ export class OccNextcloudAdapter implements NextcloudPort {
   async hasUser(username: Username): Promise<boolean> {
     const info = await this.runner.run(this.occ(['user:info', username.value]));
     return info.exitCode === 0;
+  }
+
+  // Nextcloud indexes a member's folders itself and missed the ones made on
+  // disk: scan the three mounts, and only those. No account (or no Nextcloud
+  // at all, where occ itself fails) means nothing to look at.
+  async refresh(username: Username): Promise<void> {
+    if (!(await this.hasUser(username))) {
+      return;
+    }
+    for (const mount of NEXTCLOUD_MOUNTS) {
+      await runOrThrow(
+        this.runner,
+        this.occ(['files:scan', `--path=/${username.value}/files/${mount.label}`]),
+      );
+    }
   }
 
   async setUserPassword(username: Username, password: Password): Promise<void> {

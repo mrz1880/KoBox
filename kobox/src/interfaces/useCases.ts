@@ -108,6 +108,7 @@ import type {
   TorrentRepository,
   UserScriptRunnerPort,
   WatchDirPort,
+  FileIndexPort,
 } from '../domain/torrent/ports.js';
 import type { ManagedFilesPort } from '../domain/shared/files.js';
 import type {
@@ -295,6 +296,7 @@ export interface TorrentUseCaseDeps {
   readonly torrents: TorrentRepository;
   readonly config: RtorrentConfigPort;
   readonly watchDirs: WatchDirPort;
+  readonly fileIndex: FileIndexPort;
   readonly services: ServiceControlPort;
   readonly metainfo: TorrentMetainfoPort;
   readonly control: RtorrentControlPort;
