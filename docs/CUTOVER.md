@@ -52,8 +52,9 @@ Set up what the box needs before members arrive, each covered in `docs/OPS.md`:
   Ask again for the final name at the switch (§7).
 - **Pinned components** (ruTorrent, Nextcloud, NanoMon, speedtest): unpinned means skipped.
 - **Trackers and blocklists**: add the trackers members use (admin console, or
-  `kobox discover-tracker <host>`), then `kobox import-blocklist-catalog` and
-  `kobox update-blocklists`.
+  `kobox discover-tracker <host>`), then `kobox import-blocklist-catalog`: it
+  enables MySB's curated set, and the lists download right after. Until that
+  import, no list exists and nothing is blocked.
 
 ## 3. Create the accounts
 
