@@ -60,6 +60,8 @@ import {
 } from '../views/userPages.js';
 import { syncPage } from '../views/syncPage.js';
 import { Language } from '../../../domain/portal/Language.js';
+import { IPV4_PATTERN, IpAddress } from '../../../domain/shared/IpAddress.js';
+import type { UserAddressRepository } from '../../../domain/tracker/ports.js';
 
 const categorySchema = z.object({ label: z.string().min(1).max(64) });
 const retrySchema = z.object({ id: z.coerce.number().int().positive() });
@@ -160,6 +162,7 @@ export interface UserRoutesDeps {
   // in here, but only from its own login page
   readonly nextcloudSignsInFromPortal: boolean;
   readonly users: UserRepository;
+  readonly addresses: UserAddressRepository;
   readonly fairUse: FairUseRepository;
   readonly queue: JobQueuePort;
   readonly hasher: PasswordHasherPort;
@@ -200,6 +203,11 @@ async function signalRowFor(
 
 // The name members reach the box by over SFTP: only known when the operator
 // configured one, so a page shows it rather than guessing.
+// The firewall filters IPv4 only, so an IPv6 visitor has nothing to declare.
+function visitorAddress(raw: string): IpAddress | undefined {
+  return IPV4_PATTERN.test(raw) ? IpAddress.parse(raw) : undefined;
+}
+
 function sftpHostName(): string | undefined {
   const host = process.env.KOBOX_VPN_REMOTE;
   return host === undefined || host === '' ? undefined : host;
@@ -336,6 +344,19 @@ export function registerUserRoutes(
       .filter((label): label is Label => label !== undefined);
   };
 
+  // A member's own declared addresses and where this request comes from. The
+  // list is filtered to the signed-in member: nobody sees anyone else's.
+  const addressFacts = async (
+    username: Username,
+    requestIp: string,
+  ): Promise<{ addresses: readonly string[]; currentAddress?: string }> => {
+    const current = visitorAddress(requestIp);
+    const addresses = (await deps.addresses.listAll())
+      .filter((address) => address.username.equals(username))
+      .map((address) => address.ip.value);
+    return { addresses, ...(current !== undefined && { currentAddress: current.value }) };
+  };
+
   const sshKeySchema = z.object({ key: z.string().min(32).max(1024) });
 
   server.post('/access/ssh-key', async (request, reply) => {
@@ -362,6 +383,50 @@ export function registerUserRoutes(
       buildJob.setSshKey({ username: session.username.value, key: parsed.data.key }),
     );
     return redirectWithFlash(reply, '/access', 'Key accepted. It is being installed.');
+  });
+
+  // The address is the one the request came from, never one typed in: a member
+  // can only open the box to a place they are actually standing in.
+  server.post('/access/addresses/add-current', async (request, reply) => {
+    const session = await guards.requireCsrf(request, reply);
+    if (session === undefined) {
+      return;
+    }
+    const ip = visitorAddress(request.ip);
+    if (ip === undefined) {
+      return redirectWithFlash(
+        reply,
+        '/access',
+        'You are connecting over IPv6. Only IPv4 addresses can be declared.',
+      );
+    }
+    await deps.queue.enqueue(
+      buildJob.addUserAddress({ username: session.username.value, ipv4: ip.value }),
+    );
+    return redirectWithFlash(reply, '/access', 'Address added.');
+  });
+
+  const addressSchema = z.object({ ipv4: z.string().max(15) });
+
+  server.post('/access/addresses/remove', async (request, reply) => {
+    const session = await guards.requireCsrf(request, reply);
+    if (session === undefined) {
+      return;
+    }
+    const parsed = addressSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.code(400).send();
+    }
+    // the job is keyed on the member, so another member's address could not be
+    // touched anyway; refusing here keeps a forged form from queueing no-ops
+    const { addresses } = await addressFacts(session.username, request.ip);
+    if (!addresses.includes(parsed.data.ipv4)) {
+      return reply.code(404).send();
+    }
+    await deps.queue.enqueue(
+      buildJob.removeUserAddress({ username: session.username.value, ipv4: parsed.data.ipv4 }),
+    );
+    return redirectWithFlash(reply, '/access', 'Address removed.');
   });
 
   server.post('/access/ssh-key/remove', async (request, reply) => {
@@ -740,6 +805,7 @@ export function registerUserRoutes(
           const stored = await deps.sshKeys.find(session.username);
           return stored === undefined ? {} : { sshKey: stored.key, sshKeyAddedAt: stored.addedAt };
         })()),
+        ...(await addressFacts(session.username, request.ip)),
       }),
     );
   });
@@ -767,6 +833,7 @@ export function registerUserRoutes(
         rtorrentPort: user.rtorrentPort.value,
         hasAppToken: true,
         freshToken: token.reveal(),
+        ...(await addressFacts(session.username, request.ip)),
       }),
     );
   });

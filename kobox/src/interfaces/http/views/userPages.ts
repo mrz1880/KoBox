@@ -410,6 +410,42 @@ export interface AccessFacts {
   readonly freshToken?: string;
   readonly sshKey?: SshPublicKey;
   readonly sshKeyAddedAt?: string;
+  // the member's own declared addresses only: nobody sees anyone else's
+  readonly addresses: readonly string[];
+  // where this request came from; absent over IPv6, which cannot be declared
+  readonly currentAddress?: string;
+}
+
+// SSH and SFTP answer only declared addresses and the VPN, so a member whose
+// home address changed fixes it from here, on the web, which stays open.
+function addressesSection(viewer: Viewer, facts: AccessFacts): RawHtml {
+  const declaredHere =
+    facts.currentAddress !== undefined && facts.addresses.includes(facts.currentAddress);
+  return html`<h2>${viewer.t('Where you connect from')}</h2>
+<p class="muted">SSH and SFTP accept connections from the addresses below and
+from the VPN. Add your address from home, from the place your scripts or your NAS
+run. Only you and the administrators see this list.</p>
+${facts.addresses.length === 0
+    ? html`<p class="muted">No address declared.</p>`
+    : html`<ul>${facts.addresses.map(
+      (address) => html`<li><span class="mono">${address}</span>
+<form class="inline" method="post" action="/access/addresses/remove">
+  <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
+  <input type="hidden" name="ipv4" value="${address}">
+  <button type="submit" class="ghost">Remove</button>
+</form></li>`,
+    )}</ul>`}
+${facts.currentAddress === undefined
+    ? html`<p class="muted">You are connecting over IPv6 right now. Only IPv4
+addresses can be declared: come back from a connection that uses IPv4.</p>`
+    : declaredHere
+      ? html`<p>You are connecting from <span class="mono">${facts.currentAddress}</span>,
+which is declared.</p>`
+      : html`<form class="inline" method="post" action="/access/addresses/add-current">
+  <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
+  <span>You are connecting from <span class="mono">${facts.currentAddress}</span>.</span>
+  <button type="submit">Add this address</button>
+</form>`}`;
 }
 
 // A key is for a script on the member's own machine dropping torrent files in.
@@ -546,6 +582,8 @@ export function accessPage(viewer: Viewer, facts: AccessFacts): string {
 <p class="muted">Your SFTP password is the one you use here.</p>
 
 ${appTokenSection(viewer, facts)}
+
+${addressesSection(viewer, facts)}
 
 ${sshKeySection(viewer, facts)}
 

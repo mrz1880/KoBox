@@ -67,6 +67,7 @@ const FR: Readonly<Record<string, string>> = {
   Files: 'Fichiers',
   'Change password': 'Changer de mot de passe',
   'Your own SSH key': 'Votre clé SSH',
+  'Where you connect from': 'D’où tu te connectes',
   'Public key': 'Clé publique',
   'Install this key': 'Installer cette clé',
   'Remove it': 'La retirer',
