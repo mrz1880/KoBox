@@ -2,6 +2,7 @@ import {
   MAX_MAIL_ATTEMPTS,
   nextAttemptDelayMinutes,
 } from '../../domain/maintenance/outbox.js';
+import { shiftStamp } from '../../domain/shared/stamp.js';
 import type { MailOutboxPort } from './MailOutboxPort.js';
 import type { MailTransportPort } from './MailTransportPort.js';
 
@@ -21,12 +22,6 @@ export interface SendMailsReport {
 }
 
 const BATCH_LIMIT = 20;
-
-function addMinutes(stamp: string, minutes: number): string {
-  const date = new Date(`${stamp.replace(' ', 'T')}Z`);
-  date.setUTCMinutes(date.getUTCMinutes() + minutes);
-  return date.toISOString().slice(0, 19).replace('T', ' ');
-}
 
 // The legacy SendMails.bsh, typed: flush due outbox rows through the relay,
 // let the backoff ladder absorb transient failures, keep dead mails visible.
@@ -56,7 +51,7 @@ export class SendMails {
           await this.deps.outbox.markFailed(mail.id, message);
           failed += 1;
         } else {
-          await this.deps.outbox.markRetry(mail.id, message, addMinutes(input.now, delay));
+          await this.deps.outbox.markRetry(mail.id, message, shiftStamp(input.now, delay * 60_000));
           retried += 1;
         }
       }

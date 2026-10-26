@@ -4,6 +4,7 @@ import { LoggableService, ManagedService } from '../../domain/maintenance/Manage
 import { parseRole } from '../../domain/portal/Role.js';
 import { DynDnsHost } from '../../domain/security/DynDnsHost.js';
 import { IpAddress } from '../../domain/shared/IpAddress.js';
+import { stampOf } from '../../domain/shared/stamp.js';
 import { TrackerHost } from '../../domain/tracker/TrackerHost.js';
 import { EventHook } from '../../domain/torrent/EventHook.js';
 import { InfoHash } from '../../domain/torrent/InfoHash.js';
@@ -44,7 +45,7 @@ interface ChainHints {
 }
 
 function nowStamp(): string {
-  return new Date().toISOString().slice(0, 19).replace('T', ' ');
+  return stampOf(new Date());
 }
 
 // The only privileged consumer. Payloads were schema-checked at enqueue and at
