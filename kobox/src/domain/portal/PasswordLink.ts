@@ -1,6 +1,6 @@
 import { DomainError } from '../shared/DomainError.js';
 import type { Username } from '../user/Username.js';
-import { shift } from './policy.js';
+import { shiftStamp } from '../shared/stamp.js';
 
 // Why a member is handed a link to choose their password: they were just
 // invited, or they forgot it.
@@ -59,7 +59,7 @@ export class PasswordLink {
       username: props.username,
       purpose: props.purpose,
       tokenHash: props.tokenHash,
-      expiresAt: shift(props.now, LIFETIME_MS[props.purpose]),
+      expiresAt: shiftStamp(props.now, LIFETIME_MS[props.purpose]),
     });
   }
 

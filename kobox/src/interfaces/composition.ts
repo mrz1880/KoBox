@@ -12,6 +12,7 @@ import {
 import { RunInstallation } from '../application/installation/RunInstallation.js';
 import { UninstallComponents } from '../application/installation/UninstallComponents.js';
 import { COMPONENT_CATALOG } from '../domain/installation/catalog.js';
+import { stampOf } from '../domain/shared/stamp.js';
 import { SqliteComponentRegistry } from '../infrastructure/persistence/SqliteComponentRegistry.js';
 import { AptPackageAdapter } from '../infrastructure/system/AptPackageAdapter.js';
 import {
@@ -242,9 +243,8 @@ function portalAddress(db: KoboxDatabase): PortalAddressPort {
   };
 }
 
-// the stamp every stored date uses: UTC, to the second, 'YYYY-MM-DD HH:MM:SS'
 export function nowStamp(): string {
-  return new Date().toISOString().slice(0, 19).replace('T', ' ');
+  return stampOf(new Date());
 }
 
 // The frozen alert channels (ntfy + email via Postfix + Discord), each armed
@@ -412,7 +412,6 @@ export async function buildInstallation(
   };
   const installers = buildInstallers(ctx);
   const registry = new SqliteComponentRegistry(c.db);
-  const now = (): string => new Date().toISOString().slice(0, 19).replace('T', ' ');
   const onProgress = (line: string): void => {
     process.stdout.write(`${line}\n`);
   };
@@ -427,14 +426,14 @@ export async function buildInstallation(
         await c.queue.enqueue(parseJob(type, {}));
       },
       drain: () => c.worker.drain(),
-      now,
+      now: nowStamp,
       onProgress,
     }),
     uninstall: new UninstallComponents({
       registry,
       installers,
       catalog: COMPONENT_CATALOG,
-      now,
+      now: nowStamp,
       onProgress,
     }),
     registry,

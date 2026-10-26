@@ -5,7 +5,7 @@ import { UserAlreadyExistsError, UserNotFoundError } from '../user/errors.js';
 import { DomainError } from '../../domain/shared/DomainError.js';
 import type { Language } from '../../domain/portal/Language.js';
 import { PasswordLink, type PasswordLinkPurpose } from '../../domain/portal/PasswordLink.js';
-import { shift } from '../../domain/portal/policy.js';
+import { shiftStamp } from '../../domain/shared/stamp.js';
 import type {
   PasswordLinkRepository,
   PortalCredentialsPort,
@@ -73,7 +73,7 @@ async function mailPasswordLink(
   },
 ): Promise<string> {
   const now = deps.clock();
-  const issued = await deps.links.countIssuedSince(member.username, shift(now, -HOUR_MS));
+  const issued = await deps.links.countIssuedSince(member.username, shiftStamp(now, -HOUR_MS));
   if (issued >= LINKS_PER_HOUR) {
     throw new TooManyPasswordLinksError(member.username.value);
   }
