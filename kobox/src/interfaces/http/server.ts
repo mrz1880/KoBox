@@ -10,6 +10,8 @@ import type { Role } from '../../domain/portal/Role.js';
 import type { AuthenticateApp } from '../../application/portal/AuthenticateApp.js';
 import type { IssueAppToken } from '../../application/portal/IssueAppToken.js';
 import type { Authenticate } from '../../application/portal/Authenticate.js';
+import type { EnterTwoStepCode } from '../../application/portal/EnterTwoStepCode.js';
+import type { TwoStepSetup } from '../../application/portal/TwoStepSetup.js';
 import type { Login } from '../../application/portal/Login.js';
 import type { Logout } from '../../application/portal/Logout.js';
 import { USERNAME_PATTERN, Username } from '../../domain/user/Username.js';
@@ -65,7 +67,7 @@ import type {
   SetPasswordFromLink,
 } from '../../application/portal/PasswordLinks.js';
 import { registerUserRoutes } from './routes/user.js';
-import { loginPage } from './views/loginPage.js';
+import { loginPage, twoStepCodePage } from './views/loginPage.js';
 
 // The realm a program is asked to authenticate to with its member's token.
 const APP_AUTH_CHALLENGE = 'Basic realm="KoBox"';
@@ -76,6 +78,10 @@ export interface PortalServerDeps {
   readonly login: Login;
   readonly logout: Logout;
   readonly authenticate: Authenticate;
+  readonly enterTwoStepCode: EnterTwoStepCode;
+  readonly twoStepSetup: TwoStepSetup;
+  // wall-clock milliseconds, for the 30-second steps of two-step codes
+  readonly nowMs: () => number;
   readonly authenticateApp: AuthenticateApp;
   readonly issueAppToken: IssueAppToken;
   readonly now: () => string;
@@ -138,6 +144,7 @@ export function buildPortalServer(deps: PortalServerDeps): FastifyInstance {
   void server.register(fastifyFormbody);
 
   const guards = buildGuards(deps.authenticate, deps.now);
+  const twoStepCodeSchema = z.object({ code: z.string().regex(/^[0-9]{6}$/) });
 
   server.get('/login', async (request, reply) => {
     if ((await guards.sessionOf(request)) !== undefined) {
@@ -177,8 +184,50 @@ export function buildPortalServer(deps: PortalServerDeps): FastifyInstance {
         path: '/',
       })
       .code(303)
-      .header('location', '/')
+      .header('location', result.awaitingCode ? '/login/code' : '/')
       .send();
+  });
+
+  server.get('/login/code', async (request, reply) => {
+    if ((await guards.pendingSessionOf(request)) === undefined) {
+      return reply.code(303).header('location', '/login').send();
+    }
+    return reply.type('text/html').send(twoStepCodePage());
+  });
+
+  server.post('/login/code', async (request, reply) => {
+    const parsed = twoStepCodeSchema.safeParse(request.body);
+    const token = request.cookies[SESSION_COOKIE] ?? '';
+    const outcome = parsed.success
+      ? await deps.enterTwoStepCode.execute({
+          token,
+          code: parsed.data.code,
+          now: deps.now(),
+          nowMs: deps.nowMs(),
+        })
+      : 'wrong-code';
+    switch (outcome) {
+      case 'accepted':
+        return reply.code(303).header('location', '/').send();
+      case 'no-session':
+        return reply.code(303).header('location', '/login').send();
+      case 'locked':
+        deps.logger?.warn(`portal two-step code refused from ${request.ip} (locked)`);
+        return reply.type('text/html').send(twoStepCodePage('Too many attempts: account temporarily locked.'));
+      case 'wrong-code':
+        // same line as a wrong password: fail2ban counts both
+        deps.logger?.warn(`portal login failed for <two-step> from ${request.ip} (wrong-code)`);
+        return reply.type('text/html').send(twoStepCodePage('That code did not work. Try the current one.'));
+    }
+  });
+
+  // leaving the code page: the half-open session is dropped
+  server.post('/logout/pending', async (request, reply) => {
+    const token = request.cookies[SESSION_COOKIE];
+    if (token !== undefined) {
+      await deps.logout.execute({ token });
+    }
+    return reply.clearCookie(SESSION_COOKIE, { path: '/' }).code(303).header('location', '/login').send();
   });
 
   server.post('/logout', async (request, reply) => {

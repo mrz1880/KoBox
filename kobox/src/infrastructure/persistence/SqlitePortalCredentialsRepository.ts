@@ -2,6 +2,7 @@ import { eq } from 'drizzle-orm';
 import type { PortalCredentials, PortalCredentialsPort } from '../../domain/portal/ports.js';
 import { HashedPassword } from '../../domain/user/HashedPassword.js';
 import { Language } from '../../domain/portal/Language.js';
+import { TotpSecret } from '../../domain/portal/TotpSecret.js';
 import { Username } from '../../domain/user/Username.js';
 import type { KoboxDatabase } from './db.js';
 import { portalCredentials } from './schema.js';
@@ -25,6 +26,13 @@ export class SqlitePortalCredentialsRepository implements PortalCredentialsPort 
       mustChangePassword: row.mustChangePassword === 1,
       ...(row.appTokenHash !== null && { appTokenHash: row.appTokenHash }),
       ...(row.language !== null && { language: Language.parse(row.language) }),
+      ...(row.twoStepSecret !== null && {
+        twoStep: {
+          secret: TotpSecret.parse(row.twoStepSecret),
+          ...(row.twoStepLastStep !== null && { lastStep: row.twoStepLastStep }),
+        },
+      }),
+      ...(row.twoStepPending !== null && { twoStepPending: TotpSecret.parse(row.twoStepPending) }),
     });
   }
 
@@ -39,6 +47,9 @@ export class SqlitePortalCredentialsRepository implements PortalCredentialsPort 
         mustChangePassword: mustChange,
         appTokenHash: credentials.appTokenHash ?? null,
         language: credentials.language?.value ?? null,
+        twoStepSecret: credentials.twoStep?.secret.value ?? null,
+        twoStepLastStep: credentials.twoStep?.lastStep ?? null,
+        twoStepPending: credentials.twoStepPending?.value ?? null,
         updatedAt: now,
       })
       .onConflictDoUpdate({

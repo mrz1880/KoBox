@@ -4,14 +4,14 @@ import { Login } from '../../application/portal/Login.js';
 import { Logout } from '../../application/portal/Logout.js';
 import { CryptoSessionTokens } from '../../infrastructure/system/CryptoSessionTokens.js';
 import { FsVpnProfileStore } from '../../infrastructure/system/FsVpnProfileStore.js';
-import { buildPortalContainer } from '../composition.js';
+import { buildPortalContainer, nowStamp } from '../composition.js';
 import { buildPortalServer } from './server.js';
+import { CryptoTotp } from '../../infrastructure/system/CryptoTotp.js';
+import { EnterTwoStepCode } from '../../application/portal/EnterTwoStepCode.js';
+import { TwoStepSetup } from '../../application/portal/TwoStepSetup.js';
 
 export const DEFAULT_PORTAL_HTTP_PORT = 8190;
 
-function nowStamp(): string {
-  return new Date().toISOString().slice(0, 19).replace('T', ' ');
-}
 
 // The portal process: non-root, no privileged adapters in reach — it reads
 // repositories and enqueues typed jobs, nothing else.
@@ -26,11 +26,15 @@ async function main(): Promise<void> {
     attempts: container.loginAttempts,
     tokens,
     hasher: container.hasher,
+    totp: new CryptoTotp(),
   };
   const server = buildPortalServer({
     login: new Login(authDeps),
     logout: new Logout(authDeps),
     authenticate: new Authenticate(authDeps),
+    enterTwoStepCode: new EnterTwoStepCode(authDeps),
+    twoStepSetup: new TwoStepSetup(authDeps),
+    nowMs: () => Date.now(),
     authenticateApp: container.authenticateApp,
     issueAppToken: container.issueAppToken,
     now: nowStamp,

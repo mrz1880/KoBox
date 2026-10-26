@@ -1,6 +1,7 @@
 import { AppToken } from '../../domain/portal/AppToken.js';
 import type { PortalCredentialsPort, SessionTokenPort } from '../../domain/portal/ports.js';
 import type { Username } from '../../domain/user/Username.js';
+import { withoutCredential } from '../../domain/portal/credentials.js';
 
 interface Deps {
   readonly credentials: PortalCredentialsPort;
@@ -35,19 +36,6 @@ export class IssueAppToken {
     if (stored === undefined) {
       return;
     }
-    // rebuilt without the key: with exactOptionalPropertyTypes, absent and
-    // undefined are different, and "no token" is the absent one
-    await this.deps.credentials.save(
-      {
-        username: stored.username,
-        ...(stored.passwordHash !== undefined && { passwordHash: stored.passwordHash }),
-        role: stored.role,
-        ...(stored.mustChangePassword !== undefined && {
-          mustChangePassword: stored.mustChangePassword,
-        }),
-        ...(stored.language !== undefined && { language: stored.language }),
-      },
-      this.deps.clock(),
-    );
+    await this.deps.credentials.save(withoutCredential(stored, 'appTokenHash'), this.deps.clock());
   }
 }

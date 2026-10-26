@@ -2,6 +2,11 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { Authenticate } from '../../../../src/application/portal/Authenticate.js';
 import { Login } from '../../../../src/application/portal/Login.js';
 import { Logout } from '../../../../src/application/portal/Logout.js';
+import { IssueAppToken } from '../../../../src/application/portal/IssueAppToken.js';
+import { EnterTwoStepCode } from '../../../../src/application/portal/EnterTwoStepCode.js';
+import { TwoStepSetup } from '../../../../src/application/portal/TwoStepSetup.js';
+import { TotpSecret } from '../../../../src/domain/portal/TotpSecret.js';
+import { FakeTotp } from '../../../../src/infrastructure/system/fakes/FakeTotp.js';
 import { LOCK_MINUTES, MAX_LOGIN_FAILURES } from '../../../../src/domain/portal/policy.js';
 import type { HashedPassword } from '../../../../src/domain/user/HashedPassword.js';
 import { Password } from '../../../../src/domain/user/Password.js';
@@ -35,9 +40,11 @@ interface World {
   attempts: InMemoryLoginAttemptsRepository;
   tokens: FakeSessionTokens;
   hasher: CountingHasher;
+  totp: FakeTotp;
   login: Login;
   logout: Logout;
   authenticate: Authenticate;
+  enterCode: EnterTwoStepCode;
 }
 
 let world: World;
@@ -49,7 +56,8 @@ beforeEach(async () => {
   const attempts = new InMemoryLoginAttemptsRepository();
   const tokens = new FakeSessionTokens();
   const hasher = new CountingHasher();
-  const deps = { users, credentials, sessions, attempts, tokens, hasher };
+  const totp = new FakeTotp();
+  const deps = { users, credentials, sessions, attempts, tokens, hasher, totp };
   world = {
     users,
     credentials,
@@ -57,9 +65,11 @@ beforeEach(async () => {
     attempts,
     tokens,
     hasher,
+    totp,
     login: new Login(deps),
     logout: new Logout(deps),
     authenticate: new Authenticate(deps),
+    enterCode: new EnterTwoStepCode(deps),
   };
   await users.save(new UserBuilder().build());
   goodHash = await hasher.hash(goodPassword());
@@ -225,5 +235,88 @@ describe('Logout', () => {
     await world.logout.execute({ token: login.token });
 
     expect(await world.authenticate.execute({ token: login.token, now: NOW })).toBeUndefined();
+  });
+});
+
+describe('two-step sign-in', () => {
+  const SECRET = TotpSecret.parse('GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ');
+  const AT_MS = Date.parse('2026-07-25T10:00:00Z');
+
+  beforeEach(async () => {
+    await world.credentials.save(
+      { username: alice, passwordHash: goodHash, role: 'admin', twoStep: { secret: SECRET } },
+      NOW,
+    );
+    world.totp.accept('123456', 100);
+  });
+
+  async function signInWithPassword(): Promise<string> {
+    const result = await world.login.execute({ username: alice, password: goodPassword(), now: NOW });
+    if (!result.ok) {
+      throw new Error('the password should have been accepted');
+    }
+    return result.token;
+  }
+
+  it('should_open_nothing_with_the_password_alone', async () => {
+    const token = await signInWithPassword();
+
+    const session = await world.authenticate.execute({ token, now: NOW });
+    expect(session?.awaitingCode).toBe(true);
+  });
+
+  it('should_open_the_session_once_the_code_is_entered', async () => {
+    const token = await signInWithPassword();
+
+    const outcome = await world.enterCode.execute({ token, code: '123456', now: NOW, nowMs: AT_MS });
+
+    expect(outcome).toBe('accepted');
+    expect((await world.authenticate.execute({ token, now: NOW }))?.awaitingCode).toBe(false);
+  });
+
+  // a code seen over a shoulder opens nothing a second time
+  it('should_refuse_a_code_already_used', async () => {
+    await world.enterCode.execute({ token: await signInWithPassword(), code: '123456', now: NOW, nowMs: AT_MS });
+    const second = await signInWithPassword();
+
+    const outcome = await world.enterCode.execute({ token: second, code: '123456', now: NOW, nowMs: AT_MS });
+
+    expect(outcome).toBe('wrong-code');
+    expect((await world.authenticate.execute({ token: second, now: NOW }))?.awaitingCode).toBe(true);
+  });
+
+  // a guessed code costs a failed attempt, so the lockout bounds guessing
+  it('should_lock_the_account_after_too_many_wrong_codes', async () => {
+    const token = await signInWithPassword();
+    for (let i = 0; i < MAX_LOGIN_FAILURES; i++) {
+      await world.enterCode.execute({ token, code: '000000', now: NOW, nowMs: AT_MS });
+    }
+
+    const outcome = await world.enterCode.execute({ token, code: '123456', now: NOW, nowMs: AT_MS });
+
+    expect(outcome).toBe('locked');
+  });
+
+  // a lost phone: root on the box clears it, and the member sets it up again
+  it('should_let_root_clear_it_for_a_member_who_lost_their_phone', async () => {
+    const setup = new TwoStepSetup({ credentials: world.credentials, totp: world.totp });
+
+    await setup.reset(alice, NOW);
+
+    expect((await world.credentials.find(alice))?.twoStep).toBeUndefined();
+    const result = await world.login.execute({ username: alice, password: goodPassword(), now: NOW });
+    expect(result.ok && result.awaitingCode).toBe(false);
+  });
+
+  // revoking the app token rebuilt the login field by field and dropped the
+  // fields it did not list: two-step sign-in went with the token
+  it('should_survive_the_app_token_being_thrown_away', async () => {
+    const tokens = new IssueAppToken({ credentials: world.credentials, tokens: world.tokens, clock: () => NOW });
+    await tokens.execute(alice);
+
+    await tokens.revoke(alice);
+
+    expect((await world.credentials.find(alice))?.twoStep?.secret.value).toBe(SECRET.value);
+    expect((await world.credentials.find(alice))?.appTokenHash).toBeUndefined();
   });
 });

@@ -109,7 +109,7 @@ describe('portal pages', () => {
   });
 
   it('should_present_the_vpn_profiles_as_a_choice_with_a_recommendation', () => {
-    const page = accessPage(VIEWER, { username: 'alice', rtorrentPort: 45001, hasAppToken: false, sshPort: 22, addresses: [] });
+    const page = accessPage(VIEWER, { username: 'alice', rtorrentPort: 45001, hasAppToken: false, sshPort: 22, addresses: [], hasTwoStep: false });
 
     // named by what they do, not by the protocol
     expect(page).toContain('Everything through the seedbox');
@@ -120,7 +120,7 @@ describe('portal pages', () => {
   });
 
   it('should_omit_the_sftp_host_until_the_operator_configures_one', () => {
-    const without = accessPage(VIEWER, { username: 'alice', rtorrentPort: 45001, hasAppToken: false, sshPort: 22, addresses: [] });
+    const without = accessPage(VIEWER, { username: 'alice', rtorrentPort: 45001, hasAppToken: false, sshPort: 22, addresses: [], hasTwoStep: false });
     const with_ = accessPage(VIEWER, {
       username: 'alice',
       rtorrentPort: 45001,
@@ -128,6 +128,7 @@ describe('portal pages', () => {
       sftpHost: 'seedbox.example.org',
       sshPort: 22,
       addresses: [],
+      hasTwoStep: false,
     });
 
     expect(without).not.toContain('SFTP host');
@@ -144,6 +145,7 @@ describe('portal pages', () => {
       sftpHost: 'seedbox.example.org',
       sshPort: 2222,
       addresses: [],
+      hasTwoStep: false,
     });
 
     expect(page).toContain('scp -P 2222 my.torrent alice@seedbox.example.org:rtorrent/watch/FOLDER/');

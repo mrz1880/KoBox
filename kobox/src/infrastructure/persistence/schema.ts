@@ -302,6 +302,11 @@ export const portalCredentials = sqliteTable('portal_credentials', {
   appTokenHash: text('app_token_hash'),
   // en | fr, null meaning the member never chose and gets English
   language: text('language'),
+  // two-step sign-in: the confirmed secret and the step of the last code
+  // accepted, and a secret shown but not yet confirmed
+  twoStepSecret: text('two_step_secret'),
+  twoStepLastStep: integer('two_step_last_step'),
+  twoStepPending: text('two_step_pending'),
   updatedAt: text('updated_at').notNull(),
 });
 
@@ -315,6 +320,7 @@ export const portalSessions = sqliteTable(
     csrfToken: text('csrf_token').notNull(),
     createdAt: text('created_at').notNull(),
     expiresAt: text('expires_at').notNull(),
+    awaitingCode: integer('awaiting_code').notNull().default(0),
   },
   (table) => [index('portal_sessions_username_idx').on(table.username)],
 );

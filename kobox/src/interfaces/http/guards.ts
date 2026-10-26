@@ -4,13 +4,18 @@ import type { Authenticate, AuthenticatedSession } from '../../application/porta
 import { html } from './html.js';
 import { page, type Viewer } from './views/layout.js';
 import { translatorFor } from './views/messages.js';
+import { secondStepRequired } from '../../domain/portal/policy.js';
 
 export const SESSION_COOKIE = 'kobox_session';
 
 const csrfFormSchema = z.looseObject({ _csrf: z.string().min(1) });
 
+const TWO_STEP_FIRST = 'Set up two-step sign-in to open Administration.';
+
 export interface Guards {
   sessionOf(request: FastifyRequest): Promise<AuthenticatedSession | undefined>;
+  // a session that proved its password and waits for its two-step code
+  pendingSessionOf(request: FastifyRequest): Promise<AuthenticatedSession | undefined>;
   requireSession(
     request: FastifyRequest,
     reply: FastifyReply,
@@ -47,7 +52,8 @@ export function viewerOf(session: AuthenticatedSession): Viewer {
 }
 
 export function buildGuards(authenticate: Authenticate, now: () => string): Guards {
-  const sessionOf = async (
+  // any session the cookie names, a half-open one included
+  const anySessionOf = async (
     request: FastifyRequest,
   ): Promise<AuthenticatedSession | undefined> => {
     const token = request.cookies[SESSION_COOKIE];
@@ -57,13 +63,33 @@ export function buildGuards(authenticate: Authenticate, now: () => string): Guar
     return authenticate.execute({ token, now: now() });
   };
 
+  // A session still waiting for its two-step code is no session: nginx asks
+  // here for ruTorrent and Nextcloud, and the answer must be no.
+  const sessionOf = async (
+    request: FastifyRequest,
+  ): Promise<AuthenticatedSession | undefined> => {
+    const session = await anySessionOf(request);
+    return session?.awaitingCode === true ? undefined : session;
+  };
+
+  const pendingSessionOf = async (
+    request: FastifyRequest,
+  ): Promise<AuthenticatedSession | undefined> => {
+    const session = await anySessionOf(request);
+    return session?.awaitingCode === true ? session : undefined;
+  };
+
   const requireSession = async (
     request: FastifyRequest,
     reply: FastifyReply,
   ): Promise<AuthenticatedSession | undefined> => {
-    const session = await sessionOf(request);
+    const session = await anySessionOf(request);
     if (session === undefined) {
       await reply.code(303).header('location', '/login').send();
+      return undefined;
+    }
+    if (session.awaitingCode) {
+      await reply.code(303).header('location', '/login/code').send();
       return undefined;
     }
     // A migrated user on a temporary password is funnelled to /password before
@@ -98,6 +124,22 @@ export function buildGuards(authenticate: Authenticate, now: () => string): Guar
     return session;
   };
 
+  // An admin account opens every member's settings: Administration takes
+  // two-step sign-in, and an admin without it is sent to set it up.
+  const requireTwoStep = async (
+    session: AuthenticatedSession,
+    reply: FastifyReply,
+  ): Promise<AuthenticatedSession | undefined> => {
+    if (secondStepRequired(session.role) && !session.hasTwoStep) {
+      await reply
+        .code(303)
+        .header('location', `/access?flash=${encodeURIComponent(TWO_STEP_FIRST)}#two-step`)
+        .send();
+      return undefined;
+    }
+    return session;
+  };
+
   const requireAdmin = async (
     request: FastifyRequest,
     reply: FastifyReply,
@@ -109,7 +151,7 @@ export function buildGuards(authenticate: Authenticate, now: () => string): Guar
     if (session.role !== 'admin') {
       return forbid(reply, 'This area requires the admin role.');
     }
-    return session;
+    return requireTwoStep(session, reply);
   };
 
   const requireAdminCsrf = async (
@@ -123,10 +165,10 @@ export function buildGuards(authenticate: Authenticate, now: () => string): Guar
     if (session.role !== 'admin') {
       return forbid(reply, 'This area requires the admin role.');
     }
-    return session;
+    return requireTwoStep(session, reply);
   };
 
-  return { sessionOf, requireSession, requireCsrf, requireAdmin, requireAdminCsrf };
+  return { sessionOf, pendingSessionOf, requireSession, requireCsrf, requireAdmin, requireAdminCsrf };
 }
 
 // Post/redirect/get with a flash message carried in the query string (the

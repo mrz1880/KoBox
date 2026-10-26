@@ -37,6 +37,7 @@ import { FakeQuotaGauges } from '../../../../src/infrastructure/system/fakes/Fak
 import { FakeServiceControl } from '../../../../src/infrastructure/system/fakes/FakeServiceControl.js';
 import { FakeSftp } from '../../../../src/infrastructure/system/fakes/FakeSftp.js';
 import { FakeSystemAccounts } from '../../../../src/infrastructure/system/fakes/FakeSystemAccounts.js';
+import { TotpSecret } from '../../../../src/domain/portal/TotpSecret.js';
 
 class SequentialPortAllocator implements PortAllocatorPort {
   private nextScgi = 51101;
@@ -370,6 +371,7 @@ describe('DeleteUser', () => {
       csrfToken: 'b'.repeat(64),
       createdAt: '2026-07-25 10:00:00',
       expiresAt: '2026-08-01 10:00:00',
+      awaitingCode: false,
     });
 
     await world.deleteUser.execute({ username: alice });
@@ -459,6 +461,20 @@ describe('ChangePassword', () => {
     expect((await world.links.latest(alice))?.isOpen('2026-07-25 10:00:01')).toBe(false);
   });
 
+  // the phone app still holds the same secret: a new password must not quietly
+  // turn the second step off
+  it('should_keep_two_step_sign_in_on', async () => {
+    await world.createUser.execute(createUserCommand());
+    const stored = await world.credentials.find(alice);
+    if (stored === undefined) throw new Error('alice has no portal login');
+    const secret = TotpSecret.parse('GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ');
+    await world.credentials.save({ ...stored, twoStep: { secret, lastStep: 5 } }, '2026-07-25 10:00:00');
+
+    await world.changePassword.execute({ username: alice, password: aPassword });
+
+    expect((await world.credentials.find(alice))?.twoStep).toEqual({ secret, lastStep: 5 });
+  });
+
   it('should_keep_the_language_the_member_chose', async () => {
     await world.createUser.execute(createUserCommand());
     const stored = await world.credentials.find(alice);
@@ -489,6 +505,7 @@ describe('ChangePassword', () => {
       csrfToken: 'b'.repeat(64),
       createdAt: '2026-07-25 10:00:00',
       expiresAt: '2026-08-01 10:00:00',
+      awaitingCode: false,
     });
 
     await world.changePassword.execute({ username: alice, password: aPassword });
@@ -574,6 +591,7 @@ describe('SuspendUser / ResumeUser', () => {
       csrfToken: 'b'.repeat(64),
       createdAt: '2026-07-25 10:00:00',
       expiresAt: '2026-08-01 10:00:00',
+      awaitingCode: false,
     });
 
     await world.suspendUser.execute({ username: alice });

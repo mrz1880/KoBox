@@ -242,7 +242,8 @@ function portalAddress(db: KoboxDatabase): PortalAddressPort {
   };
 }
 
-function nowStamp(): string {
+// the stamp every stored date uses: UTC, to the second, 'YYYY-MM-DD HH:MM:SS'
+export function nowStamp(): string {
   return new Date().toISOString().slice(0, 19).replace('T', ' ');
 }
 

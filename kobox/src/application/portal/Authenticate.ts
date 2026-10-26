@@ -16,6 +16,10 @@ export interface AuthenticatedSession {
   // password change before granting any other access while this is true.
   readonly mustChangePassword: boolean;
   readonly language: Language;
+  // password proven, two-step code not yet: only the code page opens
+  readonly awaitingCode: boolean;
+  // whether the member has set two-step sign-in up at all
+  readonly hasTwoStep: boolean;
 }
 
 interface Deps {
@@ -61,6 +65,8 @@ export class Authenticate {
       csrfToken: session.csrfToken,
       mustChangePassword: stored.mustChangePassword === true,
       language: stored.language ?? Language.en,
+      awaitingCode: session.awaitingCode,
+      hasTwoStep: stored.twoStep !== undefined,
     };
   }
 }
