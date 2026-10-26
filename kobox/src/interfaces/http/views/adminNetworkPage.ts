@@ -42,9 +42,11 @@ export function adminAddressesPage(
   return page(
     'Addresses',
     html`<h1>Member addresses</h1>
-<p><span class="chip">Optional</span> A member needs no address here:
-the portal, ruTorrent, Nextcloud, SFTP and the VPN are open to all, behind their
-username and password. Unlike MySB, KoBox does not shut the web to undeclared addresses.</p>
+<p>The portal, ruTorrent, Nextcloud and the VPN are open to all, behind each
+member's username and password.
+SSH and SFTP answer only the addresses below and the VPN, as soon as one address is declared. Members add the address they connect from
+themselves, in <a href="/access">Account</a>; add one here when they cannot, such
+as a server they never browse from.</p>
 <p class="muted">An address listed here is a member's own fixed connection, such
 as their home, trusted beyond that: the firewall accepts it on
 every port of the box, ahead of the blocklists; fail2ban never bans it; and their
