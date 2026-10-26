@@ -321,6 +321,9 @@ export function renderSshdDropin(sshPort: number): RenderedFile {
     content: [
       MANAGED_HEADER,
       ...(sshPort === 22 ? [] : [`Port ${String(sshPort)}`]),
+      // the firewall filters IPv4 only, where SSH answers declared addresses
+      // and the VPN: on IPv6 it would answer everyone
+      'AddressFamily inet',
       'PermitRootLogin prohibit-password',
       'PasswordAuthentication yes',
       'X11Forwarding no',
