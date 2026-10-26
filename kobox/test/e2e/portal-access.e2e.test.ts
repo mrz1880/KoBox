@@ -4,6 +4,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { TotpSecret } from '../../src/domain/portal/TotpSecret.js';
+import { totpCodeAt } from '../../src/infrastructure/system/CryptoTotp.js';
 
 // Portal & Access E2E on a fresh Debian 13: real CLI enqueue -> real root
 // worker -> real accounts, and the real SSR portal (non-root HTTP) driven over
@@ -76,6 +78,33 @@ async function login(username: string): Promise<string | undefined> {
     redirect: 'manual',
   });
   return sessionCookie(response.headers.getSetCookie());
+}
+
+// Administration takes two-step sign-in: the admin turns it on through the
+// real pages, typing the code the key gives right now, as a person would. The
+// session is kept, so no second code is needed within the same 30 seconds.
+let admin: string | undefined;
+async function adminSession(): Promise<string> {
+  if (admin !== undefined) {
+    return admin;
+  }
+  const cookie = (await login(ADMIN)) ?? '';
+  const csrf = await csrfFrom('/access', cookie);
+  const started = await fetch(`${BASE}/access/two-step/start`, {
+    method: 'POST',
+    headers: { cookie, 'content-type': 'application/x-www-form-urlencoded' },
+    body: `_csrf=${encodeURIComponent(csrf)}`,
+  });
+  const key = /<p class="mono">([A-Z2-7 ]+)<\/p>/.exec(await started.text())?.[1]?.replace(/ /g, '') ?? '';
+  const code = totpCodeAt(TotpSecret.parse(key), Date.now());
+  await fetch(`${BASE}/access/two-step/confirm`, {
+    method: 'POST',
+    headers: { cookie, 'content-type': 'application/x-www-form-urlencoded' },
+    body: `_csrf=${encodeURIComponent(csrf)}&code=${code}`,
+    redirect: 'manual',
+  });
+  admin = cookie;
+  return cookie;
 }
 
 async function waitForPortal(): Promise<void> {
@@ -161,12 +190,12 @@ describe.skipIf(!onDebianAsRoot)('E2E: portal login -> create user -> member sel
     });
     expect(sessionCookie(bad.headers.getSetCookie())).toBeUndefined();
 
-    const cookie = await login(ADMIN);
+    const cookie = await adminSession();
     expect(cookie).toBeDefined();
   });
 
   it('should_invite_a_member_who_then_chooses_their_own_password', async () => {
-    const cookie = (await login(ADMIN)) ?? '';
+    const cookie = await adminSession();
     const csrf = await csrfFrom('/admin/users', cookie);
 
     // nobody types the member's password: the admin gets a link to pass on

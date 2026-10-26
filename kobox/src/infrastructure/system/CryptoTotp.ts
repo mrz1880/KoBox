@@ -33,6 +33,12 @@ function fromBase32(text: string): Buffer {
   return Buffer.from(bytes);
 }
 
+// The code an authenticator app shows for this secret at this time; what the
+// end-to-end test types, as a member would.
+export function totpCodeAt(secret: TotpSecret, nowMs: number): string {
+  return codeAt(fromBase32(secret.value), Math.floor(nowMs / STEP_MS));
+}
+
 // RFC 4226 dynamic truncation of HMAC-SHA1 over the big-endian step counter
 function codeAt(key: Buffer, step: number): string {
   const counter = Buffer.alloc(8);
