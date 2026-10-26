@@ -68,6 +68,20 @@ describe('admin addresses screen', () => {
     expect(world.queue.jobs.map((j) => j.type)).toEqual(['add-user-address', 'remove-user-address']);
   });
 
+  it('should_refuse_to_add_a_private_address_but_still_let_one_be_removed', async () => {
+    // one typed before this check existed must stay removable
+    for (const action of ['add', 'remove']) {
+      await world.server.inject({
+        method: 'POST',
+        url: `/admin/addresses/${action}`,
+        headers: { cookie: admin.cookie, 'content-type': 'application/x-www-form-urlencoded' },
+        payload: form({ _csrf: admin.csrf, username: 'alice', ipv4: '192.168.1.20' }),
+      });
+    }
+
+    expect(world.queue.jobs.map((j) => j.type)).toEqual(['remove-user-address']);
+  });
+
   it('should_enqueue_hostname_add_and_remove_jobs', async () => {
     const add = await world.server.inject({
       method: 'POST',
