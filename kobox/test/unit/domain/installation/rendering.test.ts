@@ -23,6 +23,7 @@ import {
   renderPortalUnit,
   renderRutorrentConfig,
   renderRutorrentPlugins,
+  renderRutorrentPhpPool,
   renderQuotaGauge,
   renderRutorrentQuotaAnswer,
   renderRutorrentRatioOffer,
@@ -123,7 +124,8 @@ describe('installation rendering', () => {
   it('should_hand_php_to_the_php_fpm_of_the_target_release', () => {
     const socket = 'fastcgi_pass unix:/run/php/php8.4-fpm.sock;';
 
-    expect(renderNginxVhost({ portalPort: 8189 }).content).toContain(socket);
+    // ruTorrent's PHP goes to each member's own pool; Nextcloud keeps the
+    // release's shared one
     expect(renderNextcloudSite().content).toContain(socket);
   });
 
@@ -201,6 +203,34 @@ describe('installation rendering', () => {
     expect(conf).toContain('fastcgi_param PATH_INFO $path_info;');
     expect(conf).toContain('location ~ ^/nextcloud/(?:build|tests|config|lib|3rdparty|templates|data)(?:$|/) {');
     expectGolden('nextcloud.conf.golden', conf);
+  });
+
+  // ruTorrent ran as the web server, which is in every member's group for
+  // Nextcloud: a flaw in it read every member's files. Each member now has a
+  // PHP pool of their own, running as them
+  it('should_give_each_member_a_rutorrent_php_pool_running_as_them', () => {
+    const pool = renderRutorrentPhpPool('alice');
+
+    expect(pool.path).toBe('/etc/php/8.4/fpm/pool.d/kobox-ru-alice.conf');
+    for (const line of [
+      '[kobox-ru-alice]',
+      'user = alice',
+      'group = alice',
+      'listen = /run/php/kobox-ru-alice.sock',
+      'listen.owner = www-data',
+      'listen.mode = 0660',
+      'pm = ondemand',
+    ]) {
+      expect(pool.content, line).toContain(`${line}\n`);
+    }
+  });
+
+  it('should_hand_rutorrents_php_to_the_pool_of_the_member_signed_in', () => {
+    const conf = renderNginxVhost({ portalPort: 8189 }).content;
+    const rutorrentPhp = conf.slice(conf.indexOf('location ~ ^/ru/(.+\\.php)$'));
+
+    expect(rutorrentPhp).toContain('fastcgi_pass unix:/run/php/kobox-ru-$kobox_user.sock;');
+    expect(conf).not.toContain(`fastcgi_param SCRIPT_FILENAME /usr/local/share/kobox/rutorrent-quota.php;\n        fastcgi_param REMOTE_USER $kobox_user;\n        fastcgi_pass unix:/run/php/php8.4-fpm.sock;`);
   });
 
   it('should_refuse_rutorrents_private_directories_before_any_other_ru_location', () => {

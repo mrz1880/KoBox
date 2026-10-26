@@ -109,6 +109,7 @@ import type {
   UserScriptRunnerPort,
   WatchDirPort,
   FileIndexPort,
+  RutorrentPoolsPort,
   TorrentFilingPort,
 } from '../domain/torrent/ports.js';
 import type { ManagedFilesPort } from '../domain/shared/files.js';
@@ -290,6 +291,7 @@ export function buildMaintenanceUseCases(deps: MaintenanceUseCaseDeps): Maintena
 export interface TorrentUseCaseDeps {
   readonly users: UserRepository;
   readonly rutorrentProfiles: RutorrentProfilePort;
+  readonly rutorrentPools: RutorrentPoolsPort;
   readonly mediaScanner: MediaScanPort;
   readonly media: MediaRepository;
   readonly clock: () => string;
@@ -446,6 +448,7 @@ export function buildTorrentUseCases(deps: TorrentUseCaseDeps): TorrentUseCases 
       files: deps.config,
       reload: deps.nginx,
       profiles: deps.rutorrentProfiles,
+      pools: deps.rutorrentPools,
     }),
     restart: new RestartRtorrentInstance({ users: deps.users, services: deps.services }),
     indexMedia: new IndexUserMedia({

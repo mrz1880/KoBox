@@ -33,8 +33,8 @@ export class RutorrentProfileAdapter implements RutorrentProfilePort {
     }
   }
 
-  // ruTorrent finds a member's settings by REMOTE_USER, and the web server owns
-  // the folder they live in: the script runs as it, for that member only
+  // ruTorrent finds a member's settings by REMOTE_USER and runs as the member,
+  // who reaches the folder through its group: the script does the same
   async offerRatioGroups(username: Username): Promise<void> {
     const script = renderRutorrentRatioOffer().path;
     // laid down with ruTorrent: no ruTorrent on this box, nothing to offer
@@ -43,7 +43,7 @@ export class RutorrentProfileAdapter implements RutorrentProfilePort {
     }
     await runOrThrow(this.runner, {
       command: 'runuser',
-      args: ['-u', WEB_SERVER_USER, '--', 'env', `REMOTE_USER=${username.value}`, 'php', script],
+      args: ['-u', username.value, '--', 'env', `REMOTE_USER=${username.value}`, 'php', script],
     });
   }
 }

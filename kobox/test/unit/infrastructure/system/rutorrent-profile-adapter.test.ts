@@ -40,16 +40,16 @@ describe('RutorrentProfileAdapter', () => {
     ]);
   });
 
-  it('should_offer_the_ratio_groups_as_the_web_server_for_that_member_only', async () => {
+  it('should_offer_the_ratio_groups_as_the_member_like_the_rest_of_their_rutorrent', async () => {
     const runner = new RecordingRunner();
 
     await new RutorrentProfileAdapter(runner).offerRatioGroups(Username.parse('alice'));
 
-    // ruTorrent finds a member's settings by REMOTE_USER, and writes them as
-    // the web server, which owns the profile folder
+    // ruTorrent finds a member's settings by REMOTE_USER, and now runs as the
+    // member: the script writes them the same way
     expect(runner.calls.map((call) => [call.command, ...call.args])).toEqual([
       ['test', '-f', '/usr/local/share/kobox/rutorrent-ratios.php'],
-      ['runuser', '-u', 'www-data', '--', 'env', 'REMOTE_USER=alice', 'php', '/usr/local/share/kobox/rutorrent-ratios.php'],
+      ['runuser', '-u', 'alice', '--', 'env', 'REMOTE_USER=alice', 'php', '/usr/local/share/kobox/rutorrent-ratios.php'],
     ]);
   });
 
