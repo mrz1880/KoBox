@@ -57,6 +57,7 @@ async function main(): Promise<void> {
     diskSamples: container.diskSamples,
     mailRelay: container.mailRelay,
     boxInVpn: container.boxInVpn,
+    sshPort: container.sshPort,
     nextcloudSignsInFromPortal: container.nextcloudSignsInFromPortal,
     siteSettings: container.siteSettings,
     saveMailRelay: container.saveMailRelay,

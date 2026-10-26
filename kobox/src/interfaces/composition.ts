@@ -568,6 +568,7 @@ export interface PortalContainer {
   readonly mailRelay: SqliteMailRelayRepository;
   readonly siteSettings: SiteSettingsWithInstallDefault;
   readonly boxInVpn: string;
+  readonly sshPort: number;
   readonly nextcloudSignsInFromPortal: boolean;
   readonly saveMailRelay: SaveMailRelay;
   readonly sshKeys: SqliteSshKeyRepository;
@@ -670,6 +671,7 @@ export function buildPortalContainer(name: string): PortalContainer {
     siteSettings: siteSettings(db),
     // members reach Samba and NFS at the box's address in the usual tunnel
     boxInVpn: subnetOf('tun-gw', securitySettings().vpn).firstAddress(),
+    sshPort: securitySettings().sshPort,
     // pinned, the nextcloud component installs it with Nextcloud itself
     nextcloudSignsInFromPortal: nextcloudSsoRelease(artifactPinsFrom(process.env)) !== undefined,
     // the PUBLIC half only: the portal and the CLI store a relay the same way
