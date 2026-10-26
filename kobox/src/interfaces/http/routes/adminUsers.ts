@@ -20,7 +20,7 @@ import { Quota } from '../../../domain/user/Quota.js';
 import { buildJob } from '../../cli/buildJob.js';
 import { invitationLinkPage } from '../views/passwordLinkPages.js';
 import { flashOf, redirectWithFlash, viewerOf, type Guards } from '../guards.js';
-import { adminUserDetailPage, adminUsersPage } from '../views/adminUsersPage.js';
+import { adminUserDetailPage, adminUsersPage, type MemberLogin } from '../views/adminUsersPage.js';
 
 const createUserSchema = z.object({
   username: z.string().regex(USERNAME_PATTERN),
@@ -61,16 +61,19 @@ export function registerAdminUserRoutes(
   deps: AdminUsersDeps,
   guards: Guards,
 ): void {
-  // the members who have not followed their invitation: a login, no password
-  const invitedAmong = async (users: readonly SeedboxUser[]): Promise<ReadonlySet<string>> => {
-    const invited = new Set<string>();
+  // each member's portal login as the list shows it: their role, and whether
+  // they still have to follow their invitation (a login, no password)
+  const loginsOf = async (
+    users: readonly SeedboxUser[],
+  ): Promise<ReadonlyMap<string, MemberLogin>> => {
+    const logins = new Map<string, MemberLogin>();
     for (const user of users) {
       const login = await deps.credentials.find(user.username);
-      if (awaitsInvitation(login)) {
-        invited.add(user.username.value);
+      if (login !== undefined) {
+        logins.set(user.username.value, { role: login.role, invited: awaitsInvitation(login) });
       }
     }
-    return invited;
+    return logins;
   };
 
   server.get('/admin/users', async (request, reply) => {
@@ -81,7 +84,7 @@ export function registerAdminUserRoutes(
     const users = await deps.users.listAll();
     return reply
       .type('text/html')
-      .send(adminUsersPage(users, await invitedAmong(users), viewerOf(session), flashOf(request)));
+      .send(adminUsersPage(users, await loginsOf(users), viewerOf(session), flashOf(request)));
   });
 
   server.post('/admin/users', async (request, reply) => {
@@ -95,7 +98,7 @@ export function registerAdminUserRoutes(
       return reply
         .code(400)
         .type('text/html')
-        .send(adminUsersPage(users, await invitedAmong(users), viewerOf(session), undefined));
+        .send(adminUsersPage(users, await loginsOf(users), viewerOf(session), undefined));
     }
     // nobody types the member's password: they choose it through the link
     let invitation: { readonly url: string };
