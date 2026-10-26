@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Username } from '../../../src/domain/user/Username.js';
 import { IpAddress } from '../../../src/domain/shared/IpAddress.js';
+import { DynDnsHost } from '../../../src/domain/security/DynDnsHost.js';
 import { ComponentName } from '../../../src/domain/installation/ComponentName.js';
 import { Label } from '../../../src/domain/torrent/Label.js';
 import { LocalPath } from '../../../src/domain/sync/LocalPath.js';
@@ -1409,6 +1410,69 @@ describe('a member declaring where they connect from', () => {
     const removals = world.queue.jobs.filter((j) => j.type === 'remove-user-address');
     expect(removals.map((j) => j.payload)).toEqual([
       expect.objectContaining({ username: 'alice', ipv4: '198.51.100.7' }),
+    ]);
+  });
+});
+
+describe('a member declaring a dynamic hostname', () => {
+  const post = (url: string, fields: Record<string, string>) =>
+    world.server.inject({
+      method: 'POST',
+      url,
+      headers: { cookie: user.cookie, 'content-type': 'application/x-www-form-urlencoded' },
+      payload: form({ _csrf: user.csrf, ...fields }),
+    });
+
+  it('should_declare_a_hostname_whose_address_follows_their_box', async () => {
+    // a home address that changes on its own: the name keeps up, the member doesn't have to
+    const response = await post('/access/hostnames/add', { hostname: 'Alice-Home.dyndns.example' });
+
+    expect(response.statusCode).toBe(303);
+    expect(world.queue.jobs.map((j) => [j.type, j.payload])).toEqual([
+      ['add-user-hostname', expect.objectContaining({ username: 'alice', hostname: 'alice-home.dyndns.example' })],
+    ]);
+  });
+
+  it('should_refuse_what_is_not_a_hostname', async () => {
+    for (const hostname of ['198.51.100.7', 'home', 'a b.example']) {
+      expect((await post('/access/hostnames/add', { hostname })).statusCode).toBe(303);
+    }
+
+    expect(world.queue.jobs).toHaveLength(0);
+  });
+
+  it('should_show_their_own_hostnames_with_the_address_they_point_at_but_nobody_elses', async () => {
+    await world.addresses.addHostname(Username.parse('alice'), DynDnsHost.parse('alice.dyndns.example'));
+    await world.addresses.updateResolvedIp(
+      Username.parse('alice'),
+      DynDnsHost.parse('alice.dyndns.example'),
+      IpAddress.parse('198.51.100.50'),
+    );
+    await world.addresses.addHostname(Username.parse('boss'), DynDnsHost.parse('boss.dyndns.example'));
+
+    const response = await world.server.inject({
+      method: 'GET',
+      url: '/access',
+      headers: { cookie: user.cookie },
+    });
+
+    expect(response.body).toContain('alice.dyndns.example');
+    expect(response.body).toContain('198.51.100.50');
+    expect(response.body).not.toContain('boss.dyndns.example');
+    // the address belongs to the name: removing it alone would be undone in five minutes
+    expect(response.body).not.toContain('name="ipv4" value="198.51.100.50"');
+  });
+
+  it('should_remove_one_of_their_own_hostnames_but_never_someone_elses', async () => {
+    await world.addresses.addHostname(Username.parse('alice'), DynDnsHost.parse('alice.dyndns.example'));
+    await world.addresses.addHostname(Username.parse('boss'), DynDnsHost.parse('boss.dyndns.example'));
+
+    for (const hostname of ['alice.dyndns.example', 'boss.dyndns.example']) {
+      await post('/access/hostnames/remove', { hostname });
+    }
+
+    expect(world.queue.jobs.map((j) => [j.type, j.payload])).toEqual([
+      ['remove-user-hostname', expect.objectContaining({ username: 'alice', hostname: 'alice.dyndns.example' })],
     ]);
   });
 });

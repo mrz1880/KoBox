@@ -34,7 +34,7 @@ import type {
 import type { PortalCredentialsPort } from '../../../domain/portal/ports.js';
 import type { IssueAppToken } from '../../../application/portal/IssueAppToken.js';
 import { DomainError } from '../../../domain/shared/DomainError.js';
-import type { FairUseRepository } from '../../../domain/security/ports.js';
+import type { DynDnsBindingRepository, FairUseRepository } from '../../../domain/security/ports.js';
 import { VPN_VARIANTS, type VpnVariant } from '../../../domain/security/vpn.js';
 import type {
   PasswordHasherPort,
@@ -57,11 +57,13 @@ import {
   rutorrentPage,
   userHomePage,
   type FleetRow,
+  type MemberHostname,
   type SignalRow,
 } from '../views/userPages.js';
 import { syncPage } from '../views/syncPage.js';
 import { Language } from '../../../domain/portal/Language.js';
 import { IPV4_PATTERN, IpAddress } from '../../../domain/shared/IpAddress.js';
+import { DynDnsHost, InvalidDynDnsHostError } from '../../../domain/security/DynDnsHost.js';
 import { DEFAULT_TRANSFER_MAILS, TRANSFER_MAILS } from '../../../domain/sync/TransferMails.js';
 import type { BlocklistRepository, UserAddressRepository } from '../../../domain/tracker/ports.js';
 import { blocklistCoverage } from '../../../domain/tracker/BlocklistCoverage.js';
@@ -170,6 +172,7 @@ export interface UserRoutesDeps {
   readonly nextcloudSignsInFromPortal: boolean;
   readonly users: UserRepository;
   readonly addresses: UserAddressRepository;
+  readonly bindings: DynDnsBindingRepository;
   readonly blocklists: BlocklistRepository;
   readonly twoStepSetup: TwoStepSetup;
   readonly nowMs: () => number;
@@ -360,12 +363,28 @@ export function registerUserRoutes(
   const addressFacts = async (
     username: Username,
     requestIp: string,
-  ): Promise<{ addresses: readonly string[]; currentAddress?: string }> => {
+  ): Promise<{
+    addresses: readonly string[];
+    hostnames: readonly MemberHostname[];
+    currentAddress?: string;
+  }> => {
     const current = visitorAddress(requestIp);
+    const hostnames = (await deps.bindings.listHostnames())
+      .filter((binding) => binding.username.equals(username))
+      .map((binding) => ({
+        host: binding.host.value,
+        ...(binding.resolvedIp !== undefined && { pointsAt: binding.resolvedIp.value }),
+      }));
+    // an address a name points at is the name's: it comes and goes with it
+    const named = new Set(hostnames.map((hostname) => hostname.pointsAt));
     const addresses = (await deps.addresses.listAll())
-      .filter((address) => address.username.equals(username))
+      .filter((address) => address.username.equals(username) && !named.has(address.ip.value))
       .map((address) => address.ip.value);
-    return { addresses, ...(current !== undefined && { currentAddress: current.value }) };
+    return {
+      addresses,
+      hostnames,
+      ...(current !== undefined && { currentAddress: current.value }),
+    };
   };
 
   const addressSchema = z.object({ ipv4: z.string().max(15) });
@@ -442,6 +461,58 @@ export function registerUserRoutes(
       buildJob.addUserAddress({ username: session.username.value, ipv4: ip.value }),
     );
     return redirectWithFlash(reply, '/access', 'Address added.');
+  });
+
+  const hostnameSchema = z.object({ hostname: z.string().max(253) });
+
+  // A name kept up to date by the member's router or a dynamic DNS service: the
+  // box looks it up every few minutes and follows the address it points at.
+  server.post('/access/hostnames/add', async (request, reply) => {
+    const session = await guards.requireCsrf(request, reply);
+    if (session === undefined) {
+      return;
+    }
+    const parsed = hostnameSchema.safeParse(request.body);
+    let host: DynDnsHost;
+    try {
+      host = DynDnsHost.parse(parsed.success ? parsed.data.hostname : '');
+    } catch (error) {
+      if (!(error instanceof InvalidDynDnsHostError)) {
+        throw error;
+      }
+      return redirectWithFlash(
+        reply,
+        '/access',
+        'That is not a hostname, like myhome.duckdns.org. For a fixed address, use the field above.',
+      );
+    }
+    await deps.queue.enqueue(
+      buildJob.addUserHostname({ username: session.username.value, hostname: host.value }),
+    );
+    return redirectWithFlash(reply, '/access', 'Hostname added. Its address opens within five minutes.');
+  });
+
+  server.post('/access/hostnames/remove', async (request, reply) => {
+    const session = await guards.requireCsrf(request, reply);
+    if (session === undefined) {
+      return;
+    }
+    const parsed = hostnameSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.code(400).send();
+    }
+    // the same guard as for addresses: only a name of their own is queued
+    const { hostnames } = await addressFacts(session.username, request.ip);
+    if (!hostnames.some((hostname) => hostname.host === parsed.data.hostname)) {
+      return reply.code(404).send();
+    }
+    await deps.queue.enqueue(
+      buildJob.removeUserHostname({
+        username: session.username.value,
+        hostname: parsed.data.hostname,
+      }),
+    );
+    return redirectWithFlash(reply, '/access', 'Hostname removed.');
   });
 
   const twoStepCodeSchema = z.object({ code: z.string().regex(/^[0-9]{6}$/) });

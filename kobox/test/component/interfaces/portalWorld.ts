@@ -239,7 +239,7 @@ export async function buildPortalWorld(
     trackers: new InMemoryTrackerRepository(),
     blocklists,
     addresses,
-    bindings: new InMemoryUserAddressRepository(),
+    bindings: addresses,
     fairUse,
     // everything healthy unless a test swaps in its own probe
     health: new FakeHealthProbe(),

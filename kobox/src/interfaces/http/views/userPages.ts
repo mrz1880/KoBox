@@ -429,6 +429,13 @@ const VPN_CHOICES: readonly {
   },
 ];
 
+// A dynamic name a member declared, and the address it pointed at when the box
+// last looked it up (none yet right after it was added).
+export interface MemberHostname {
+  readonly host: string;
+  readonly pointsAt?: string;
+}
+
 export interface AccessFacts {
   readonly username: string;
   readonly sftpHost?: string;
@@ -442,6 +449,7 @@ export interface AccessFacts {
   readonly sshKeyAddedAt?: string;
   // the member's own declared addresses only: nobody sees anyone else's
   readonly addresses: readonly string[];
+  readonly hostnames: readonly MemberHostname[];
   readonly hasTwoStep: boolean;
   // where this request came from; absent over IPv6, which cannot be declared
   readonly currentAddress?: string;
@@ -528,7 +536,36 @@ which is declared.</p>`
 </form>
 <p class="muted">For a place you are not at right now, your NAS at home or the
 office: type the public address it shows to the internet (a site like
-whatismyip.com, opened from there, tells you).</p>`;
+whatismyip.com, opened from there, tells you).</p>
+${hostnamesPart(viewer, facts)}`;
+}
+
+// A home address that changes on its own is declared by a name the member's
+// router or a dynamic DNS service (DuckDNS, No-IP...) keeps up to date.
+function hostnamesPart(viewer: Viewer, facts: AccessFacts): RawHtml {
+  return html`<h3>Dynamic hostname</h3>
+<p class="muted">If your home address changes on its own, give a name your router
+or a service like DuckDNS keeps pointed at it. The box looks it up every five
+minutes and follows it.</p>
+${facts.hostnames.length === 0
+    ? html``
+    : html`<ul>${facts.hostnames.map(
+      (hostname) => html`<li><span class="mono">${hostname.host}</span>
+<span class="muted">${hostname.pointsAt === undefined
+        ? 'not looked up yet'
+        : html`points at <span class="mono">${hostname.pointsAt}</span>`}</span>
+<form class="inline" method="post" action="/access/hostnames/remove">
+  <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
+  <input type="hidden" name="hostname" value="${hostname.host}">
+  <button type="submit" class="ghost">Remove</button>
+</form></li>`,
+    )}</ul>`}
+<form class="inline" method="post" action="/access/hostnames/add">
+  <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
+  <label for="hostname">Hostname</label>
+  <input id="hostname" name="hostname" required placeholder="myhome.duckdns.org">
+  <button type="submit">Add</button>
+</form>`;
 }
 
 // A key is for a script on the member's own machine dropping torrent files in.
