@@ -1355,3 +1355,18 @@ describe('a member declaring where they connect from', () => {
     ]);
   });
 });
+
+describe('the admin overview and the blocklists', () => {
+  // a fresh box blocked nothing until somebody thought of importing the
+  // catalog; the overview is where an admin looks first
+  it('should_say_nothing_is_blocked_and_offer_the_step_that_is_missing', async () => {
+    const response = await world.server.inject({
+      method: 'GET',
+      url: '/admin',
+      headers: { cookie: admin.cookie },
+    });
+
+    expect(response.body).toContain('Nothing is blocked');
+    expect(response.body).toContain('action="/admin/blocklists/import-catalog"');
+  });
+});

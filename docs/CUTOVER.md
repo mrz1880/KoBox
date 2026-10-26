@@ -54,7 +54,8 @@ Set up what the box needs before members arrive, each covered in `docs/OPS.md`:
 - **Trackers and blocklists**: add the trackers members use (admin console, or
   `kobox discover-tracker <host>`), then `kobox import-blocklist-catalog`: it
   enables MySB's curated set, and the lists download right after. Until that
-  import, no list exists and nothing is blocked.
+  import, no list exists and nothing is blocked; the admin Overview says so,
+  with the button that imports it.
 
 ## 3. Create the accounts
 
