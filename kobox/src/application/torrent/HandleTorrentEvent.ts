@@ -6,14 +6,16 @@ import { TorrentState } from '../../domain/torrent/TorrentState.js';
 import type { TorrentInstance } from '../../domain/torrent/TorrentInstance.js';
 import type {
   AnnouncerSink,
+  ContentRecyclerPort,
+  FileIndexPort,
   RtorrentControlPort,
   TorrentInstanceRepository,
   TorrentMetainfoPort,
+  TorrentFilingPort,
   TorrentRepository,
   UserScriptRunnerPort,
 } from '../../domain/torrent/ports.js';
 import type { UserRepository } from '../../domain/user/ports.js';
-import type { ContentRecyclerPort } from '../../domain/torrent/ports.js';
 import type { Username } from '../../domain/user/Username.js';
 import type { MailOutboxPort } from '../maintenance/MailOutboxPort.js';
 import { TorrentInstanceNotFoundError } from './errors.js';
@@ -60,6 +62,8 @@ interface Deps {
   readonly outbox: MailOutboxPort;
   readonly clock: () => string;
   readonly recycler: ContentRecyclerPort;
+  readonly filing: TorrentFilingPort;
+  readonly fileIndex: FileIndexPort;
 }
 
 // The typed replacement for the legacy 400-line bash hooks. Behavior flags
@@ -142,6 +146,7 @@ export class HandleTorrentEvent {
       ) {
         await this.deps.control.start(instance.scgiPort, command.infoHash);
       }
+      await this.fileAway(instance, command, home);
       return;
     }
     await this.deps.torrents.upsert(command.username, torrent.reject());
@@ -150,6 +155,28 @@ export class HandleTorrentEvent {
       .stopAndClose(instance.scgiPort, command.infoHash)
       .catch(() => undefined);
     await this.notifyRemoval(command.username, torrent.name);
+  }
+
+  // Watch is a drop box: once added, the .torrent is filed under torrents/ of
+  // the same category, as on MySB. rTorrent keeps its own copy in the session,
+  // so moving the file costs nothing. Best-effort, like the steps above.
+  private async fileAway(
+    instance: TorrentInstance,
+    command: TorrentEventCommand,
+    home: string,
+  ): Promise<void> {
+    const folder =
+      command.torrentFile === undefined
+        ? undefined
+        : instance.torrentsFolderFor(command.torrentFile, home);
+    try {
+      if (command.torrentFile !== undefined && folder !== undefined) {
+        await this.deps.filing.file(command.torrentFile, folder);
+      }
+      await this.deps.fileIndex.refresh(command.username);
+    } catch {
+      return;
+    }
   }
 
   // What another member already finished can be put where this member's
@@ -215,6 +242,8 @@ export class HandleTorrentEvent {
       });
     const tree = command.basePath ?? command.directory ?? existing?.tree ?? '';
     await this.deps.torrents.upsert(command.username, base.complete(tree));
+    // the finished files show in Nextcloud without anyone rescanning
+    await this.deps.fileIndex.refresh(command.username).catch(() => undefined);
 
     if (instance.syncDisabled) {
       return; // per-user flag (converted prod patch): no post-download fan-out

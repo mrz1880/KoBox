@@ -53,6 +53,7 @@ import { FakeTorrentMetainfo } from '../../../src/infrastructure/system/fakes/Fa
 import { FakeUserScriptRunner } from '../../../src/infrastructure/system/fakes/FakeUserScriptRunner.js';
 import { FakeWatchDirs } from '../../../src/infrastructure/system/fakes/FakeWatchDirs.js';
 import { FakeFileIndex } from '../../../src/infrastructure/system/fakes/FakeFileIndex.js';
+import { FakeTorrentFiling } from '../../../src/infrastructure/system/fakes/FakeTorrentFiling.js';
 import { loadRtorrentTemplates } from '../../../src/infrastructure/templates/TemplateProvider.js';
 import { Bandwidth } from '../../../src/domain/security/Bandwidth.js';
 import { Cidr } from '../../../src/domain/security/Cidr.js';
@@ -299,6 +300,7 @@ beforeEach(() => {
     config: rutorrentFiles,
     watchDirs: new FakeWatchDirs(),
     fileIndex: new FakeFileIndex(),
+    filing: new FakeTorrentFiling(),
     services,
     metainfo: new FakeTorrentMetainfo(),
     control: new FakeRtorrentControl(),

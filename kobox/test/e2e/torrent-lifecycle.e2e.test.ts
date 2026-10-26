@@ -484,6 +484,9 @@ describe.skipIf(!onDebianAsRoot)('E2E: torrent lifecycle with a real rtorrent', 
       drainQueue({ KOBOX_SPOOL: DEFAULT_SPOOL_DIR });
       expect(await rtorrentState(fixture.infoHash)).toBe(1);
     }, 30_000);
+    // watch is a drop box: once added, the file is filed under torrents/
+    expect(existsSync(join(HOME, 'rtorrent/torrents/films/dropped-linux.iso.torrent'))).toBe(true);
+    expect(existsSync(dropped)).toBe(false);
   }, 60_000);
 
   it('should_early_exit_on_an_inserted_event_without_torrent_file', () => {

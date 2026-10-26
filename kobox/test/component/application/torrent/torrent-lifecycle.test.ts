@@ -28,6 +28,7 @@ import { FakeTorrentMetainfo } from '../../../../src/infrastructure/system/fakes
 import { FakeUserScriptRunner } from '../../../../src/infrastructure/system/fakes/FakeUserScriptRunner.js';
 import { FakeWatchDirs } from '../../../../src/infrastructure/system/fakes/FakeWatchDirs.js';
 import { FakeFileIndex } from '../../../../src/infrastructure/system/fakes/FakeFileIndex.js';
+import { FakeTorrentFiling } from '../../../../src/infrastructure/system/fakes/FakeTorrentFiling.js';
 import { loadRtorrentTemplates } from '../../../../src/infrastructure/templates/TemplateProvider.js';
 import { aUser } from '../../../builders/UserBuilder.js';
 
@@ -51,6 +52,7 @@ interface Context {
   readonly config: FakeRtorrentConfig;
   readonly watchDirs: FakeWatchDirs;
   readonly fileIndex: FakeFileIndex;
+  readonly filing: FakeTorrentFiling;
   readonly services: FakeServiceControl;
   readonly meta: FakeTorrentMetainfo;
   readonly control: FakeRtorrentControl;
@@ -85,6 +87,7 @@ function makeContext(): Context {
   const config = new FakeRtorrentConfig();
   const watchDirs = new FakeWatchDirs();
   const fileIndex = new FakeFileIndex();
+  const filing = new FakeTorrentFiling();
   const services = new FakeServiceControl();
   const meta = new FakeTorrentMetainfo();
   const control = new FakeRtorrentControl();
@@ -102,6 +105,7 @@ function makeContext(): Context {
     config,
     watchDirs,
     fileIndex,
+    filing,
     services,
     meta,
     control,
@@ -132,6 +136,8 @@ function makeContext(): Context {
       outbox,
       clock: () => '2026-08-17 12:00:00',
       recycler,
+      filing,
+      fileIndex,
     }),
     outbox,
     recycler,
@@ -374,6 +380,23 @@ describe('HandleTorrentEvent', () => {
     expect(c.control.started).toEqual([{ scgiPort: 51101, infoHash: HASH.value }]);
   });
 
+  // asked by a member: watch is a drop box, as on MySB. Once added, the file
+  // is filed under torrents/, and Nextcloud is told to look again
+  it('should_file_an_admitted_torrent_under_torrents_and_have_nextcloud_see_it', async () => {
+    const dropped = '/home/alice/rtorrent/watch/x.torrent';
+    c.meta.preload(dropped, metainfo(true));
+
+    await c.handleEvent.execute({
+      username: alice,
+      event: 'inserted_new',
+      infoHash: HASH,
+      torrentFile: dropped,
+    });
+
+    expect(c.filing.filed).toEqual([{ file: dropped, folder: '/home/alice/rtorrent/torrents' }]);
+    expect(c.fileIndex.refreshed).toEqual(['alice']);
+  });
+
   it('should_tell_the_member_why_their_torrent_was_taken_out', async () => {
     // a torrent that vanishes without a word reads as a bug. The removal was
     // already correct; nobody was told about it.
@@ -444,6 +467,8 @@ describe('HandleTorrentEvent', () => {
     const torrent = await c.torrents.findByInfoHash(alice, HASH);
     expect(torrent?.state.value).toBe('completed');
     expect(torrent?.tree).toBe('/home/alice/rtorrent/complete/x');
+    // the finished download shows in Nextcloud without anyone rescanning
+    expect(c.fileIndex.refreshed).toEqual(['alice']);
     expect(c.scripts.runs).toEqual([
       {
         username: 'alice',
@@ -566,6 +591,8 @@ describe('HandleTorrentEvent announcer publication (Torrent -> Tracker seam)', (
       recycler: c.recycler,
       users: c.users,
       outbox: c.outbox,
+      filing: c.filing,
+      fileIndex: c.fileIndex,
       clock: () => '2026-08-17 12:00:00',
       announcers: {
         publish: () => Promise.reject(new Error('queue down')),
