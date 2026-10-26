@@ -1324,6 +1324,35 @@ describe('a member declaring where they connect from', () => {
     expect(job?.payload).toMatchObject({ username: 'alice', ipv4: '203.0.113.20' });
   });
 
+  it('should_declare_an_address_they_type_for_a_place_they_are_not_at', async () => {
+    // the NAS at home, the office: a member declares them from anywhere
+    const response = await world.server.inject({
+      method: 'POST',
+      url: '/access/addresses/add',
+      headers: fromHome(user.cookie),
+      payload: form({ _csrf: user.csrf, ipv4: '198.51.100.40' }),
+    });
+
+    expect(response.statusCode).toBe(303);
+    const job = world.queue.jobs.find((j) => j.type === 'add-user-address');
+    expect(job?.payload).toMatchObject({ username: 'alice', ipv4: '198.51.100.40' });
+  });
+
+  it('should_refuse_a_typed_address_that_is_not_one_internet_can_come_from', async () => {
+    // a box-side address (192.168.x.x) is the likely mistake: it opens nothing
+    for (const ipv4 of ['192.168.1.20', 'not an address']) {
+      const response = await world.server.inject({
+        method: 'POST',
+        url: '/access/addresses/add',
+        headers: fromHome(user.cookie),
+        payload: form({ _csrf: user.csrf, ipv4 }),
+      });
+
+      expect(response.statusCode).toBe(303);
+    }
+    expect(world.queue.jobs).toHaveLength(0);
+  });
+
   it('should_say_so_rather_than_fail_when_they_come_over_ipv6', async () => {
     // the firewall rules are IPv4 only: there is nothing to declare
     const response = await world.server.inject({
@@ -1350,6 +1379,18 @@ describe('a member declaring where they connect from', () => {
     expect(response.body).toContain('198.51.100.7');
     expect(response.body).toContain('203.0.113.20');
     expect(response.body).not.toContain('198.51.100.99');
+  });
+
+  it('should_offer_to_type_another_address_even_once_the_current_one_is_declared', async () => {
+    await world.addresses.add(Username.parse('alice'), IpAddress.parse('203.0.113.20'));
+
+    const response = await world.server.inject({
+      method: 'GET',
+      url: '/access',
+      headers: fromHome(user.cookie),
+    });
+
+    expect(response.body).toContain('action="/access/addresses/add"');
   });
 
   it('should_remove_one_of_their_own_addresses_but_never_someone_elses', async () => {

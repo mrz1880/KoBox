@@ -519,7 +519,16 @@ which is declared.</p>`
   <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
   <span>You are connecting from <span class="mono">${facts.currentAddress}</span>.</span>
   <button type="submit">Add this address</button>
-</form>`}`;
+</form>`}
+<form class="inline" method="post" action="/access/addresses/add">
+  <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
+  <label for="ipv4">Another place</label>
+  <input id="ipv4" name="ipv4" required inputmode="decimal" placeholder="203.0.113.20">
+  <button type="submit">Add</button>
+</form>
+<p class="muted">For a place you are not at right now, your NAS at home or the
+office: type the public address it shows to the internet (a site like
+whatismyip.com, opened from there, tells you).</p>`;
 }
 
 // A key is for a script on the member's own machine dropping torrent files in.

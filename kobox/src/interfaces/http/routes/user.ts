@@ -368,6 +368,8 @@ export function registerUserRoutes(
     return { addresses, ...(current !== undefined && { currentAddress: current.value }) };
   };
 
+  const addressSchema = z.object({ ipv4: z.string().max(15) });
+
   const sshKeySchema = z.object({ key: z.string().min(32).max(1024) });
 
   server.post('/access/ssh-key', async (request, reply) => {
@@ -417,6 +419,31 @@ export function registerUserRoutes(
     return redirectWithFlash(reply, '/access', 'Address added.');
   });
 
+  // An address typed in, for a place the member is not at right now (the NAS
+  // at home, the office). Only one the internet can connect from opens anything.
+  server.post('/access/addresses/add', async (request, reply) => {
+    const session = await guards.requireCsrf(request, reply);
+    if (session === undefined) {
+      return;
+    }
+    const parsed = addressSchema.safeParse(request.body);
+    if (!parsed.success || !IPV4_PATTERN.test(parsed.data.ipv4)) {
+      return redirectWithFlash(reply, '/access', 'That is not an IPv4 address, like 203.0.113.20.');
+    }
+    const ip = IpAddress.parse(parsed.data.ipv4);
+    if (!ip.isPublic) {
+      return redirectWithFlash(
+        reply,
+        '/access',
+        'That address only exists inside a home or office network. Declare the one that place shows to the internet.',
+      );
+    }
+    await deps.queue.enqueue(
+      buildJob.addUserAddress({ username: session.username.value, ipv4: ip.value }),
+    );
+    return redirectWithFlash(reply, '/access', 'Address added.');
+  });
+
   const twoStepCodeSchema = z.object({ code: z.string().regex(/^[0-9]{6}$/) });
 
   server.post('/access/two-step/start', async (request, reply) => {
@@ -457,8 +484,6 @@ export function registerUserRoutes(
       return redirectWithFlash(reply, '/access', ok ? done : refused);
     });
   }
-
-  const addressSchema = z.object({ ipv4: z.string().max(15) });
 
   server.post('/access/addresses/remove', async (request, reply) => {
     const session = await guards.requireCsrf(request, reply);
