@@ -3,6 +3,9 @@ import {
   PHP_FPM,
   PHP_SETTINGS,
   RUTORRENT_DIR,
+  RUTORRENT_POOL_DIR,
+  RUTORRENT_POOL_PREFIX,
+  rutorrentPoolSocket,
   WEB_SERVER_USER,
 } from './platform.js';
 import { PORTAL_USER_VARIABLE } from './NextcloudPort.js';
@@ -533,7 +536,8 @@ export function renderNginxVhost(settings: NginxVhostSettings): RenderedFile {
       '        include fastcgi_params;',
       `        fastcgi_param SCRIPT_FILENAME ${RUTORRENT_QUOTA_ANSWER};`,
       '        fastcgi_param REMOTE_USER $kobox_user;',
-      `        fastcgi_pass unix:${PHP_FPM.socket};`,
+      // the member's own pool: ruTorrent's PHP runs as them, not as the web server
+      `        fastcgi_pass unix:${rutorrentPoolSocket('$kobox_user')};`,
       '    }',
       '',
       '    location ~ ^/ru/(.+\\.php)$ {',
@@ -542,7 +546,7 @@ export function renderNginxVhost(settings: NginxVhostSettings): RenderedFile {
       '        include fastcgi_params;',
       `        fastcgi_param SCRIPT_FILENAME ${RUTORRENT_DIR}/$1;`,
       '        fastcgi_param REMOTE_USER $kobox_user;',
-      `        fastcgi_pass unix:${PHP_FPM.socket};`,
+      `        fastcgi_pass unix:${rutorrentPoolSocket('$kobox_user')};`,
       '    }',
       '',
       '    # per-user SCGI mounts (/RPC-<USER>), each gated to its owner or an admin',
@@ -760,6 +764,34 @@ export function renderNextcloudPhp(): readonly RenderedFile[] {
     file(PHP_SETTINGS.cli, ['memory_limit = 512M', 'apc.enable_cli = 1']),
     file(PHP_SETTINGS.pool, ['[www]', 'clear_env = no']),
   ];
+}
+
+// ruTorrent's PHP for one member, as that member. ondemand: an idle member
+// costs no process. The web server keeps the socket so nginx can reach it.
+export function renderRutorrentPhpPool(member: string): RenderedFile {
+  const pool = `${RUTORRENT_POOL_PREFIX}${member}`;
+  return {
+    path: `${RUTORRENT_POOL_DIR}/${pool}.conf`,
+    content: [
+      `;${MANAGED_HEADER.slice(1)}`,
+      `[${pool}]`,
+      `user = ${member}`,
+      `group = ${member}`,
+      `listen = ${rutorrentPoolSocket(member)}`,
+      `listen.owner = ${WEB_SERVER_USER}`,
+      `listen.group = ${WEB_SERVER_USER}`,
+      'listen.mode = 0660',
+      'pm = ondemand',
+      'pm.max_children = 4',
+      'pm.process_idle_timeout = 30s',
+      // ruTorrent runs its helpers (mediainfo, unrar...) through the PATH
+      'clear_env = no',
+      '',
+    ].join('\n'),
+    mode: '0644',
+    owner: 'root',
+    group: 'root',
+  };
 }
 
 export function renderNextcloudSite(): RenderedFile {

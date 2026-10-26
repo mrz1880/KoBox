@@ -4,6 +4,7 @@ import { InMemoryUserRepository } from '../../../../src/infrastructure/persisten
 import { FakeNetworkServices } from '../../../../src/infrastructure/system/fakes/FakeNetworkServices.js';
 import { FakeRutorrentProfiles } from '../../../../src/infrastructure/system/fakes/FakeRutorrentProfiles.js';
 import { FakeRtorrentConfig } from '../../../../src/infrastructure/system/fakes/FakeRtorrentConfig.js';
+import { FakeRutorrentPools } from '../../../../src/infrastructure/system/fakes/FakeRutorrentPools.js';
 import { UserBuilder } from '../../../builders/UserBuilder.js';
 
 async function world() {
@@ -15,12 +16,14 @@ async function world() {
     new UserBuilder().withUsername('bob').withScgiPort(51102).withRtorrentPort(45001).build(),
   );
   const profiles = new FakeRutorrentProfiles();
+  const pools = new FakeRutorrentPools();
   return {
     users,
     files,
     reload,
     profiles,
-    useCase: new RenderRutorrentUsers({ users, files, reload, profiles }),
+    pools,
+    useCase: new RenderRutorrentUsers({ users, files, reload, profiles, pools }),
   };
 }
 
@@ -43,6 +46,20 @@ describe('RenderRutorrentUsers', () => {
     await useCase.execute();
 
     expect(profiles.offeredRatioGroups).toEqual(['alice', 'bob']);
+  });
+
+  // ruTorrent's PHP runs as each member, so a flaw in it reaches that
+  // member's files and nobody else's; a suspended member keeps no pool
+  it('should_run_rutorrent_as_each_active_member_and_nobody_else', async () => {
+    const { users, pools, useCase } = await world();
+    await users.save(new UserBuilder().withUsername('carol').withScgiPort(51103).withRtorrentPort(45002).suspended());
+
+    await useCase.execute();
+
+    expect(pools.converged.map((pool) => pool.path)).toEqual([
+      '/etc/php/8.4/fpm/pool.d/kobox-ru-alice.conf',
+      '/etc/php/8.4/fpm/pool.d/kobox-ru-bob.conf',
+    ]);
   });
 
   it('should_render_the_rpc_include_and_a_config_per_user', async () => {
@@ -76,7 +93,7 @@ describe('RenderRutorrentUsers', () => {
     const reload = new FakeNetworkServices();
     await users.save(new UserBuilder().withUsername('alice').withScgiPort(51101).suspended());
     const profiles = new FakeRutorrentProfiles();
-    const useCase = new RenderRutorrentUsers({ users, files, reload, profiles });
+    const useCase = new RenderRutorrentUsers({ users, files, reload, profiles, pools: new FakeRutorrentPools() });
 
     await useCase.execute();
 

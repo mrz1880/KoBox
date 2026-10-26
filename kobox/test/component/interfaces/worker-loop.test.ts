@@ -53,6 +53,7 @@ import { FakeTorrentMetainfo } from '../../../src/infrastructure/system/fakes/Fa
 import { FakeUserScriptRunner } from '../../../src/infrastructure/system/fakes/FakeUserScriptRunner.js';
 import { FakeWatchDirs } from '../../../src/infrastructure/system/fakes/FakeWatchDirs.js';
 import { FakeFileIndex } from '../../../src/infrastructure/system/fakes/FakeFileIndex.js';
+import { FakeRutorrentPools } from '../../../src/infrastructure/system/fakes/FakeRutorrentPools.js';
 import { FakeTorrentFiling } from '../../../src/infrastructure/system/fakes/FakeTorrentFiling.js';
 import { loadRtorrentTemplates } from '../../../src/infrastructure/templates/TemplateProvider.js';
 import { Bandwidth } from '../../../src/domain/security/Bandwidth.js';
@@ -310,6 +311,7 @@ beforeEach(() => {
     settings: { koboxBin: '/usr/local/bin/kobox' },
     nginx: new FakeNetworkServices(),
     rutorrentProfiles: new FakeRutorrentProfiles(),
+    rutorrentPools: new FakeRutorrentPools(),
     mediaScanner: { scan: () => Promise.resolve([]) },
     media: new InMemoryMediaRepository(),
     clock: () => '2026-07-25 10:00:00',

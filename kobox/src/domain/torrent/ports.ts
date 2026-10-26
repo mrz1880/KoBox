@@ -7,6 +7,7 @@ import type { RecyclingMode } from './RecyclingMode.js';
 import type { Torrent } from './Torrent.js';
 import type { TorrentInstance } from './TorrentInstance.js';
 import type { WatchDir } from './WatchDir.js';
+import type { RenderedFile } from '../shared/files.js';
 
 export type { RenderedFile } from '../shared/files.js';
 
@@ -50,6 +51,12 @@ export interface WatchDirPort {
 // once added (torrents/ of the same category).
 export interface TorrentFilingPort {
   file(torrentFile: string, folder: string): Promise<void>;
+}
+
+// The per-member PHP pools ruTorrent runs in: exactly these and no others,
+// checked by PHP before it reloads, so one bad pool never stops the rest.
+export interface RutorrentPoolsPort {
+  converge(pools: readonly RenderedFile[]): Promise<void>;
 }
 
 // What keeps its own index of a member's folders (Nextcloud) and does not see

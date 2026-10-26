@@ -14,8 +14,17 @@ export const PHP_SETTINGS = {
   pool: `/etc/php/${PHP_VERSION}/fpm/pool.d/zz-kobox.conf`,
 } as const;
 
+// One PHP pool per member for ruTorrent, running as that member: the web
+// server, in every member's group for Nextcloud, no longer runs ruTorrent.
+export const RUTORRENT_POOL_PREFIX = 'kobox-ru-';
+export const RUTORRENT_POOL_DIR = `/etc/php/${PHP_VERSION}/fpm/pool.d`;
+export function rutorrentPoolSocket(member: string): string {
+  return `/run/php/${RUTORRENT_POOL_PREFIX}${member}.sock`;
+}
+
 export const PHP_FPM = {
   unit: `php${PHP_VERSION}-fpm`,
+  binary: `php-fpm${PHP_VERSION}`,
   socket: `/run/php/php${PHP_VERSION}-fpm.sock`,
 } as const;
 

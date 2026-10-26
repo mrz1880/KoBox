@@ -396,9 +396,16 @@ describe.skipIf(!onDebianAsRoot)('E2E: fresh Debian 13 -> bootstrap -> full stac
     // ruTorrent: fastcgi_params also fills REMOTE_USER from the client's own
     // Authorization header, before the line that sets the portal's member
     const ruProbe = '/var/www/rutorrent/kobox-whoami.php';
-    writeFileSync(ruProbe, '<?php echo $_SERVER["REMOTE_USER"] ?? "";');
+    writeFileSync(
+      ruProbe,
+      '<?php echo $_SERVER["REMOTE_USER"] ?? "", " as ", posix_getpwuid(posix_geteuid())["name"];',
+    );
     try {
-      expect(sh('curl', ['-sk', '-b', jar, ...forged, 'https://127.0.0.1:8189/ru/kobox-whoami.php'])).toBe(USER);
+      // and it runs as that member, in their own pool, not as the web server
+      // that every member's group lets in
+      expect(sh('curl', ['-sk', '-b', jar, ...forged, 'https://127.0.0.1:8189/ru/kobox-whoami.php'])).toBe(
+        `${USER} as ${USER}`,
+      );
     } finally {
       rmSync(ruProbe);
     }

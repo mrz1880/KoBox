@@ -22,6 +22,7 @@ import { CertbotAdapter } from '../infrastructure/system/CertbotAdapter.js';
 import { ConfigCheckAdapter } from '../infrastructure/system/ConfigCheckAdapter.js';
 import { OccNextcloudAdapter } from '../infrastructure/system/OccNextcloudAdapter.js';
 import { MvTorrentFiling } from '../infrastructure/system/MvTorrentFiling.js';
+import { PhpFpmRutorrentPools } from '../infrastructure/system/PhpFpmRutorrentPools.js';
 import { InstallHostAdapter } from '../infrastructure/system/InstallHostAdapter.js';
 import { SystemdAdapter } from '../infrastructure/system/SystemdAdapter.js';
 import { SystemFactsAdapter } from '../infrastructure/system/SystemFactsAdapter.js';
@@ -782,6 +783,7 @@ export function buildContainer(name: string): Container {
     settings: { koboxBin: process.env.KOBOX_BIN ?? DEFAULT_KOBOX_BIN },
     nginx: networkServices,
     rutorrentProfiles: new RutorrentProfileAdapter(runner),
+    rutorrentPools: new PhpFpmRutorrentPools(runner, new RtorrentConfigAdapter(runner)),
     mediaScanner: new FsMediaScanner(),
     media: mediaRepo,
     clock: nowStamp,
