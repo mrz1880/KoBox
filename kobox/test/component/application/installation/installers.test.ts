@@ -1129,6 +1129,25 @@ describe('nextcloud installer', () => {
     expect(pinned.nextcloud.disabledApps).toContain('app_api');
   });
 
+  // Nextcloud checks its tree file by file: a marker of ours inside it made
+  // the integrity check fail on the admin page
+  it('should_keep_its_release_marker_out_of_nextclouds_tree', async () => {
+    const pinned = buildWorld({
+      nextcloud: { url: 'https://example.net/nc.tar.bz2', sha256: 'd'.repeat(64), adminPassword: 'chosen-by-the-operator' },
+    });
+    // a box installed before: the marker sits in the tree, the release with it
+    await pinned.host.apply([
+      { path: '/var/www/nextcloud/.kobox-artifact-sha256', content: `${'d'.repeat(64)}\n`, mode: '0644', owner: 'root', group: 'root' },
+    ]);
+
+    await installer(pinned, 'nextcloud').install();
+
+    expect(pinned.host.contentAt('/var/www/nextcloud/.kobox-artifact-sha256')).toBeUndefined();
+    expect(pinned.host.contentAt('/var/lib/kobox/nextcloud.release-sha256')).toBe(`${'d'.repeat(64)}\n`);
+    // the release it records is already there: no download to move a marker
+    expect(pinned.host.fetched.map(([url]) => url)).not.toContain('https://example.net/nc.tar.bz2');
+  });
+
   it('should_install_the_decompressor_its_own_release_needs', async () => {
     // Nextcloud ships .tar.bz2 and a minimal Debian has no bzip2, so without
     // this the extraction fails on a fresh box with "bzip2: not found". Nothing

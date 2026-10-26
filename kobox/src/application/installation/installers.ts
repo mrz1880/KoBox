@@ -203,11 +203,15 @@ const NGINX_VHOST = '/etc/nginx/conf.d/kobox.conf';
 const HTPASSWD = '/etc/nginx/kobox.htpasswd';
 const NEXTCLOUD_DIR = '/var/www/nextcloud';
 const NEXTCLOUD_DATA = '/var/lib/nextcloud/data';
-const NEXTCLOUD_MARKER = `${NEXTCLOUD_DIR}/.kobox-artifact-sha256`;
+// outside the tree: Nextcloud checks its files one by one, and a file of ours
+// in there failed its integrity check. The old place is read once, then cleared.
+const NEXTCLOUD_MARKER = '/var/lib/kobox/nextcloud.release-sha256';
+const NEXTCLOUD_MARKER_IN_TREE = `${NEXTCLOUD_DIR}/.kobox-artifact-sha256`;
 const NEXTCLOUD_ARCHIVE = '/var/tmp/kobox/nextcloud.tar.bz2';
 const NEXTCLOUD_SSO_APP = 'user_saml';
 const NEXTCLOUD_SSO_DIR = `${NEXTCLOUD_DIR}/apps/${NEXTCLOUD_SSO_APP}`;
-const NEXTCLOUD_SSO_MARKER = `${NEXTCLOUD_SSO_DIR}/.kobox-artifact-sha256`;
+const NEXTCLOUD_SSO_MARKER = '/var/lib/kobox/user_saml.release-sha256';
+const NEXTCLOUD_SSO_MARKER_IN_TREE = `${NEXTCLOUD_SSO_DIR}/.kobox-artifact-sha256`;
 const NEXTCLOUD_SSO_ARCHIVE = '/var/tmp/kobox/user_saml.tar.gz';
 const RUTORRENT_MARKER = `${RUTORRENT_DIR}/.kobox-artifact-sha256`;
 const RUTORRENT_ARCHIVE = '/var/tmp/kobox/rutorrent.tar.gz';
@@ -538,6 +542,26 @@ export function nextcloudSsoRelease(pins: {
     : { url: pins.nextcloudSsoUrl, sha256: pins.nextcloudSsoSha256 };
 }
 
+// The release a marker records, moving one left inside an application's tree
+// by an older KoBox out to where the application does not look.
+async function releaseMarker(
+  host: InstallHostPort,
+  marker: string,
+  inTree: string,
+): Promise<string | undefined> {
+  const recorded = await host.readFile(marker);
+  if (recorded !== undefined) {
+    return recorded;
+  }
+  const old = await host.readFile(inTree);
+  if (old === undefined) {
+    return undefined;
+  }
+  await host.ensureFile({ path: marker, content: old, mode: '0644', owner: 'root', group: 'root' });
+  await host.removeFile(inTree);
+  return old;
+}
+
 class NextcloudInstaller implements ComponentInstaller {
   readonly name = 'nextcloud';
 
@@ -584,7 +608,7 @@ class NextcloudInstaller implements ComponentInstaller {
     if ((await files.apply(renderNextcloudPhp())).length > 0) {
       await systemd.reloadOrRestart(PHP_FPM.unit);
     }
-    const marker = await host.readFile(NEXTCLOUD_MARKER);
+    const marker = await releaseMarker(host, NEXTCLOUD_MARKER, NEXTCLOUD_MARKER_IN_TREE);
     if (marker?.trim() !== install.nextcloudSha256) {
       await artifacts.fetchVerified(
         install.nextcloudUrl,
@@ -639,7 +663,7 @@ class NextcloudInstaller implements ComponentInstaller {
     if (release === undefined) {
       return 'Nextcloud asks for the password again: set KOBOX_NEXTCLOUD_SSO_URL and KOBOX_NEXTCLOUD_SSO_SHA256 (its user_saml app), then re-run kobox install, to open it from the portal session';
     }
-    const marker = await host.readFile(NEXTCLOUD_SSO_MARKER);
+    const marker = await releaseMarker(host, NEXTCLOUD_SSO_MARKER, NEXTCLOUD_SSO_MARKER_IN_TREE);
     if (marker?.trim() !== release.sha256) {
       await artifacts.fetchVerified(
         release.url,
