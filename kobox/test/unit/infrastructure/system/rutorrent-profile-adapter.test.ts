@@ -28,8 +28,11 @@ describe('RutorrentProfileAdapter', () => {
 
     const dir = '/var/lib/rutorrent/users/alice';
     expect(runner.calls.map((call) => [call.command, ...call.args])).toEqual([
-      // theirs and the web server's; setgid so what ruTorrent adds stays in their group
-      ['install', '-d', '-o', 'www-data', '-g', 'alice', '-m', '2770', dir],
+      // theirs and the web server's; setgid so what ruTorrent adds stays in their group.
+      // ruTorrent makes settings, torrents and tmp only when it creates the
+      // profile itself: a folder made ahead of it left a new member without
+      // torrents, and ruTorrent refused to add any
+      ['install', '-d', '-o', 'www-data', '-g', 'alice', '-m', '2770', dir, `${dir}/settings`, `${dir}/torrents`, `${dir}/tmp`],
       // what ruTorrent already created (0777, www-data's group) joins them
       ['chown', '-R', 'www-data:alice', dir],
       ['chmod', '-R', 'g+rwX,o-rwx', dir],
