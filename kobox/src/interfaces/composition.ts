@@ -768,6 +768,7 @@ export function buildContainer(name: string): Container {
     torrents: new SqliteTorrentRepository(db),
     config: new RtorrentConfigAdapter(runner),
     watchDirs: new WatchDirAdapter(runner),
+    fileIndex: nextcloud,
     services,
     metainfo: new BencodeMetainfoAdapter(),
     control: new ScgiRtorrentControlAdapter(),

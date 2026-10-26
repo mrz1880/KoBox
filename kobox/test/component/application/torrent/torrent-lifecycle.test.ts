@@ -27,6 +27,7 @@ import { FakeServiceControl } from '../../../../src/infrastructure/system/fakes/
 import { FakeTorrentMetainfo } from '../../../../src/infrastructure/system/fakes/FakeTorrentMetainfo.js';
 import { FakeUserScriptRunner } from '../../../../src/infrastructure/system/fakes/FakeUserScriptRunner.js';
 import { FakeWatchDirs } from '../../../../src/infrastructure/system/fakes/FakeWatchDirs.js';
+import { FakeFileIndex } from '../../../../src/infrastructure/system/fakes/FakeFileIndex.js';
 import { loadRtorrentTemplates } from '../../../../src/infrastructure/templates/TemplateProvider.js';
 import { aUser } from '../../../builders/UserBuilder.js';
 
@@ -49,6 +50,7 @@ interface Context {
   readonly torrents: InMemoryTorrentRepository;
   readonly config: FakeRtorrentConfig;
   readonly watchDirs: FakeWatchDirs;
+  readonly fileIndex: FakeFileIndex;
   readonly services: FakeServiceControl;
   readonly meta: FakeTorrentMetainfo;
   readonly control: FakeRtorrentControl;
@@ -82,6 +84,7 @@ function makeContext(): Context {
   const torrents = new InMemoryTorrentRepository();
   const config = new FakeRtorrentConfig();
   const watchDirs = new FakeWatchDirs();
+  const fileIndex = new FakeFileIndex();
   const services = new FakeServiceControl();
   const meta = new FakeTorrentMetainfo();
   const control = new FakeRtorrentControl();
@@ -91,13 +94,14 @@ function makeContext(): Context {
   const recycler = new FakeContentRecycler();
   const templates = loadRtorrentTemplates();
   const settings = { koboxBin: '/usr/local/bin/kobox' };
-  const render = new RenderRtorrentConfig({ instances, config, watchDirs, services, templates, settings });
+  const render = new RenderRtorrentConfig({ instances, config, watchDirs, fileIndex, services, templates, settings });
   return {
     users,
     instances,
     torrents,
     config,
     watchDirs,
+    fileIndex,
     services,
     meta,
     control,
@@ -196,6 +200,17 @@ describe('AddWatchDir and RenderRtorrentConfig', () => {
       'films',
     ]);
     expect(c.services.restartsFor(alice)).toBe(1);
+  });
+
+  // Nextcloud keeps its own index of a member's folders and did not show the
+  // ones made behind its back until it was told to look again
+  it('should_have_the_file_index_look_again_once_the_folders_are_laid_out', async () => {
+    await c.provision.execute({ username: alice });
+    await c.addWatchDir.execute({ username: alice, label: Label.parse('films') });
+
+    await c.render.execute({ username: alice });
+
+    expect(c.fileIndex.refreshed).toEqual(['alice']);
   });
 
   it('should_not_restart_a_stopped_instance_on_render', async () => {
