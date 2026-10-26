@@ -63,10 +63,15 @@ describe('SyncTransfer', () => {
     expect(retried.attempts).toBe(1);
   });
 
-  it('should_refuse_to_requeue_something_that_already_went_through', () => {
+  // the rule changed at a member's request: MySB let them send a finished
+  // download home again (deleted by mistake, another machine), and so does this
+  it('should_send_again_something_that_already_went_through', () => {
     const sent = aTransfer().start('2026-08-15 10:01:00').succeed('2026-08-15 10:05:00');
 
-    expect(() => sent.requeue('2026-08-15 11:00:00')).toThrow();
+    const again = sent.requeue('2026-08-15 11:00:00');
+
+    expect(again.state).toBe('waiting');
+    expect(again.attempts).toBe(1);
   });
 
   it('should_refuse_to_start_something_that_is_already_on_its_way', () => {

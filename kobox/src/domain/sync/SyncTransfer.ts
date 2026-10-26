@@ -3,12 +3,6 @@ import type { Label } from '../torrent/Label.js';
 import type { Username } from '../user/Username.js';
 import type { LocalPath } from './LocalPath.js';
 
-export class TransferNotRetryableError extends DomainError {
-  constructor(state: string) {
-    super(`a transfer that is ${state} cannot be put back in the queue`);
-  }
-}
-
 export class TransferAlreadyOnItsWayError extends DomainError {
   constructor() {
     super('this transfer is already on its way');
@@ -102,10 +96,8 @@ export class SyncTransfer {
     return this.next({ state: 'failed', lastError: reason, updatedAt: at });
   }
 
+  // a failed transfer tried again, or one that arrived sent home once more
   requeue(at: string): SyncTransfer {
-    if (this.state === 'sent') {
-      throw new TransferNotRetryableError(this.state);
-    }
     // the attempt count is kept: it is the history, not the state
     return this.next({ state: 'waiting', updatedAt: at });
   }

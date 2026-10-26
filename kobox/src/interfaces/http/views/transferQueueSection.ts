@@ -1,4 +1,4 @@
-import type { SyncTransfer } from '../../../domain/sync/SyncTransfer.js';
+import type { SyncTransfer, TransferState } from '../../../domain/sync/SyncTransfer.js';
 import { html, type RawHtml } from '../html.js';
 import type { Viewer } from './layout.js';
 
@@ -11,6 +11,12 @@ const STATE_WORDS: Readonly<Record<string, { readonly chip: string; readonly tex
   failed: { chip: 'bad', text: 'did not arrive' },
 };
 
+// what putting a finished transfer back in the queue means to the member
+const AGAIN_LABELS: Readonly<Partial<Record<TransferState, string>>> = {
+  failed: 'Try again',
+  sent: 'Send again',
+};
+
 function row(transfer: SyncTransfer, viewer: Viewer): RawHtml {
   const words = STATE_WORDS[transfer.state] ?? { chip: '', text: transfer.state };
   return html`<tr>
@@ -20,13 +26,13 @@ function row(transfer: SyncTransfer, viewer: Viewer): RawHtml {
   <td class="reason">${transfer.lastError ?? ''}</td>
   <td class="when">${transfer.updatedAt}</td>
   <td>${
-    transfer.state === 'failed'
-      ? html`<form class="inline" method="post" action="/sync/transfers/retry">
+    AGAIN_LABELS[transfer.state] === undefined
+      ? html``
+      : html`<form class="inline" method="post" action="/sync/transfers/retry">
     <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
     <input type="hidden" name="id" value="${String(transfer.id ?? 0)}">
-    <button class="ghost" type="submit">Try again</button>
+    <button class="ghost" type="submit">${AGAIN_LABELS[transfer.state]}</button>
   </form>`
-      : html``
   }</td>
 </tr>`;
 }
