@@ -807,6 +807,15 @@ describe('rutorrent installer', () => {
     }
   });
 
+  // each member's ruTorrent reads its own config under conf/users: the worker
+  // creating that folder with its 027 umask made it 0750, and no member could
+  // reach their file
+  it('should_let_every_member_traverse_to_their_own_config', async () => {
+    await installer(world, 'rutorrent').install();
+
+    expect(world.host.dirs.get('/var/www/rutorrent/conf/users')).toBe('0755');
+  });
+
   it('should_lay_down_the_ratio_groups_members_are_offered', async () => {
     await installer(world, 'rutorrent').install();
 

@@ -516,6 +516,9 @@ class RutorrentInstaller implements ComponentInstaller {
       await host.ensureDir(dir, '0710');
       await host.chown(dir, WEB_SERVER_USER, MEMBERS_GROUP);
     }
+    // each member's own ruTorrent reaches its config through here: made by
+    // the worker's 027 umask it would be 0750, and closed to all of them
+    await host.ensureDir(`${RUTORRENT_DIR}/conf/users`, '0755');
     await files.apply([
       renderRutorrentConfig(),
       renderRutorrentPlugins(),
