@@ -20,7 +20,10 @@ export class WatchDirAdapter implements WatchDirPort {
     await this.letTheWebServerIn(username);
     const home = homeOf(username);
     await this.install(username, '0750', `${home}/rtorrent`);
-    await this.install(username, '0750', `${home}/rtorrent/config.d`);
+    // read by rtorrent alone: the web server, in the member's group for
+    // Nextcloud and the media player, has no business in the config or logs
+    await this.install(username, '0700', `${home}/rtorrent/config.d`);
+    await this.install(username, '0700', `${home}/logs`);
     for (const dir of watchDirs) {
       // setgid: a .torrent the web server drops keeps the member's group
       await this.install(username, '2770', dir.watchPath(home));
