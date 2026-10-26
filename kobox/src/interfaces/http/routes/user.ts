@@ -62,7 +62,8 @@ import { syncPage } from '../views/syncPage.js';
 import { Language } from '../../../domain/portal/Language.js';
 import { IPV4_PATTERN, IpAddress } from '../../../domain/shared/IpAddress.js';
 import { DEFAULT_TRANSFER_MAILS, TRANSFER_MAILS } from '../../../domain/sync/TransferMails.js';
-import type { UserAddressRepository } from '../../../domain/tracker/ports.js';
+import type { BlocklistRepository, UserAddressRepository } from '../../../domain/tracker/ports.js';
+import { blocklistCoverage } from '../../../domain/tracker/BlocklistCoverage.js';
 
 const categorySchema = z.object({ label: z.string().min(1).max(64) });
 const retrySchema = z.object({ id: z.coerce.number().int().positive() });
@@ -167,6 +168,7 @@ export interface UserRoutesDeps {
   readonly nextcloudSignsInFromPortal: boolean;
   readonly users: UserRepository;
   readonly addresses: UserAddressRepository;
+  readonly blocklists: BlocklistRepository;
   readonly fairUse: FairUseRepository;
   readonly queue: JobQueuePort;
   readonly hasher: PasswordHasherPort;
@@ -276,9 +278,10 @@ export function registerUserRoutes(
     for (const user of await deps.users.listAll()) {
       rows.push(await signalRowFor(deps, user));
     }
+    const coverage = blocklistCoverage(await deps.blocklists.listAll());
     return reply
       .type('text/html')
-      .send(adminHomePage(rows, viewerOf(session), flashOf(request)));
+      .send(adminHomePage(rows, coverage, viewerOf(session), flashOf(request)));
   });
 
   server.get('/password', async (request, reply) => {

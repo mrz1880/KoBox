@@ -5,6 +5,7 @@ import type { SshPublicKey } from '../../../domain/user/SshPublicKey.js';
 import type { SeedboxUser } from '../../../domain/user/SeedboxUser.js';
 import { html, type RawHtml } from '../html.js';
 import { flash, page, type Viewer } from './layout.js';
+import type { BlocklistCoverage } from '../../../domain/tracker/BlocklistCoverage.js';
 
 function fairUseChip(level: string): RawHtml {
   if (level === 'throttled') {
@@ -176,8 +177,35 @@ export type FleetRow = SignalRow;
 // The fleet console: an aggregate ribbon, then one channel per user. The strips
 // are ordered loudest-first, so whoever is pushing the most egress is at the top
 // of the desk rather than buried in alphabetical order.
+// Only the two states that leave the box unprotected get a word, each with
+// the one click that fixes it.
+function blocklistWarning(coverage: BlocklistCoverage, viewer: Viewer): RawHtml {
+  switch (coverage) {
+    case 'blocking':
+      return html``;
+    case 'no-list-enabled':
+      return html`<section class="panel">
+  <p class="lead">Nothing is blocked: no blocklist is enabled.</p>
+  <p class="muted">Importing the catalog enables the lists MySB used, and downloads them.</p>
+  <form class="inline" method="post" action="/admin/blocklists/import-catalog">
+    <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
+    <button type="submit">Import the catalog</button>
+  </form>
+</section>`;
+    case 'not-downloaded-yet':
+      return html`<section class="panel">
+  <p class="lead">Nothing is blocked yet: the enabled blocklists were never downloaded.</p>
+  <form class="inline" method="post" action="/admin/blocklists/update">
+    <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
+    <button type="submit">Download them now</button>
+  </form>
+</section>`;
+  }
+}
+
 export function adminHomePage(
   rows: readonly FleetRow[],
+  coverage: BlocklistCoverage,
   viewer: Viewer,
   message?: string,
 ): string {
@@ -192,6 +220,7 @@ export function adminHomePage(
     'Overview',
     html`<h1>Fleet console</h1>
 ${flash(message)}
+${blocklistWarning(coverage, viewer)}
 <div class="ribbon">
   <span class="metric"><span class="eyebrow">Users active</span>
     <span class="val">${active}/${rows.length}</span></span>

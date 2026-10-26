@@ -100,6 +100,7 @@ describe('portal pages', () => {
         row({ username: 'loud', egressBytes: 900 * G }),
         row({ username: 'middling', egressBytes: 50 * G }),
       ],
+      'blocking',
       ADMIN,
     );
 

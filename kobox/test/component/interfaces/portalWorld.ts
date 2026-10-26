@@ -153,6 +153,7 @@ export interface PortalWorld {
   readonly diskSamples: InMemoryDiskUsageRepository;
   readonly sshKeys: InMemorySshKeyRepository;
   readonly addresses: InMemoryUserAddressRepository;
+  readonly blocklists: InMemoryBlocklistRepository;
   readonly components: InMemoryComponentRegistry;
   readonly mailRelay: InMemoryMailRelayRepository;
   readonly siteSettings: InMemorySiteSettingsRepository;
@@ -188,6 +189,7 @@ export async function buildPortalWorld(
   const diskSamples = new InMemoryDiskUsageRepository();
   const sshKeys = new InMemorySshKeyRepository();
   const addresses = new InMemoryUserAddressRepository();
+  const blocklists = new InMemoryBlocklistRepository();
   const components = new InMemoryComponentRegistry();
   const mailRelay = new InMemoryMailRelayRepository();
   const siteSettings = new InMemorySiteSettingsRepository();
@@ -226,7 +228,7 @@ export async function buildPortalWorld(
     requestPasswordReset: new RequestPasswordReset(linkDeps),
     setPasswordFromLink: new SetPasswordFromLink(linkDeps),
     trackers: new InMemoryTrackerRepository(),
-    blocklists: new InMemoryBlocklistRepository(),
+    blocklists,
     addresses,
     bindings: new InMemoryUserAddressRepository(),
     fairUse,
@@ -283,7 +285,7 @@ export async function buildPortalWorld(
     { username: Username.parse('boss'), passwordHash: goodHash, role: 'admin' },
     NOW,
   );
-  return { server, users, credentials, sessions, queue, outbox, downloads, debridAccounts, media, fairUse, diagnostics, instances, diskSamples, sshKeys, addresses, components, mailRelay, siteSettings, destinations, transfers, passwords };
+  return { server, users, credentials, sessions, queue, outbox, downloads, debridAccounts, media, fairUse, diagnostics, instances, diskSamples, sshKeys, addresses, blocklists, components, mailRelay, siteSettings, destinations, transfers, passwords };
 }
 
 export interface AgentSession {
