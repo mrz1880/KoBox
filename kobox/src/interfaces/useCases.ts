@@ -510,6 +510,7 @@ export interface SyncUseCaseDeps {
   readonly instances: TorrentInstanceRepository;
   readonly destinations: SyncDestinationRepository;
   readonly transfers: SyncTransferRepository;
+  readonly outbox: MailOutboxPort;
   readonly opener: RemotePasswordOpenerPort;
   readonly probe: RemoteProbePort;
   readonly transport: FileTransferPort;
@@ -545,6 +546,7 @@ export function buildSyncUseCases(deps: SyncUseCaseDeps): SyncUseCases {
       users: deps.users,
       destinations: deps.destinations,
       transfers: deps.transfers,
+      outbox: deps.outbox,
       opener: deps.opener,
       transport: deps.transport,
       facts: deps.facts,

@@ -888,6 +888,7 @@ export function buildContainer(name: string): Container {
     instances: new SqliteTorrentInstanceRepository(db),
     destinations: syncDestinationRepo,
     transfers: syncTransferRepo,
+    outbox,
     transport: new RsyncOverSshTransfer(runner),
     facts: new FsLocalFileFacts(),
     hour: () => new Date().getHours(),

@@ -6,6 +6,8 @@ import type { RemotePath } from './RemotePath.js';
 import type { RemotePort } from './RemotePort.js';
 import type { SendHour } from './SendHour.js';
 import type { TransferBatchSize } from './TransferBatchSize.js';
+import type { TransferState } from './SyncTransfer.js';
+import { DEFAULT_TRANSFER_MAILS, mailsAbout, type TransferMails } from './TransferMails.js';
 
 // What the last "test it now" concluded, in words the page can show as they are.
 export interface ConnectionCheck {
@@ -27,6 +29,8 @@ interface SyncDestinationProps {
   readonly batchSize: TransferBatchSize;
   readonly placement: LoneFilePlacement;
   readonly sendHour: SendHour;
+  // absent on a destination set before the choice existed: the default holds
+  readonly transferMails?: TransferMails;
   readonly lastCheck?: ConnectionCheck;
 }
 
@@ -52,6 +56,7 @@ export class SyncDestination {
   readonly batchSize: TransferBatchSize;
   readonly placement: LoneFilePlacement;
   readonly sendHour: SendHour;
+  readonly transferMails: TransferMails;
   readonly lastCheck?: ConnectionCheck;
 
   private constructor(props: SyncDestinationProps) {
@@ -64,6 +69,7 @@ export class SyncDestination {
     this.batchSize = props.batchSize;
     this.placement = props.placement;
     this.sendHour = props.sendHour;
+    this.transferMails = props.transferMails ?? DEFAULT_TRANSFER_MAILS;
     if (props.lastCheck !== undefined) {
       this.lastCheck = props.lastCheck;
     }
@@ -121,6 +127,14 @@ export class SyncDestination {
     return new SyncDestination({ ...this.props(), sendHour });
   }
 
+  withTransferMails(transferMails: TransferMails): SyncDestination {
+    return new SyncDestination({ ...this.props(), transferMails });
+  }
+
+  wantsMailAbout(state: TransferState): boolean {
+    return mailsAbout(this.transferMails, state);
+  }
+
   recordCheck(check: ConnectionCheck): SyncDestination {
     return new SyncDestination({ ...this.connection(), lastCheck: check });
   }
@@ -137,6 +151,7 @@ export class SyncDestination {
       batchSize: this.batchSize,
       placement: this.placement,
       sendHour: this.sendHour,
+      transferMails: this.transferMails,
     };
   }
 

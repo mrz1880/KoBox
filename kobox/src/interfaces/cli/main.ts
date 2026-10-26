@@ -14,6 +14,7 @@ import { RemotePassword } from '../../domain/sync/RemotePassword.js';
 import { RemotePath } from '../../domain/sync/RemotePath.js';
 import { RemotePort } from '../../domain/sync/RemotePort.js';
 import { SendHour } from '../../domain/sync/SendHour.js';
+import { DEFAULT_TRANSFER_MAILS, parseTransferMails } from '../../domain/sync/TransferMails.js';
 import { TransferBatchSize } from '../../domain/sync/TransferBatchSize.js';
 import { ROLES, parseRole } from '../../domain/portal/Role.js';
 import { EmailAddress } from '../../domain/user/EmailAddress.js';
@@ -211,6 +212,7 @@ program
   .option('--batch-size <n>', 'files per pass, 0 for everything waiting', '0')
   .option('--lone-file <placement>', 'beside-the-others | in-its-own-folder', 'beside-the-others')
   .option('--send-hour <h>', 'hour of day the scheduled folders go out', '2')
+  .option('--transfer-mails <choice>', 'never | failures | every', DEFAULT_TRANSFER_MAILS)
   .description("set where a member's finished downloads are copied (password on stdin)")
   .action(
     async (
@@ -219,7 +221,7 @@ program
       rawPort: string,
       rawAccount: string,
       rawPath: string,
-      options: { batchSize: string; loneFile: string; sendHour: string },
+      options: { batchSize: string; loneFile: string; sendHour: string; transferMails: string },
     ) => {
       // stdin, never an argument: a password on the command line is readable in
       // `ps` by every other member of the box
@@ -234,6 +236,7 @@ program
         batchSize: TransferBatchSize.parse(Number(options.batchSize)),
         placement: LoneFilePlacement.parse(options.loneFile),
         sendHour: SendHour.parse(Number(options.sendHour)),
+        transferMails: parseTransferMails(options.transferMails),
         ...(secret !== '' && { password: RemotePassword.parse(secret) }),
       });
       await done(c, `destination set for ${rawUser}`);

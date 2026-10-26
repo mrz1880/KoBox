@@ -96,4 +96,15 @@ describe('SyncDestination', () => {
     expect(failed.lastCheck?.ok).toBe(false);
     expect(failed.lastCheck?.detail).toBe('the password was refused');
   });
+
+  // a member chooses: some want to hear about every arrival, some about nothing
+  it('should_mail_about_a_transfer_only_as_the_member_chose', () => {
+    const quiet = aDestination();
+    const failuresOnly = quiet.withTransferMails('failures');
+    const everything = quiet.withTransferMails('every');
+
+    expect([quiet.wantsMailAbout('sent'), quiet.wantsMailAbout('failed')]).toEqual([false, false]);
+    expect([failuresOnly.wantsMailAbout('sent'), failuresOnly.wantsMailAbout('failed')]).toEqual([false, true]);
+    expect([everything.wantsMailAbout('sent'), everything.wantsMailAbout('failed')]).toEqual([true, true]);
+  });
 });

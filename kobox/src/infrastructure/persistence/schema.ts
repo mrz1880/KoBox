@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm';
 import { index, integer, sqliteTable, text, unique } from 'drizzle-orm/sqlite-core';
+import { DEFAULT_TRANSFER_MAILS } from '../../domain/sync/TransferMails.js';
 
 export const users = sqliteTable('users', {
   id: integer('id').primaryKey({ autoIncrement: true }),
@@ -422,6 +423,8 @@ export const syncDestinations = sqliteTable('sync_destinations', {
   placement: text('placement').notNull().default('beside-the-others'),
   // the hour of day the "send it a bit later" folders go out
   sendHour: integer('send_hour').notNull().default(2),
+  // when the member hears by mail about a transfer: never, failures, every
+  transferMails: text('transfer_mails').notNull().default(DEFAULT_TRANSFER_MAILS),
   // what the last "test it now" concluded, so the page can show it back
   lastCheckOk: integer('last_check_ok'),
   lastCheckAt: text('last_check_at'),
