@@ -27,24 +27,37 @@ function invitationChip(name: string, viewer: Viewer): RawHtml {
 </form>`;
 }
 
+// What the list shows of a member's portal login. A member without one (an
+// account made outside the portal) has no entry at all.
+export interface MemberLogin {
+  readonly role: Role;
+  // has not followed their invitation yet
+  readonly invited: boolean;
+}
+
+const ROLE_LABELS: Record<Role, string> = { admin: 'Administrator', user: 'Member' };
+
 export function adminUsersPage(
   users: readonly SeedboxUser[],
-  // the members who have not followed their invitation yet
-  invited: ReadonlySet<string>,
+  logins: ReadonlyMap<string, MemberLogin>,
   viewer: Viewer,
   message?: string,
 ): string {
-  const rows = users.map(
-    (user) => html`<tr>
+  const rows = users.map((user) => {
+    const login = logins.get(user.username.value);
+    return html`<tr>
   <td><a href="/admin/users/${user.username.value}">${user.username.value}</a></td>
   <td>${user.email.value}</td>
   <td class="num">${user.quota.toGib()} GiB</td>
+  <td>${login === undefined
+    ? html`<span class="muted">${viewer.t('No portal login')}</span>`
+    : viewer.t(ROLE_LABELS[login.role])}</td>
   <td class="num">${user.scgiPort.value}</td>
-  <td>${invited.has(user.username.value)
+  <td>${login?.invited === true
     ? invitationChip(user.username.value, viewer)
     : statusChip(user, viewer)}</td>
-</tr>`,
-  );
+</tr>`;
+  });
   return page(
     'Members',
     html`<h1>${viewer.t('Members')}</h1>
@@ -53,7 +66,7 @@ export function adminUsersPage(
 ${flash(message)}
 <table>
   <thead>
-    <tr><th>${viewer.t('User')}</th><th>${viewer.t('Email')}</th><th>${viewer.t('Quota')}</th><th>${viewer.t('SCGI')}</th><th>${viewer.t('Status')}</th></tr>
+    <tr><th>${viewer.t('User')}</th><th>${viewer.t('Email')}</th><th>${viewer.t('Quota')}</th><th>${viewer.t('Role')}</th><th>${viewer.t('SCGI')}</th><th>${viewer.t('Status')}</th></tr>
   </thead>
   <tbody>${rows}</tbody>
 </table>

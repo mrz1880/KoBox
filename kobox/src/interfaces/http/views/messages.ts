@@ -93,6 +93,10 @@ const FR: Readonly<Record<string, string>> = {
   // members
   Email: 'Adresse mail',
   Quota: 'Quota',
+  Role: 'Rôle',
+  Administrator: 'Administrateur',
+  Member: 'Membre',
+  'No portal login': 'Pas d’accès au portail',
   SCGI: 'SCGI',
   'Invite a member': 'Inviter un membre',
   'Send the invitation': 'Envoyer l’invitation',

@@ -37,6 +37,20 @@ describe('admin users list', () => {
     expect(response.body).toContain('boss');
     expect(response.body).toContain('active');
   });
+
+  it('should_show_each_members_role_in_the_list', async () => {
+    const response = await world.server.inject({
+      method: 'GET',
+      url: '/admin/users',
+      headers: { cookie: admin.cookie },
+    });
+
+    const rowOf = (name: string): string =>
+      new RegExp(`<tr>\\s*<td><a href="/admin/users/${name}">[^]*?</tr>`).exec(response.body)?.[0] ?? '';
+    expect(rowOf('boss')).toContain('Administrator');
+    expect(rowOf('alice')).toContain('Member');
+    expect(rowOf('alice')).not.toContain('Administrator');
+  });
 });
 
 describe('admin user creation', () => {
