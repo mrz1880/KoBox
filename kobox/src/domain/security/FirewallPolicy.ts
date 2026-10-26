@@ -45,6 +45,8 @@ function assertPort(value: number, what: string): void {
 // The whole desired firewall state. Loopback, established and SSH survival are
 // invariants of the type, not options: no input can produce a ruleset without
 // them (the §5.2 destructive-refresh cycle AND the lockout risk both die here).
+// SSH survives as the declared addresses and the tunnels, or as an open port
+// while nobody has declared an address yet.
 export class FirewallPolicy {
   private constructor(
     readonly sshPort: number,
@@ -53,6 +55,13 @@ export class FirewallPolicy {
     readonly users: readonly FirewallUser[],
     readonly blocklistSet: boolean,
   ) {}
+
+  // SSH and SFTP answer only declared addresses and the VPN, but only once
+  // someone has declared one: a fresh box, reached over SSH by whoever installs
+  // it, would otherwise shut its own installer out on the first apply.
+  get sshOpenToAll(): boolean {
+    return this.users.every((user) => user.addresses.length === 0);
+  }
 
   static create(props: FirewallPolicyProps): FirewallPolicy {
     assertPort(props.sshPort, 'sshPort');

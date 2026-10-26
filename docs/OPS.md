@@ -700,6 +700,28 @@ nginx's checks for ruTorrent and Nextcloud answer no.
 - Nextcloud's own sign-in (desktop and mobile apps) is not covered: those apps
   sign in to Nextcloud with the password, not through the portal.
 
+## Who can reach SSH and SFTP
+
+The web (portal, invitations, password links, Nextcloud) answers everyone.
+SSH and SFTP answer only the members' declared addresses and the three VPN
+subnets, the compromise MySB members already knew. A declared address is
+trusted for every port, as on MySB.
+
+- A member declares their addresses in **Account**, under "Where you connect
+  from": the one of the current request in one click, or one typed in for a
+  place they are not at (private ranges are refused). A home address that
+  changes on its own is declared as a dynamic hostname, looked up every five
+  minutes. The page shows only the member's own list. Administrators manage
+  every member's addresses and hostnames in **Network and security**.
+- While no address is declared at all, SSH stays open to everyone: a fresh box
+  must not shut out whoever is installing it.
+- Locked out of SSH because your address changed: sign in to the portal (the
+  web stays open), add your current address, wait for the worker to apply it,
+  then connect. The VPN works too. An established SSH session survives every
+  re-apply.
+- The firewall rules are IPv4 only, and sshd listens on IPv4 only
+  (`AddressFamily inet`), so SSH is not reachable over IPv6 at all.
+
 ## A member's NAS through the VPN
 
 The VPN is optional: Nextcloud, the portal, ruTorrent, SFTP, the apps' RPC and
