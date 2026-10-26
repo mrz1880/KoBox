@@ -981,6 +981,30 @@ describe('ipset chain (blocklists -> kernel set)', () => {
     );
   });
 
+  // an import that enables lists and stops there leaves the kernel set empty
+  // until the next scheduled update, hours later
+  it('should_download_the_lists_right_after_importing_the_catalog', async () => {
+    await world.blocklists.save(
+      Blocklist.create({
+        source: BlocklistSource.parse('personal'),
+        author: 'me',
+        name: 'mine',
+        url: BlocklistUrl.parse('https://lists.example.net/mine.txt'),
+        subscription: false,
+        enabled: true,
+      }),
+    );
+    world.download.givenList('https://lists.example.net/mine.txt', {
+      ranges: ['192.0.2.0/24'],
+      sha256: 'bb',
+    });
+    await world.queue.enqueue(parseJob('import-blocklist-catalog', {}));
+
+    await world.worker.drain();
+
+    expect(world.ipset.restored).toEqual(['/etc/kobox/blocklist.ipset']);
+  });
+
   it('should_render_but_not_load_when_the_kernel_lacks_ipset', async () => {
     world.ipset.supported = false;
     const id = await world.queue.enqueue(parseJob('apply-ipset', {}));

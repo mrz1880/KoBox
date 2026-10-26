@@ -32,6 +32,7 @@ interface ChainHints {
   readonly fetchCertHost?: string;
   readonly whitelistDirty?: boolean;
   readonly blocklistsUpdated?: boolean;
+  readonly blocklistsDue?: boolean;
   readonly firewallDirty?: boolean;
   readonly fail2banDirty?: boolean;
   readonly openVpnDirty?: boolean;
@@ -144,6 +145,9 @@ export class JobWorker {
     }
     if (hints?.whitelistDirty === true) {
       await this.queue.enqueue(parseJob('render-whitelist', {}));
+    }
+    if (hints?.blocklistsDue === true) {
+      await this.queue.enqueue(parseJob('update-blocklists', {}));
     }
     if (hints?.blocklistsUpdated === true) {
       await this.queue.enqueue(parseJob('render-blocklist-filters', {}));
@@ -352,9 +356,11 @@ export class JobWorker {
         });
         return { whitelistDirty: report.whitelistDirty };
       }
+      // the import enables lists; without a download right after, the kernel
+      // set stays empty until the next scheduled update, hours later
       case 'import-blocklist-catalog':
         await this.trackers.importCatalog.execute();
-        return;
+        return { blocklistsDue: true };
       case 'update-blocklists': {
         const report = await this.trackers.updateBlocklists.execute({ now: nowStamp() });
         return { blocklistsUpdated: report.ranges !== undefined };
