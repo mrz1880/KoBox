@@ -327,6 +327,12 @@ describe('installation rendering', () => {
     }
   });
 
+  // the firewall rules are IPv4 only: an sshd answering on IPv6 would be open
+  // to every address the day the box gets a public IPv6 one
+  it('should_have_sshd_answer_on_ipv4_only', () => {
+    expect(renderSshdDropin(22).content).toContain('AddressFamily inet\n');
+  });
+
   it('should_render_the_sshd_dropin_without_a_port_line_on_the_default_port', () => {
     const file = renderSshdDropin(22);
     expect(file.path).toBe('/etc/ssh/sshd_config.d/90-kobox.conf');

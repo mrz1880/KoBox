@@ -1,4 +1,5 @@
 # KoBox-managed — DO NOT EDIT (rendered declaratively).
+AddressFamily inet
 PermitRootLogin prohibit-password
 PasswordAuthentication yes
 X11Forwarding no
