@@ -113,6 +113,7 @@ export interface PortalServerDeps {
   readonly diskSamples: DiskUsageRepository;
   readonly mailRelay: MailRelayRepository;
   readonly boxInVpn: string;
+  readonly sshPort: number;
   readonly nextcloudSignsInFromPortal: boolean;
   readonly siteSettings: SiteSettingsRepository;
   readonly saveMailRelay: SaveMailRelay;

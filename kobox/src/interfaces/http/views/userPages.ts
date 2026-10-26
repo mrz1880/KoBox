@@ -403,6 +403,7 @@ const VPN_CHOICES: readonly {
 export interface AccessFacts {
   readonly username: string;
   readonly sftpHost?: string;
+  readonly sshPort: number;
   readonly rtorrentPort: number;
   readonly hasAppToken: boolean;
   // set exactly once, on the response that issued it: only its hash is stored,
@@ -474,7 +475,13 @@ ${facts.sshKey.comment === '' ? html`` : html`<span class="mono">${facts.sshKey.
 anywhere else. This key transfers files and cannot open a shell, which is all a
 send-my-torrents script needs.</p>
   <button type="submit">Install this key</button>
-</form>`;
+</form>
+${facts.sftpHost === undefined
+    ? html``
+    : html`<p class="muted">With the key installed, send a torrent file over SFTP
+into one of your folders (replace FOLDER with its name, as listed under Folders);
+rTorrent picks it up within a few seconds and gives it that folder's label:</p>
+<p class="mono">scp -P ${facts.sshPort} my.torrent ${facts.username}@${facts.sftpHost}:rtorrent/watch/FOLDER/</p>`}`;
 }
 
 // What a member gives to Sonarr, Radarr or any other program that drives their

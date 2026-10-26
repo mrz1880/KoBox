@@ -158,6 +158,8 @@ export interface UserRoutesDeps {
   readonly components: ComponentRegistry;
   // the box's own address in the usual tunnel, where the network share lives
   readonly boxInVpn: string;
+  // where SFTP answers, shown beside the member's key
+  readonly sshPort: number;
   // Nextcloud's SSO app is in place: it opens the session of the member signed
   // in here, but only from its own login page
   readonly nextcloudSignsInFromPortal: boolean;
@@ -800,6 +802,7 @@ export function registerUserRoutes(
         username: user.username.value,
         hasAppToken: (await deps.credentials.find(session.username))?.appTokenHash !== undefined,
         ...(sftpHost !== undefined && { sftpHost }),
+        sshPort: deps.sshPort,
         rtorrentPort: user.rtorrentPort.value,
         ...(await (async () => {
           const stored = await deps.sshKeys.find(session.username);
@@ -830,6 +833,7 @@ export function registerUserRoutes(
       accessPage(viewerOf(session), {
         username: user.username.value,
         ...(sftpHost !== undefined && sftpHost !== '' && { sftpHost }),
+        sshPort: deps.sshPort,
         rtorrentPort: user.rtorrentPort.value,
         hasAppToken: true,
         freshToken: token.reveal(),
