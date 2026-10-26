@@ -68,6 +68,7 @@ function withoutPassword(overrides: Partial<Command> = {}): Command {
     batchSize: TransferBatchSize.unlimited(),
     placement: LoneFilePlacement.besideTheOthers,
     sendHour: SendHour.default(),
+    transferMails: 'never',
     ...overrides,
   };
 }

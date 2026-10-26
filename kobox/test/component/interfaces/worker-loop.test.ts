@@ -394,6 +394,7 @@ beforeEach(() => {
     instances,
     destinations: syncDestinations,
     transfers: syncTransfers,
+    outbox,
     transport: { send: () => Promise.resolve({ ok: true }) },
     facts: { isDirectory: () => Promise.resolve(false), exists: () => Promise.resolve(true) },
     hour: () => 2,

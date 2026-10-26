@@ -5,6 +5,7 @@ import { RemoteHost } from '../../domain/sync/RemoteHost.js';
 import { RemotePath } from '../../domain/sync/RemotePath.js';
 import { RemotePort } from '../../domain/sync/RemotePort.js';
 import { SendHour } from '../../domain/sync/SendHour.js';
+import { parseTransferMails } from '../../domain/sync/TransferMails.js';
 import { SyncDestination, type ConnectionCheck } from '../../domain/sync/SyncDestination.js';
 import { TransferBatchSize } from '../../domain/sync/TransferBatchSize.js';
 import type { SyncDestinationRepository } from '../../domain/sync/ports.js';
@@ -50,6 +51,7 @@ export class SqliteSyncDestinationRepository implements SyncDestinationRepositor
         batchSize: TransferBatchSize.parse(row.batchSize),
         placement: LoneFilePlacement.parse(row.placement),
         sendHour: SendHour.parse(row.sendHour),
+        transferMails: parseTransferMails(row.transferMails),
         ...(check !== undefined && { lastCheck: check }),
       }),
     );
@@ -66,6 +68,7 @@ export class SqliteSyncDestinationRepository implements SyncDestinationRepositor
       batchSize: destination.batchSize.value,
       placement: destination.placement.value,
       sendHour: destination.sendHour.value,
+      transferMails: destination.transferMails,
       lastCheckOk: destination.lastCheck === undefined ? null : destination.lastCheck.ok ? 1 : 0,
       lastCheckAt: destination.lastCheck?.at ?? null,
       lastCheckDetail: destination.lastCheck?.detail ?? null,

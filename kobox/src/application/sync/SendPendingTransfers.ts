@@ -7,6 +7,7 @@ import type {
   SyncDestinationRepository,
   SyncTransferRepository,
 } from '../../domain/sync/ports.js';
+import type { MailOutboxPort } from '../maintenance/MailOutboxPort.js';
 import type { UserRepository } from '../../domain/user/ports.js';
 import type { Username } from '../../domain/user/Username.js';
 
@@ -14,6 +15,8 @@ interface Deps {
   readonly users: UserRepository;
   readonly destinations: SyncDestinationRepository;
   readonly transfers: SyncTransferRepository;
+  // what the member chose to hear about goes out through the mail queue
+  readonly outbox: MailOutboxPort;
   readonly opener: RemotePasswordOpenerPort;
   readonly transport: FileTransferPort;
   readonly facts: LocalFileFactsPort;
@@ -80,8 +83,9 @@ export class SendPendingTransfers {
 
     if (!(await this.deps.facts.exists(transfer.source))) {
       // the member deleted it between the download finishing and the pass
-      await this.deps.transfers.save(
+      await this.finish(
         sending.fail('the file is no longer on the box', this.deps.clock()),
+        destination,
       );
       return;
     }
@@ -95,10 +99,54 @@ export class SendPendingTransfers {
       source: transfer.source,
       remoteFolder,
     });
-    await this.deps.transfers.save(
+    await this.finish(
       outcome.ok
         ? sending.succeed(this.deps.clock())
         : sending.fail(outcome.detail ?? 'it did not go through', this.deps.clock()),
+      destination,
     );
   }
+
+  private async finish(transfer: SyncTransfer, destination: SyncDestination): Promise<void> {
+    await this.deps.transfers.save(transfer);
+    if (destination.wantsMailAbout(transfer.state)) {
+      await this.tell(transfer);
+    }
+  }
+
+  // Best-effort: the transfer is recorded either way, and a mail that cannot
+  // be queued must not turn a file that arrived into a failed pass.
+  private async tell(transfer: SyncTransfer): Promise<void> {
+    try {
+      const user = await this.deps.users.findByUsername(transfer.username);
+      if (user === undefined) {
+        return;
+      }
+      await this.deps.outbox.enqueue(
+        { recipient: user.email.value, ...transferMail(transfer) },
+        this.deps.clock(),
+      );
+    } catch {
+      return;
+    }
+  }
+}
+
+function transferMail(transfer: SyncTransfer): { subject: string; body: string } {
+  if (transfer.state === 'sent') {
+    return {
+      subject: `${transfer.name} arrived`,
+      body: `${transfer.name}, from your ${transfer.label.value} folder, has arrived on your own machine.\n`,
+    };
+  }
+  return {
+    subject: `${transfer.name} did not arrive`,
+    body: [
+      `${transfer.name}, from your ${transfer.label.value} folder, could not be sent to your own machine:`,
+      `${transfer.lastError ?? 'it did not go through'}.`,
+      '',
+      'It stays under Folders on your seedbox, where you can try it again.',
+      '',
+    ].join('\n'),
+  };
 }

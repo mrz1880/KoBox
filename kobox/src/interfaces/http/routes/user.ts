@@ -61,6 +61,7 @@ import {
 import { syncPage } from '../views/syncPage.js';
 import { Language } from '../../../domain/portal/Language.js';
 import { IPV4_PATTERN, IpAddress } from '../../../domain/shared/IpAddress.js';
+import { DEFAULT_TRANSFER_MAILS, TRANSFER_MAILS } from '../../../domain/sync/TransferMails.js';
 import type { UserAddressRepository } from '../../../domain/tracker/ports.js';
 
 const categorySchema = z.object({ label: z.string().min(1).max(64) });
@@ -75,6 +76,7 @@ const destinationSchema = z.object({
   batchSize: z.coerce.number().int().min(0).max(1000),
   placement: z.string().min(1).max(32),
   sendHour: z.coerce.number().int().min(0).max(23),
+  transferMails: z.enum(TRANSFER_MAILS).default(DEFAULT_TRANSFER_MAILS),
 });
 const categoryModeSchema = z.object({
   label: z.string().min(1).max(64),
@@ -673,6 +675,7 @@ export function registerUserRoutes(
         batchSize: TransferBatchSize.parse(form.batchSize),
         placement: LoneFilePlacement.parse(form.placement),
         sendHour: SendHour.parse(form.sendHour),
+        transferMails: form.transferMails,
         ...(form.password !== undefined &&
           form.password !== '' && { password: RemotePassword.parse(form.password) }),
       });

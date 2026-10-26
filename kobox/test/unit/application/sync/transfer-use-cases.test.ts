@@ -12,6 +12,8 @@ import { RemotePath } from '../../../../src/domain/sync/RemotePath.js';
 import { RemotePort } from '../../../../src/domain/sync/RemotePort.js';
 import { SendHour } from '../../../../src/domain/sync/SendHour.js';
 import { SyncDestination } from '../../../../src/domain/sync/SyncDestination.js';
+import type { TransferMails } from '../../../../src/domain/sync/TransferMails.js';
+import { InMemoryMailOutbox } from '../../../../src/infrastructure/persistence/InMemoryMailOutbox.js';
 import { TransferBatchSize } from '../../../../src/domain/sync/TransferBatchSize.js';
 import type {
   FileTransferPort,
@@ -128,28 +130,37 @@ describe('QueueFinishedDownload', () => {
 });
 
 describe('SendPendingTransfers', () => {
-  async function world(options: { hour?: number; batchSize?: TransferBatchSize } = {}) {
+  async function world(
+    options: {
+      hour?: number;
+      batchSize?: TransferBatchSize;
+      mails?: TransferMails;
+      outcome?: TransferOutcome;
+    } = {},
+  ) {
     const users = new InMemoryUserRepository();
     await users.save(new UserBuilder().build());
     const destinations = new InMemorySyncDestinationRepository();
     await destinations.save(
       aDestination({
         ...(options.batchSize !== undefined && { batchSize: options.batchSize }),
-      }),
+      }).withTransferMails(options.mails ?? 'never'),
     );
     const transfers = new InMemorySyncTransferRepository();
-    const transport = new RecordingTransport();
+    const transport = new RecordingTransport(options.outcome);
+    const outbox = new InMemoryMailOutbox();
     const useCase = new SendPendingTransfers({
       users,
       destinations,
       transfers,
+      outbox,
       opener: { open: () => Promise.resolve(RemotePassword.parse('opened')) },
       transport,
       facts: everythingIsAFile,
       clock: () => NOW,
       hour: () => options.hour ?? 2,
     });
-    return { transfers, transport, useCase };
+    return { transfers, transport, outbox, useCase };
   }
 
   async function queueOne(
@@ -165,6 +176,27 @@ describe('SendPendingTransfers', () => {
       }),
     );
   }
+
+  // asked by a member: MySB mailed every arrival, and that is how they learnt
+  // a new episode was in; others want no mail at all
+  it('should_mail_the_member_about_a_transfer_only_as_they_chose', async () => {
+    const mailsFor = async (mails: TransferMails, outcome: TransferOutcome) => {
+      const { transfers, outbox, useCase } = await world({ mails, outcome });
+      await queueOne(transfers, 'Some.Episode.mkv');
+      await useCase.execute();
+      return (await outbox.listDue(NOW, 10)).map((mail) => `${mail.recipient}: ${mail.subject}`);
+    };
+    const failed: TransferOutcome = { ok: false, detail: 'no room left' };
+
+    expect(await mailsFor('never', failed)).toEqual([]);
+    expect(await mailsFor('failures', { ok: true })).toEqual([]);
+    expect(await mailsFor('failures', failed)).toEqual([
+      'alice@example.org: Some.Episode.mkv did not arrive',
+    ]);
+    expect(await mailsFor('every', { ok: true })).toEqual([
+      'alice@example.org: Some.Episode.mkv arrived',
+    ]);
+  });
 
   it('should_send_what_is_waiting_when_the_members_hour_has_come', async () => {
     const { transfers, transport, useCase } = await world({ hour: 2 });
@@ -224,6 +256,7 @@ describe('SendPendingTransfers', () => {
       users,
       destinations,
       transfers,
+      outbox: new InMemoryMailOutbox(),
       opener: { open: () => Promise.resolve(RemotePassword.parse('opened')) },
       transport,
       facts: everythingIsAFile,
@@ -246,6 +279,7 @@ describe('SendPendingTransfers', () => {
       users,
       destinations,
       transfers,
+      outbox: new InMemoryMailOutbox(),
       opener: { open: () => Promise.resolve(RemotePassword.parse('opened')) },
       transport: new RecordingTransport({ ok: false, detail: 'the other machine has no room left' }),
       facts: everythingIsAFile,
@@ -271,6 +305,7 @@ describe('SendPendingTransfers', () => {
       users,
       destinations,
       transfers,
+      outbox: new InMemoryMailOutbox(),
       opener: { open: () => Promise.resolve(RemotePassword.parse('opened')) },
       transport,
       facts: { isDirectory: () => Promise.resolve(false), exists: () => Promise.resolve(false) },

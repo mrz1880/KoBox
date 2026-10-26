@@ -811,6 +811,24 @@ describe('where a member sends their files', () => {
     expect(page.body).not.toContain(REMOTE_SEAL_PREFIX);
   });
 
+  it('should_keep_the_members_choice_of_mails_about_transfers', async () => {
+    await world.server.inject({
+      method: 'POST',
+      url: '/sync/destination',
+      headers: { cookie: user.cookie, 'content-type': 'application/x-www-form-urlencoded' },
+      payload: form({ _csrf: user.csrf, ...aForm, transferMails: 'every' }),
+    });
+
+    const stored = await world.destinations.findByUsername(Username.parse('alice'));
+    expect(stored?.transferMails).toBe('every');
+    const page = await world.server.inject({
+      method: 'GET',
+      url: '/sync',
+      headers: { cookie: user.cookie },
+    });
+    expect(page.body).toContain('<option value="every" selected>');
+  });
+
   it('should_keep_the_stored_password_when_the_field_is_left_empty', async () => {
     await world.server.inject({
       method: 'POST',

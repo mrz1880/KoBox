@@ -2,6 +2,7 @@ import { LoneFilePlacement } from '../../../domain/sync/LoneFilePlacement.js';
 import type { SyncDestination } from '../../../domain/sync/SyncDestination.js';
 import { html, type RawHtml } from '../html.js';
 import type { Viewer } from './layout.js';
+import { DEFAULT_TRANSFER_MAILS, TRANSFER_MAILS, type TransferMails } from '../../../domain/sync/TransferMails.js';
 
 const PLACEMENT_WORDS: Readonly<Record<string, string>> = {
   'beside-the-others': 'Put the file straight in the folder',
@@ -34,6 +35,13 @@ that ever changes without you reinstalling it, KoBox will refuse to connect and 
 // Everything a member needs to describe their own machine. The password field
 // is deliberately never pre-filled: a form cannot show one back, and leaving it
 // empty means "keep the one you already have" rather than "erase it".
+// the choice in the member's words
+const MAIL_WORDS: Readonly<Record<TransferMails, string>> = {
+  never: 'never',
+  failures: 'only when one fails',
+  every: 'every time, arrived or failed',
+};
+
 export function destinationSection(
   destination: SyncDestination | undefined,
   viewer: Viewer,
@@ -52,6 +60,12 @@ export function destinationSection(
   const hours = Array.from({ length: 24 }, (_, hour) =>
     html`<option value="${String(hour)}"${hour === chosenHour ? html` selected` : html``}>${
       `${String(hour).padStart(2, '0')}:00`
+    }</option>`,
+  );
+  const chosenMails = destination?.transferMails ?? DEFAULT_TRANSFER_MAILS;
+  const mails = TRANSFER_MAILS.map(
+    (choice) => html`<option value="${choice}"${choice === chosenMails ? html` selected` : html``}>${
+      MAIL_WORDS[choice]
     }</option>`,
   );
   return html`<h2>Where your files go</h2>
@@ -86,6 +100,8 @@ in a folder of the same name over there.</p>
         <select name="placement">${placements}</select></label>
       <label>Send the "a bit later" folders at
         <select name="sendHour">${hours}</select></label>
+      <label>Mail me about a transfer
+        <select name="transferMails">${mails}</select></label>
     </div>
     <button type="submit">Save</button>
   </form>

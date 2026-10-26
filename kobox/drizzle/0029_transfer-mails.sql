@@ -1,0 +1,1 @@
+ALTER TABLE `sync_destinations` ADD `transfer_mails` text DEFAULT 'never' NOT NULL;
