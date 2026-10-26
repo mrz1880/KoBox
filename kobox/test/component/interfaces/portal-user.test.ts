@@ -928,6 +928,30 @@ describe('the queue a member can see', () => {
     expect(response.body).not.toContain('>failed<');
   });
 
+  // asked by a member: a file that arrived can be sent home once more
+  it('should_offer_to_send_again_a_file_that_arrived', async () => {
+    const queued = await world.transfers.queue(
+      SyncTransfer.queue({
+        username: Username.parse('alice'),
+        label: Label.parse('Films'),
+        source: LocalPath.parse('/home/alice/rtorrent/complete/Films/Other.Film.mkv'),
+        queuedAt: '2026-08-15 10:00:00',
+      }),
+    );
+    if (queued === undefined) {
+      throw new Error('the fixture failed to queue a transfer');
+    }
+    await world.transfers.save(queued.start('2026-08-15 10:01:00').succeed('2026-08-15 10:05:00'));
+
+    const response = await world.server.inject({
+      method: 'GET',
+      url: '/sync',
+      headers: { cookie: user.cookie },
+    });
+
+    expect(response.body).toContain('Send again');
+  });
+
   it('should_ask_the_worker_to_put_a_failed_transfer_back_in_the_queue', async () => {
     const id = await aFailedTransfer();
     world.queue.jobs.length = 0;
