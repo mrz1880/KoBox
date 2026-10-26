@@ -1238,8 +1238,24 @@ describe("clearing a line from a member's own download list", () => {
       payload: form({ _csrf: admin.csrf }),
     });
 
-    expect(response.statusCode).toBe(404);
+    // the same answer as for a line that does not exist: nothing to learn
+    expect(response.statusCode).toBe(303);
+    expect(world.queue.jobs.filter((j) => j.type === 'discard-debrid-download')).toHaveLength(0);
     expect(await world.downloads.listForUser(Username.parse('alice'))).toHaveLength(1);
+  });
+
+  // the page comes back before the worker has dropped the line, so a member
+  // clicked Remove again and got a blank 404
+  it('should_say_a_line_is_already_gone_rather_than_show_a_bare_error', async () => {
+    const response = await world.server.inject({
+      method: 'POST',
+      url: '/downloads/999/remove',
+      headers: { cookie: user.cookie, 'content-type': 'application/x-www-form-urlencoded' },
+      payload: form({ _csrf: user.csrf }),
+    });
+
+    expect(response.statusCode).toBe(303);
+    expect(response.headers.location).toContain('/downloads?flash=');
   });
 });
 

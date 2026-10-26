@@ -474,13 +474,12 @@ export function registerUserRoutes(
     if (!params.success) {
       return reply.code(400).send();
     }
-    // scoped by the session's own username: a 404 for somebody else's row says
-    // the same thing as a 404 for a row that never existed, which is the point
-    // ownership is checked here so somebody else's id answers 404 rather than
-    // silently enqueueing a job that would do nothing
+    // scoped by the session's own username, so somebody else's id enqueues
+    // nothing and gets the answer a line already removed gets: the page comes
+    // back before the worker drops a line, and a second click is common
     const rows = await deps.downloads.listForUser(session.username);
     if (!rows.some((row) => row.id === params.data.id)) {
-      return reply.code(404).send();
+      return redirectWithFlash(reply, '/downloads', 'That one is already gone.');
     }
     // the portal can neither reach aria2 nor delete from the staging dir, so
     // the worker does the whole thing: cancel, discard the partial file, drop
