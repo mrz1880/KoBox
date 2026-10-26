@@ -11,6 +11,8 @@ import { runOrThrow, type CommandRunner } from './CommandRunner.js';
 // their settings) and to the member's own group (their rTorrent leaves the
 // answers to ruTorrent's external checks there). Nobody else gets in: before
 // this, ruTorrent's default mask left these folders 0777.
+const PROFILE_SUBFOLDERS = ['settings', 'torrents', 'tmp'] as const;
+
 export class RutorrentProfileAdapter implements RutorrentProfilePort {
   constructor(private readonly runner: CommandRunner) {}
 
@@ -18,7 +20,10 @@ export class RutorrentProfileAdapter implements RutorrentProfilePort {
     const dir = `${rutorrentProfilesDir()}/${username.value}`;
     const group = username.value;
     const steps: readonly (readonly [string, ...string[]])[] = [
-      ['install', '-d', '-o', WEB_SERVER_USER, '-g', group, '-m', '2770', dir],
+      // ruTorrent makes these three only when it creates the profile folder
+      // itself, so a folder made ahead of it must come with them
+      ['install', '-d', '-o', WEB_SERVER_USER, '-g', group, '-m', '2770', dir,
+        ...PROFILE_SUBFOLDERS.map((sub) => `${dir}/${sub}`)],
       ['chown', '-R', `${WEB_SERVER_USER}:${group}`, dir],
       ['chmod', '-R', 'g+rwX,o-rwx', dir],
       ['find', dir, '-type', 'd', '-exec', 'chmod', 'g+s', '{}', '+'],
