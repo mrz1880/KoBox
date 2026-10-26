@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Username } from '../../../src/domain/user/Username.js';
+import { IpAddress } from '../../../src/domain/shared/IpAddress.js';
 import { ComponentName } from '../../../src/domain/installation/ComponentName.js';
 import { Label } from '../../../src/domain/torrent/Label.js';
 import { LocalPath } from '../../../src/domain/sync/LocalPath.js';
@@ -1240,5 +1241,75 @@ describe('how far along a running download is', () => {
     });
 
     expect(response.body).not.toContain('class="bar"');
+  });
+});
+
+describe('a member declaring where they connect from', () => {
+  // nginx overwrites X-Forwarded-For with $remote_addr, and the portal trusts
+  // only the loopback proxy: the header is the visitor's real address
+  const fromHome = (cookie: string): Record<string, string> => ({
+    cookie,
+    'content-type': 'application/x-www-form-urlencoded',
+    'x-forwarded-for': '203.0.113.20',
+  });
+
+  it('should_declare_the_address_they_are_connecting_from', async () => {
+    const response = await world.server.inject({
+      method: 'POST',
+      url: '/access/addresses/add-current',
+      headers: fromHome(user.cookie),
+      payload: form({ _csrf: user.csrf }),
+    });
+
+    expect(response.statusCode).toBe(303);
+    const job = world.queue.jobs.find((j) => j.type === 'add-user-address');
+    expect(job?.payload).toMatchObject({ username: 'alice', ipv4: '203.0.113.20' });
+  });
+
+  it('should_say_so_rather_than_fail_when_they_come_over_ipv6', async () => {
+    // the firewall rules are IPv4 only: there is nothing to declare
+    const response = await world.server.inject({
+      method: 'POST',
+      url: '/access/addresses/add-current',
+      headers: { ...fromHome(user.cookie), 'x-forwarded-for': '2001:db8::7' },
+      payload: form({ _csrf: user.csrf }),
+    });
+
+    expect(response.statusCode).toBe(303);
+    expect(world.queue.jobs).toHaveLength(0);
+  });
+
+  it('should_show_them_their_own_addresses_and_where_they_are_now_but_nobody_elses', async () => {
+    await world.addresses.add(Username.parse('alice'), IpAddress.parse('198.51.100.7'));
+    await world.addresses.add(Username.parse('boss'), IpAddress.parse('198.51.100.99'));
+
+    const response = await world.server.inject({
+      method: 'GET',
+      url: '/access',
+      headers: fromHome(user.cookie),
+    });
+
+    expect(response.body).toContain('198.51.100.7');
+    expect(response.body).toContain('203.0.113.20');
+    expect(response.body).not.toContain('198.51.100.99');
+  });
+
+  it('should_remove_one_of_their_own_addresses_but_never_someone_elses', async () => {
+    await world.addresses.add(Username.parse('alice'), IpAddress.parse('198.51.100.7'));
+    await world.addresses.add(Username.parse('boss'), IpAddress.parse('198.51.100.99'));
+
+    for (const ipv4 of ['198.51.100.7', '198.51.100.99']) {
+      await world.server.inject({
+        method: 'POST',
+        url: '/access/addresses/remove',
+        headers: fromHome(user.cookie),
+        payload: form({ _csrf: user.csrf, ipv4 }),
+      });
+    }
+
+    const removals = world.queue.jobs.filter((j) => j.type === 'remove-user-address');
+    expect(removals.map((j) => j.payload)).toEqual([
+      expect.objectContaining({ username: 'alice', ipv4: '198.51.100.7' }),
+    ]);
   });
 });

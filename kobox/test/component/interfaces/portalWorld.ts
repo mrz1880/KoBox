@@ -152,6 +152,7 @@ export interface PortalWorld {
   readonly instances: InMemoryTorrentInstanceRepository;
   readonly diskSamples: InMemoryDiskUsageRepository;
   readonly sshKeys: InMemorySshKeyRepository;
+  readonly addresses: InMemoryUserAddressRepository;
   readonly components: InMemoryComponentRegistry;
   readonly mailRelay: InMemoryMailRelayRepository;
   readonly siteSettings: InMemorySiteSettingsRepository;
@@ -186,6 +187,7 @@ export async function buildPortalWorld(
   const instances = new InMemoryTorrentInstanceRepository();
   const diskSamples = new InMemoryDiskUsageRepository();
   const sshKeys = new InMemorySshKeyRepository();
+  const addresses = new InMemoryUserAddressRepository();
   const components = new InMemoryComponentRegistry();
   const mailRelay = new InMemoryMailRelayRepository();
   const siteSettings = new InMemorySiteSettingsRepository();
@@ -225,7 +227,7 @@ export async function buildPortalWorld(
     setPasswordFromLink: new SetPasswordFromLink(linkDeps),
     trackers: new InMemoryTrackerRepository(),
     blocklists: new InMemoryBlocklistRepository(),
-    addresses: new InMemoryUserAddressRepository(),
+    addresses,
     bindings: new InMemoryUserAddressRepository(),
     fairUse,
     // everything healthy unless a test swaps in its own probe
@@ -280,7 +282,7 @@ export async function buildPortalWorld(
     { username: Username.parse('boss'), passwordHash: goodHash, role: 'admin' },
     NOW,
   );
-  return { server, users, credentials, sessions, queue, outbox, downloads, debridAccounts, media, fairUse, diagnostics, instances, diskSamples, sshKeys, components, mailRelay, siteSettings, destinations, transfers, passwords };
+  return { server, users, credentials, sessions, queue, outbox, downloads, debridAccounts, media, fairUse, diagnostics, instances, diskSamples, sshKeys, addresses, components, mailRelay, siteSettings, destinations, transfers, passwords };
 }
 
 export interface AgentSession {
