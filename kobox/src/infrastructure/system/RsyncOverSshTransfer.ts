@@ -1,8 +1,11 @@
+import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import type { LocalPath } from '../../domain/sync/LocalPath.js';
 import type { RemotePassword } from '../../domain/sync/RemotePassword.js';
 import type { SyncDestination } from '../../domain/sync/SyncDestination.js';
 import type { FileTransferPort, TransferOutcome } from '../../domain/sync/ports.js';
-import type { CommandRunner } from './CommandRunner.js';
+import type { CommandResult, CommandRunner } from './CommandRunner.js';
 import { KNOWN_HOSTS_DIR } from './SshRemoteProbe.js';
 
 // Large files over a home link: generous, but never unbounded. A transfer that
@@ -35,6 +38,7 @@ export class RsyncOverSshTransfer implements FileTransferPort {
   constructor(
     private readonly runner: CommandRunner,
     private readonly knownHostsDir: string = KNOWN_HOSTS_DIR,
+    private readonly scratchDir: string = tmpdir(),
   ) {}
 
   async send(request: {
@@ -63,19 +67,31 @@ export class RsyncOverSshTransfer implements FileTransferPort {
     ];
     const target = `${destination.account.value}@${destination.host.value}`;
     const env = { SSHPASS: password.reveal() };
-
+    const remoteShell = ['-e', `sshpass -e ssh ${sshOptions.join(' ')}`];
     // Copying into a folder that does not exist scatters files at the root of
-    // the member's NAS, which is worse than not copying at all.
-    const made = await this.runner.run({
-      command: 'sshpass',
-      args: ['-e', 'ssh', ...sshOptions, target, 'mkdir', '-p', remoteFolder],
-      env,
-      timeoutMs: 60_000,
-    });
+    // the member's NAS, which is worse than not copying at all. The folders are
+    // made by rsync itself, sending an empty tree of them: a Synology gives a
+    // shell to administrators alone, so `mkdir -p` over ssh refused an
+    // ordinary account allowed rsync. --recursive only: --archive would hand
+    // the empty tree's own 0700 to the member's root folder.
+    const root = destination.path.value;
+    const relative = remoteFolder.startsWith(`${root}/`) ? remoteFolder.slice(root.length + 1) : '';
+    const tree = mkdtempSync(join(this.scratchDir, 'kobox-sync-'));
+    let made: CommandResult;
+    try {
+      mkdirSync(join(tree, relative), { recursive: true });
+      made = await this.runner.run({
+        command: 'rsync',
+        args: ['--recursive', '--timeout=60', ...remoteShell, `${tree}/`, `${target}:${root}/`],
+        env,
+        timeoutMs: 60_000,
+      });
+    } finally {
+      rmSync(tree, { recursive: true, force: true });
+    }
     if (made.exitCode !== 0) {
       return { ok: false, detail: explain(made.stderr, made.exitCode) };
     }
-
     // ONE call. The legacy looped three times with its `break` commented out,
     // so every file crossed the link three times on every pass. Retry belongs to
     // the caller, which knows whether the failure is worth retrying.
@@ -89,8 +105,7 @@ export class RsyncOverSshTransfer implements FileTransferPort {
         '--partial',
         '--append-verify',
         '--timeout=120',
-        '-e',
-        `sshpass -e ssh ${sshOptions.join(' ')}`,
+        ...remoteShell,
         source.value,
         `${target}:${remoteFolder}/`,
       ],

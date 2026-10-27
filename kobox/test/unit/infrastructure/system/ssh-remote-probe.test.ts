@@ -62,11 +62,24 @@ describe('SshRemoteProbe', () => {
 
     await new SshRemoteProbe(runner, '/var/lib/kobox/sync').probe(destination, password);
 
-    const ssh = runner.calls.find((call) => call.command === 'sshpass');
+    const rsync = runner.calls.find((call) => call.command === 'rsync');
     // `sshpass -p <password>` would put it in `ps` for every other member
-    expect(ssh?.args).toContain('-e');
-    expect(ssh?.args.join(' ')).not.toContain('hunter2000');
-    expect(ssh?.env).toEqual({ SSHPASS: 'hunter2000' });
+    expect(rsync?.args.join(' ')).toContain('sshpass -e ssh');
+    expect(rsync?.args.join(' ')).not.toContain('hunter2000');
+    expect(rsync?.env).toEqual({ SSHPASS: 'hunter2000' });
+  });
+
+  it('should_ask_only_what_an_account_allowed_sftp_and_rsync_may_answer', async () => {
+    // a Synology gives a shell to administrators alone: `test -w` over ssh
+    // read as a refused password for an ordinary account that rsync lets in
+    const runner = new ScriptedRunner();
+
+    await new SshRemoteProbe(runner, '/var/lib/kobox/sync').probe(destination, password);
+
+    const remote = runner.calls.filter((call) => ['sshpass', 'ssh', 'rsync'].includes(call.command));
+    expect(remote.map((call) => call.command)).toEqual(['rsync']);
+    expect(remote[0]?.args).toContain('--list-only');
+    expect(remote[0]?.args.at(-1)).toBe('seedbox@nas.example.org:/volume1/torrents/');
   });
 
   it('should_pin_the_host_key_on_first_sight_and_refuse_a_change_afterwards', async () => {
@@ -74,7 +87,7 @@ describe('SshRemoteProbe', () => {
 
     await new SshRemoteProbe(runner, '/var/lib/kobox/sync').probe(destination, password);
 
-    const argv = runner.calls.find((call) => call.command === 'sshpass')?.args.join(' ') ?? '';
+    const argv = runner.calls.find((call) => call.command === 'rsync')?.args.join(' ') ?? '';
     expect(argv).toContain('StrictHostKeyChecking=accept-new');
     expect(argv).toContain('UserKnownHostsFile=/var/lib/kobox/sync/alice.known_hosts');
     // the legacy passed both of these, which trusts whatever answers
@@ -84,8 +97,11 @@ describe('SshRemoteProbe', () => {
 
   it('should_say_the_folder_is_the_problem_when_the_account_itself_works', async () => {
     const runner = new ScriptedRunner();
-    // `test -w` failing looks like exit 1 with nothing on stderr
-    runner.onCommand('sshpass', { exitCode: 1, stderr: '' });
+    // in, but the folder is not there: rsync's partial-transfer code
+    runner.onCommand('rsync', {
+      exitCode: 23,
+      stderr: 'rsync: [sender] change_dir "/volume1/torrents" failed: No such file or directory (2)',
+    });
 
     const outcome = await new SshRemoteProbe(runner, '/tmp/kh').probe(destination, password);
 
@@ -95,7 +111,7 @@ describe('SshRemoteProbe', () => {
 
   it('should_translate_a_refused_password_into_something_a_member_can_act_on', async () => {
     const runner = new ScriptedRunner();
-    runner.onCommand('sshpass', { exitCode: 5, stderr: 'Permission denied, please try again.' });
+    runner.onCommand('rsync', { exitCode: 255, stderr: 'Permission denied, please try again.' });
 
     const outcome = await new SshRemoteProbe(runner, '/tmp/kh').probe(destination, password);
 
@@ -104,7 +120,7 @@ describe('SshRemoteProbe', () => {
 
   it('should_name_a_changed_host_key_for_what_it_is', async () => {
     const runner = new ScriptedRunner();
-    runner.onCommand('sshpass', {
+    runner.onCommand('rsync', {
       exitCode: 255,
       stderr: 'WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED!',
     });

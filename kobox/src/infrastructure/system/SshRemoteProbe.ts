@@ -8,6 +8,9 @@ import type { CommandRunner } from './CommandRunner.js';
 // answer decide another's.
 export const KNOWN_HOSTS_DIR = '/var/lib/kobox/sync';
 
+// rsync's exit status when it got in but could not read what it was asked for
+const RSYNC_PARTIAL_TRANSFER = 23;
+
 // Turning ssh's own diagnostics into something a member can act on. The raw
 // text goes nowhere near the page: it names our paths and our options.
 function explain(stderr: string): string {
@@ -62,34 +65,30 @@ export class SshRemoteProbe implements RemoteProbePort {
     // that puts it in argv, where every other member of the box can read it
     // straight out of `ps`. This is the legacy's worst habit, and it is not
     // being carried over.
+    const ssh = [
+      'sshpass -e ssh',
+      `-p ${String(destination.port.value)}`,
+      // first sight pins the key; a CHANGE after that is refused, loudly
+      '-o StrictHostKeyChecking=accept-new',
+      `-o UserKnownHostsFile=${knownHosts}`,
+      '-o BatchMode=no',
+      '-o PasswordAuthentication=yes',
+      '-o PubkeyAuthentication=no',
+      '-o ConnectTimeout=10',
+      '-o NumberOfPasswordPrompts=1',
+    ].join(' ');
+    // The question is asked through rsync, the one thing the transfer needs: a
+    // Synology gives a shell to administrators alone, so a shell command here
+    // refused an ordinary account that rsync lets in. Listing the folder proves
+    // the machine answers, takes the account, and has that folder; whether it
+    // can be written to shows on the first transfer.
     const result = await this.runner.run({
-      command: 'sshpass',
+      command: 'rsync',
       args: [
+        '--list-only',
         '-e',
-        'ssh',
-        '-p',
-        String(destination.port.value),
-        // first sight pins the key; a CHANGE after that is refused, loudly
-        '-o',
-        'StrictHostKeyChecking=accept-new',
-        '-o',
-        `UserKnownHostsFile=${knownHosts}`,
-        '-o',
-        'BatchMode=no',
-        '-o',
-        'PasswordAuthentication=yes',
-        '-o',
-        'PubkeyAuthentication=no',
-        '-o',
-        'ConnectTimeout=10',
-        '-o',
-        'NumberOfPasswordPrompts=1',
-        `${destination.account.value}@${destination.host.value}`,
-        // the smallest question that proves the whole chain: reachable, the
-        // account is accepted, and the folder they named is writable
-        'test',
-        '-w',
-        destination.path.value,
+        ssh,
+        `${destination.account.value}@${destination.host.value}:${destination.path.value}/`,
       ],
       env: { SSHPASS: password.reveal() },
       timeoutMs: 30_000,
@@ -97,16 +96,15 @@ export class SshRemoteProbe implements RemoteProbePort {
     if (result.exitCode === 0) {
       return {
         ok: true,
-        detail: 'the machine answered and the folder is writable',
+        detail: 'the machine answered and the folder is there',
         ...(await this.fingerprint(destination)),
       };
     }
-    // exit 1 with no ssh diagnostic is `test -w` failing: we got in, the folder
-    // is the problem — a distinction worth making, because the fix is different
-    if (result.exitCode === 1 && result.stderr.trim() === '') {
+    // in, but the folder is missing: rsync reports it as a partial transfer
+    if (result.exitCode === RSYNC_PARTIAL_TRANSFER) {
       return {
         ok: false,
-        detail: 'the account works, but that folder does not exist or cannot be written to',
+        detail: 'the account works, but that folder does not exist or cannot be read',
         ...(await this.fingerprint(destination)),
       };
     }
