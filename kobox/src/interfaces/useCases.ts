@@ -26,6 +26,7 @@ import { RenderWhitelist } from '../application/tracker/RenderWhitelist.js';
 import { RenewTrackerCerts } from '../application/tracker/RenewTrackerCerts.js';
 import { UpdateBlocklists, type IblocklistCredentials } from '../application/tracker/UpdateBlocklists.js';
 import { AddWatchDir } from '../application/torrent/AddWatchDir.js';
+import { RemoveWatchDir, RenameWatchDir } from '../application/torrent/ReshapeWatchDir.js';
 import { SetCategorySyncMode } from '../application/torrent/SetCategorySyncMode.js';
 import { CheckSyncDestination } from '../application/sync/CheckSyncDestination.js';
 import { QueueFinishedDownload } from '../application/sync/QueueFinishedDownload.js';
@@ -319,6 +320,8 @@ export interface TorrentUseCases {
   readonly deprovision: DeprovisionRtorrentInstance;
   readonly render: RenderRtorrentConfig;
   readonly addWatchDir: AddWatchDir;
+  readonly removeWatchDir: RemoveWatchDir;
+  readonly renameWatchDir: RenameWatchDir;
   readonly setCategorySyncMode: SetCategorySyncMode;
   readonly setSyncDisabled: SetSyncDisabled;
   readonly setAllowPublicTracker: SetAllowPublicTracker;
@@ -438,6 +441,8 @@ export function buildTorrentUseCases(deps: TorrentUseCaseDeps): TorrentUseCases 
     deprovision: new DeprovisionRtorrentInstance(deps),
     render,
     addWatchDir: new AddWatchDir({ instances: deps.instances }),
+    removeWatchDir: new RemoveWatchDir(deps),
+    renameWatchDir: new RenameWatchDir(deps),
     setCategorySyncMode: new SetCategorySyncMode({ instances: deps.instances }),
     setSyncDisabled: new SetSyncDisabled(deps),
     setAllowPublicTracker: new SetAllowPublicTracker(deps),

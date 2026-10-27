@@ -5,6 +5,7 @@ import { Label } from '../../../../src/domain/torrent/Label.js';
 import type { TorrentMetainfo } from '../../../../src/domain/torrent/ports.js';
 import { Username } from '../../../../src/domain/user/Username.js';
 import { AddWatchDir } from '../../../../src/application/torrent/AddWatchDir.js';
+import { RemoveWatchDir, RenameWatchDir } from '../../../../src/application/torrent/ReshapeWatchDir.js';
 import { DeprovisionRtorrentInstance } from '../../../../src/application/torrent/DeprovisionRtorrentInstance.js';
 import { HandleTorrentEvent } from '../../../../src/application/torrent/HandleTorrentEvent.js';
 import { ProvisionRtorrentInstance } from '../../../../src/application/torrent/ProvisionRtorrentInstance.js';
@@ -62,6 +63,8 @@ interface Context {
   readonly deprovision: DeprovisionRtorrentInstance;
   readonly render: RenderRtorrentConfig;
   readonly addWatchDir: AddWatchDir;
+  readonly removeWatchDir: RemoveWatchDir;
+  readonly renameWatchDir: RenameWatchDir;
   readonly setSyncDisabled: SetSyncDisabled;
   readonly setAllowPublicTracker: SetAllowPublicTracker;
   readonly handleEvent: HandleTorrentEvent;
@@ -123,6 +126,8 @@ function makeContext(): Context {
     deprovision: new DeprovisionRtorrentInstance({ instances, torrents, services }),
     render,
     addWatchDir: new AddWatchDir({ instances }),
+    removeWatchDir: new RemoveWatchDir({ instances, watchDirs }),
+    renameWatchDir: new RenameWatchDir({ instances, watchDirs }),
     setSyncDisabled: new SetSyncDisabled({ instances }),
     setAllowPublicTracker: new SetAllowPublicTracker({ instances }),
     handleEvent: new HandleTorrentEvent({
@@ -209,6 +214,48 @@ describe('AddWatchDir and RenderRtorrentConfig', () => {
   });
 
   // Nextcloud keeps its own index of a member's folders and did not show the
+  it('should_remove_an_empty_folder_and_leave_one_holding_downloads', async () => {
+    await c.provision.execute({ username: alice });
+    for (const label of ['Divers', 'Series']) {
+      await c.addWatchDir.execute({ username: alice, label: Label.parse(label) });
+    }
+    c.watchDirs.occupied.add('alice/Series');
+
+    const divers = await c.removeWatchDir.execute({ username: alice, label: Label.parse('Divers') });
+    const series = await c.removeWatchDir.execute({ username: alice, label: Label.parse('Series') });
+
+    expect([divers, series]).toEqual([{ changed: true }, { changed: false }]);
+    const instance = await c.instances.findByUsername(alice);
+    expect(instance?.watchDirs.map((dir) => dir.label?.value)).toEqual([undefined, 'Series']);
+  });
+
+  it('should_rename_an_empty_folder_but_not_one_holding_downloads', async () => {
+    await c.provision.execute({ username: alice });
+    for (const label of ['Divers', 'Series']) {
+      await c.addWatchDir.execute({ username: alice, label: Label.parse(label) });
+    }
+    c.watchDirs.occupied.add('alice/Series');
+
+    const divers = await c.renameWatchDir.execute({
+      username: alice,
+      label: Label.parse('Divers'),
+      to: Label.parse('Docs'),
+    });
+    const series = await c.renameWatchDir.execute({
+      username: alice,
+      label: Label.parse('Series'),
+      to: Label.parse('Shows'),
+    });
+
+    expect([divers, series]).toEqual([{ changed: true }, { changed: false }]);
+    const instance = await c.instances.findByUsername(alice);
+    expect(instance?.watchDirs.map((dir) => dir.label?.value)).toEqual([
+      undefined,
+      'Docs',
+      'Series',
+    ]);
+  });
+
   // ones made behind its back until it was told to look again
   it('should_have_the_file_index_look_again_once_the_folders_are_laid_out', async () => {
     await c.provision.execute({ username: alice });

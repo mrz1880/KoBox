@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { Label } from '../../../../src/domain/torrent/Label.js';
 import { RecyclingMode } from '../../../../src/domain/torrent/RecyclingMode.js';
-import { TorrentInstance } from '../../../../src/domain/torrent/TorrentInstance.js';
+import {
+  FolderNameTakenError,
+  TorrentInstance,
+} from '../../../../src/domain/torrent/TorrentInstance.js';
+import { SyncMode } from '../../../../src/domain/torrent/SyncMode.js';
 import { RtorrentPort, ScgiPort } from '../../../../src/domain/user/Port.js';
 import { Username } from '../../../../src/domain/user/Username.js';
 
@@ -37,6 +41,42 @@ describe('TorrentInstance', () => {
     const { instance: again, event: none } = withFilms.addWatchDir(films);
     expect(again).toBe(withFilms); // idempotent: same aggregate, no event
     expect(none).toBeUndefined();
+  });
+
+  it('should_remove_a_folder_and_shrug_at_one_already_gone', () => {
+    const films = Label.parse('films');
+    const withFilms = provisioned().addWatchDir(films).instance;
+
+    const without = withFilms.removeWatchDir(films);
+
+    expect(without.watchDirs.map((dir) => dir.label?.value)).toEqual([undefined]);
+    // a job run twice finds nothing the second time: that is not an error
+    expect(without.removeWatchDir(films)).toBe(without);
+  });
+
+  it('should_rename_a_folder_and_keep_what_happens_to_its_downloads', () => {
+    const films = Label.parse('films');
+    const movies = Label.parse('Movies');
+    const instance = provisioned()
+      .addWatchDir(films)
+      .instance.setSyncMode(films, SyncMode.parse('immediate'));
+
+    const renamed = instance.renameWatchDir(films, movies);
+
+    expect(renamed.watchDirs.map((dir) => [dir.label?.value, dir.syncMode.value])).toEqual([
+      [undefined, 'off'],
+      ['Movies', 'immediate'],
+    ]);
+    // run again, the old name is gone and the new one there: already done
+    expect(renamed.renameWatchDir(films, movies)).toBe(renamed);
+  });
+
+  it('should_refuse_to_rename_a_folder_onto_one_that_exists', () => {
+    const films = Label.parse('films');
+    const series = Label.parse('series');
+    const instance = provisioned().addWatchDir(films).instance.addWatchDir(series).instance;
+
+    expect(() => instance.renameWatchDir(films, series)).toThrow(FolderNameTakenError);
   });
 
   it('should_flip_flags_immutably_and_idempotently', () => {

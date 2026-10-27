@@ -779,6 +779,100 @@ describe('categories and sending', () => {
   });
 });
 
+describe('renaming or removing a folder', () => {
+  const alice = Username.parse('alice');
+  const post = (url: string, fields: Record<string, string>) =>
+    world.server.inject({
+      method: 'POST',
+      url,
+      headers: { cookie: user.cookie, 'content-type': 'application/x-www-form-urlencoded' },
+      payload: form({ _csrf: user.csrf, ...fields }),
+    });
+
+  const holdsADownload = async (label: string): Promise<void> => {
+    await world.media.replaceFor(
+      alice,
+      [{ path: MediaPath.parse(`${label}/Some.Film.mkv`), sizeBytes: 1024 }],
+      NOW,
+    );
+  };
+
+  it('should_remove_an_empty_folder', async () => {
+    const response = await post('/sync/categories/remove', { label: 'films' });
+
+    expect(response.statusCode).toBe(303);
+    expect(world.queue.jobs).toEqual([
+      { type: 'remove-watch-dir', payload: { username: 'alice', label: 'films' } },
+    ]);
+  });
+
+  it('should_rename_an_empty_folder', async () => {
+    const response = await post('/sync/categories/rename', { label: 'films', to: 'Movies' });
+
+    expect(response.statusCode).toBe(303);
+    expect(world.queue.jobs).toEqual([
+      { type: 'rename-watch-dir', payload: { username: 'alice', label: 'films', to: 'Movies' } },
+    ]);
+  });
+
+  it('should_leave_a_folder_holding_downloads_as_it_is_and_say_why', async () => {
+    // its downloads seed from its path: moving them is not done behind their back
+    await holdsADownload('films');
+
+    await post('/sync/categories/remove', { label: 'films' });
+    const rename = await post('/sync/categories/rename', { label: 'films', to: 'Movies' });
+
+    expect(world.queue.jobs).toHaveLength(0);
+    const page = await world.server.inject({
+      method: 'GET',
+      url: String(rename.headers.location),
+      headers: { cookie: user.cookie },
+    });
+    expect(page.body).toContain('still holds downloads');
+  });
+
+  it('should_refuse_a_new_name_already_taken_or_unsafe', async () => {
+    const instance = await world.instances.findByUsername(alice);
+    if (instance === undefined) {
+      throw new Error('the world should have provisioned alice');
+    }
+    await world.instances.save(instance.addWatchDir(Label.parse('Divers')).instance);
+
+    await post('/sync/categories/rename', { label: 'films', to: 'Divers' });
+    const unsafe = await post('/sync/categories/rename', { label: 'films', to: '../up' });
+
+    expect(unsafe.statusCode).toBe(400);
+    expect(world.queue.jobs).toHaveLength(0);
+  });
+
+  it('should_never_touch_a_folder_the_member_does_not_have', async () => {
+    const response = await post('/sync/categories/remove', { label: 'Jeux' });
+
+    expect(response.statusCode).toBe(404);
+    expect(world.queue.jobs).toHaveLength(0);
+  });
+
+  it('should_offer_to_rename_or_remove_only_the_folders_that_hold_nothing', async () => {
+    const instance = await world.instances.findByUsername(alice);
+    if (instance === undefined) {
+      throw new Error('the world should have provisioned alice');
+    }
+    await world.instances.save(instance.addWatchDir(Label.parse('Divers')).instance);
+    await holdsADownload('films');
+
+    const response = await world.server.inject({
+      method: 'GET',
+      url: '/sync',
+      headers: { cookie: user.cookie },
+    });
+
+    // Divers alone: films holds a download
+    expect(response.body.match(/action="\/sync\/categories\/rename"/g)).toHaveLength(1);
+    expect(response.body.match(/action="\/sync\/categories\/remove"/g)).toHaveLength(1);
+    expect(response.body).toContain('Holds downloads');
+  });
+});
+
 describe('where a member sends their files', () => {
   const aForm = {
     host: 'nas.example.org',

@@ -79,6 +79,12 @@ export const buildJob = {
   addWatchDir(input: { username: string; label: string }): Job {
     return parseJob('add-watch-dir', input);
   },
+  removeWatchDir(input: { username: string; label: string }): Job {
+    return parseJob('remove-watch-dir', input);
+  },
+  renameWatchDir(input: { username: string; label: string; to: string }): Job {
+    return parseJob('rename-watch-dir', input);
+  },
 
   applyMailRelay(): Job {
     return parseJob('apply-mail-relay', {});

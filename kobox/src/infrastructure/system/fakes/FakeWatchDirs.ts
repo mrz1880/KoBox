@@ -10,6 +10,13 @@ export class FakeWatchDirs implements WatchDirPort {
     return Promise.resolve();
   }
 
+  // folders a test says hold a download: "<username>/<label>"
+  readonly occupied = new Set<string>();
+
+  removeIfEmpty(username: Username, dir: WatchDir): Promise<boolean> {
+    return Promise.resolve(!this.occupied.has(`${username.value}/${dir.label?.value ?? ''}`));
+  }
+
   layoutFor(username: Username): readonly WatchDir[] {
     return this.layouts.get(username.value) ?? [];
   }
