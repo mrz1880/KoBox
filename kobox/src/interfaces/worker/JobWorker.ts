@@ -261,6 +261,21 @@ export class JobWorker {
         });
         return added ? { renderConfigFor: job.payload.username } : undefined;
       }
+      case 'remove-watch-dir': {
+        const { changed } = await this.torrents.removeWatchDir.execute({
+          username: Username.parse(job.payload.username),
+          label: Label.parse(job.payload.label),
+        });
+        return changed ? { renderConfigFor: job.payload.username } : undefined;
+      }
+      case 'rename-watch-dir': {
+        const { changed } = await this.torrents.renameWatchDir.execute({
+          username: Username.parse(job.payload.username),
+          label: Label.parse(job.payload.label),
+          to: Label.parse(job.payload.to),
+        });
+        return changed ? { renderConfigFor: job.payload.username } : undefined;
+      }
       case 'send-pending-transfers':
         await this.sync.sendPending.execute(
           job.payload.username === undefined

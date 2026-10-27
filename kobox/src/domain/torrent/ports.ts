@@ -45,6 +45,9 @@ export type RtorrentConfigPort = ManagedFilesPort;
 
 export interface WatchDirPort {
   ensureLayout(username: Username, watchDirs: readonly WatchDir[]): Promise<void>;
+  // Removes the folder's watch, complete and torrents directories only when
+  // all three hold nothing; false when one does, and then nothing is touched.
+  removeIfEmpty(username: Username, dir: WatchDir): Promise<boolean>;
 }
 
 // Moves a .torrent the member dropped into a watch folder to where it is kept

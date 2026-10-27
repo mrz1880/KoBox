@@ -40,8 +40,34 @@ function modeChoice(dir: WatchDir, viewer: Viewer): RawHtml {
 </form>`;
 }
 
+// A folder is renamed or removed only while it holds nothing: its downloads
+// seed from its path. One that holds something says so instead of offering it.
+function reshapeChoice(dir: WatchDir, holding: ReadonlySet<string>, viewer: Viewer): RawHtml {
+  const label = dir.label?.value ?? '';
+  if (holding.has(label)) {
+    return html`<span class="muted">Holds downloads: empty it to rename or remove it.</span>`;
+  }
+  return html`<form class="inline" method="post" action="/sync/categories/rename">
+  <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
+  <input type="hidden" name="label" value="${label}">
+  <input name="to" aria-label="New name for ${label}" placeholder="new name" maxlength="64" required>
+  <button class="ghost" type="submit">Rename</button>
+</form>
+<form class="inline" method="post" action="/sync/categories/remove">
+  <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
+  <input type="hidden" name="label" value="${label}">
+  <button class="ghost" type="submit">Remove</button>
+</form>`;
+}
+
+export interface MemberFolders {
+  readonly categories: readonly WatchDir[];
+  // the folders the index saw a download in
+  readonly holding: ReadonlySet<string>;
+}
+
 export function syncPage(
-  categories: readonly WatchDir[],
+  { categories, holding }: MemberFolders,
   destination: SyncDestination | undefined,
   transfers: readonly SyncTransfer[],
   viewer: Viewer,
@@ -52,6 +78,7 @@ export function syncPage(
   <td>${dir.label?.value ?? ''}</td>
   <td>${modeChoice(dir, viewer)}</td>
   <td class="muted">${MODE_WORDS[dir.syncMode.value]?.hint ?? ''}</td>
+  <td>${reshapeChoice(dir, holding, viewer)}</td>
 </tr>`,
   );
   return page(
@@ -64,7 +91,7 @@ ${flash(message)}
 ${categories.length === 0
       ? html`<p class="lead">You have no folders yet.</p>`
       : html`<table>
-  <thead><tr><th>Folder</th><th>When a download finishes</th><th></th></tr></thead>
+  <thead><tr><th>Folder</th><th>When a download finishes</th><th></th><th></th></tr></thead>
   <tbody>${rows}</tbody>
 </table>`}
 

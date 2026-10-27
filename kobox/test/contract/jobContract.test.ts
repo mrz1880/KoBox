@@ -24,6 +24,8 @@ describe('job contract', () => {
       'deprovision-rtorrent',
       'render-rtorrent-config',
       'add-watch-dir',
+      'remove-watch-dir',
+      'rename-watch-dir',
     'set-category-sync-mode',
     'check-sync-destination',
     'send-pending-transfers',
@@ -243,6 +245,16 @@ describe('job contract', () => {
     expect(parseJob('add-watch-dir', { username: 'alice', label: 'films' }).type).toBe(
       'add-watch-dir',
     );
+    expect(parseJob('remove-watch-dir', { username: 'alice', label: 'Divers' }).type).toBe(
+      'remove-watch-dir',
+    );
+    expect(
+      parseJob('rename-watch-dir', { username: 'alice', label: 'Divers', to: 'Docs' }).type,
+    ).toBe('rename-watch-dir');
+    // the new name becomes a directory too: the same rule as for a new folder
+    expect(() =>
+      parseJob('rename-watch-dir', { username: 'alice', label: 'Divers', to: '../up' }),
+    ).toThrow();
     expect(parseJob('set-sync-disabled', { username: 'alice', disabled: true }).type).toBe(
       'set-sync-disabled',
     );

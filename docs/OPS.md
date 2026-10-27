@@ -415,6 +415,13 @@ Each folder carries a mode — keep it here, send it a bit later, send it straig
 away. A new folder starts at *keep it here*: turning on a copy to somebody
 else's machine is their decision, not a default.
 
+A member renames or removes a folder from the same page, but only while it holds
+nothing: its downloads seed from its path, and moving them under a seeding
+torrent is not done behind its back. The page checks the media index; the
+worker checks the disk again and removes the watch, complete and torrents
+directories with `rmdir`, so anything that lands in between keeps the folder.
+A renamed folder keeps its mode.
+
 The destination is one per member: address, port, account, password, and a root
 folder. Each folder lands in a folder of the same name over there, which is what
 the legacy did and what members' NAS layouts already assume.

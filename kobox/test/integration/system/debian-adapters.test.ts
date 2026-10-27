@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { statSync, writeFileSync } from 'node:fs';
+import { existsSync, statSync, writeFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { Label } from '../../../src/domain/torrent/Label.js';
 import { WatchDir } from '../../../src/domain/torrent/WatchDir.js';
@@ -141,6 +141,29 @@ describe.skipIf(!onDebianAsRoot)('torrent adapters on real Debian', () => {
     expect(execFileSync('cat', [dropIn], { encoding: 'utf8' })).toBe('user tweak\n');
 
     await accounts.deleteAccount(username);
+  });
+
+  it('should_remove_an_empty_folder_and_keep_one_that_holds_a_file', async () => {
+    const accounts = new SystemAccountAdapter(runner);
+    const watchDirs = new WatchDirAdapter(runner);
+    const username = Username.parse('kbxituser6');
+    cleanupUser('kbxituser6');
+    await accounts.createAccount(username);
+    const empty = WatchDir.labeled(Label.parse('Divers'));
+    const full = WatchDir.labeled(Label.parse('Series'));
+    await watchDirs.ensureLayout(username, [WatchDir.root(), empty, full]);
+    writeFileSync('/home/kbxituser6/rtorrent/complete/Series/Show.S01E01.mkv', 'x');
+
+    expect(await watchDirs.removeIfEmpty(username, empty)).toBe(true);
+    expect(await watchDirs.removeIfEmpty(username, full)).toBe(false);
+
+    for (const tree of ['watch', 'complete', 'torrents']) {
+      expect(existsSync(`/home/kbxituser6/rtorrent/${tree}/Divers`)).toBe(false);
+      expect(existsSync(`/home/kbxituser6/rtorrent/${tree}/Series`)).toBe(true);
+    }
+    // run again on what is already gone: nothing left to hold anything
+    expect(await watchDirs.removeIfEmpty(username, empty)).toBe(true);
+    cleanupUser('kbxituser6');
   });
 });
 

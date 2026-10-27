@@ -7,6 +7,8 @@ import { runAllowing, runOrThrow, type CommandRunner } from './CommandRunner.js'
 
 // systemctl's exit status for a unit that does not exist
 const UNIT_NOT_FOUND = 5;
+// find's exit status when its starting directory does not exist
+const FIND_MISSING_START_POINT = 1;
 
 // A member's tree belongs to the member's own group, never to a group every
 // member shares: that one let any member write into another's watch folder
@@ -30,6 +32,32 @@ export class WatchDirAdapter implements WatchDirPort {
       await this.install(username, '0750', dir.completePath(home));
       await this.install(username, '0750', dir.torrentsPath(home));
     }
+  }
+
+  async removeIfEmpty(username: Username, dir: WatchDir): Promise<boolean> {
+    const home = homeOf(username);
+    const paths = [dir.watchPath(home), dir.completePath(home), dir.torrentsPath(home)];
+    const present: string[] = [];
+    for (const path of paths) {
+      // a tree that is already gone holds nothing
+      const found = await runAllowing(
+        this.runner,
+        { command: 'find', args: [path, '-mindepth', '1', '-print', '-quit'] },
+        [FIND_MISSING_START_POINT],
+      );
+      if (found.stdout.trim() !== '') {
+        return false;
+      }
+      if (found.exitCode === 0) {
+        present.push(path);
+      }
+    }
+    // rmdir and not rm -r: something written in between makes it fail rather
+    // than vanish
+    for (const path of present) {
+      await runOrThrow(this.runner, { command: 'rmdir', args: [path] });
+    }
+    return true;
   }
 
   private async letTheWebServerIn(username: Username): Promise<void> {

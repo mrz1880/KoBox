@@ -156,6 +156,35 @@ describe('WatchDirAdapter', () => {
     expect(lines.join('\n')).not.toContain('kobox-users');
   });
 
+  it('should_remove_an_empty_folder_from_all_three_trees', async () => {
+    const runner = new RecordingRunner();
+
+    const removed = await new WatchDirAdapter(runner).removeIfEmpty(
+      alice,
+      WatchDir.labeled(Label.parse('Divers')),
+    );
+
+    expect(removed).toBe(true);
+    const lines = runner.lines();
+    for (const tree of ['watch', 'complete', 'torrents']) {
+      expect(lines).toContain(`rmdir /home/alice/rtorrent/${tree}/Divers`);
+    }
+  });
+
+  it('should_leave_a_folder_that_holds_anything_untouched', async () => {
+    // a download in it is seeding from that path: removing it is not ours to do
+    const runner = new RecordingRunner();
+    runner.onCommand('find', { stdout: '/home/alice/rtorrent/complete/Divers/Some.Film.mkv\n' });
+
+    const removed = await new WatchDirAdapter(runner).removeIfEmpty(
+      alice,
+      WatchDir.labeled(Label.parse('Divers')),
+    );
+
+    expect(removed).toBe(false);
+    expect(runner.lines().filter((line) => line.startsWith('rmdir'))).toEqual([]);
+  });
+
   it('should_let_the_web_server_into_a_new_member_group_and_reload_it', async () => {
     const runner = new RecordingRunner();
     runner.onCommand('id', { stdout: 'www-data bob\n' });

@@ -27,6 +27,8 @@ export const JOB_TYPES = [
   'deprovision-rtorrent',
   'render-rtorrent-config',
   'add-watch-dir',
+  'remove-watch-dir',
+  'rename-watch-dir',
   'set-category-sync-mode',
   'check-sync-destination',
   'send-pending-transfers',
@@ -192,6 +194,12 @@ export const jobPayloadSchemas = {
   'deprovision-rtorrent': usernameOnly,
   'render-rtorrent-config': usernameOnly,
   'add-watch-dir': z.strictObject({ username: usernameField, label: labelField }),
+  'remove-watch-dir': z.strictObject({ username: usernameField, label: labelField }),
+  'rename-watch-dir': z.strictObject({
+    username: usernameField,
+    label: labelField,
+    to: labelField,
+  }),
   'check-sync-destination': z.strictObject({ username: usernameField }),
   // no username: the scheduled pass takes on whoever's hour has come. With one,
   // it is the "send it straight away" folders of that member.

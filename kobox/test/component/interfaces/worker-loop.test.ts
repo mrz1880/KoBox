@@ -686,6 +686,26 @@ describe('CLI enqueue -> root worker loop (the privilege seam)', () => {
     expect(instance?.watchDirs.filter((dir) => dir.label !== undefined)).toHaveLength(7);
   });
 
+  it('should_rename_then_remove_a_folder_and_render_what_is_left', async () => {
+    await enqueueCreateAlice();
+    await world.worker.drain();
+    await world.queue.enqueue(parseJob('add-watch-dir', { username: 'alice', label: 'Divers' }));
+    await world.queue.enqueue(parseJob('add-watch-dir', { username: 'alice', label: 'Films' }));
+    await world.worker.drain();
+    const before = world.services.restartsFor(alice);
+
+    await world.queue.enqueue(
+      parseJob('rename-watch-dir', { username: 'alice', label: 'Divers', to: 'Docs' }),
+    );
+    await world.queue.enqueue(parseJob('remove-watch-dir', { username: 'alice', label: 'Films' }));
+    await world.worker.drain();
+
+    const instance = await world.instances.findByUsername(alice);
+    expect(instance?.watchDirs.map((dir) => dir.label?.value)).toEqual([undefined, 'Docs']);
+    // the folder rTorrent watches has to follow: one render for both
+    expect(world.services.restartsFor(alice) - before).toBe(1);
+  });
+
   it('should_suspend_then_resume_via_jobs', async () => {
     await enqueueCreateAlice();
     await world.queue.enqueue(buildJob.suspendUser({ username: 'alice' }));

@@ -13,6 +13,12 @@ export class UnknownCategoryError extends DomainError {
   }
 }
 
+export class FolderNameTakenError extends DomainError {
+  constructor(label: string) {
+    super(`there is already a folder named ${JSON.stringify(label)}`);
+  }
+}
+
 export type TorrentPrivacy = 'private' | 'public';
 export type AdmissionDecision = 'accepted' | 'rejected-public-tracker';
 
@@ -71,7 +77,7 @@ export class TorrentInstance {
   }
 
   addWatchDir(label: Label): { instance: TorrentInstance; event?: WatchDirAdded } {
-    if (this.watchDirs.some((dir) => dir.label?.equals(label))) {
+    if (this.hasFolder(label)) {
       return { instance: this };
     }
     return {
@@ -83,10 +89,44 @@ export class TorrentInstance {
     };
   }
 
+  // Whether the folder's directories hold nothing is for the caller to have
+  // checked on disk: the instance only stops knowing the name. One already
+  // gone is a job run twice, not an error.
+  removeWatchDir(label: Label): TorrentInstance {
+    if (!this.hasFolder(label)) {
+      return this;
+    }
+    return new TorrentInstance({
+      ...this.props(),
+      watchDirs: this.watchDirs.filter((dir) => dir.label?.equals(label) !== true),
+    });
+  }
+
+  // The folder keeps its place and what happens to its finished downloads;
+  // only its name changes. Renamed already (old name gone, new one there) is a
+  // job run twice.
+  renameWatchDir(from: Label, to: Label): TorrentInstance {
+    if (!this.hasFolder(from) && this.hasFolder(to)) {
+      return this;
+    }
+    if (!this.hasFolder(from)) {
+      throw new UnknownCategoryError(from.value);
+    }
+    if (this.hasFolder(to)) {
+      throw new FolderNameTakenError(to.value);
+    }
+    return new TorrentInstance({
+      ...this.props(),
+      watchDirs: this.watchDirs.map((dir) =>
+        dir.label?.equals(from) === true ? WatchDir.labeled(to, dir.syncMode) : dir,
+      ),
+    });
+  }
+
   // Only a category this instance actually owns can carry a mode: a label whose
   // directories were never created would push from a path that does not exist.
   setSyncMode(label: Label, mode: SyncMode): TorrentInstance {
-    if (!this.watchDirs.some((dir) => dir.label?.equals(label) === true)) {
+    if (!this.hasFolder(label)) {
       throw new UnknownCategoryError(label.value);
     }
     return new TorrentInstance({
@@ -138,6 +178,10 @@ export class TorrentInstance {
   torrentsFolderFor(torrentFile: string, home: string): string | undefined {
     const parent = torrentFile.slice(0, torrentFile.lastIndexOf('/'));
     return this.watchDirs.find((dir) => dir.watchPath(home) === parent)?.torrentsPath(home);
+  }
+
+  hasFolder(label: Label): boolean {
+    return this.watchDirs.some((dir) => dir.label?.equals(label) === true);
   }
 
   private props(): TorrentInstanceProps {

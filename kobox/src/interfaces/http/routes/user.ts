@@ -70,6 +70,10 @@ import { blocklistCoverage } from '../../../domain/tracker/BlocklistCoverage.js'
 import type { TwoStepSetup } from '../../../application/portal/TwoStepSetup.js';
 
 const categorySchema = z.object({ label: z.string().min(1).max(64) });
+const categoryRenameSchema = z.object({
+  label: z.string().min(1).max(64),
+  to: z.string().min(1).max(64),
+});
 const retrySchema = z.object({ id: z.coerce.number().int().positive() });
 const destinationSchema = z.object({
   host: z.string().min(1).max(253),
@@ -219,6 +223,18 @@ async function signalRowFor(
 // The firewall filters IPv4 only, so an IPv6 visitor has nothing to declare.
 function visitorAddress(raw: string): IpAddress | undefined {
   return IPV4_PATTERN.test(raw) ? IpAddress.parse(raw) : undefined;
+}
+
+// A folder name from a form: undefined when it could not be a directory name.
+function parseLabel(raw: string): Label | undefined {
+  try {
+    return Label.parse(raw);
+  } catch (error) {
+    if (error instanceof DomainError) {
+      return undefined;
+    }
+    throw error;
+  }
 }
 
 function sftpHostName(): string | undefined {
@@ -724,6 +740,15 @@ export function registerUserRoutes(
     return redirectWithFlash(reply, '/rutorrent', 'Restarting your rtorrent.');
   });
 
+  // The member's folders that hold a download, as the index last saw them. The
+  // worker checks the disk again before it removes anything: this is what the
+  // page explains, not what keeps the files safe.
+  const foldersHoldingDownloads = async (username: Username): Promise<ReadonlySet<string>> =>
+    new Set((await deps.media.listFor(username)).map((file) => file.path.category));
+
+  const holdsDownloadsFlash = (label: Label): string =>
+    `${label.value} still holds downloads: they seed from its path. Remove them first, then the folder.`;
+
   server.get('/sync', async (request, reply) => {
     const session = await guards.requireSession(request, reply);
     if (session === undefined) {
@@ -735,9 +760,18 @@ export function registerUserRoutes(
     const categories = (instance?.watchDirs ?? []).filter((dir) => dir.label !== undefined);
     const destination = await deps.destinations.findByUsername(session.username);
     const transfers = await deps.transfers.listRecent(session.username, 25);
+    const holding = await foldersHoldingDownloads(session.username);
     return reply
       .type('text/html')
-      .send(syncPage(categories, destination, transfers, viewerOf(session), flashOf(request)));
+      .send(
+        syncPage(
+          { categories, holding },
+          destination,
+          transfers,
+          viewerOf(session),
+          flashOf(request),
+        ),
+      );
   });
 
   server.post('/sync/categories', async (request, reply) => {
@@ -794,6 +828,60 @@ export function registerUserRoutes(
       }),
     );
     return redirectWithFlash(reply, '/sync', `Saved what happens to ${label.value}.`);
+  });
+
+  server.post('/sync/categories/remove', async (request, reply) => {
+    const session = await guards.requireCsrf(request, reply);
+    if (session === undefined) {
+      return;
+    }
+    const parsed = categorySchema.safeParse(request.body);
+    const label = parsed.success ? parseLabel(parsed.data.label) : undefined;
+    if (label === undefined) {
+      return reply.code(400).send();
+    }
+    const instance = await deps.instances.findByUsername(session.username);
+    if (instance?.hasFolder(label) !== true) {
+      return reply.code(404).send();
+    }
+    if ((await foldersHoldingDownloads(session.username)).has(label.value)) {
+      return redirectWithFlash(reply, '/sync', holdsDownloadsFlash(label));
+    }
+    await deps.queue.enqueue(
+      buildJob.removeWatchDir({ username: session.username.value, label: label.value }),
+    );
+    return redirectWithFlash(reply, '/sync', `Removing the ${label.value} folder.`);
+  });
+
+  server.post('/sync/categories/rename', async (request, reply) => {
+    const session = await guards.requireCsrf(request, reply);
+    if (session === undefined) {
+      return;
+    }
+    const parsed = categoryRenameSchema.safeParse(request.body);
+    const label = parsed.success ? parseLabel(parsed.data.label) : undefined;
+    const to = parsed.success ? parseLabel(parsed.data.to) : undefined;
+    if (label === undefined || to === undefined) {
+      return reply.code(400).send();
+    }
+    const instance = await deps.instances.findByUsername(session.username);
+    if (instance?.hasFolder(label) !== true) {
+      return reply.code(404).send();
+    }
+    if (instance.hasFolder(to)) {
+      return redirectWithFlash(reply, '/sync', `There is already a folder named ${to.value}.`);
+    }
+    if ((await foldersHoldingDownloads(session.username)).has(label.value)) {
+      return redirectWithFlash(reply, '/sync', holdsDownloadsFlash(label));
+    }
+    await deps.queue.enqueue(
+      buildJob.renameWatchDir({
+        username: session.username.value,
+        label: label.value,
+        to: to.value,
+      }),
+    );
+    return redirectWithFlash(reply, '/sync', `Renaming ${label.value} to ${to.value}.`);
   });
 
   server.post('/sync/destination', async (request, reply) => {
