@@ -895,6 +895,7 @@ export function buildContainer(name: string): Container {
     outbox,
     transport: new RsyncOverSshTransfer(runner),
     facts: new FsLocalFileFacts(),
+    torrents: new SqliteTorrentRepository(db),
     hour: () => new Date().getHours(),
     // the private half of the host key: root only, which is why this lives in
     // the worker container and not in the portal's

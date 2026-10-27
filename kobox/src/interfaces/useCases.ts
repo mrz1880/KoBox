@@ -30,6 +30,7 @@ import { RemoveWatchDir, RenameWatchDir } from '../application/torrent/ReshapeWa
 import { SetCategorySyncMode } from '../application/torrent/SetCategorySyncMode.js';
 import { CheckSyncDestination } from '../application/sync/CheckSyncDestination.js';
 import { QueueFinishedDownload } from '../application/sync/QueueFinishedDownload.js';
+import { QueueFolderBacklog } from '../application/sync/QueueFolderBacklog.js';
 import { RequeueTransfer } from '../application/sync/RequeueTransfer.js';
 import { SendPendingTransfers } from '../application/sync/SendPendingTransfers.js';
 import type {
@@ -525,6 +526,7 @@ export interface SyncUseCaseDeps {
   readonly probe: RemoteProbePort;
   readonly transport: FileTransferPort;
   readonly facts: LocalFileFactsPort;
+  readonly torrents: TorrentRepository;
   readonly clock: () => string;
   readonly hour: () => number;
 }
@@ -535,11 +537,17 @@ export interface SyncUseCaseDeps {
 export interface SyncUseCases {
   readonly checkDestination: CheckSyncDestination;
   readonly queueFinished: QueueFinishedDownload;
+  readonly queueBacklog: QueueFolderBacklog;
   readonly sendPending: SendPendingTransfers;
   readonly requeue: RequeueTransfer;
 }
 
 export function buildSyncUseCases(deps: SyncUseCaseDeps): SyncUseCases {
+  const queueFinished = new QueueFinishedDownload({
+    instances: deps.instances,
+    transfers: deps.transfers,
+    clock: deps.clock,
+  });
   return {
     checkDestination: new CheckSyncDestination({
       destinations: deps.destinations,
@@ -547,10 +555,11 @@ export function buildSyncUseCases(deps: SyncUseCaseDeps): SyncUseCases {
       probe: deps.probe,
       clock: deps.clock,
     }),
-    queueFinished: new QueueFinishedDownload({
-      instances: deps.instances,
-      transfers: deps.transfers,
-      clock: deps.clock,
+    queueFinished,
+    queueBacklog: new QueueFolderBacklog({
+      torrents: deps.torrents,
+      files: deps.facts,
+      queueFinished,
     }),
     sendPending: new SendPendingTransfers({
       users: deps.users,

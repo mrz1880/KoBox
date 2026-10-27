@@ -27,4 +27,16 @@ describe('Torrent', () => {
   it('should_transition_to_rejected', () => {
     expect(Torrent.load({ infoHash: HASH, name: 'x' }).reject().state).toBe(TorrentState.rejected);
   });
+
+  it('should_name_the_tree_a_finished_download_left_in_its_folder_only', () => {
+    const films = Label.parse('Films');
+    const loaded = Torrent.load({ infoHash: InfoHash.parse('a'.repeat(40)), name: 'Film', label: films });
+    const done = loaded.complete('/home/alice/rtorrent/complete/Films/Film');
+
+    expect(done.finishedTreeIn(films)).toBe('/home/alice/rtorrent/complete/Films/Film');
+    // still downloading, or in another folder: nothing there to send yet
+    expect(loaded.finishedTreeIn(films)).toBeUndefined();
+    expect(done.finishedTreeIn(Label.parse('Series'))).toBeUndefined();
+    expect(done.reject().finishedTreeIn(films)).toBeUndefined();
+  });
 });

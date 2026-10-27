@@ -180,6 +180,11 @@ export class TorrentInstance {
     return this.watchDirs.find((dir) => dir.watchPath(home) === parent)?.torrentsPath(home);
   }
 
+  // whether what finishes in that folder goes out to the member's machine
+  sendsFolder(label: Label): boolean {
+    return this.watchDirs.some((dir) => dir.label?.equals(label) === true && dir.syncMode.sends);
+  }
+
   hasFolder(label: Label): boolean {
     return this.watchDirs.some((dir) => dir.label?.equals(label) === true);
   }

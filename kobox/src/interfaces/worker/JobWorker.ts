@@ -283,6 +283,13 @@ export class JobWorker {
             : Username.parse(job.payload.username),
         );
         return;
+      case 'queue-folder-backlog': {
+        const report = await this.sync.queueBacklog.execute({
+          username: Username.parse(job.payload.username),
+          label: Label.parse(job.payload.label),
+        });
+        return report.sendNow ? { sendNowFor: job.payload.username } : undefined;
+      }
       case 'requeue-transfer':
         await this.sync.requeue.execute(Username.parse(job.payload.username), job.payload.id);
         return;

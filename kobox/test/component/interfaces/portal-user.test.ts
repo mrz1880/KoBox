@@ -4,6 +4,7 @@ import { IpAddress } from '../../../src/domain/shared/IpAddress.js';
 import { DynDnsHost } from '../../../src/domain/security/DynDnsHost.js';
 import { ComponentName } from '../../../src/domain/installation/ComponentName.js';
 import { Label } from '../../../src/domain/torrent/Label.js';
+import { SyncMode } from '../../../src/domain/torrent/SyncMode.js';
 import { LocalPath } from '../../../src/domain/sync/LocalPath.js';
 import { SyncTransfer } from '../../../src/domain/sync/SyncTransfer.js';
 import { MediaPath } from '../../../src/domain/media/MediaFile.js';
@@ -870,6 +871,55 @@ describe('renaming or removing a folder', () => {
     expect(response.body.match(/action="\/sync\/categories\/rename"/g)).toHaveLength(1);
     expect(response.body.match(/action="\/sync\/categories\/remove"/g)).toHaveLength(1);
     expect(response.body).toContain('Holds downloads');
+  });
+});
+
+describe('sending what a folder already holds', () => {
+  const alice = Username.parse('alice');
+  const films = Label.parse('films');
+
+  const setFilms = async (mode: string): Promise<void> => {
+    const instance = await world.instances.findByUsername(alice);
+    if (instance === undefined) {
+      throw new Error('the world should have provisioned alice');
+    }
+    await world.instances.save(instance.setSyncMode(films, SyncMode.parse(mode)));
+  };
+
+  const ask = () =>
+    world.server.inject({
+      method: 'POST',
+      url: '/sync/categories/send-existing',
+      headers: { cookie: user.cookie, 'content-type': 'application/x-www-form-urlencoded' },
+      payload: form({ _csrf: user.csrf, label: 'films' }),
+    });
+
+  it('should_queue_what_a_sending_folder_already_holds', async () => {
+    await setFilms('scheduled');
+
+    const response = await ask();
+
+    expect(response.statusCode).toBe(303);
+    expect(world.queue.jobs).toEqual([
+      { type: 'queue-folder-backlog', payload: { username: 'alice', label: 'films' } },
+    ]);
+  });
+
+  it('should_send_nothing_from_a_folder_kept_on_the_box', async () => {
+    const response = await ask();
+
+    expect(response.statusCode).toBe(303);
+    expect(world.queue.jobs).toHaveLength(0);
+  });
+
+  it('should_offer_it_only_beside_a_folder_that_sends', async () => {
+    const page = async (): Promise<string> =>
+      (await world.server.inject({ method: 'GET', url: '/sync', headers: { cookie: user.cookie } }))
+        .body;
+
+    expect(await page()).not.toContain('action="/sync/categories/send-existing"');
+    await setFilms('immediate');
+    expect(await page()).toContain('action="/sync/categories/send-existing"');
   });
 });
 

@@ -29,6 +29,7 @@ describe('job contract', () => {
     'set-category-sync-mode',
     'check-sync-destination',
     'send-pending-transfers',
+    'queue-folder-backlog',
     'requeue-transfer',
       'set-sync-disabled',
       'set-allow-public-tracker',
@@ -244,6 +245,9 @@ describe('job contract', () => {
     expect(parseJob('provision-rtorrent', { username: 'alice' }).type).toBe('provision-rtorrent');
     expect(parseJob('add-watch-dir', { username: 'alice', label: 'films' }).type).toBe(
       'add-watch-dir',
+    );
+    expect(parseJob('queue-folder-backlog', { username: 'alice', label: 'Films' }).type).toBe(
+      'queue-folder-backlog',
     );
     expect(parseJob('remove-watch-dir', { username: 'alice', label: 'Divers' }).type).toBe(
       'remove-watch-dir',

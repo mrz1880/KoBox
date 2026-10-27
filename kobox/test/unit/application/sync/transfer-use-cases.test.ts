@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { QueueFinishedDownload } from '../../../../src/application/sync/QueueFinishedDownload.js';
+import { QueueFolderBacklog } from '../../../../src/application/sync/QueueFolderBacklog.js';
+import { InfoHash } from '../../../../src/domain/torrent/InfoHash.js';
+import { Torrent } from '../../../../src/domain/torrent/Torrent.js';
+import { InMemoryTorrentRepository } from '../../../../src/infrastructure/persistence/InMemoryTorrentRepository.js';
 import { RequeueTransfer } from '../../../../src/application/sync/RequeueTransfer.js';
 import { SendPendingTransfers } from '../../../../src/application/sync/SendPendingTransfers.js';
 import { LocalPath } from '../../../../src/domain/sync/LocalPath.js';
@@ -354,5 +358,63 @@ describe('RequeueTransfer', () => {
     await new RequeueTransfer({ transfers, clock: () => NOW }).execute(Username.parse('boss'), id);
 
     expect(await transfers.countByState(alice, 'failed')).toBe(1);
+  });
+});
+
+describe('QueueFolderBacklog', () => {
+  const tree = (name: string): string => `/home/alice/rtorrent/complete/Films/${name}`;
+
+  async function backlogWith(mode: SyncMode, present: (path: string) => boolean = () => true) {
+    const torrents = new InMemoryTorrentRepository();
+    const finished = (hash: string, name: string, label = films) =>
+      Torrent.load({ infoHash: InfoHash.parse(hash.repeat(40)), name, label }).complete(tree(name));
+    await torrents.upsert(alice, finished('a', 'Old.Film.mkv'));
+    await torrents.upsert(alice, finished('b', 'Gone.Film.mkv'));
+    await torrents.upsert(alice, finished('c', 'Other.Show', Label.parse('Series')));
+    // still downloading: half a file is nothing to send
+    await torrents.upsert(
+      alice,
+      Torrent.load({ infoHash: InfoHash.parse('d'.repeat(40)), name: 'Busy.Film.mkv', label: films }),
+    );
+    const transfers = new InMemorySyncTransferRepository();
+    const instances = await instancesWith(mode);
+    const useCase = new QueueFolderBacklog({
+      torrents,
+      files: {
+        isDirectory: () => Promise.resolve(false),
+        exists: (path) => Promise.resolve(present(path.value)),
+      },
+      queueFinished: new QueueFinishedDownload({ instances, transfers, clock: () => NOW }),
+    });
+    return { useCase, transfers };
+  }
+
+  it('should_queue_the_finished_downloads_already_in_a_folder_set_to_send', async () => {
+    // a folder switched from keep-it-here only queued what finished afterwards
+    const { useCase, transfers } = await backlogWith(
+      SyncMode.parse('immediate'),
+      (path) => !path.endsWith('Gone.Film.mkv'),
+    );
+
+    const report = await useCase.execute({ username: alice, label: films });
+
+    expect(report).toEqual({ queued: 1, sendNow: true });
+    const waiting = await transfers.listWaiting(alice);
+    expect(waiting.map((transfer) => transfer.source.value)).toEqual([tree('Old.Film.mkv')]);
+    // asked twice, nothing goes twice
+    expect(await useCase.execute({ username: alice, label: films })).toEqual({
+      queued: 0,
+      sendNow: false,
+    });
+  });
+
+  it('should_queue_nothing_from_a_folder_kept_on_the_box', async () => {
+    const { useCase, transfers } = await backlogWith(SyncMode.parse('off'));
+
+    expect(await useCase.execute({ username: alice, label: films })).toEqual({
+      queued: 0,
+      sendNow: false,
+    });
+    expect(await transfers.listWaiting(alice)).toEqual([]);
   });
 });
