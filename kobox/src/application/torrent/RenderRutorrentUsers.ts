@@ -21,7 +21,7 @@ interface Deps {
 // Renders the per-user nginx SCGI mounts (/RPC-<USER>) and the matching
 // ruTorrent per-user configs, then reloads nginx. Declarative + idempotent:
 // the whole set is re-rendered from the active user population, so a removed
-// user's mount disappears on the next run (no stale /RPC- left behind).
+// user's mount and ruTorrent config disappear on the next run.
 export class RenderRutorrentUsers {
   constructor(private readonly deps: Deps) {}
 
@@ -38,6 +38,7 @@ export class RenderRutorrentUsers {
       ...wirings.map((wiring) => renderRutorrentUserConfig(wiring)),
     ];
     await files.apply(rendered);
+    await profiles.keepConfigFoldersOf(active.map((user) => user.username));
     // before nginx reloads: the reloaded vhost sends a member's ruTorrent to
     // their pool, which has to be listening by then
     await pools.converge(active.map((user) => renderRutorrentPhpPool(user.username.value)));

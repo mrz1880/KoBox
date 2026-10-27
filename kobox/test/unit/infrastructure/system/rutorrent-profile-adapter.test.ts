@@ -10,13 +10,20 @@ import { RutorrentProfileAdapter } from '../../../../src/infrastructure/system/R
 class RecordingRunner implements CommandRunner {
   readonly calls: CommandRequest[] = [];
 
-  // test -f answers whether the ratio script is on this box
-  constructor(private readonly scriptPresent = true) {}
+  // test -f answers whether the ratio script is on this box, test -d whether
+  // its ruTorrent configs are (null: they are not); find lists them
+  constructor(
+    private readonly scriptPresent = true,
+    private readonly configFolders: readonly string[] | null = [],
+  ) {}
 
   run(request: CommandRequest): Promise<CommandResult> {
     this.calls.push(request);
-    const missing = request.command === 'test' && !this.scriptPresent;
-    return Promise.resolve({ stdout: '', stderr: '', exitCode: missing ? 1 : 0 });
+    const missing = request.command === 'test' && (request.args[0] === '-d'
+      ? this.configFolders === null
+      : !this.scriptPresent);
+    const stdout = request.command === 'find' ? (this.configFolders ?? []).map((dir) => `${dir}\n`).join('') : '';
+    return Promise.resolve({ stdout, stderr: '', exitCode: missing ? 1 : 0 });
   }
 }
 
@@ -52,6 +59,28 @@ describe('RutorrentProfileAdapter', () => {
       ['chown', 'root:alice', dir],
       ['chmod', '0750', dir],
     ]);
+  });
+
+  it('should_remove_the_config_folder_of_a_member_no_longer_listed_and_nothing_else', async () => {
+    const root = '/var/www/rutorrent/conf/users';
+    const runner = new RecordingRunner(true, [`${root}/alice`, `${root}/gone`]);
+
+    await new RutorrentProfileAdapter(runner).keepConfigFoldersOf([Username.parse('alice')]);
+
+    expect(runner.calls.map((call) => [call.command, ...call.args])).toEqual([
+      ['test', '-d', root],
+      // folders only, one level down: ruTorrent's own .gitignore sits there too
+      ['find', root, '-mindepth', '1', '-maxdepth', '1', '-type', 'd'],
+      ['rm', '-rf', '--', `${root}/gone`],
+    ]);
+  });
+
+  it('should_leave_a_box_without_rutorrent_configs_as_it_is', async () => {
+    const runner = new RecordingRunner(true, null);
+
+    await expect(new RutorrentProfileAdapter(runner).keepConfigFoldersOf([])).resolves.toBeUndefined();
+
+    expect(runner.calls.map((call) => call.command)).toEqual(['test']);
   });
 
   it('should_offer_the_ratio_groups_as_the_member_like_the_rest_of_their_rutorrent', async () => {

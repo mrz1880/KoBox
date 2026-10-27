@@ -111,6 +111,8 @@ export interface RutorrentProfilePort {
   ensureProfile(username: Username): Promise<void>;
   // the folder holding the member's config, open to their ruTorrent alone
   ensureConfigFolder(username: Username): Promise<void>;
+  // drops the config folder of anyone not listed: a member gone or suspended
+  keepConfigFoldersOf(members: readonly Username[]): Promise<void>;
   // KoBox's ratio groups, in place of ruTorrent's eight alike ones, for a
   // member who never changed theirs; one who did keeps their own
   offerRatioGroups(username: Username): Promise<void>;

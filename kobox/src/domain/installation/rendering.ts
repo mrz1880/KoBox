@@ -713,9 +713,13 @@ export function renderRutorrentUsersInclude(users: readonly RutorrentUserWiring[
   };
 }
 
-// Where ruTorrent's multiuser layout looks for a member's own config.
+// Where ruTorrent's multiuser layout looks for each member's own config.
+export function rutorrentUserConfigsDir(): string {
+  return `${RUTORRENT_DIR}/conf/users`;
+}
+
 export function rutorrentUserConfigDir(username: string): string {
-  return `${RUTORRENT_DIR}/conf/users/${username}`;
+  return `${rutorrentUserConfigsDir()}/${username}`;
 }
 
 // The per-user ruTorrent config the multiuser layout reads for REMOTE_USER:

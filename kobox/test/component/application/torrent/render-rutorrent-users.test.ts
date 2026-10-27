@@ -48,6 +48,17 @@ describe('RenderRutorrentUsers', () => {
     expect(profiles.configFolders).toEqual(['alice', 'bob']);
   });
 
+  // a member gone or suspended has no pool any more: the config naming their
+  // rTorrent goes with it, as their pool does
+  it('should_keep_the_config_folders_of_active_members_only', async () => {
+    const { users, profiles, useCase } = await world();
+    await users.save(new UserBuilder().withUsername('carol').withScgiPort(51103).withRtorrentPort(45002).suspended());
+
+    await useCase.execute();
+
+    expect(profiles.keptConfigFolders).toEqual(['alice', 'bob']);
+  });
+
   // ruTorrent's eight alike groups said nothing: every member is offered
   // KoBox's, which keep a member's own choice once they made one
   it('should_offer_every_active_member_ratio_groups_that_say_what_they_do', async () => {
