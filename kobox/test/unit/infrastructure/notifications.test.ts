@@ -7,6 +7,12 @@ import { NtfyChannel } from '../../../src/infrastructure/notifications/NtfyChann
 import { OutboxEmailChannel } from '../../../src/infrastructure/notifications/OutboxEmailChannel.js';
 import { SendmailTransport } from '../../../src/infrastructure/notifications/SendmailTransport.js';
 import { InMemoryMailOutbox } from '../../../src/infrastructure/persistence/InMemoryMailOutbox.js';
+import { InMemoryPortalCredentialsRepository } from '../../../src/infrastructure/persistence/InMemoryPortalCredentialsRepository.js';
+import { InMemoryUserRepository } from '../../../src/infrastructure/persistence/InMemoryUserRepository.js';
+import { AccountNoticesToAdmins } from '../../../src/infrastructure/notifications/AccountNoticesToAdmins.js';
+import { EmailAddress } from '../../../src/domain/user/EmailAddress.js';
+import { Username } from '../../../src/domain/user/Username.js';
+import { UserBuilder } from '../../builders/UserBuilder.js';
 import { formatEvent, type AnyDomainEvent } from '../../../src/infrastructure/notifications/formatEvent.js';
 import type {
   CommandRequest,
@@ -45,6 +51,8 @@ class RecordingRunner implements CommandRunner {
   }
 }
 
+const NOW_STAMP = '2026-10-27 12:00:00';
+
 const context = {
   box: 'box.example.org',
   portalUrl: 'https://box.example.org',
@@ -59,6 +67,7 @@ const EVERY_EVENT: readonly AnyDomainEvent[] = [
   { type: 'PasswordChanged', username: 'alice' },
   { type: 'UserSuspended', username: 'alice' },
   { type: 'UserResumed', username: 'alice' },
+  { type: 'PasswordResetRequested', username: 'alice' },
   { type: 'TrackerDiscovered', host: 'tracker.example.org' },
   { type: 'TrackerDied', host: 'tracker.example.org' },
   { type: 'TrackerCertRenewed', host: 'tracker.example.org', expiresOn: '2027-01-24' },
@@ -101,6 +110,12 @@ describe('formatEvent', () => {
     expect(body).toContain('portal, SFTP, Samba and Nextcloud');
     // the app token goes with the old password: Sonarr and Radarr need a new one
     expect(body).toContain('app token');
+  });
+
+  it('should_say_who_asked_for_a_new_password_and_what_to_do_if_it_was_not_them', () => {
+    const formatted = formatEvent({ type: 'PasswordResetRequested', username: 'alice' }, context);
+    expect(formatted.title).toContain('alice');
+    expect(formatted.body).toContain('suspend');
   });
 
   it('should_give_fair_use_incidents_high_priority', () => {
@@ -253,5 +268,54 @@ describe('MultiChannelNotifier', () => {
       notifier.notify({ type: 'UserCreated', username: 'alice' }),
     ).resolves.toBeUndefined();
     expect(discord.calls).toHaveLength(1);
+  });
+});
+
+describe('AccountNoticesToAdmins', () => {
+  async function world() {
+    const users = new InMemoryUserRepository();
+    const credentials = new InMemoryPortalCredentialsRepository();
+    for (const [name, role] of [
+      ['boss', 'admin'],
+      ['guigui', 'admin'],
+      ['alice', 'user'],
+    ] as const) {
+      await users.save(new UserBuilder().withUsername(name).withEmail(`${name}@example.org`).build());
+      await credentials.save({ username: Username.parse(name), role }, NOW_STAMP);
+    }
+    const outbox = new InMemoryMailOutbox();
+    const operator: AnyDomainEvent[] = [];
+    const notifier = new AccountNoticesToAdmins({
+      operator: { notify: (event) => Promise.resolve(void operator.push(event)) },
+      users,
+      credentials,
+      outbox,
+      context: () => Promise.resolve(context),
+      now: () => NOW_STAMP,
+      // the operator's alert address already gets everything
+      alreadyMailed: EmailAddress.parse('boss@example.org'),
+    });
+    return { notifier, outbox, operator };
+  }
+
+  it('should_mail_every_admin_who_joins_leaves_or_asks_for_a_new_password', async () => {
+    const { notifier, outbox, operator } = await world();
+
+    await notifier.notify({ type: 'PasswordResetRequested', username: 'alice' });
+
+    const mails = await outbox.listRecent(10);
+    expect(mails.map((mail) => mail.recipient)).toEqual(['guigui@example.org']);
+    expect(mails[0]?.subject).toContain('alice');
+    expect(operator.map((event) => event.type)).toEqual(['PasswordResetRequested']);
+  });
+
+  it('should_leave_every_other_event_to_the_operator_channels', async () => {
+    const { notifier, outbox, operator } = await world();
+
+    await notifier.notify({ type: 'TrackerDied', host: 'tracker.example.org' });
+    await notifier.notify({ type: 'UserSuspended', username: 'alice' });
+
+    expect(await outbox.listRecent(10)).toEqual([]);
+    expect(operator).toHaveLength(2);
   });
 });

@@ -14,7 +14,7 @@ import type {
 import type { Role } from '../../domain/portal/Role.js';
 import { EmailAddress } from '../../domain/user/EmailAddress.js';
 import type { Password } from '../../domain/user/Password.js';
-import type { PasswordSealerPort, UserRepository } from '../../domain/user/ports.js';
+import type { NotificationPort, PasswordSealerPort, UserRepository } from '../../domain/user/ports.js';
 import type { Quota } from '../../domain/user/Quota.js';
 import { Username } from '../../domain/user/Username.js';
 import { passwordLinkMail } from './passwordLinkMail.js';
@@ -164,8 +164,12 @@ export class SendPasswordLink {
 
 // "Forgot your password?": a username or an address in, a mail out if it
 // names an active member, and the very same silence in every other case.
+// Every admin hears of a link that went out: a request nobody made shows up
+// in their mailbox, not only in the member's.
 export class RequestPasswordReset {
-  constructor(private readonly deps: PasswordLinkDeps) {}
+  constructor(
+    private readonly deps: PasswordLinkDeps & { readonly notifications: NotificationPort },
+  ) {}
 
   async execute(identifier: string): Promise<void> {
     const user = await this.memberNamed(identifier.trim());
@@ -178,7 +182,12 @@ export class RequestPasswordReset {
       if (!(error instanceof TooManyPasswordLinksError)) {
         throw error;
       }
+      return;
     }
+    await this.deps.notifications.notify({
+      type: 'PasswordResetRequested',
+      username: user.username.value,
+    });
   }
 
   private async memberNamed(identifier: string) {

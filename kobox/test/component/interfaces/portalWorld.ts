@@ -234,7 +234,10 @@ export async function buildPortalWorld(
     passwords,
     inviteMember: new InviteMember(linkDeps),
     sendPasswordLink: new SendPasswordLink(linkDeps),
-    requestPasswordReset: new RequestPasswordReset(linkDeps),
+    requestPasswordReset: new RequestPasswordReset({
+      ...linkDeps,
+      notifications: { notify: () => Promise.resolve() },
+    }),
     setPasswordFromLink: new SetPasswordFromLink(linkDeps),
     trackers: new InMemoryTrackerRepository(),
     blocklists,

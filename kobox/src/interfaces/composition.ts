@@ -13,6 +13,7 @@ import { RunInstallation } from '../application/installation/RunInstallation.js'
 import { UninstallComponents } from '../application/installation/UninstallComponents.js';
 import { COMPONENT_CATALOG } from '../domain/installation/catalog.js';
 import { stampOf } from '../domain/shared/stamp.js';
+import { EmailAddress } from '../domain/user/EmailAddress.js';
 import { SqliteComponentRegistry } from '../infrastructure/persistence/SqliteComponentRegistry.js';
 import { AptPackageAdapter } from '../infrastructure/system/AptPackageAdapter.js';
 import {
@@ -36,6 +37,7 @@ import { BackupHostAdapter } from '../infrastructure/system/BackupHostAdapter.js
 import { GitAdapter } from '../infrastructure/system/GitAdapter.js';
 import { UpgradeHostAdapter } from '../infrastructure/system/UpgradeHostAdapter.js';
 import { SqliteReleaseRepository } from '../infrastructure/persistence/SqliteReleaseRepository.js';
+import { AccountNoticesToAdmins } from '../infrastructure/notifications/AccountNoticesToAdmins.js';
 import { MultiChannelNotifier } from '../infrastructure/notifications/MultiChannelNotifier.js';
 import { OutboxEmailChannel } from '../infrastructure/notifications/OutboxEmailChannel.js';
 import { SendmailTransport } from '../infrastructure/notifications/SendmailTransport.js';
@@ -65,7 +67,10 @@ import { AllDebridAdapter } from '../infrastructure/system/AllDebridAdapter.js';
 import { Aria2Adapter } from '../infrastructure/system/Aria2Adapter.js';
 import { DdlPlacementAdapter } from '../infrastructure/system/DdlPlacementAdapter.js';
 import { NtfyChannel } from '../infrastructure/notifications/NtfyChannel.js';
-import type { NotificationChannel } from '../infrastructure/notifications/formatEvent.js';
+import type {
+  NotificationChannel,
+  NotificationContext,
+} from '../infrastructure/notifications/formatEvent.js';
 import type { SecurityNotificationPort } from '../domain/security/ports.js';
 import type { TrackerNotificationPort } from '../domain/tracker/ports.js';
 import type { NotificationPort, PasswordSealerPort } from '../domain/user/ports.js';
@@ -247,6 +252,16 @@ export function nowStamp(): string {
   return stampOf(new Date());
 }
 
+// The operator's alert address as an address, when it is one: an admin with
+// that same address is not mailed twice.
+function alertAddress(raw: string | undefined): EmailAddress | undefined {
+  try {
+    return raw === undefined || raw === '' ? undefined : EmailAddress.parse(raw);
+  } catch {
+    return undefined;
+  }
+}
+
 // The frozen alert channels (ntfy + email via Postfix + Discord), each armed
 // by its env var; with none configured the Phase 0 console stub remains.
 // Email is durable since Phase 5: alerts land in the mails outbox and the
@@ -269,13 +284,25 @@ function buildNotifier(
   if (email !== undefined && email !== '') {
     channels.push(new OutboxEmailChannel(outbox, email, nowStamp));
   }
-  return channels.length > 0
-    ? new MultiChannelNotifier(channels, logger, async () => {
-        // the box is named the way its members reach it
-        const portalUrl = await portalAddress(db).baseUrl();
-        return { box: new URL(portalUrl).host, portalUrl, at: nowStamp() };
-      })
-    : new ConsoleNotificationAdapter(logger);
+  const context = async (): Promise<NotificationContext> => {
+    // the box is named the way its members reach it
+    const portalUrl = await portalAddress(db).baseUrl();
+    return { box: new URL(portalUrl).host, portalUrl, at: nowStamp() };
+  };
+  const operator =
+    channels.length > 0
+      ? new MultiChannelNotifier(channels, logger, context)
+      : new ConsoleNotificationAdapter(logger);
+  const alreadyMailed = alertAddress(email);
+  return new AccountNoticesToAdmins({
+    operator,
+    users: new SqliteUserRepository(db),
+    credentials: new SqlitePortalCredentialsRepository(db),
+    outbox,
+    context,
+    now: nowStamp,
+    ...(alreadyMailed !== undefined && { alreadyMailed }),
+  });
 }
 
 export function fairUsePolicy(): FairUsePolicy {
@@ -621,10 +648,11 @@ export function buildPortalContainer(name: string): PortalContainer {
   const portalCredentialsRepo = new SqlitePortalCredentialsRepository(db);
   const portalAttempts = new SqliteLoginAttemptsRepository(db);
   const users = new SqliteUserRepository(db);
+  const outbox = new SqliteMailOutbox(db);
   const linkDeps = passwordLinkDeps(db, {
     users,
     credentials: portalCredentialsRepo,
-    outbox: new SqliteMailOutbox(db),
+    outbox,
     queue,
   });
   return {
@@ -634,7 +662,10 @@ export function buildPortalContainer(name: string): PortalContainer {
     repo: users,
     inviteMember: new InviteMember(linkDeps),
     sendPasswordLink: new SendPasswordLink(linkDeps),
-    requestPasswordReset: new RequestPasswordReset(linkDeps),
+    requestPasswordReset: new RequestPasswordReset({
+      ...linkDeps,
+      notifications: buildNotifier(logger, outbox, db),
+    }),
     setPasswordFromLink: new SetPasswordFromLink(linkDeps),
     credentials: portalCredentialsRepo,
     sessions: new SqlitePortalSessionRepository(db),
