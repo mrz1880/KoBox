@@ -5,7 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { Bandwidth } from '../../../src/domain/security/Bandwidth.js';
 import { Cidr } from '../../../src/domain/security/Cidr.js';
 import { FirewallPolicy } from '../../../src/domain/security/FirewallPolicy.js';
-import { renderFail2banJails, renderFirewallRules, renderPortalLoginFilter, renderPublickeyFloodFilter } from '../../../src/domain/security/rendering.js';
+import { renderFail2banJails, renderFirewallRules, renderNextcloudAuthFilter, renderPortalLoginFilter, renderPublickeyFloodFilter } from '../../../src/domain/security/rendering.js';
 import { Username } from '../../../src/domain/user/Username.js';
 import { FakeHealthProbe } from '../../../src/infrastructure/system/fakes/FakeHealthProbe.js';
 import { ExecFileRunner } from '../../../src/infrastructure/system/CommandRunner.js';
@@ -139,14 +139,17 @@ describe.skipIf(!inContainerAsRoot)('security adapters against the real containe
     // the test owns its precondition rather than leaning on external setup
     mkdirSync('/var/log/nginx', { recursive: true });
     writeFileSync('/var/log/nginx/error.log', '');
+    // and the Nextcloud jail reads the access log
+    writeFileSync('/var/log/nginx/access.log', '');
     const files = new RtorrentConfigAdapter(runner);
     // render the whole set the jail file references (jail + both filters):
     // the [kobox-portal] jail points at kobox-portal.conf, so -t rejects the
     // config if it is missing
     await files.apply([
-      renderFail2banJails([], 22),
+      renderFail2banJails([], { sshPort: 22, portalPort: 8189 }),
       renderPublickeyFloodFilter(),
       renderPortalLoginFilter(),
+      renderNextcloudAuthFilter(),
     ]);
 
     // exit 0 = full configuration (including the publickey-flood jail) parses

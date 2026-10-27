@@ -32,6 +32,10 @@ export const PHP_FPM = {
 // the media a member streams, and so what has to reach into member trees.
 export const WEB_SERVER_USER = 'www-data';
 
+// Where Debian's nginx writes every request it answered, in its combined
+// format: client address, the user a Basic Auth request named, status.
+export const NGINX_ACCESS_LOG = '/var/log/nginx/access.log';
+
 // Where the vendored ruTorrent release is extracted and served from.
 export const RUTORRENT_DIR = '/var/www/rutorrent';
 

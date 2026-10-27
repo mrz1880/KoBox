@@ -1,3 +1,4 @@
+import { NGINX_ACCESS_LOG } from '../installation/platform.js';
 import { HTTPS_PORT, NFS_MOUNTD_PORT, SAMBA_PORT } from '../installation/rendering.js';
 import type { RenderedFile } from '../shared/files.js';
 import type { IpAddress } from '../shared/IpAddress.js';
@@ -124,10 +125,17 @@ const ROOT_FILE = { mode: '0644', owner: 'root', group: 'root' } as const;
 // The jail no stock fail2ban setup has: it counts *accepted* publickey logins.
 // A valid key makes a flood invisible to every failure-based jail (the user-h
 // vector: 1979 connections/day) — abnormal success frequency IS the signal.
+export interface JailPorts {
+  readonly sshPort: number;
+  // the portal and Nextcloud answer on it as well as on 80 and 443
+  readonly portalPort: number;
+}
+
 export function renderFail2banJails(
   ignoreIps: readonly IpAddress[],
-  sshPort: number,
+  { sshPort, portalPort }: JailPorts,
 ): RenderedFile {
+  const webPorts = `http,https,${String(portalPort)}`;
   const sorted = [...ignoreIps].sort((a, b) => ipSortKey(a.value) - ipSortKey(b.value));
   const ignoreLine = ['127.0.0.1/8', '::1', ...sorted.map((ip) => ip.value)].join(' ');
   return {
@@ -162,7 +170,19 @@ export function renderFail2banJails(
       'enabled = true',
       'backend = systemd',
       'filter = kobox-portal',
-      'port = http,https',
+      `port = ${webPorts}`,
+      'maxretry = 10',
+      'findtime = 600',
+      'bantime = 3600',
+      '',
+      // Nextcloud's desktop and mobile apps sign in with the password, not
+      // through the portal: a refused one shows as a 401 naming a user in the
+      // web server's own log
+      '[kobox-nextcloud]',
+      'enabled = true',
+      'filter = kobox-nextcloud',
+      `logpath = ${NGINX_ACCESS_LOG}`,
+      `port = ${webPorts}`,
       'maxretry = 10',
       'findtime = 600',
       'bantime = 3600',
@@ -183,6 +203,23 @@ export function renderPortalLoginFilter(): RenderedFile {
       '[Definition]',
       'journalmatch = SYSLOG_IDENTIFIER=kobox-portal',
       String.raw`failregex = portal login failed for .* from <HOST>`,
+      'ignoreregex =',
+      '',
+    ].join('\n'),
+    ...ROOT_FILE,
+  };
+}
+
+// A Basic Auth request to WebDAV, OCS or a public link that named a user and
+// got a 401: a refused password. The first request of a sync client carries no
+// credentials ("-") and gets its 401 challenge; that one is not counted.
+export function renderNextcloudAuthFilter(): RenderedFile {
+  return {
+    path: '/etc/fail2ban/filter.d/kobox-nextcloud.conf',
+    content: [
+      '# KoBox — bans repeated refused Nextcloud passwords (apps, WebDAV, OCS).',
+      '[Definition]',
+      String.raw`failregex = ^<HOST> - (?!- )\S+ \[[^\]]*\] "[A-Z]+ /nextcloud/(?:remote\.php|public\.php|ocs)/\S* HTTP/[^"]*" 401 `,
       'ignoreregex =',
       '',
     ].join('\n'),

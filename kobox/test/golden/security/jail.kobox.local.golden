@@ -25,7 +25,16 @@ bantime = 3600
 enabled = true
 backend = systemd
 filter = kobox-portal
-port = http,https
+port = http,https,8189
+maxretry = 10
+findtime = 600
+bantime = 3600
+
+[kobox-nextcloud]
+enabled = true
+filter = kobox-nextcloud
+logpath = /var/log/nginx/access.log
+port = http,https,8189
 maxretry = 10
 findtime = 600
 bantime = 3600

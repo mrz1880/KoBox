@@ -1,6 +1,7 @@
 import type { NetworkServicePort } from '../../domain/security/ports.js';
 import {
   renderFail2banJails,
+  renderNextcloudAuthFilter,
   renderPortalLoginFilter,
   renderPublickeyFloodFilter,
 } from '../../domain/security/rendering.js';
@@ -30,9 +31,13 @@ export class RenderFail2ban {
     const userIps = (await addresses.listAll()).map((address) => address.ip);
 
     const changedFiles = await files.apply([
-      renderFail2banJails(userIps, settings.sshPort),
+      renderFail2banJails(userIps, {
+        sshPort: settings.sshPort,
+        portalPort: settings.portalPort,
+      }),
       renderPublickeyFloodFilter(),
       renderPortalLoginFilter(),
+      renderNextcloudAuthFilter(),
     ]);
 
     if (changedFiles.length > 0) {
