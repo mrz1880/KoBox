@@ -24,6 +24,10 @@ export const NEXTCLOUD_SYSTEM_VALUES: readonly NextcloudSystemValue[] = [
   { key: 'maintenance_window_start', value: '1', type: 'integer' },
   // phone numbers typed without +33 are French: the members are
   { key: 'default_phone_region', value: 'FR', type: 'string' },
+  // a new account starts with its torrent folders and nothing else: no sample
+  // photos, manual or document templates for the member to delete by hand
+  { key: 'skeletondirectory', value: '', type: 'string' },
+  { key: 'templatedirectory', value: '', type: 'string' },
 ];
 
 // Shipped enabled, of no use here, and its admin warning is noise.

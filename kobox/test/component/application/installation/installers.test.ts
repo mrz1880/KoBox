@@ -1135,6 +1135,10 @@ describe('nextcloud installer', () => {
     expect(pinned.host.contentAt('/etc/php/8.4/cli/conf.d/90-kobox.ini')).toContain('apc.enable_cli = 1');
     expect(pinned.nextcloud.systemValues.get('memcache.local')).toBe('\\OC\\Memcache\\APCu');
     expect(pinned.nextcloud.systemValues.get('default_phone_region')).toBe('FR');
+    // a new account starts with its torrent folders and nothing else: no
+    // sample photos, manual or document templates to delete by hand
+    expect(pinned.nextcloud.systemValues.get('skeletondirectory')).toBe('');
+    expect(pinned.nextcloud.systemValues.get('templatedirectory')).toBe('');
     expect(pinned.nextcloud.disabledApps).toContain('app_api');
   });
 
