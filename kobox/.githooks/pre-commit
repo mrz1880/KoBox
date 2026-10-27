@@ -16,26 +16,33 @@ else
 fi
 
 # The identifier guard runs on EVERY staged path (public repo): a stray doc or
-# handoff note leaks just as hard as source code.
+# handoff note leaks just as hard as source code. The list itself is never in
+# the repo, not even encoded: each clone keeps its own, untracked, in
+#   .git/info/forbidden-identifiers           (this repository)
+#   ~/.config/git/forbidden-identifiers        (every repository of this user)
+# one extended regex per line, '#' for comments. Deliberate exceptions go, one
+# substring per line, in the matching allowed-identifiers file: the substring
+# is removed from the line rather than the line being skipped, so any other
+# identifier on that line still blocks.
+read_list() {
+  for file in "$@"; do
+    [ -r "$file" ] && grep -vE '^[[:space:]]*(#|$)' "$file"
+  done
+  return 0
+}
+git_info="$(git -C "$repo_root" rev-parse --path-format=absolute --git-common-dir)/info"
+user_lists="${XDG_CONFIG_HOME:-$HOME/.config}/git"
+forbidden="$(read_list "$git_info/forbidden-identifiers" "$user_lists/forbidden-identifiers" | paste -sd'|' -)"
+if [ -z "$forbidden" ]; then
+  echo "[pre-commit] guard: no identifier list in .git/info or ~/.config/git, nothing checked"
+  exit 0
+fi
 echo "[pre-commit] guard: no production/personal identifiers"
-# The detection list is base64-encoded so the very identifiers we forbid do
-# not appear in cleartext in this public repo. Decode at runtime only.
-forbidden="$(printf '%s' \
-  'a29mYW1pbHl8MTk1XC4xNTRcLjE3MXxtcnoxODgwfFxiYW50aG9ueVxifFxibHVkb1xifFxibHVkb2ZcYnxcYmxlb25ldWZcYnxcYmp1bGllblxifFxidGl0aVxifFxidG9ueXpcYnxcYmZyZWRcYnxcYnJvbWFpblxi' \
-  | base64 -d)"
-# One deliberate exception, encoded for the same reason as the list above: the
-# public NanoMon repository whose release KoBox pins. Authorised by the owner on
-# 2026-08-16 so the pin in OPS.md is copy-pasteable rather than a placeholder.
-# The substring is REMOVED from the line rather than the line being skipped, so
-# any other identifier sharing that line still blocks.
-allowed="$(printf '%s' \
-  'aHR0cHM6Ly9naXRodWIuY29tL21yejE4ODAvbmFub21vbg==' \
-  | base64 -d)"
-if git -C "$repo_root" diff --cached -U0 --no-color \
-    | grep -nE '^\+' \
-    | grep -viE '^\+\+\+' \
-    | sed "s|$allowed||g" \
-    | grep -inE "$forbidden"; then
+staged="$(git -C "$repo_root" diff --cached -U0 --no-color | grep -E '^\+' | grep -vE '^\+\+\+' || true)"
+while IFS= read -r allowed; do
+  staged="${staged//"$allowed"/}"
+done < <(read_list "$git_info/allowed-identifiers" "$user_lists/allowed-identifiers")
+if printf '%s\n' "$staged" | grep -inE "$forbidden"; then
   echo "[pre-commit] BLOCKED: staged lines contain a production/personal identifier." >&2
   exit 1
 fi
