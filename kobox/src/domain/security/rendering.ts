@@ -47,6 +47,10 @@ export function renderFirewallRules(policy: FirewallPolicy): RenderedFile {
     '-A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT',
     '-A INPUT -p icmp -j ACCEPT',
     ...trustedRules(users),
+    // Let's Encrypt validates from several clouds at once and the blocklists
+    // cover whole cloud ranges: port 80 answers before them, or no certificate
+    // is issued or renewed. It serves the challenge and a redirect, nothing else.
+    '-A INPUT -p tcp --dport 80 -j ACCEPT',
     // pgl successor: blocklisted sources die before any service accept.
     // Trusted members and established flows were already accepted above —
     // the allow.p2p semantics, structurally.
@@ -59,7 +63,6 @@ export function renderFirewallRules(policy: FirewallPolicy): RenderedFile {
           (subnet) => `-A INPUT -s ${subnet.value} -p tcp --dport ${String(policy.sshPort)} -j ACCEPT`,
         )),
     `-A INPUT -p tcp --dport ${String(policy.portalPort)} -j ACCEPT`,
-    '-A INPUT -p tcp --dport 80 -j ACCEPT',
     `-A INPUT -p tcp --dport ${String(HTTPS_PORT)} -j ACCEPT`,
     `-A INPUT -p udp --dport ${String(vpn.tunGwPort)} -j ACCEPT`,
     `-A INPUT -p udp --dport ${String(vpn.tunPort)} -j ACCEPT`,
