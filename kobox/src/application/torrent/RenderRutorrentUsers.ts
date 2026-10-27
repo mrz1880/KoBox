@@ -42,6 +42,7 @@ export class RenderRutorrentUsers {
     // their pool, which has to be listening by then
     await pools.converge(active.map((user) => renderRutorrentPhpPool(user.username.value)));
     for (const user of active) {
+      await profiles.ensureConfigFolder(user.username);
       await profiles.ensureProfile(user.username);
       await profiles.offerRatioGroups(user.username);
     }

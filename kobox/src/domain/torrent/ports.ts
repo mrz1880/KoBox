@@ -109,6 +109,8 @@ export interface AnnouncerSink {
 // server, by nobody else. Idempotent, and it repairs a folder left too open.
 export interface RutorrentProfilePort {
   ensureProfile(username: Username): Promise<void>;
+  // the folder holding the member's config, open to their ruTorrent alone
+  ensureConfigFolder(username: Username): Promise<void>;
   // KoBox's ratio groups, in place of ruTorrent's eight alike ones, for a
   // member who never changed theirs; one who did keeps their own
   offerRatioGroups(username: Username): Promise<void>;
