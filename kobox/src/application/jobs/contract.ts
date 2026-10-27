@@ -32,6 +32,7 @@ export const JOB_TYPES = [
   'set-category-sync-mode',
   'check-sync-destination',
   'send-pending-transfers',
+  'queue-folder-backlog',
   'requeue-transfer',
   'set-sync-disabled',
   'set-allow-public-tracker',
@@ -195,6 +196,7 @@ export const jobPayloadSchemas = {
   'render-rtorrent-config': usernameOnly,
   'add-watch-dir': z.strictObject({ username: usernameField, label: labelField }),
   'remove-watch-dir': z.strictObject({ username: usernameField, label: labelField }),
+  'queue-folder-backlog': z.strictObject({ username: usernameField, label: labelField }),
   'rename-watch-dir': z.strictObject({
     username: usernameField,
     label: labelField,

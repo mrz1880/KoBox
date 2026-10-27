@@ -49,6 +49,14 @@ export class Torrent {
     return new Torrent({ ...this.props(), state: TorrentState.completed, tree });
   }
 
+  // What a finished download left in that folder, to send on; nothing while it
+  // is still downloading, once it was rejected, or when it sits elsewhere.
+  finishedTreeIn(label: Label): string | undefined {
+    const finishedHere =
+      this.state === TorrentState.completed && this.label?.equals(label) === true;
+    return finishedHere && this.tree !== '' ? this.tree : undefined;
+  }
+
   reject(): Torrent {
     return new Torrent({ ...this.props(), state: TorrentState.rejected });
   }

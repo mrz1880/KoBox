@@ -10,6 +10,8 @@ import { InMemoryDiagnosticsRepository } from '../../../src/infrastructure/persi
 import { InMemorySpeedtestRepository } from '../../../src/infrastructure/persistence/InMemorySpeedtestRepository.js';
 import type { ClaimedJob, JobQueuePort } from '../../../src/application/jobs/JobQueuePort.js';
 import { InfoHash } from '../../../src/domain/torrent/InfoHash.js';
+import { Label } from '../../../src/domain/torrent/Label.js';
+import { Torrent } from '../../../src/domain/torrent/Torrent.js';
 import { Password } from '../../../src/domain/user/Password.js';
 import { Username } from '../../../src/domain/user/Username.js';
 import { IpAddress } from '../../../src/domain/shared/IpAddress.js';
@@ -401,6 +403,7 @@ beforeEach(() => {
     outbox,
     transport: { send: () => Promise.resolve({ ok: true }) },
     facts: { isDirectory: () => Promise.resolve(false), exists: () => Promise.resolve(true) },
+    torrents,
     hour: () => 2,
     // the sealed blob is opaque here: this suite proves the worker asks, not
     // that RSA works — that is the cipher's own test
@@ -704,6 +707,35 @@ describe('CLI enqueue -> root worker loop (the privilege seam)', () => {
     expect(instance?.watchDirs.map((dir) => dir.label?.value)).toEqual([undefined, 'Docs']);
     // the folder rTorrent watches has to follow: one render for both
     expect(world.services.restartsFor(alice) - before).toBe(1);
+  });
+
+  it('should_send_what_a_folder_already_holds_once_asked', async () => {
+    await enqueueCreateAlice();
+    await world.worker.drain();
+    await world.queue.enqueue(parseJob('add-watch-dir', { username: 'alice', label: 'Films' }));
+    await world.worker.drain();
+    await world.torrents.upsert(
+      alice,
+      Torrent.load({
+        infoHash: InfoHash.parse('e'.repeat(40)),
+        name: 'Old.Film.mkv',
+        label: Label.parse('Films'),
+      }).complete('/home/alice/rtorrent/complete/Films/Old.Film.mkv'),
+    );
+    await world.queue.enqueue(
+      parseJob('set-category-sync-mode', { username: 'alice', label: 'Films', mode: 'scheduled' }),
+    );
+    const id = await world.queue.enqueue(
+      parseJob('queue-folder-backlog', { username: 'alice', label: 'Films' }),
+    );
+
+    await world.worker.drain();
+    expect(world.queue.errorOf(id)).toBeUndefined();
+
+    const waiting = await world.syncTransfers.listWaiting(alice);
+    expect(waiting.map((transfer) => transfer.source.value)).toEqual([
+      '/home/alice/rtorrent/complete/Films/Old.Film.mkv',
+    ]);
   });
 
   it('should_suspend_then_resume_via_jobs', async () => {

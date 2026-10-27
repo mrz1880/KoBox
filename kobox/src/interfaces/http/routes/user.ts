@@ -830,6 +830,39 @@ export function registerUserRoutes(
     return redirectWithFlash(reply, '/sync', `Saved what happens to ${label.value}.`);
   });
 
+  // A folder set to send only queues what finishes from then on; this sends
+  // what it already held. The worker skips anything already queued or sent.
+  server.post('/sync/categories/send-existing', async (request, reply) => {
+    const session = await guards.requireCsrf(request, reply);
+    if (session === undefined) {
+      return;
+    }
+    const parsed = categorySchema.safeParse(request.body);
+    const label = parsed.success ? parseLabel(parsed.data.label) : undefined;
+    if (label === undefined) {
+      return reply.code(400).send();
+    }
+    const instance = await deps.instances.findByUsername(session.username);
+    if (instance?.hasFolder(label) !== true) {
+      return reply.code(404).send();
+    }
+    if (!instance.sendsFolder(label)) {
+      return redirectWithFlash(
+        reply,
+        '/sync',
+        `${label.value} keeps everything here. Choose when it goes out first.`,
+      );
+    }
+    await deps.queue.enqueue(
+      buildJob.queueFolderBacklog({ username: session.username.value, label: label.value }),
+    );
+    return redirectWithFlash(
+      reply,
+      '/sync',
+      `Queuing what ${label.value} already holds. Anything already sent stays as it is.`,
+    );
+  });
+
   server.post('/sync/categories/remove', async (request, reply) => {
     const session = await guards.requireCsrf(request, reply);
     if (session === undefined) {

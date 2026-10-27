@@ -79,6 +79,9 @@ export const buildJob = {
   addWatchDir(input: { username: string; label: string }): Job {
     return parseJob('add-watch-dir', input);
   },
+  queueFolderBacklog(input: { username: string; label: string }): Job {
+    return parseJob('queue-folder-backlog', input);
+  },
   removeWatchDir(input: { username: string; label: string }): Job {
     return parseJob('remove-watch-dir', input);
   },

@@ -40,6 +40,19 @@ function modeChoice(dir: WatchDir, viewer: Viewer): RawHtml {
 </form>`;
 }
 
+// What finishes after a folder is set to send goes out on its own; what it
+// held before stays unless the member asks.
+function backlogChoice(dir: WatchDir, viewer: Viewer): RawHtml {
+  if (!dir.syncMode.sends) {
+    return html``;
+  }
+  return html`<form class="inline" method="post" action="/sync/categories/send-existing">
+  <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
+  <input type="hidden" name="label" value="${dir.label?.value ?? ''}">
+  <button class="ghost" type="submit">Send what is already here</button>
+</form>`;
+}
+
 // A folder is renamed or removed only while it holds nothing: its downloads
 // seed from its path. One that holds something says so instead of offering it.
 function reshapeChoice(dir: WatchDir, holding: ReadonlySet<string>, viewer: Viewer): RawHtml {
@@ -77,7 +90,7 @@ export function syncPage(
     (dir) => html`<tr>
   <td>${dir.label?.value ?? ''}</td>
   <td>${modeChoice(dir, viewer)}</td>
-  <td class="muted">${MODE_WORDS[dir.syncMode.value]?.hint ?? ''}</td>
+  <td class="muted">${MODE_WORDS[dir.syncMode.value]?.hint ?? ''}${backlogChoice(dir, viewer)}</td>
   <td>${reshapeChoice(dir, holding, viewer)}</td>
 </tr>`,
   );

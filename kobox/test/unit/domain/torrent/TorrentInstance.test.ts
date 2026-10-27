@@ -71,6 +71,15 @@ describe('TorrentInstance', () => {
     expect(renamed.renameWatchDir(films, movies)).toBe(renamed);
   });
 
+  it('should_tell_whether_a_folder_sends_what_finishes_in_it', () => {
+    const films = Label.parse('films');
+    const kept = provisioned().addWatchDir(films).instance;
+
+    expect(kept.sendsFolder(films)).toBe(false);
+    expect(kept.setSyncMode(films, SyncMode.parse('scheduled')).sendsFolder(films)).toBe(true);
+    expect(kept.sendsFolder(Label.parse('series'))).toBe(false);
+  });
+
   it('should_refuse_to_rename_a_folder_onto_one_that_exists', () => {
     const films = Label.parse('films');
     const series = Label.parse('series');

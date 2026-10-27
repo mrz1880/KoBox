@@ -415,6 +415,11 @@ Each folder carries a mode — keep it here, send it a bit later, send it straig
 away. A new folder starts at *keep it here*: turning on a copy to somebody
 else's machine is their decision, not a default.
 
+A folder set to send queues what finishes from then on. **Send what is already
+here**, beside a folder that sends, queues its finished downloads from before
+too, each as if it had just finished: still-running downloads and anything
+already queued or sent are left out, and so is what is gone from the disk.
+
 A member renames or removes a folder from the same page, but only while it holds
 nothing: its downloads seed from its path, and moving them under a seeding
 torrent is not done behind its back. The page checks the media index; the
