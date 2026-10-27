@@ -40,7 +40,9 @@ import { SqliteReleaseRepository } from '../infrastructure/persistence/SqliteRel
 import { AccountNoticesToAdmins } from '../infrastructure/notifications/AccountNoticesToAdmins.js';
 import { MultiChannelNotifier } from '../infrastructure/notifications/MultiChannelNotifier.js';
 import { OutboxEmailChannel } from '../infrastructure/notifications/OutboxEmailChannel.js';
-import { SendmailTransport } from '../infrastructure/notifications/SendmailTransport.js';
+import { SmtpLoopbackTransport } from '../infrastructure/notifications/SmtpLoopbackTransport.js';
+import { DeliverNowOrQueue } from '../application/maintenance/DeliverNowOrQueue.js';
+import type { MailOutboxPort } from '../application/maintenance/MailOutboxPort.js';
 import { SqliteMailOutbox } from '../infrastructure/persistence/SqliteMailOutbox.js';
 import { SqliteMysbDumpSource } from '../infrastructure/persistence/SqliteMysbDumpSource.js';
 import { SqliteDebridAccountRepository } from '../infrastructure/persistence/SqliteDebridAccountRepository.js';
@@ -262,13 +264,19 @@ function alertAddress(raw: string | undefined): EmailAddress | undefined {
   }
 }
 
+// Every mail goes to the local relay as it is written, and to the outbox only
+// when the relay did not take it (see DeliverNowOrQueue).
+function mailOutbox(db: KoboxDatabase): MailOutboxPort {
+  return new DeliverNowOrQueue(new SqliteMailOutbox(db), new SmtpLoopbackTransport());
+}
+
 // The frozen alert channels (ntfy + email via Postfix + Discord), each armed
 // by its env var; with none configured the Phase 0 console stub remains.
 // Email is durable since Phase 5: alerts land in the mails outbox and the
 // scheduled send-mails job flushes them through the relay.
 function buildNotifier(
   logger: Logger,
-  outbox: SqliteMailOutbox,
+  outbox: MailOutboxPort,
   db: KoboxDatabase,
 ): NotificationPort & TrackerNotificationPort & SecurityNotificationPort {
   const channels: NotificationChannel[] = [];
@@ -527,7 +535,7 @@ export interface Container {
   readonly maintenanceUseCases: MaintenanceUseCases;
   readonly saveMailRelay: SaveMailRelay;
   readonly inviteMember: InviteMember;
-  readonly outbox: SqliteMailOutbox;
+  readonly outbox: MailOutboxPort;
   readonly ddlUseCases: DdlUseCases;
   readonly downloader: Aria2Adapter;
   readonly syncUseCases: SyncUseCases;
@@ -604,7 +612,7 @@ export interface PortalContainer {
   readonly destinations: SqliteSyncDestinationRepository;
   readonly transfers: SqliteSyncTransferRepository;
   readonly setDestination: SetSyncDestination;
-  readonly outbox: SqliteMailOutbox;
+  readonly outbox: MailOutboxPort;
   readonly debridDownloadRepo: SqliteDebridDownloadRepository;
   readonly debridAccountRepo: SqliteDebridAccountRepository;
   readonly debridEncryptor: DebridKeyEncryptorPort;
@@ -648,7 +656,7 @@ export function buildPortalContainer(name: string): PortalContainer {
   const portalCredentialsRepo = new SqlitePortalCredentialsRepository(db);
   const portalAttempts = new SqliteLoginAttemptsRepository(db);
   const users = new SqliteUserRepository(db);
-  const outbox = new SqliteMailOutbox(db);
+  const outbox = mailOutbox(db);
   const linkDeps = passwordLinkDeps(db, {
     users,
     credentials: portalCredentialsRepo,
@@ -719,7 +727,7 @@ export function buildPortalContainer(name: string): PortalContainer {
       destinations: syncDestinations,
       sealer: remotePasswordCipher(),
     }),
-    outbox: new SqliteMailOutbox(db),
+    outbox,
     debridDownloadRepo,
     debridAccountRepo: new SqliteDebridAccountRepository(db),
     media: new SqliteMediaRepository(db),
@@ -745,7 +753,7 @@ export function buildContainer(name: string): Container {
         logger.warn({ username }, 'quota enforcement skipped: KOBOX_QUOTA_FS not set');
       });
   const services = new SystemdServiceControlAdapter(runner);
-  const outbox = new SqliteMailOutbox(db);
+  const outbox = mailOutbox(db);
   const notifications = buildNotifier(logger, outbox, db);
   const credentials = new SqlitePortalCredentialsRepository(db);
   const sessions = new SqlitePortalSessionRepository(db);
@@ -879,7 +887,7 @@ export function buildContainer(name: string): Container {
   const mailRelay = new SqliteMailRelayRepository(db);
   const maintenanceUseCases = buildMaintenanceUseCases({
     outbox,
-    transport: new SendmailTransport(runner),
+    transport: new SmtpLoopbackTransport(),
     backupHost: new BackupHostAdapter(runner, db),
     backupSettings: backupSettings(),
     speedtest: new LibrespeedAdapter(runner, process.env.KOBOX_SPEEDTEST_BIN),
