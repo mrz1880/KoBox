@@ -166,6 +166,17 @@ describe('renderFirewallRules', () => {
     expect(dropIndex).toBeLessThan(portalIndex); // blocklisted IPs never reach services
   });
 
+  it('should_let_certificate_validation_reach_port_80_ahead_of_the_blocklist', () => {
+    // Let's Encrypt validates from several clouds at once, and the blocklists
+    // cover whole cloud ranges: dropped there, no certificate is ever issued or
+    // renewed. Port 80 serves the challenge and a redirect to https, nothing else.
+    const lines = renderFirewallRules(policyWith(users, { blocklistSet: true })).content.split('\n');
+    const http = lines.indexOf('-A INPUT -p tcp --dport 80 -j ACCEPT');
+    const dropIndex = lines.indexOf('-A INPUT -m set --match-set kobox-bl src -j DROP');
+    expect(http).toBeGreaterThan(-1);
+    expect(http).toBeLessThan(dropIndex);
+  });
+
   it('should_omit_the_match_set_rule_when_the_kernel_lacks_ipset', () => {
     // containers without the ip_set module still get a loadable ruleset
     const content = renderFirewallRules(policyWith(users, { blocklistSet: false })).content;
