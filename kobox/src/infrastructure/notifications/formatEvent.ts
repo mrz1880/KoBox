@@ -76,6 +76,17 @@ function noticeOf(event: AnyDomainEvent): Notice {
         page: member(event.username),
         priority: 'default',
       };
+    case 'PasswordResetRequested':
+      return {
+        title: `New password asked: ${event.username}`,
+        facts: [
+          `Someone asked for a new password for ${event.username} from the sign-in page; a link went to the address on their account.`,
+          'Their current password keeps working until they choose a new one through that link.',
+        ],
+        todo: 'If they did not ask, nothing happens unless the link is used: suspend the account from their page if their mailbox may be in other hands.',
+        page: member(event.username),
+        priority: 'default',
+      };
     case 'UserSuspended':
       return {
         title: `Member suspended: ${event.username}`,

@@ -129,7 +129,7 @@ sous `/opt/pebble-test`. `NODE_EXTRA_CA_CERTS` fait accepter les fixtures auto-s
 | Installation | `KOBOX_STRICT_SERVICES=1` (unité absente = erreur), `KOBOX_QUOTA_FS`, `KOBOX_RUTORRENT_URL` + `KOBOX_RUTORRENT_SHA256` (sans pin, le composant est `skipped`) |
 | Trackers, listes | `KOBOX_IBLOCKLIST_CATALOG_URL`, `KOBOX_BLOCKLIST_CACHE`, `KOBOX_CERTS_DIR` (défaut `/etc/ssl/certs`), `KOBOX_IBLOCKLIST_USER` + `KOBOX_IBLOCKLIST_PIN` (jamais en DB ni dans les logs) |
 | Réseau, VPN | `KOBOX_SSH_PORT` (défaut 22), `KOBOX_PORTAL_PORT`, `KOBOX_VPN_{TUN_GW,TUN,TAP}_PORT`, `KOBOX_VPN_*_SUBNET`, `KOBOX_VPN_REMOTE`, `KOBOX_VPN_PKI` (défaut `/etc/openvpn/kobox-pki`), `KOBOX_VPN_PROFILES_DIR` (défaut `/etc/kobox/vpn-profiles`), `KOBOX_WAN_IF` (défaut `eth0`), `KOBOX_FAIRUSE_{EGRESS_MBIT,AUTH_PER_HOUR,THROTTLE_MBIT}` (défauts 50/30/5) |
-| Alertes | `KOBOX_NTFY_URL`, `KOBOX_DISCORD_WEBHOOK`, `KOBOX_ALERT_EMAIL` (aucun = stub console) |
+| Alertes | `KOBOX_NTFY_URL`, `KOBOX_DISCORD_WEBHOOK`, `KOBOX_ALERT_EMAIL` (aucun = stub console). Création et suppression de compte, demande de nouveau mot de passe : aussi par mail à chaque admin (`concernsEveryAdmin`) |
 | Let's Encrypt | `KOBOX_LE_DOMAIN` + `KOBOX_LE_EMAIL` (arment le composant), `KOBOX_ACME_URL`, `KOBOX_ACME_CA_BUNDLE` |
 | Sauvegardes, upgrades | `KOBOX_BACKUP_ROOT`, `KOBOX_BACKUP_TTL_DAYS`, `KOBOX_BACKUP_KEEP_MIN`, `KOBOX_REPO_DIR`, `KOBOX_RELEASES_DIR`, `KOBOX_CURRENT_LINK` |
 | Portail | `KOBOX_PORTAL_HTTP_PORT`, `KOBOX_PORTAL_HTTP_HOST` |

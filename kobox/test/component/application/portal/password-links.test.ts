@@ -10,6 +10,7 @@ import {
   TooManyPasswordLinksError,
 } from '../../../../src/application/portal/PasswordLinks.js';
 import { Language } from '../../../../src/domain/portal/Language.js';
+import type { UserEvent } from '../../../../src/domain/user/events.js';
 import { EmailAddress } from '../../../../src/domain/user/EmailAddress.js';
 import { Password } from '../../../../src/domain/user/Password.js';
 import { Quota } from '../../../../src/domain/user/Quota.js';
@@ -213,10 +214,38 @@ describe('SendPasswordLink', () => {
 });
 
 describe('RequestPasswordReset', () => {
+  const told: UserEvent[] = [];
+  const resetWith = () =>
+    new RequestPasswordReset({
+      ...deps,
+      notifications: { notify: (event) => Promise.resolve(void told.push(event)) },
+    });
+  beforeEach(() => {
+    told.length = 0;
+  });
+
+  it('should_tell_the_admins_each_time_a_link_went_out_and_never_otherwise', async () => {
+    await users.save(new UserBuilder().withUsername('alice').build());
+    await credentials.save({ username: alice, role: 'user' }, now);
+    const request = resetWith();
+
+    await request.execute('nobody');
+    for (let i = 0; i < 5; i += 1) {
+      await request.execute('alice');
+    }
+
+    // three links within the hourly limit, three notices; none for a stranger
+    expect(told).toEqual([
+      { type: 'PasswordResetRequested', username: 'alice' },
+      { type: 'PasswordResetRequested', username: 'alice' },
+      { type: 'PasswordResetRequested', username: 'alice' },
+    ]);
+  });
+
   it('should_mail_a_member_found_by_name_or_by_address_and_stay_silent_otherwise', async () => {
     await users.save(new UserBuilder().withUsername('alice').withEmail('alice@example.org').build());
     await credentials.save({ username: alice, role: 'user' }, now);
-    const request = new RequestPasswordReset(deps);
+    const request = resetWith();
 
     await request.execute('alice');
     await request.execute('ALICE@example.org');
@@ -232,7 +261,7 @@ describe('RequestPasswordReset', () => {
   it('should_stay_silent_once_the_hourly_limit_is_reached_rather_than_tell', async () => {
     await users.save(new UserBuilder().withUsername('alice').build());
     await credentials.save({ username: alice, role: 'user' }, now);
-    const request = new RequestPasswordReset(deps);
+    const request = resetWith();
 
     for (let i = 0; i < 5; i += 1) {
       await request.execute('alice');
@@ -245,7 +274,7 @@ describe('RequestPasswordReset', () => {
     await users.save(new UserBuilder().withUsername('alice').suspended());
     await credentials.save({ username: alice, role: 'user' }, now);
 
-    await new RequestPasswordReset(deps).execute('alice');
+    await resetWith().execute('alice');
 
     expect(await mails()).toHaveLength(0);
   });
