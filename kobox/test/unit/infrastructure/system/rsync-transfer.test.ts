@@ -1,3 +1,6 @@
+import { mkdtempSync, readdirSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { LocalPath } from '../../../../src/domain/sync/LocalPath.js';
 import { LoneFilePlacement } from '../../../../src/domain/sync/LoneFilePlacement.js';
@@ -19,17 +22,30 @@ import { Username } from '../../../../src/domain/user/Username.js';
 
 class ScriptedRunner implements CommandRunner {
   readonly calls: CommandRequest[] = [];
-  private readonly results = new Map<string, CommandResult>();
+  private readonly results = new Map<string, CommandResult[]>();
 
-  onCommand(command: string, result: Partial<CommandResult>): void {
-    this.results.set(command, { stdout: '', stderr: '', exitCode: 0, ...result });
+  // answers given in turn to successive calls of that command, the last one
+  // repeating
+  onCommand(command: string, ...results: Partial<CommandResult>[]): void {
+    this.results.set(
+      command,
+      results.map((result) => ({ stdout: '', stderr: '', exitCode: 0, ...result })),
+    );
   }
 
   run(request: CommandRequest): Promise<CommandResult> {
     this.calls.push(request);
-    return Promise.resolve(
-      this.results.get(request.command) ?? { stdout: '', stderr: '', exitCode: 0 },
-    );
+    const queue = this.results.get(request.command) ?? [];
+    const result = (queue.length > 1 ? queue.shift() : queue[0]) ?? {
+      stdout: '',
+      stderr: '',
+      exitCode: 0,
+    };
+    return Promise.resolve(result);
+  }
+
+  rsyncs(): CommandRequest[] {
+    return this.calls.filter((call) => call.command === 'rsync');
   }
 }
 
@@ -47,12 +63,15 @@ const destination = SyncDestination.define({
 const password = RemotePassword.parse('hunter2000');
 const source = LocalPath.parse('/home/alice/rtorrent/complete/Films/Some.Film.2024.mkv');
 
-function transfer(runner: CommandRunner): Promise<{ ok: boolean; detail?: string }> {
+function transfer(
+  runner: CommandRunner,
+  remoteFolder = '/volume1/torrents/Films',
+): Promise<{ ok: boolean; detail?: string }> {
   return new RsyncOverSshTransfer(runner, '/var/lib/kobox/sync').send({
     destination,
     password,
     source,
-    remoteFolder: '/volume1/torrents/Films',
+    remoteFolder,
   });
 }
 
@@ -65,18 +84,41 @@ describe('RsyncOverSshTransfer', () => {
 
     await transfer(runner);
 
-    expect(runner.calls.filter((call) => call.command === 'rsync')).toHaveLength(1);
+    expect(runner.rsyncs().filter((call) => call.args.includes(source.value))).toHaveLength(1);
   });
 
-  it('should_make_the_remote_folder_before_it_copies_into_it', async () => {
+  it('should_make_the_remote_folders_with_rsync_alone_before_it_copies', async () => {
+    // a Synology gives a shell to administrators alone: `mkdir -p` over ssh
+    // refused an ordinary account allowed rsync and SFTP
     const runner = new ScriptedRunner();
 
-    await transfer(runner);
+    await transfer(runner, '/volume1/torrents/Films/Some.Film.2024');
 
-    const mkdirAt = runner.calls.findIndex((call) => call.args.join(' ').includes('mkdir'));
-    expect(mkdirAt).toBeGreaterThanOrEqual(0);
-    expect(runner.calls[mkdirAt]?.args.join(' ')).toContain('/volume1/torrents/Films');
-    expect(mkdirAt).toBeLessThan(runner.calls.findIndex((call) => call.command === 'rsync'));
+    expect(runner.calls.some((call) => ['sshpass', 'ssh'].includes(call.command))).toBe(false);
+    const [folders, file] = runner.rsyncs();
+    expect(folders?.args.at(-1)).toBe('seedbox@nas.example.org:/volume1/torrents/');
+    expect(folders?.args).toContain('--recursive');
+    // --archive would hand the empty tree's 0700 to the member's own root folder
+    const ownFlags = (folders?.args ?? []).filter(
+      (arg, i, all) => arg.startsWith('-') && all[i - 1] !== '-e',
+    );
+    expect(ownFlags.join(' ')).not.toMatch(/--archive|--perms|(^| )-[a-zA-Z]*[ap]/);
+    expect(file?.args.at(-1)).toBe('seedbox@nas.example.org:/volume1/torrents/Films/Some.Film.2024/');
+  });
+
+  it('should_leave_no_scratch_tree_behind_even_when_the_folders_fail', async () => {
+    const scratch = mkdtempSync(join(tmpdir(), 'kobox-test-'));
+    const runner = new ScriptedRunner();
+    runner.onCommand('rsync', { exitCode: 3, stderr: 'mkdir failed' });
+
+    await new RsyncOverSshTransfer(runner, '/var/lib/kobox/sync', scratch).send({
+      destination,
+      password,
+      source,
+      remoteFolder: '/volume1/torrents/Films',
+    });
+
+    expect(readdirSync(scratch)).toEqual([]);
   });
 
   it('should_pass_the_password_through_the_environment_and_never_through_argv', async () => {
@@ -84,11 +126,9 @@ describe('RsyncOverSshTransfer', () => {
 
     await transfer(runner);
 
-    for (const call of runner.calls) {
-      expect(call.args.join(' '), call.command).not.toContain('hunter2000');
-      if (call.command === 'sshpass') {
-        expect(call.args).toContain('-e');
-      }
+    for (const call of runner.rsyncs()) {
+      expect(call.args.join(' ')).not.toContain('hunter2000');
+      expect(call.args.join(' ')).toContain('sshpass -e ssh');
       expect(call.env?.SSHPASS).toBe('hunter2000');
     }
   });
@@ -106,10 +146,11 @@ describe('RsyncOverSshTransfer', () => {
 
   it('should_report_what_rsync_said_when_it_could_not_finish', async () => {
     const runner = new ScriptedRunner();
-    runner.onCommand('rsync', {
-      exitCode: 12,
-      stderr: 'rsync: connection unexpectedly closed',
-    });
+    runner.onCommand(
+      'rsync',
+      {},
+      { exitCode: 12, stderr: 'rsync: connection unexpectedly closed' },
+    );
 
     const outcome = await transfer(runner);
 
@@ -121,11 +162,11 @@ describe('RsyncOverSshTransfer', () => {
     // copying into a folder that does not exist scatters files at the root of
     // the member's NAS, which is worse than not copying
     const runner = new ScriptedRunner();
-    runner.onCommand('sshpass', { exitCode: 1, stderr: 'mkdir: Permission denied' });
+    runner.onCommand('rsync', { exitCode: 3, stderr: 'rsync: mkdir "/volume1/torrents/Films" failed: Permission denied' });
 
     const outcome = await transfer(runner);
 
     expect(outcome.ok).toBe(false);
-    expect(runner.calls.some((call) => call.command === 'rsync')).toBe(false);
+    expect(runner.rsyncs()).toHaveLength(1);
   });
 });

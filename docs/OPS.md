@@ -448,10 +448,17 @@ the legacy did and what members' NAS layouts already assume.
 ### Testing it
 
 **Test it now** enqueues `check-sync-destination`; the root worker opens the
-password, connects, and runs `test -w` on the remote folder — the smallest
-question that proves the whole chain at once. The verdict is stored and shown
-back in words: whether the machine answered, whether the account was accepted,
-whether the folder is writable, and the fingerprint it identified itself with.
+password and lists the remote folder with `rsync --list-only`. The verdict is
+stored and shown back in words: whether the machine answered, whether the
+account was accepted, whether the folder is there, and the fingerprint it
+identified itself with. Whether it can be written to shows on the first
+transfer.
+
+Nothing runs a shell on the member's machine, only rsync: a Synology gives an
+ssh shell to administrators alone, and an ordinary account allowed rsync and
+SFTP must be enough. The transfer makes the folders it needs by sending an
+empty tree of them with `rsync --recursive` (never `--archive`, which would
+apply the tree's own permissions to the member's root folder), then the file.
 
 Two failures are reported separately on purpose. A password that cannot be
 opened (a database restored without its host key) says *type it in again*; a
