@@ -40,6 +40,20 @@ describe('RutorrentProfileAdapter', () => {
     ]);
   });
 
+  it('should_let_a_member_s_own_rutorrent_into_the_folder_holding_their_config', async () => {
+    const runner = new RecordingRunner();
+
+    await new RutorrentProfileAdapter(runner).ensureConfigFolder(Username.parse('alice'));
+
+    // ruTorrent runs as the member: a folder left root:www-data from before
+    // hid their SCGI port, and ruTorrent lost their rTorrent
+    const dir = '/var/www/rutorrent/conf/users/alice';
+    expect(runner.calls.map((call) => [call.command, ...call.args])).toEqual([
+      ['chown', 'root:alice', dir],
+      ['chmod', '0750', dir],
+    ]);
+  });
+
   it('should_offer_the_ratio_groups_as_the_member_like_the_rest_of_their_rutorrent', async () => {
     const runner = new RecordingRunner();
 

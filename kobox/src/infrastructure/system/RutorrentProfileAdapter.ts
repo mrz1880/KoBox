@@ -2,6 +2,7 @@ import { WEB_SERVER_USER } from '../../domain/installation/platform.js';
 import {
   renderRutorrentRatioOffer,
   rutorrentProfilesDir,
+  rutorrentUserConfigDir,
 } from '../../domain/installation/rendering.js';
 import type { RutorrentProfilePort } from '../../domain/torrent/ports.js';
 import type { Username } from '../../domain/user/Username.js';
@@ -31,6 +32,15 @@ export class RutorrentProfileAdapter implements RutorrentProfilePort {
     for (const [command, ...args] of steps) {
       await runOrThrow(this.runner, { command, args });
     }
+  }
+
+  // ruTorrent runs as the member, who must reach their config.php. Set on every
+  // run, not only at creation: folders made before ruTorrent ran as the member
+  // were root:www-data and hid the member's SCGI port from their own ruTorrent.
+  async ensureConfigFolder(username: Username): Promise<void> {
+    const dir = rutorrentUserConfigDir(username.value);
+    await runOrThrow(this.runner, { command: 'chown', args: [`root:${username.value}`, dir] });
+    await runOrThrow(this.runner, { command: 'chmod', args: ['0750', dir] });
   }
 
   // ruTorrent finds a member's settings by REMOTE_USER and runs as the member,

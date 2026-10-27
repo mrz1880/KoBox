@@ -9,6 +9,13 @@ export class FakeRutorrentProfiles implements RutorrentProfilePort {
     return Promise.resolve();
   }
 
+  readonly configFolders: string[] = [];
+
+  ensureConfigFolder(username: Username): Promise<void> {
+    this.configFolders.push(username.value);
+    return Promise.resolve();
+  }
+
   readonly offeredRatioGroups: string[] = [];
 
   offerRatioGroups(username: Username): Promise<void> {

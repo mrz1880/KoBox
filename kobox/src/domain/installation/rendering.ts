@@ -713,11 +713,16 @@ export function renderRutorrentUsersInclude(users: readonly RutorrentUserWiring[
   };
 }
 
+// Where ruTorrent's multiuser layout looks for a member's own config.
+export function rutorrentUserConfigDir(username: string): string {
+  return `${RUTORRENT_DIR}/conf/users/${username}`;
+}
+
 // The per-user ruTorrent config the multiuser layout reads for REMOTE_USER:
 // binds that user's SCGI mount so ruTorrent talks to their own rtorrent.
 export function renderRutorrentUserConfig(user: RutorrentUserWiring): RenderedFile {
   return {
-    path: `${RUTORRENT_DIR}/conf/users/${user.username}/config.php`,
+    path: `${rutorrentUserConfigDir(user.username)}/config.php`,
     content: [
       '<?php',
       '// KoBox-managed — DO NOT EDIT (rendered declaratively).',
