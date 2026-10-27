@@ -3,6 +3,7 @@ import {
   renderRutorrentRatioOffer,
   rutorrentProfilesDir,
   rutorrentUserConfigDir,
+  rutorrentUserConfigsDir,
 } from '../../domain/installation/rendering.js';
 import type { RutorrentProfilePort } from '../../domain/torrent/ports.js';
 import type { Username } from '../../domain/user/Username.js';
@@ -41,6 +42,24 @@ export class RutorrentProfileAdapter implements RutorrentProfilePort {
     const dir = rutorrentUserConfigDir(username.value);
     await runOrThrow(this.runner, { command: 'chown', args: [`root:${username.value}`, dir] });
     await runOrThrow(this.runner, { command: 'chmod', args: ['0750', dir] });
+  }
+
+  // Folders only, one level down: ruTorrent ships a .gitignore beside them.
+  async keepConfigFoldersOf(members: readonly Username[]): Promise<void> {
+    const root = rutorrentUserConfigsDir();
+    // no ruTorrent on this box, or no member yet: nothing to drop
+    if ((await this.runner.run({ command: 'test', args: ['-d', root] })).exitCode !== 0) {
+      return;
+    }
+    const wanted = new Set(members.map((member) => rutorrentUserConfigDir(member.value)));
+    const listed = await runOrThrow(this.runner, {
+      command: 'find',
+      args: [root, '-mindepth', '1', '-maxdepth', '1', '-type', 'd'],
+    });
+    const stale = listed.stdout.split('\n').filter((dir) => dir !== '' && !wanted.has(dir));
+    for (const dir of stale) {
+      await runOrThrow(this.runner, { command: 'rm', args: ['-rf', '--', dir] });
+    }
   }
 
   // ruTorrent finds a member's settings by REMOTE_USER and runs as the member,
