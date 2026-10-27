@@ -66,8 +66,13 @@ The `releases` table is the ledger (`staged/current/previous/failed`). Rules:
 
 ## Mail relay (outbox)
 
-Alerts land in the `mails` table and leave via the local Postfix every 5 min
-(`send-mails`), with backoff 5 m → 30 m → 2 h → 12 h and a terminal `failed`
+Every mail (alerts, invitations, password links, transfer reports) is handed
+to the local Postfix over SMTP on `127.0.0.1:25` the moment it is written. Once
+Postfix answers "queued", the mail is on its disk and Postfix retries the relay
+on its own (`mailq` shows what waits); KoBox records it as `sent` in the `mails`
+table, for the record. When Postfix refuses or does not answer within 5 s, the
+mail stays `pending` in that table instead, and the `send-mails` pass every
+5 min retries it with backoff 5 m → 30 m → 2 h → 12 h, then a terminal `failed`
 state after 5 attempts (visible in the table, never silently dropped).
 
 To relay through an authenticated SMTP provider:

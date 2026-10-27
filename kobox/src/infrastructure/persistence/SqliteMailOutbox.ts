@@ -42,6 +42,24 @@ export class SqliteMailOutbox implements MailOutboxPort {
     return Promise.resolve(inserted.id);
   }
 
+  recordSent(draft: OutboxMailDraft, now: string): Promise<number> {
+    const inserted = this.db.orm
+      .insert(mails)
+      .values({
+        recipient: draft.recipient,
+        subject: draft.subject,
+        body: draft.body,
+        status: 'sent',
+        attempts: 1,
+        nextAttemptAt: now,
+        createdAt: now,
+        sentAt: now,
+      })
+      .returning({ id: mails.id })
+      .get();
+    return Promise.resolve(inserted.id);
+  }
+
   listDue(now: string, limit: number): Promise<readonly OutboxMail[]> {
     const rows = this.db.orm
       .select()

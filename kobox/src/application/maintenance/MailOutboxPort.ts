@@ -21,6 +21,8 @@ export interface OutboxMail extends OutboxMailDraft {
 // flusher, and a crash mid-send simply retries at the next tick.
 export interface MailOutboxPort {
   enqueue(draft: OutboxMailDraft, now: string): Promise<number>;
+  // a mail the local relay already accepted: kept for the record, never due
+  recordSent(draft: OutboxMailDraft, now: string): Promise<number>;
   listDue(now: string, limit: number): Promise<readonly OutboxMail[]>;
   markSent(id: number, now: string): Promise<void>;
   markRetry(id: number, error: string, nextAttemptAt: string): Promise<void>;

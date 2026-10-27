@@ -52,6 +52,22 @@ export class InMemoryMailOutbox implements MailOutboxPort {
     return Promise.resolve(id);
   }
 
+  recordSent(draft: OutboxMailDraft, now: string): Promise<number> {
+    const id = this.nextId++;
+    this.rows.push({
+      id,
+      recipient: draft.recipient,
+      subject: draft.subject,
+      body: draft.body,
+      status: 'sent',
+      attempts: 1,
+      nextAttemptAt: now,
+      createdAt: now,
+      sentAt: now,
+    });
+    return Promise.resolve(id);
+  }
+
   listDue(now: string, limit: number): Promise<readonly OutboxMail[]> {
     return Promise.resolve(
       this.rows

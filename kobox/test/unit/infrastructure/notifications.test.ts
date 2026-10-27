@@ -1,11 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { createLogger } from '../../../src/infrastructure/logging/logger.js';
 import { DiscordChannel } from '../../../src/infrastructure/notifications/DiscordChannel.js';
-import { EmailChannel } from '../../../src/infrastructure/notifications/EmailChannel.js';
 import { MultiChannelNotifier } from '../../../src/infrastructure/notifications/MultiChannelNotifier.js';
 import { NtfyChannel } from '../../../src/infrastructure/notifications/NtfyChannel.js';
 import { OutboxEmailChannel } from '../../../src/infrastructure/notifications/OutboxEmailChannel.js';
-import { SendmailTransport } from '../../../src/infrastructure/notifications/SendmailTransport.js';
 import { InMemoryMailOutbox } from '../../../src/infrastructure/persistence/InMemoryMailOutbox.js';
 import { InMemoryPortalCredentialsRepository } from '../../../src/infrastructure/persistence/InMemoryPortalCredentialsRepository.js';
 import { InMemoryUserRepository } from '../../../src/infrastructure/persistence/InMemoryUserRepository.js';
@@ -14,11 +12,6 @@ import { EmailAddress } from '../../../src/domain/user/EmailAddress.js';
 import { Username } from '../../../src/domain/user/Username.js';
 import { UserBuilder } from '../../builders/UserBuilder.js';
 import { formatEvent, type AnyDomainEvent } from '../../../src/infrastructure/notifications/formatEvent.js';
-import type {
-  CommandRequest,
-  CommandResult,
-  CommandRunner,
-} from '../../../src/infrastructure/system/CommandRunner.js';
 
 process.env.KOBOX_LOG_LEVEL = 'silent';
 const logger = createLogger('test');
@@ -40,15 +33,6 @@ function recordingFetch(status = 200): {
       return Promise.resolve({ ok: status < 400, status });
     },
   };
-}
-
-class RecordingRunner implements CommandRunner {
-  readonly calls: CommandRequest[] = [];
-
-  run(request: CommandRequest): Promise<CommandResult> {
-    this.calls.push(request);
-    return Promise.resolve({ stdout: '', stderr: '', exitCode: 0 });
-  }
 }
 
 const NOW_STAMP = '2026-10-27 12:00:00';
@@ -182,40 +166,6 @@ describe('DiscordChannel', () => {
   });
 });
 
-describe('EmailChannel', () => {
-  it('should_pipe_a_complete_message_through_sendmail', async () => {
-    const runner = new RecordingRunner();
-    const channel = new EmailChannel(runner, 'admin@example.org');
-
-    await channel.send({ title: 'KoBox: alert', body: 'details', priority: 'high' });
-
-    expect(runner.calls[0]?.command).toBe('sendmail');
-    expect(runner.calls[0]?.args).toEqual(['-t']);
-    expect(runner.calls[0]?.stdin).toContain('To: admin@example.org');
-    expect(runner.calls[0]?.stdin).toContain('Subject: KoBox: alert');
-    expect(runner.calls[0]?.stdin).toContain('details');
-  });
-});
-
-describe('SendmailTransport', () => {
-  it('should_pipe_a_complete_delivery_through_sendmail', async () => {
-    const runner = new RecordingRunner();
-    const transport = new SendmailTransport(runner);
-
-    await transport.deliver({
-      recipient: 'admin@example.org',
-      subject: 'KoBox: alert',
-      body: 'details',
-    });
-
-    expect(runner.calls[0]?.command).toBe('sendmail');
-    expect(runner.calls[0]?.args).toEqual(['-t']);
-    expect(runner.calls[0]?.stdin).toContain('To: admin@example.org');
-    expect(runner.calls[0]?.stdin).toContain('Subject: KoBox: alert');
-    expect(runner.calls[0]?.stdin).toContain('details');
-  });
-});
-
 describe('OutboxEmailChannel', () => {
   it('should_enqueue_a_pending_outbox_row_instead_of_sending', async () => {
     const outbox = new InMemoryMailOutbox();
@@ -237,12 +187,12 @@ describe('MultiChannelNotifier', () => {
   it('should_fan_out_every_event_to_every_channel', async () => {
     const ntfy = recordingFetch();
     const discord = recordingFetch();
-    const runner = new RecordingRunner();
+    const outbox = new InMemoryMailOutbox();
     const notifier = new MultiChannelNotifier(
       [
         new NtfyChannel(ntfy.fetch, 'https://ntfy.example.net/kobox'),
         new DiscordChannel(discord.fetch, 'https://discord.example.net/api/webhooks/x/y'),
-        new EmailChannel(runner, 'admin@example.org'),
+        new OutboxEmailChannel(outbox, 'admin@example.org', () => NOW_STAMP),
       ],
       logger,
       () => Promise.resolve(context),
@@ -252,7 +202,7 @@ describe('MultiChannelNotifier', () => {
 
     expect(ntfy.calls).toHaveLength(1);
     expect(discord.calls).toHaveLength(1);
-    expect(runner.calls).toHaveLength(1);
+    expect(await outbox.listRecent(10)).toHaveLength(1);
   });
 
   it('should_never_let_one_failing_channel_break_the_others_or_the_caller', async () => {

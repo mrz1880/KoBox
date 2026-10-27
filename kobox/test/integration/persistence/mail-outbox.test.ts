@@ -27,6 +27,17 @@ afterEach(() => {
 });
 
 describe('SqliteMailOutbox', () => {
+  it('should_record_a_mail_already_handed_off_as_sent_and_never_due', async () => {
+    // handed to the local relay at once: kept for the record, never resent
+    await outbox.recordSent(DRAFT, '2026-07-25 10:00:00');
+
+    expect(await outbox.listDue('2026-07-25 11:00:00', 10)).toEqual([]);
+    const [recorded] = await outbox.listRecent(10);
+    expect(recorded?.status).toBe('sent');
+    expect(recorded?.sentAt).toBe('2026-07-25 10:00:00');
+    expect(recorded?.attempts).toBe(1);
+  });
+
   it('should_enqueue_a_pending_mail_due_immediately', async () => {
     const id = await outbox.enqueue(DRAFT, '2026-07-25 10:00:00');
 
