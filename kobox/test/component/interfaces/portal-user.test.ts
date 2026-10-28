@@ -1308,6 +1308,34 @@ describe('the language a member reads the portal in', () => {
 
     expect(response.body).toContain('<html lang="en">');
   });
+
+  it('should_speak_the_browsers_language_to_a_member_who_never_chose', async () => {
+    const response = await world.server.inject({
+      method: 'GET',
+      url: '/',
+      headers: { cookie: user.cookie, 'accept-language': 'fr-FR,fr;q=0.9' },
+    });
+
+    expect(response.body).toContain('<html lang="fr">');
+    expect(response.body).toContain('Accueil');
+  });
+
+  it('should_keep_a_members_choice_whatever_the_browser_says', async () => {
+    await world.server.inject({
+      method: 'POST',
+      url: '/access/language',
+      headers: { cookie: user.cookie, 'content-type': 'application/x-www-form-urlencoded' },
+      payload: form({ _csrf: user.csrf, language: 'en' }),
+    });
+
+    const response = await world.server.inject({
+      method: 'GET',
+      url: '/',
+      headers: { cookie: user.cookie, 'accept-language': 'fr' },
+    });
+
+    expect(response.body).toContain('<html lang="en">');
+  });
 });
 
 describe("a member's own SSH key", () => {

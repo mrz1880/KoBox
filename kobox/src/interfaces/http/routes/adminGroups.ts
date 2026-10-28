@@ -10,7 +10,7 @@ export function registerAdminGroupRoutes(server: FastifyInstance, guards: Guards
       if (session === undefined) {
         return;
       }
-      return reply.type('text/html').send(adminGroupPage(group, viewerOf(session)));
+      return reply.type('text/html').send(adminGroupPage(group, viewerOf(session, request)));
     });
   }
 }

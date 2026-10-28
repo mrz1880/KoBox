@@ -42,7 +42,7 @@ export function registerAdminMailRoutes(
     const settings = await deps.mailRelay.get();
     return reply
       .type('text/html')
-      .send(adminMailPage(settings, viewerOf(session), flashOf(request)));
+      .send(adminMailPage(settings, viewerOf(session, request), flashOf(request)));
   });
 
   server.post('/admin/mail-relay', async (request, reply) => {
@@ -58,7 +58,7 @@ export function registerAdminMailRoutes(
         .send(
           adminMailPage(
             await deps.mailRelay.get(),
-            viewerOf(session),
+            viewerOf(session, request),
             undefined,
             'A relay needs a hostname, a port between 1 and 65535, a login and a password.',
           ),

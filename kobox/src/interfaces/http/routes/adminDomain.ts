@@ -28,7 +28,13 @@ export function registerAdminDomainRoutes(
     }
     return reply
       .type('text/html')
-      .send(adminDomainPage(await deps.siteSettings.get(), viewerOf(session), flashOf(request)));
+      .send(
+        adminDomainPage(
+          await deps.siteSettings.get(),
+          viewerOf(session, request),
+          flashOf(request),
+        ),
+      );
   });
 
   server.post('/admin/domain', async (request, reply) => {
@@ -44,7 +50,7 @@ export function registerAdminDomainRoutes(
         .send(
           adminDomainPage(
             await deps.siteSettings.get(),
-            viewerOf(session),
+            viewerOf(session, request),
             undefined,
             'That is not a hostname. Give the name on its own, with no https:// and no trailing slash.',
           ),

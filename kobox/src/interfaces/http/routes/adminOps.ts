@@ -57,7 +57,7 @@ export function registerAdminOpsRoutes(
       (component: ComponentRecord) =>
         String(component.name) === 'nanomon' && String(component.state) === 'installed',
     );
-    return reply.type('text/html').send(monitoringPage(viewerOf(session), installed));
+    return reply.type('text/html').send(monitoringPage(viewerOf(session, request), installed));
   });
 
   server.get('/admin/health', async (request, reply) => {
@@ -84,7 +84,7 @@ export function registerAdminOpsRoutes(
           probes,
           components,
           releases,
-          viewerOf(session),
+          viewerOf(session, request),
           measurements,
           available,
           flashOf(request),
@@ -142,7 +142,7 @@ export function registerAdminOpsRoutes(
     );
     return reply
       .type('text/html')
-      .send(adminLogsPage(snapshots, viewerOf(session), flashOf(request)));
+      .send(adminLogsPage(snapshots, viewerOf(session, request), flashOf(request)));
   });
 
   server.post('/admin/logs/capture', async (request, reply) => {
@@ -177,7 +177,7 @@ export function registerAdminOpsRoutes(
     const snapshot = await deps.diagnostics.findPackages();
     return reply
       .type('text/html')
-      .send(adminPackagesPage(snapshot, viewerOf(session), flashOf(request)));
+      .send(adminPackagesPage(snapshot, viewerOf(session, request), flashOf(request)));
   });
 
   server.post('/admin/packages/check', async (request, reply) => {
@@ -228,7 +228,9 @@ export function registerAdminOpsRoutes(
       }
     }
     const found = selected === undefined ? undefined : await deps.configFiles.read(selected);
-    return reply.type('text/html').send(adminConfigPage(selected, found, viewerOf(session)));
+    return reply
+      .type('text/html')
+      .send(adminConfigPage(selected, found, viewerOf(session, request)));
   });
 
   server.get('/admin/mails', async (request, reply) => {
@@ -239,6 +241,6 @@ export function registerAdminOpsRoutes(
     const mails = await deps.outbox.listRecent(50);
     return reply
       .type('text/html')
-      .send(adminMailsPage(mails, viewerOf(session), flashOf(request)));
+      .send(adminMailsPage(mails, viewerOf(session, request), flashOf(request)));
   });
 }
