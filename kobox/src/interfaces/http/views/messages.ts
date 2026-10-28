@@ -781,6 +781,7 @@ const FR: Readonly<Record<string, string>> = {
     'Rien de tout cela n’est une garantie, et cela ne remplace pas le VPN de Mon compte. Cela écarte les surveillants les plus bruyants et les plus connus.',
 
   // one member
+  'User {name}': 'Membre {name}',
   'Email: {email}': 'Adresse mail : {email}',
   'Quota: {quota} GiB': 'Quota : {quota} Gio',
   'SCGI port: {port}': 'Port SCGI : {port}',
