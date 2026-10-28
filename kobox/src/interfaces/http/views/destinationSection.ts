@@ -1,7 +1,7 @@
 import { LoneFilePlacement } from '../../../domain/sync/LoneFilePlacement.js';
 import type { SyncDestination } from '../../../domain/sync/SyncDestination.js';
 import { html, type RawHtml } from '../html.js';
-import type { Viewer } from './layout.js';
+import { sentence, type Viewer } from './layout.js';
 import { DEFAULT_TRANSFER_MAILS, TRANSFER_MAILS, type TransferMails } from '../../../domain/sync/TransferMails.js';
 
 const PLACEMENT_WORDS: Readonly<Record<string, string>> = {
@@ -12,23 +12,24 @@ const PLACEMENT_WORDS: Readonly<Record<string, string>> = {
 // The verdict of the last "test it now", stated as an outcome rather than as an
 // exit code. A member who cannot fix what they cannot understand will simply
 // turn sync off and stop trusting the screen.
-function verdict(destination: SyncDestination | undefined): RawHtml {
+function verdict(destination: SyncDestination | undefined, viewer: Viewer): RawHtml {
   const check = destination?.lastCheck;
   if (destination === undefined) {
     return html``;
   }
   if (check === undefined) {
-    return html`<p class="muted">Not tried yet. Test it before you rely on it.</p>`;
+    return html`<p class="muted">${viewer.t('Not tried yet. Test it before you rely on it.')}</p>`;
   }
   return html`<p class="eyebrow">
-  ${check.ok ? html`<span class="chip ok">it works</span>` : html`<span class="chip bad">it does not work</span>`}
+  ${check.ok ? html`<span class="chip ok">${viewer.t('it works')}</span>` : html`<span class="chip bad">${viewer.t('it does not work')}</span>`}
   <span class="muted">${check.detail ?? ''}</span>
 </p>
-<p class="muted">Last tried ${check.at}.${
+<p class="muted">${viewer.t('Last tried {at}.', { at: check.at })}${
     check.fingerprint === undefined
       ? html``
-      : html` The machine identified itself as <span class="mono">${check.fingerprint}</span> — if
-that ever changes without you reinstalling it, KoBox will refuse to connect and say so.`
+      : html` ${sentence(viewer.t, 'The machine identified itself as {fingerprint}: if that ever changes without you reinstalling it, KoBox will refuse to connect and say so.', {
+        fingerprint: html`<span class="mono">${check.fingerprint}</span>`,
+      })}`
   }</p>`;
 }
 
@@ -51,7 +52,7 @@ export function destinationSection(
       placement.equals(destination?.placement ?? LoneFilePlacement.besideTheOthers)
         ? html` selected`
         : html``
-    }>${PLACEMENT_WORDS[placement.value] ?? placement.value}</option>`,
+    }>${viewer.t(PLACEMENT_WORDS[placement.value] ?? placement.value)}</option>`,
   );
   // A member on a slow link picks the middle of the night on purpose. The
   // legacy gave them the same choice through their own crontab; here one hourly
@@ -65,56 +66,51 @@ export function destinationSection(
   const chosenMails = destination?.transferMails ?? DEFAULT_TRANSFER_MAILS;
   const mails = TRANSFER_MAILS.map(
     (choice) => html`<option value="${choice}"${choice === chosenMails ? html` selected` : html``}>${
-      MAIL_WORDS[choice]
+      viewer.t(MAIL_WORDS[choice])
     }</option>`,
   );
-  return html`<h2>Where your files go</h2>
-<p class="muted">The machine of yours KoBox copies finished downloads to — a NAS,
-a home server, anything that accepts an SSH connection. Each folder above lands
-in a folder of the same name over there.</p>
+  return html`<h2>${viewer.t('Where your files go')}</h2>
+<p class="muted">${viewer.t('The machine of yours KoBox copies finished downloads to: a NAS, a home server, anything that accepts an SSH connection. Each folder above lands in a folder of the same name over there.')}</p>
 <section class="panel">
-  ${verdict(destination)}
+  ${verdict(destination, viewer)}
   <form method="post" action="/sync/destination">
     <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
     <div class="facts">
-      <label>Address
+      <label>${viewer.t('Address')}
         <input name="host" value="${destination?.host.value ?? ''}"
           placeholder="nas.example.org" maxlength="253" required></label>
-      <label>Port
+      <label>${viewer.t('Port')}
         <input name="port" type="number" min="1" max="65535"
           value="${String(destination?.port.value ?? 22)}" required></label>
-      <label>Account there
+      <label>${viewer.t('Account there')}
         <input name="account" value="${destination?.account.value ?? ''}"
           placeholder="seedbox" maxlength="64" required></label>
-      <label>Password
+      <label>${viewer.t('Password')}
         <input name="password" type="password" maxlength="256"
-          placeholder="${destination === undefined ? '' : 'leave empty to keep the current one'}"
+          placeholder="${destination === undefined ? '' : viewer.t('leave empty to keep the current one')}"
           ${destination === undefined ? html`required` : html``}></label>
-      <label>Folder there
+      <label>${viewer.t('Folder there')}
         <input name="path" value="${destination?.path.value ?? ''}"
           placeholder="/volume1/torrents" maxlength="512" required></label>
-      <label>Files per pass
+      <label>${viewer.t('Files per pass')}
         <input name="batchSize" type="number" min="0" max="1000"
           value="${String(destination?.batchSize.value ?? 0)}" required></label>
-      <label>A download that is one single file
+      <label>${viewer.t('A download that is one single file')}
         <select name="placement">${placements}</select></label>
-      <label>Send the "a bit later" folders at
+      <label>${viewer.t('Send the "a bit later" folders at')}
         <select name="sendHour">${hours}</select></label>
-      <label>Mail me about a transfer
+      <label>${viewer.t('Mail me about a transfer')}
         <select name="transferMails">${mails}</select></label>
     </div>
-    <button type="submit">Save</button>
+    <button type="submit">${viewer.t('Save')}</button>
   </form>
-  <p class="muted">0 files per pass means "everything waiting". Your password is
-  sealed with this box's key the moment you save it: it is never stored in a form
-  you can read back, and never appears in a command line.</p>
+  <p class="muted">${viewer.t('0 files per pass means "everything waiting". Your password is sealed with this box\'s key the moment you save it: it is never stored in a form you can read back, and never appears in a command line.')}</p>
 </section>
 ${destination === undefined
     ? html``
     : html`<form class="inline" method="post" action="/sync/destination/test">
   <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
-  <button class="ghost" type="submit">Test it now</button>
+  <button class="ghost" type="submit">${viewer.t('Test it now')}</button>
 </form>
-<p class="muted">Connects, then checks the folder can be written to. Takes a few
-seconds — reload the page for the answer.</p>`}`;
+<p class="muted">${viewer.t('Connects, then checks the folder can be written to. Takes a few seconds: reload the page for the answer.')}</p>`}`;
 }

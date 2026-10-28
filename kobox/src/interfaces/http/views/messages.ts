@@ -319,6 +319,76 @@ const FR: Readonly<Record<string, string>> = {
   "With the key installed, send a torrent file over SFTP into one of your folders (replace FOLDER with its name, as listed under Folders); rTorrent picks it up within a few seconds and gives it that folder's label:":
     'Une fois la clé installée, envoyez un fichier torrent par SFTP dans un de vos dossiers (remplacez FOLDER par son nom, tel qu’il apparaît dans Dossiers) ; rTorrent le prend en charge en quelques secondes et lui donne l’étiquette de ce dossier :',
 
+  // folders and sending to a member's own machine
+  'Your folders': 'Vos dossiers',
+  "A folder is what you sort your downloads into. Drop a torrent in a folder's watch directory and what comes out lands in that folder, and, if you ask for it here, gets copied on to your own machine.":
+    'Un dossier, c’est là où vous rangez vos téléchargements. Déposez un torrent dans le répertoire watch d’un dossier et ce qui en sort arrive dans ce dossier, puis, si vous le demandez ici, est copié jusqu’à votre propre machine.',
+  'You have no folders yet.': 'Vous n’avez pas encore de dossier.',
+  'When a download finishes': 'Quand un téléchargement se termine',
+  'Add a folder': 'Ajouter un dossier',
+  'Add it': 'L’ajouter',
+  'Letters, digits, dot, dash or underscore: no spaces and no accents, because it becomes a folder name on this box and on your own machine. New folders keep everything here until you say otherwise.':
+    'Lettres, chiffres, point, tiret ou tiret bas : ni espace ni accent, car le nom devient un nom de dossier sur cette box et sur votre machine. Un nouveau dossier garde tout ici tant que vous ne dites pas autre chose.',
+  'Keep it here': 'Le garder ici',
+  'Nothing leaves the box. Download it yourself whenever you like.':
+    'Rien ne quitte la box. Téléchargez-le vous-même quand vous voulez.',
+  'Send it a bit later': 'L’envoyer un peu plus tard',
+  'It goes out on the next pass, a few minutes after it finishes.':
+    'Il part au prochain passage, quelques minutes après la fin du téléchargement.',
+  'Send it straight away': 'L’envoyer tout de suite',
+  'It starts copying the moment the download is done.':
+    'La copie démarre dès que le téléchargement est terminé.',
+  'What happens to a finished {folder} download':
+    'Ce que devient un téléchargement terminé dans {folder}',
+  'Send what is already here': 'Envoyer ce qui est déjà là',
+  'Holds downloads: empty it to rename or remove it.':
+    'Contient des téléchargements : videz-le pour le renommer ou le retirer.',
+  'New name for {folder}': 'Nouveau nom pour {folder}',
+  'new name': 'nouveau nom',
+  Rename: 'Renommer',
+  'Where your files go': 'Où vont vos fichiers',
+  'The machine of yours KoBox copies finished downloads to: a NAS, a home server, anything that accepts an SSH connection. Each folder above lands in a folder of the same name over there.':
+    'La machine à vous vers laquelle KoBox copie les téléchargements terminés : un NAS, un serveur à la maison, tout ce qui accepte une connexion SSH. Chaque dossier ci-dessus arrive là-bas dans un dossier du même nom.',
+  'Not tried yet. Test it before you rely on it.':
+    'Pas encore essayée. Testez-la avant de compter dessus.',
+  'it works': 'ça marche',
+  'it does not work': 'ça ne marche pas',
+  'Last tried {at}.': 'Dernier essai le {at}.',
+  'The machine identified itself as {fingerprint}: if that ever changes without you reinstalling it, KoBox will refuse to connect and say so.':
+    'La machine s’est présentée comme {fingerprint} : si cela change un jour sans que vous l’ayez réinstallée, KoBox refusera de s’y connecter et le dira.',
+  Address: 'Adresse',
+  'Account there': 'Compte là-bas',
+  'leave empty to keep the current one': 'laisser vide pour garder l’actuel',
+  'Folder there': 'Dossier là-bas',
+  'Files per pass': 'Fichiers par passage',
+  'A download that is one single file': 'Un téléchargement fait d’un seul fichier',
+  'Send the "a bit later" folders at': 'Envoyer les dossiers « un peu plus tard » à',
+  'Mail me about a transfer': 'M’écrire au sujet d’un transfert',
+  'Put the file straight in the folder': 'Mettre le fichier directement dans le dossier',
+  'Give each file a folder of its own': 'Donner à chaque fichier son propre dossier',
+  never: 'jamais',
+  'only when one fails': 'seulement quand un envoi échoue',
+  'every time, arrived or failed': 'à chaque fois, arrivé ou en échec',
+  '0 files per pass means "everything waiting". Your password is sealed with this box\'s key the moment you save it: it is never stored in a form you can read back, and never appears in a command line.':
+    '0 fichier par passage veut dire « tout ce qui attend ». Votre mot de passe est scellé avec la clé de cette box dès l’enregistrement : il n’est jamais stocké sous une forme relisible, et n’apparaît jamais dans une ligne de commande.',
+  'Test it now': 'La tester maintenant',
+  'Connects, then checks the folder can be written to. Takes a few seconds: reload the page for the answer.':
+    'Se connecte, puis vérifie qu’on peut écrire dans le dossier. Cela prend quelques secondes : rechargez la page pour la réponse.',
+  'What has been sent': 'Ce qui a été envoyé',
+  'Nothing yet. Once a folder set to send finishes a download, it turns up here.':
+    'Rien pour l’instant. Dès qu’un dossier réglé pour envoyer termine un téléchargement, il apparaît ici.',
+  State: 'État',
+  'What happened': 'Ce qui s’est passé',
+  'Last change': 'Dernier changement',
+  'waiting its turn': 'attend son tour',
+  'on its way': 'en route',
+  arrived: 'arrivé',
+  'did not arrive': 'pas arrivé',
+  'Try again': 'Réessayer',
+  'Send again': 'Renvoyer',
+  'A file that did not arrive stays here until you try it again: it is never silently dropped, and trying again resumes where it stopped rather than starting the file over.':
+    'Un fichier qui n’est pas arrivé reste ici jusqu’à ce que vous réessayiez : il n’est jamais abandonné en silence, et réessayer reprend là où le transfert s’est arrêté au lieu de recommencer le fichier.',
+
   // admin navigation
   Trackers: 'Trackers',
   Blocklists: 'Listes de blocage',
