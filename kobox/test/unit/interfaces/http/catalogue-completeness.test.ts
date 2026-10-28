@@ -88,12 +88,9 @@ import { accessFacts, signalRow } from './viewFixtures.js';
 // language plan empties it; the test also fails when a key here gains its
 // French, so the list never claims a gap that is already closed.
 const KNOWN_GAPS: readonly string[] = [
-  'Download a link',
   'Invitation sent',
-  'Torrents',
   'User',
   'User alice',
-  'ruTorrent',
 ];
 
 const NOW = '2026-10-28 10:00:00';

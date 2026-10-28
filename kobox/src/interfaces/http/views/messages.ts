@@ -184,6 +184,141 @@ const FR: Readonly<Record<string, string>> = {
   'That is not a hostname. Give the name on its own, with no https:// and no trailing slash.':
     'Ce n’est pas un nom d’hôte. Donnez le nom seul, sans https:// ni barre oblique finale.',
 
+  // member pages
+  Torrents: 'Torrents',
+  ruTorrent: 'ruTorrent',
+  'Download a link': 'Télécharger un lien',
+  Open: 'Ouvrir',
+  'Hello {name}': 'Bonjour {name}',
+  'My account and connection details': 'Mon compte et mes informations de connexion',
+  'Add a torrent and follow it. This is the main tool.':
+    'Ajoutez un torrent et suivez-le. C’est l’outil principal.',
+  'Watch or download what has finished.': 'Regardez ou téléchargez ce qui est terminé.',
+  'Paste a link from a file host and let the server fetch it.':
+    'Collez un lien d’hébergeur et laissez le serveur le récupérer.',
+  'Your account is suspended. Contact the administrator to have it restored.':
+    'Votre compte est suspendu. Contactez l’administrateur pour le faire rétablir.',
+  'Your torrent client is not running. {restart}.':
+    'Votre client torrent ne tourne pas. {restart}.',
+  'Restart it from the ruTorrent page': 'Relancez-le depuis la page ruTorrent',
+  'Your connection is temporarily slowed because of heavy use. It lifts on its own once traffic settles.':
+    'Votre connexion est ralentie pour un temps à cause d’une forte utilisation. Cela se lève tout seul quand le trafic se calme.',
+  'You are using a lot of bandwidth right now. Nothing is limited yet.':
+    'Vous utilisez beaucoup de bande passante en ce moment. Rien n’est encore limité.',
+  'Everything is running.': 'Tout fonctionne.',
+  'Current password': 'Mot de passe actuel',
+  'Restart my rtorrent': 'Redémarrer mon rtorrent',
+  'Use this if the interface stops responding.': 'À utiliser si l’interface ne répond plus.',
+  'Back to my media': 'Retour à mes médias',
+  'Download this file': 'Télécharger ce fichier',
+  'You have no folders yet. Create one under {folders}, and what lands in it shows up here.':
+    'Vous n’avez pas encore de dossier. Créez-en un dans {folders}, et ce qui y arrive apparaîtra ici.',
+  'You have no folders yet. Create one under {folders} and it will show up here.':
+    'Vous n’avez pas encore de dossier. Créez-en un dans {folders} et il apparaîtra ici.',
+  done: 'terminé',
+  failed: 'en échec',
+  downloading: 'en cours',
+  pending: 'en attente',
+  'My AllDebrid account': 'Mon compte AllDebrid',
+  'Status: {state}': 'État : {state}',
+  'key configured': 'clé configurée',
+  'no key': 'pas de clé',
+  'Your key is stored encrypted and is only used for your own downloads. Without one, downloads stay unavailable for you, and nothing else changes.':
+    'Votre clé est stockée chiffrée et ne sert qu’à vos propres téléchargements. Sans clé, les téléchargements vous restent fermés, et rien d’autre ne change.',
+  'Replace my key': 'Remplacer ma clé',
+  'My AllDebrid API key': 'Ma clé d’API AllDebrid',
+  'Remove my key': 'Retirer ma clé',
+  'The download engine is {notSetUp}, so links will not go anywhere. This is not something you can fix from here: tell an admin, and they will find the reason under Health.':
+    'Le moteur de téléchargement {notSetUp}, les liens n’iront donc nulle part. Ce n’est pas réparable d’ici : prévenez un administrateur, il trouvera la raison dans État du système.',
+  'not set up on this box': 'n’est pas installé sur cette box',
+  'Simplest': 'Le plus simple',
+  'Three ways to reach your files. All of them take your username, {username}, and the password you use here.':
+    'Trois façons d’accéder à vos fichiers. Toutes demandent votre identifiant, {username}, et le mot de passe que vous utilisez ici.',
+  'In the browser, or in the Nextcloud app on a phone or a computer. No VPN, nothing to set up on your network.':
+    'Dans le navigateur, ou dans l’application Nextcloud sur un téléphone ou un ordinateur. Pas de VPN, rien à configurer sur votre réseau.',
+  'Open Nextcloud': 'Ouvrir Nextcloud',
+  'Nextcloud is not installed on this box. Ask an administrator.':
+    'Nextcloud n’est pas installé sur cette box. Demandez à un administrateur.',
+  'For FileZilla, Cyberduck or rsync, and for large transfers.':
+    'Pour FileZilla, Cyberduck ou rsync, et pour les gros transferts.',
+  'Network share': 'Partage réseau',
+  'Samba, like a local disk. Connect the VPN with the usual profile first ({account}), then open:':
+    'Samba, comme un disque local. Connectez d’abord le VPN avec le profil habituel ({account}), puis ouvrez :',
+
+  // account: VPN, app token, two-step, addresses, key
+  'Connect over VPN': 'Se connecter par VPN',
+  'Download one profile and open it with your OpenVPN client.':
+    'Téléchargez un profil et ouvrez-le avec votre client OpenVPN.',
+  'Usual choice': 'Choix habituel',
+  'Download profile': 'Télécharger le profil',
+  'Everything through the seedbox': 'Tout passe par la seedbox',
+  'All your traffic leaves through the server. Pick this one unless you have a reason not to.':
+    'Tout votre trafic sort par le serveur. Prenez celui-ci, sauf raison particulière.',
+  'Seedbox traffic only': 'Seulement le trafic de la seedbox',
+  'Only what you send to the seedbox goes through the tunnel. The rest uses your normal connection.':
+    'Seul ce que vous envoyez à la seedbox passe par le tunnel. Le reste utilise votre connexion habituelle.',
+  'Bridged network': 'Réseau ponté',
+  'Puts your machine on the same network as the server. Rarely needed.':
+    'Place votre machine sur le même réseau que le serveur. Rarement utile.',
+  'SFTP host': 'Hôte SFTP',
+  'rtorrent port': 'Port rtorrent',
+  'Your SFTP password is the one you use here.':
+    'Votre mot de passe SFTP est celui que vous utilisez ici.',
+  'Open ruTorrent': 'Ouvrir ruTorrent',
+  'Connect an app': 'Connecter une application',
+  'Sonarr, Radarr and friends can add torrents for you and follow them. They sign in with your username and a {token} instead of your password, so a program that leaks its settings costs you the token and not your account. Throw it away here and it stops working immediately, everywhere.':
+    'Sonarr, Radarr et compagnie peuvent ajouter des torrents pour vous et les suivre. Ils se connectent avec votre identifiant et un {token} au lieu de votre mot de passe : un programme qui laisse fuiter ses réglages vous coûte le jeton, pas votre compte. Jetez-le ici et il cesse aussitôt de fonctionner, partout.',
+  token: 'jeton',
+  'Here is your token. Copy it now.': 'Voici votre jeton. Copiez-le maintenant.',
+  'It will not be shown again. KoBox only keeps a fingerprint of it. If you lose it, make a new one; the old one stops working at that moment.':
+    'Il ne sera plus affiché. KoBox n’en garde qu’une empreinte. Si vous le perdez, créez-en un nouveau : l’ancien cesse alors de fonctionner.',
+  "In the app, choose {client}, use your own username, paste the token where it asks for a password, and point it at this box on port {port} with the path {path}. If you would rather not connect anything, dropping a .torrent file into a folder's {watch} directory works just as well.":
+    'Dans l’application, choisissez {client}, utilisez votre propre identifiant, collez le jeton là où elle demande un mot de passe, et dirigez-la vers cette box sur le port {port} avec le chemin {path}. Si vous préférez ne rien connecter, déposer un fichier .torrent dans le répertoire {watch} d’un dossier marche tout aussi bien.',
+  'Make a new token': 'Créer un nouveau jeton',
+  'Make a token': 'Créer un jeton',
+  'Throw it away': 'Le jeter',
+  'After your password, a 6-digit code from an app on your phone (Aegis, Google Authenticator, 1Password...). Someone who learns your password still cannot sign in. Administrators need it to open Administration.':
+    'Après votre mot de passe, un code à 6 chiffres donné par une application sur votre téléphone (Aegis, Google Authenticator, 1Password...). Quelqu’un qui apprendrait votre mot de passe ne pourrait toujours pas se connecter. Les administrateurs en ont besoin pour ouvrir l’Administration.',
+  On: 'Activée',
+  'current code': 'code actuel',
+  'Turn it off': 'La désactiver',
+  'Set it up': 'La configurer',
+  'Add this key to your authenticator app.':
+    'Ajoutez cette clé à votre application d’authentification.',
+  'On the phone that has the app, this link adds it directly: {link}':
+    'Sur le téléphone qui a l’application, ce lien l’ajoute directement : {link}',
+  'Then type the code the app shows': 'Puis tapez le code affiché par l’application',
+  'Turn it on': 'L’activer',
+  'Not now': 'Pas maintenant',
+  'SSH and SFTP accept connections from the addresses below and from the VPN. Add your address from home, from the place your scripts or your NAS run. Only you and the administrators see this list.':
+    'SSH et SFTP acceptent les connexions depuis les adresses ci-dessous et depuis le VPN. Ajoutez votre adresse à la maison, celle de l’endroit où tournent vos scripts ou votre NAS. Seuls vous et les administrateurs voyez cette liste.',
+  'No address declared.': 'Aucune adresse déclarée.',
+  'You are connecting over IPv6 right now. Only IPv4 addresses can be declared: come back from a connection that uses IPv4.':
+    'Vous êtes connecté en IPv6 en ce moment. Seules les adresses IPv4 peuvent être déclarées : revenez depuis une connexion en IPv4.',
+  'You are connecting from {address}, which is declared.':
+    'Vous vous connectez depuis {address}, qui est déclarée.',
+  'You are connecting from {address}.': 'Vous vous connectez depuis {address}.',
+  'Add this address': 'Ajouter cette adresse',
+  'Another place': 'Un autre lieu',
+  Add: 'Ajouter',
+  'For a place you are not at right now, your NAS at home or the office: type the public address it shows to the internet (a site like whatismyip.com, opened from there, tells you).':
+    'Pour un lieu où vous n’êtes pas en ce moment, votre NAS à la maison ou le bureau : tapez l’adresse publique qu’il montre à internet (un site comme whatismyip.com, ouvert depuis là-bas, vous la donne).',
+  'Dynamic hostname': 'Nom d’hôte dynamique',
+  'If your home address changes on its own, give a name your router or a service like DuckDNS keeps pointed at it. The box looks it up every five minutes and follows it.':
+    'Si votre adresse à la maison change toute seule, donnez un nom que votre routeur ou un service comme DuckDNS garde pointé dessus. La box le consulte toutes les cinq minutes et le suit.',
+  'not looked up yet': 'pas encore consulté',
+  'points at {address}': 'pointe vers {address}',
+  Hostname: 'Nom d’hôte',
+  'No key installed. Add your public key and a script on your own machine can drop torrent files straight into your folders, without a password.':
+    'Aucune clé installée. Ajoutez votre clé publique et un script sur votre machine pourra déposer des fichiers torrent directement dans vos dossiers, sans mot de passe.',
+  'Installed: {key}': 'Installée : {key}',
+  'since {date}': 'depuis le {date}',
+  'The {public} half, the one line from {file}. Never paste a private key here or anywhere else. This key transfers files and cannot open a shell, which is all a send-my-torrents script needs.':
+    'La moitié {public}, l’unique ligne de {file}. Ne collez jamais une clé privée ici, ni ailleurs. Cette clé transfère des fichiers et ne peut pas ouvrir de shell, ce qui suffit à un script qui envoie vos torrents.',
+  public: 'publique',
+  "With the key installed, send a torrent file over SFTP into one of your folders (replace FOLDER with its name, as listed under Folders); rTorrent picks it up within a few seconds and gives it that folder's label:":
+    'Une fois la clé installée, envoyez un fichier torrent par SFTP dans un de vos dossiers (remplacez FOLDER par son nom, tel qu’il apparaît dans Dossiers) ; rTorrent le prend en charge en quelques secondes et lui donne l’étiquette de ce dossier :',
+
   // admin navigation
   Trackers: 'Trackers',
   Blocklists: 'Listes de blocage',

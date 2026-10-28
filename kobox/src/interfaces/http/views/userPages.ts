@@ -6,7 +6,7 @@ import type { SshPublicKey } from '../../../domain/user/SshPublicKey.js';
 import type { SeedboxUser } from '../../../domain/user/SeedboxUser.js';
 import { BROWSER_CHOICE } from '../browserLanguage.js';
 import { html, type RawHtml } from '../html.js';
-import { flash, page, type Viewer } from './layout.js';
+import { flash, page, sentence, type Viewer } from './layout.js';
 import type { BlocklistCoverage } from '../../../domain/tracker/BlocklistCoverage.js';
 
 function fairUseChip(level: string): RawHtml {
@@ -103,24 +103,22 @@ export function signalStrip(row: SignalRow): RawHtml {
 // What the person needs to know before anything else, said plainly. A VU meter
 // belongs on the operator's console; someone who just wants their files needs a
 // sentence telling them whether things are working and what to do if not.
-function plainStatus(row: SignalRow): RawHtml {
+function plainStatus(row: SignalRow, viewer: Viewer): RawHtml {
   if (row.suspended) {
-    return html`<p class="flash error">Your account is suspended. Contact the
-    administrator to have it restored.</p>`;
+    return html`<p class="flash error">${viewer.t('Your account is suspended. Contact the administrator to have it restored.')}</p>`;
   }
   if (!row.healthy) {
-    return html`<p class="flash error">Your torrent client is not running.
-    <a href="/rutorrent">Restart it from the ruTorrent page</a>.</p>`;
+    return html`<p class="flash error">${sentence(viewer.t, 'Your torrent client is not running. {restart}.', {
+      restart: html`<a href="/rutorrent">${viewer.t('Restart it from the ruTorrent page')}</a>`,
+    })}</p>`;
   }
   if (row.level === 'throttled') {
-    return html`<p class="flash error">Your connection is temporarily slowed
-    because of heavy use. It lifts on its own once traffic settles.</p>`;
+    return html`<p class="flash error">${viewer.t('Your connection is temporarily slowed because of heavy use. It lifts on its own once traffic settles.')}</p>`;
   }
   if (row.level === 'alerted') {
-    return html`<p class="flash">You are using a lot of bandwidth right now.
-    Nothing is limited yet.</p>`;
+    return html`<p class="flash">${viewer.t('You are using a lot of bandwidth right now. Nothing is limited yet.')}</p>`;
   }
-  return html`<p class="muted">Everything is running.</p>`;
+  return html`<p class="muted">${viewer.t('Everything is running.')}</p>`;
 }
 
 interface HomeAction {
@@ -158,18 +156,18 @@ export function userHomePage(
 ): string {
   const actions = HOME_ACTIONS.map(
     (action) => html`<div class="choice">
-  <h3>${action.title}</h3>
-  <p>${action.blurb}</p>
-  <a class="action" href="${action.href}">Open</a>
+  <h3>${viewer.t(action.title)}</h3>
+  <p>${viewer.t(action.blurb)}</p>
+  <a class="action" href="${action.href}">${viewer.t('Open')}</a>
 </div>`,
   );
   return page(
     'Home',
-    html`<h1>Hello ${user.username.value}</h1>
+    html`<h1>${viewer.t('Hello {name}', { name: user.username.value })}</h1>
 ${flash(viewer.t, message)}
-${plainStatus(row)}
+${plainStatus(row, viewer)}
 <div class="choices">${actions}</div>
-<p class="links"><a href="/access">My account and connection details</a></p>`,
+<p class="links"><a href="/access">${viewer.t('My account and connection details')}</a></p>`,
     viewer,
   );
 }
@@ -248,16 +246,16 @@ ${loudestFirst.map((row) => signalStrip({ ...row, scaleBytes, linked: true }))}
 export function passwordPage(viewer: Viewer, error?: string, ok?: string): string {
   return page(
     'Password',
-    html`<h1>Change password</h1>
+    html`<h1>${viewer.t('Change password')}</h1>
 ${flash(viewer.t, ok)}
 ${flash(viewer.t, error, 'error')}
 <form class="card" method="post" action="/password">
   <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
-  <label for="current">Current password</label>
+  <label for="current">${viewer.t('Current password')}</label>
   <input id="current" name="current" type="password" autocomplete="current-password" required>
-  <label for="next">New password</label>
+  <label for="next">${viewer.t('New password')}</label>
   <input id="next" name="next" type="password" autocomplete="new-password" required minlength="8">
-  <button type="submit">Change password</button>
+  <button type="submit">${viewer.t('Change password')}</button>
 </form>`,
     viewer,
   );
@@ -267,16 +265,16 @@ ${flash(viewer.t, error, 'error')}
 // profile — so the three variants are presented as a choice, each carrying the
 // sentence that tells you whether it is yours — and then knowing their own
 // connection details, which the page previously never showed at all.
-function downloadStatusChip(status: DebridDownload['status']): RawHtml {
+function downloadStatusChip(status: DebridDownload['status'], viewer: Viewer): RawHtml {
   switch (status) {
     case 'done':
-      return html`<span class="chip ok">done</span>`;
+      return html`<span class="chip ok">${viewer.t('done')}</span>`;
     case 'failed':
-      return html`<span class="chip bad">failed</span>`;
+      return html`<span class="chip bad">${viewer.t('failed')}</span>`;
     case 'downloading':
-      return html`<span class="chip warn">downloading</span>`;
+      return html`<span class="chip warn">${viewer.t('downloading')}</span>`;
     default:
-      return html`<span class="chip">pending</span>`;
+      return html`<span class="chip">${viewer.t('pending')}</span>`;
   }
 }
 
@@ -284,22 +282,23 @@ function downloadStatusChip(status: DebridDownload['status']): RawHtml {
 // sealed: the only states shown are "configured" and "not configured".
 function debridAccountCard(viewer: Viewer, hasKey: boolean): RawHtml {
   return html`<div class="card">
-  <h2>My AllDebrid account</h2>
-  <p>Status: ${hasKey
-    ? html`<span class="chip ok">key configured</span>`
-    : html`<span class="chip warn">no key</span>`}<br>
-  <span class="muted">Your key is stored encrypted and is only used for your own
-  downloads. Without one, downloads stay unavailable for you — nothing else changes.</span></p>
+  <h2>${viewer.t('My AllDebrid account')}</h2>
+  <p>${sentence(viewer.t, 'Status: {state}', {
+    state: hasKey
+      ? html`<span class="chip ok">${viewer.t('key configured')}</span>`
+      : html`<span class="chip warn">${viewer.t('no key')}</span>`,
+  })}<br>
+  <span class="muted">${viewer.t('Your key is stored encrypted and is only used for your own downloads. Without one, downloads stay unavailable for you, and nothing else changes.')}</span></p>
   <form method="post" action="/downloads/debrid-key">
     <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
-    <label for="apiKey">${hasKey ? 'Replace my key' : 'My AllDebrid API key'}</label>
+    <label for="apiKey">${viewer.t(hasKey ? 'Replace my key' : 'My AllDebrid API key')}</label>
     <input id="apiKey" name="apiKey" type="password" autocomplete="off" required>
-    <button type="submit">Save</button>
+    <button type="submit">${viewer.t('Save')}</button>
   </form>
   ${hasKey
     ? html`<form class="inline" method="post" action="/downloads/debrid-key/clear">
     <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
-    <button class="ghost" type="submit">Remove my key</button>
+    <button class="ghost" type="submit">${viewer.t('Remove my key')}</button>
   </form>`
     : undefined}
 </div>`;
@@ -337,10 +336,11 @@ function detailCell(download: DebridDownload): RawHtml {
 // The member's own folders, the same list the Folders page shows. A closed films|series
 // enum used to live here, so a member with a Divers folder could sync it and
 // never download into it.
-function folderChoice(folders: readonly Label[]): RawHtml {
+function folderChoice(folders: readonly Label[], viewer: Viewer): RawHtml {
   if (folders.length === 0) {
-    return html`<p class="muted">You have no folders yet. Create one under
-<a href="/sync">Folders</a> and it will show up here.</p>`;
+    return html`<p class="muted">${sentence(viewer.t, 'You have no folders yet. Create one under {folders} and it will show up here.', {
+      folders: html`<a href="/sync">${viewer.t('Folders')}</a>`,
+    })}</p>`;
   }
   const options = folders.map((folder) => html`<option value="${folder.value}">${folder.value}</option>`);
   return html`<select id="category" name="category">${options}</select>`;
@@ -349,12 +349,12 @@ function folderChoice(folders: readonly Label[]): RawHtml {
 // aria2 is what actually pulls the file down, and it skips its own install when
 // no RPC secret is configured. Without this, every submitted link fails one at a
 // time with a message about the last hop, and nothing says the engine is absent.
-function engineNotice(engineReady: boolean): RawHtml {
+function engineNotice(engineReady: boolean, viewer: Viewer): RawHtml {
   return engineReady
     ? html``
-    : html`<p class="card bad">The download engine is <strong>not set up on this box</strong>,
-so links will not go anywhere. This is not something you can fix from here:
-tell an admin, and they will find the reason under Health.</p>`;
+    : html`<p class="card bad">${sentence(viewer.t, 'The download engine is {notSetUp}, so links will not go anywhere. This is not something you can fix from here: tell an admin, and they will find the reason under Health.', {
+      notSetUp: html`<strong>${viewer.t('not set up on this box')}</strong>`,
+    })}</p>`;
 }
 
 export function downloadsPage(
@@ -372,7 +372,7 @@ export function downloadsPage(
       : downloads.map(
           (download) => html`<tr>
   <td>${download.category.value}</td>
-  <td>${downloadStatusChip(download.status)}${progressBar(download)}</td>
+  <td>${downloadStatusChip(download.status, viewer)}${progressBar(download)}</td>
   <td>${detailCell(download)}</td>
   <td class="when">${download.createdAt}</td>
   <td>${download.id === undefined
@@ -388,14 +388,14 @@ export function downloadsPage(
     html`<h1>${viewer.t('Downloads')}</h1>
 ${flash(viewer.t, message)}
 ${flash(viewer.t, error, 'error')}
-${engineNotice(engineReady)}
+${engineNotice(engineReady, viewer)}
 ${debridAccountCard(viewer, hasKey)}
 <form class="card" method="post" action="/downloads">
   <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
   <label for="link">${viewer.t('Filehoster link')}</label>
   <input id="link" name="link" type="url" inputmode="url" placeholder="https://…" required>
   <label for="category">${viewer.t('Folder')}</label>
-  ${folderChoice(folders)}
+  ${folderChoice(folders, viewer)}
   <button type="submit">${viewer.t('Start download')}</button>
 </form>
 <table>
@@ -461,19 +461,17 @@ export interface AccessFacts {
 
 function twoStepSection(viewer: Viewer, facts: AccessFacts): RawHtml {
   return html`<h2 id="two-step">${viewer.t('Two-step sign-in')}</h2>
-<p class="muted">After your password, a 6-digit code from an app on your phone
-(Aegis, Google Authenticator, 1Password...). Someone who learns your password
-still cannot sign in. Administrators need it to open Administration.</p>
+<p class="muted">${viewer.t('After your password, a 6-digit code from an app on your phone (Aegis, Google Authenticator, 1Password...). Someone who learns your password still cannot sign in. Administrators need it to open Administration.')}</p>
 ${facts.hasTwoStep
-    ? html`<p><span class="chip ok">On</span></p>
+    ? html`<p><span class="chip ok">${viewer.t('On')}</span></p>
 <form class="inline" method="post" action="/access/two-step/stop">
   <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
-  <input name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" placeholder="current code" required>
-  <button type="submit" class="ghost">Turn it off</button>
+  <input name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" placeholder="${viewer.t('current code')}" required>
+  <button type="submit" class="ghost">${viewer.t('Turn it off')}</button>
 </form>`
     : html`<form class="inline" method="post" action="/access/two-step/start">
   <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
-  <button type="submit">Set it up</button>
+  <button type="submit">${viewer.t('Set it up')}</button>
 </form>`}`;
 }
 
@@ -485,19 +483,20 @@ export function twoStepSetupPage(viewer: Viewer, username: string, secret: strin
     'Two-step sign-in',
     html`<h1>${viewer.t('Two-step sign-in')}</h1>
 <section class="panel">
-  <p class="lead">Add this key to your authenticator app.</p>
+  <p class="lead">${viewer.t('Add this key to your authenticator app.')}</p>
   <p class="mono">${secret.replace(/(.{4})/g, '$1 ').trim()}</p>
-  <p class="muted">On the phone that has the app, this link adds it directly:
-  <a href="${uri}">${uri}</a></p>
+  <p class="muted">${sentence(viewer.t, 'On the phone that has the app, this link adds it directly: {link}', {
+    link: html`<a href="${uri}">${uri}</a>`,
+  })}</p>
 </section>
 <form class="card" method="post" action="/access/two-step/confirm">
   <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
-  <label for="code">Then type the code the app shows</label>
+  <label for="code">${viewer.t('Then type the code the app shows')}</label>
   <input id="code" name="code" inputmode="numeric" autocomplete="one-time-code"
     pattern="[0-9]{6}" maxlength="6" autofocus required>
-  <button type="submit">Turn it on</button>
+  <button type="submit">${viewer.t('Turn it on')}</button>
 </form>
-<p class="links"><a href="/access">Not now</a></p>`,
+<p class="links"><a href="/access">${viewer.t('Not now')}</a></p>`,
     viewer,
   );
 }
@@ -508,67 +507,65 @@ function addressesSection(viewer: Viewer, facts: AccessFacts): RawHtml {
   const declaredHere =
     facts.currentAddress !== undefined && facts.addresses.includes(facts.currentAddress);
   return html`<h2>${viewer.t('Where you connect from')}</h2>
-<p class="muted">SSH and SFTP accept connections from the addresses below and
-from the VPN. Add your address from home, from the place your scripts or your NAS
-run. Only you and the administrators see this list.</p>
+<p class="muted">${viewer.t('SSH and SFTP accept connections from the addresses below and from the VPN. Add your address from home, from the place your scripts or your NAS run. Only you and the administrators see this list.')}</p>
 ${facts.addresses.length === 0
-    ? html`<p class="muted">No address declared.</p>`
+    ? html`<p class="muted">${viewer.t('No address declared.')}</p>`
     : html`<ul>${facts.addresses.map(
       (address) => html`<li><span class="mono">${address}</span>
 <form class="inline" method="post" action="/access/addresses/remove">
   <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
   <input type="hidden" name="ipv4" value="${address}">
-  <button type="submit" class="ghost">Remove</button>
+  <button type="submit" class="ghost">${viewer.t('Remove')}</button>
 </form></li>`,
     )}</ul>`}
 ${facts.currentAddress === undefined
-    ? html`<p class="muted">You are connecting over IPv6 right now. Only IPv4
-addresses can be declared: come back from a connection that uses IPv4.</p>`
+    ? html`<p class="muted">${viewer.t('You are connecting over IPv6 right now. Only IPv4 addresses can be declared: come back from a connection that uses IPv4.')}</p>`
     : declaredHere
-      ? html`<p>You are connecting from <span class="mono">${facts.currentAddress}</span>,
-which is declared.</p>`
+      ? html`<p>${sentence(viewer.t, 'You are connecting from {address}, which is declared.', {
+        address: html`<span class="mono">${facts.currentAddress}</span>`,
+      })}</p>`
       : html`<form class="inline" method="post" action="/access/addresses/add-current">
   <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
-  <span>You are connecting from <span class="mono">${facts.currentAddress}</span>.</span>
-  <button type="submit">Add this address</button>
+  <span>${sentence(viewer.t, 'You are connecting from {address}.', {
+    address: html`<span class="mono">${facts.currentAddress}</span>`,
+  })}</span>
+  <button type="submit">${viewer.t('Add this address')}</button>
 </form>`}
 <form class="inline" method="post" action="/access/addresses/add">
   <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
-  <label for="ipv4">Another place</label>
+  <label for="ipv4">${viewer.t('Another place')}</label>
   <input id="ipv4" name="ipv4" required inputmode="decimal" placeholder="203.0.113.20">
-  <button type="submit">Add</button>
+  <button type="submit">${viewer.t('Add')}</button>
 </form>
-<p class="muted">For a place you are not at right now, your NAS at home or the
-office: type the public address it shows to the internet (a site like
-whatismyip.com, opened from there, tells you).</p>
+<p class="muted">${viewer.t('For a place you are not at right now, your NAS at home or the office: type the public address it shows to the internet (a site like whatismyip.com, opened from there, tells you).')}</p>
 ${hostnamesPart(viewer, facts)}`;
 }
 
 // A home address that changes on its own is declared by a name the member's
 // router or a dynamic DNS service (DuckDNS, No-IP...) keeps up to date.
 function hostnamesPart(viewer: Viewer, facts: AccessFacts): RawHtml {
-  return html`<h3>Dynamic hostname</h3>
-<p class="muted">If your home address changes on its own, give a name your router
-or a service like DuckDNS keeps pointed at it. The box looks it up every five
-minutes and follows it.</p>
+  return html`<h3>${viewer.t('Dynamic hostname')}</h3>
+<p class="muted">${viewer.t('If your home address changes on its own, give a name your router or a service like DuckDNS keeps pointed at it. The box looks it up every five minutes and follows it.')}</p>
 ${facts.hostnames.length === 0
     ? html``
     : html`<ul>${facts.hostnames.map(
       (hostname) => html`<li><span class="mono">${hostname.host}</span>
 <span class="muted">${hostname.pointsAt === undefined
-        ? 'not looked up yet'
-        : html`points at <span class="mono">${hostname.pointsAt}</span>`}</span>
+        ? viewer.t('not looked up yet')
+        : sentence(viewer.t, 'points at {address}', {
+          address: html`<span class="mono">${hostname.pointsAt}</span>`,
+        })}</span>
 <form class="inline" method="post" action="/access/hostnames/remove">
   <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
   <input type="hidden" name="hostname" value="${hostname.host}">
-  <button type="submit" class="ghost">Remove</button>
+  <button type="submit" class="ghost">${viewer.t('Remove')}</button>
 </form></li>`,
     )}</ul>`}
 <form class="inline" method="post" action="/access/hostnames/add">
   <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
-  <label for="hostname">Hostname</label>
+  <label for="hostname">${viewer.t('Hostname')}</label>
   <input id="hostname" name="hostname" required placeholder="myhome.duckdns.org">
-  <button type="submit">Add</button>
+  <button type="submit">${viewer.t('Add')}</button>
 </form>`;
 }
 
@@ -578,32 +575,31 @@ ${facts.hostnames.length === 0
 // does nothing else. Saying that here is the difference between a member
 // understanding the limit and reporting it as a bug.
 function sshKeySection(viewer: Viewer, facts: AccessFacts): RawHtml {
-  return html`<h2>Your own SSH key</h2>
+  return html`<h2>${viewer.t('Your own SSH key')}</h2>
 ${facts.sshKey === undefined
-    ? html`<p class="muted">No key installed. Add your public key and a script on your
-own machine can drop torrent files straight into your folders, without a password.</p>`
-    : html`<p>Installed: <span class="mono">${facts.sshKey.type}</span>
-${facts.sshKey.comment === '' ? html`` : html`<span class="mono">${facts.sshKey.comment}</span>`}
-<span class="muted">since ${facts.sshKeyAddedAt ?? ''}</span></p>
+    ? html`<p class="muted">${viewer.t('No key installed. Add your public key and a script on your own machine can drop torrent files straight into your folders, without a password.')}</p>`
+    : html`<p>${sentence(viewer.t, 'Installed: {key}', {
+      key: html`<span class="mono">${facts.sshKey.type}</span>
+${facts.sshKey.comment === '' ? html`` : html`<span class="mono">${facts.sshKey.comment}</span>`}`,
+    })}
+<span class="muted">${viewer.t('since {date}', { date: facts.sshKeyAddedAt ?? '' })}</span></p>
 <form class="inline" method="post" action="/access/ssh-key/remove">
   <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
-  <button type="submit" class="danger">Remove it</button>
+  <button type="submit" class="danger">${viewer.t('Remove it')}</button>
 </form>`}
 <form class="card" method="post" action="/access/ssh-key">
   <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
-  <label for="sshkey">Public key</label>
+  <label for="sshkey">${viewer.t('Public key')}</label>
   <input id="sshkey" name="key" required placeholder="ssh-ed25519 AAAA... you@yourmachine">
-  <p class="muted">The <strong>public</strong> half, the one line from
-<span class="mono">~/.ssh/id_ed25519.pub</span>. Never paste a private key here or
-anywhere else. This key transfers files and cannot open a shell, which is all a
-send-my-torrents script needs.</p>
-  <button type="submit">Install this key</button>
+  <p class="muted">${sentence(viewer.t, 'The {public} half, the one line from {file}. Never paste a private key here or anywhere else. This key transfers files and cannot open a shell, which is all a send-my-torrents script needs.', {
+    public: html`<strong>${viewer.t('public')}</strong>`,
+    file: html`<span class="mono">~/.ssh/id_ed25519.pub</span>`,
+  })}</p>
+  <button type="submit">${viewer.t('Install this key')}</button>
 </form>
 ${facts.sftpHost === undefined
     ? html``
-    : html`<p class="muted">With the key installed, send a torrent file over SFTP
-into one of your folders (replace FOLDER with its name, as listed under Folders);
-rTorrent picks it up within a few seconds and gives it that folder's label:</p>
+    : html`<p class="muted">${viewer.t("With the key installed, send a torrent file over SFTP into one of your folders (replace FOLDER with its name, as listed under Folders); rTorrent picks it up within a few seconds and gives it that folder's label:")}</p>
 <p class="mono">scp -P ${facts.sshPort} my.torrent ${facts.username}@${facts.sftpHost}:rtorrent/watch/FOLDER/</p>`}`;
 }
 
@@ -612,33 +608,31 @@ rTorrent picks it up within a few seconds and gives it that folder's label:</p>
 // config file is a text file on another machine, and this one can be thrown
 // away on its own.
 function appTokenSection(viewer: Viewer, facts: AccessFacts): RawHtml {
-  return html`<h2>Connect an app</h2>
-<p class="muted">Sonarr, Radarr and friends can add torrents for you and follow
-them. They sign in with your username and a <strong>token</strong> instead of
-your password, so a program that leaks its settings costs you the token and not
-your account. Throw it away here and it stops working immediately, everywhere.</p>
+  return html`<h2>${viewer.t('Connect an app')}</h2>
+<p class="muted">${sentence(viewer.t, 'Sonarr, Radarr and friends can add torrents for you and follow them. They sign in with your username and a {token} instead of your password, so a program that leaks its settings costs you the token and not your account. Throw it away here and it stops working immediately, everywhere.', {
+  token: html`<strong>${viewer.t('token')}</strong>`,
+})}</p>
 ${facts.freshToken === undefined
     ? html``
     : html`<section class="panel">
-  <p class="lead">Here is your token. Copy it now.</p>
+  <p class="lead">${viewer.t('Here is your token. Copy it now.')}</p>
   <p class="mono">${facts.freshToken}</p>
-  <p class="muted">It will not be shown again. KoBox only keeps a fingerprint of
-  it. If you lose it, make a new one; the old one stops working at that moment.</p>
+  <p class="muted">${viewer.t('It will not be shown again. KoBox only keeps a fingerprint of it. If you lose it, make a new one; the old one stops working at that moment.')}</p>
 </section>`}
-<p class="muted">In the app, choose <span class="mono">rTorrent</span>, use your
-own username, paste the token where it asks for a password, and point it at this
-box on port 8189 with the path
-<span class="mono">/ru/plugins/httprpc/action.php</span>. If you would rather not
-connect anything, dropping a .torrent file into a folder's
-<span class="mono">watch</span> directory works just as well.</p>
+<p class="muted">${sentence(viewer.t, "In the app, choose {client}, use your own username, paste the token where it asks for a password, and point it at this box on port {port} with the path {path}. If you would rather not connect anything, dropping a .torrent file into a folder's {watch} directory works just as well.", {
+  client: html`<span class="mono">rTorrent</span>`,
+  port: html`8189`,
+  path: html`<span class="mono">/ru/plugins/httprpc/action.php</span>`,
+  watch: html`<span class="mono">watch</span>`,
+})}</p>
 <form class="inline" method="post" action="/access/app-token">
   <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
-  <button type="submit">${facts.hasAppToken ? 'Make a new token' : 'Make a token'}</button>
+  <button type="submit">${viewer.t(facts.hasAppToken ? 'Make a new token' : 'Make a token')}</button>
 </form>
 ${facts.hasAppToken
     ? html`<form class="inline" method="post" action="/access/app-token/revoke">
   <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
-  <button class="ghost" type="submit">Throw it away</button>
+  <button class="ghost" type="submit">${viewer.t('Throw it away')}</button>
 </form>`
     : html``}`;
 }
@@ -657,27 +651,28 @@ export function filesPage(viewer: Viewer, facts: FileAccessFacts): string {
   return page(
     'My files',
     html`<h1>${viewer.t('My files')}</h1>
-<p class="lead">Three ways to reach your files. All of them take your username,
-<span class="mono">${facts.username}</span>, and the password you use here.</p>
+<p class="lead">${sentence(viewer.t, 'Three ways to reach your files. All of them take your username, {username}, and the password you use here.', {
+  username: html`<span class="mono">${facts.username}</span>`,
+})}</p>
 <div class="choices">
 <div class="choice pick">
-  <span class="tag">Simplest</span>
+  <span class="tag">${viewer.t('Simplest')}</span>
   <h3>Nextcloud</h3>
   ${facts.nextcloudInstalled
-    ? html`<p>In the browser, or in the Nextcloud app on a phone or a computer.
-  No VPN, nothing to set up on your network.</p>
-  <a class="action" href="${facts.nextcloudHref}">Open Nextcloud</a>`
-    : html`<p>Nextcloud is not installed on this box. Ask an administrator.</p>`}
+    ? html`<p>${viewer.t('In the browser, or in the Nextcloud app on a phone or a computer. No VPN, nothing to set up on your network.')}</p>
+  <a class="action" href="${facts.nextcloudHref}">${viewer.t('Open Nextcloud')}</a>`
+    : html`<p>${viewer.t('Nextcloud is not installed on this box. Ask an administrator.')}</p>`}
 </div>
 <div class="choice">
   <h3>SFTP</h3>
-  <p>For FileZilla, Cyberduck or rsync, and for large transfers.</p>
+  <p>${viewer.t('For FileZilla, Cyberduck or rsync, and for large transfers.')}</p>
   <p class="mono">sftp://${facts.username}@${facts.sftpHost}</p>
 </div>
 <div class="choice">
-  <h3>Network share</h3>
-  <p>Samba, like a local disk. Connect the VPN with the usual profile first
-  (<a href="/access">Account</a>), then open:</p>
+  <h3>${viewer.t('Network share')}</h3>
+  <p>${sentence(viewer.t, 'Samba, like a local disk. Connect the VPN with the usual profile first ({account}), then open:', {
+    account: html`<a href="/access">${viewer.t('Account')}</a>`,
+  })}</p>
   <p class="mono">smb://${facts.boxInVpn}/${facts.username}</p>
 </div>
 </div>`,
@@ -710,29 +705,29 @@ function languageSection(viewer: Viewer, facts: AccessFacts): RawHtml {
 export function accessPage(viewer: Viewer, facts: AccessFacts, message?: string): string {
   const choices = VPN_CHOICES.map(
     (choice) => html`<div class="choice${choice.usual === true ? ' pick' : ''}">
-  ${choice.usual === true ? html`<span class="tag">Usual choice</span>` : undefined}
-  <h3>${choice.title}</h3>
-  <p>${choice.blurb}</p>
-  <a class="action" href="/access/ovpn/${choice.variant}">Download profile</a>
+  ${choice.usual === true ? html`<span class="tag">${viewer.t('Usual choice')}</span>` : undefined}
+  <h3>${viewer.t(choice.title)}</h3>
+  <p>${viewer.t(choice.blurb)}</p>
+  <a class="action" href="/access/ovpn/${choice.variant}">${viewer.t('Download profile')}</a>
 </div>`,
   );
   return page(
     'My access',
     html`<h1>${viewer.t('My access')}</h1>
 ${flash(viewer.t, message)}
-<h2>Connect over VPN</h2>
-<p class="muted">Download one profile and open it with your OpenVPN client.</p>
+<h2>${viewer.t('Connect over VPN')}</h2>
+<p class="muted">${viewer.t('Download one profile and open it with your OpenVPN client.')}</p>
 <div class="choices">${choices}</div>
 <h2>${viewer.t('Your details')}</h2>
 <dl class="facts">
   <dt>${viewer.t('Username')}</dt><dd>${facts.username}</dd>
   ${facts.sftpHost !== undefined
-    ? html`<dt>SFTP host</dt><dd>${facts.sftpHost}</dd>`
+    ? html`<dt>${viewer.t('SFTP host')}</dt><dd>${facts.sftpHost}</dd>`
     : undefined}
   <dt>${viewer.t('Files')}</dt><dd>~/rtorrent/complete</dd>
-  <dt>rtorrent port</dt><dd>${facts.rtorrentPort}</dd>
+  <dt>${viewer.t('rtorrent port')}</dt><dd>${facts.rtorrentPort}</dd>
 </dl>
-<p class="muted">Your SFTP password is the one you use here.</p>
+<p class="muted">${viewer.t('Your SFTP password is the one you use here.')}</p>
 
 ${appTokenSection(viewer, facts)}
 
@@ -744,8 +739,8 @@ ${sshKeySection(viewer, facts)}
 
 ${languageSection(viewer, facts)}
 
-<p class="links"><a href="/rutorrent">Open ruTorrent</a> ·
-<a href="/downloads">Downloads</a> ·
+<p class="links"><a href="/rutorrent">${viewer.t('Open ruTorrent')}</a> ·
+<a href="/downloads">${viewer.t('Downloads')}</a> ·
 <a href="/password">${viewer.t('Change password')}</a></p>`,
     viewer,
   );
@@ -822,8 +817,9 @@ export function mediaPage(
 ${flash(viewer.t, message)}
 <p class="lead">${viewer.t('media.playback')}</p>
 ${sections.length === 0
-      ? html`<p class="muted">You have no folders yet. Create one under
-<a href="/sync">Folders</a>, and what lands in it shows up here.</p>`
+      ? html`<p class="muted">${sentence(viewer.t, 'You have no folders yet. Create one under {folders}, and what lands in it shows up here.', {
+        folders: html`<a href="/sync">${viewer.t('Folders')}</a>`,
+      })}</p>`
       : html`${sections}`}`,
     viewer,
   );
@@ -836,8 +832,8 @@ export function mediaWatchPage(viewer: Viewer, file: MediaFile): string {
     'Watch',
     html`<h1>${file.path.name}</h1>
 <video class="app" controls preload="metadata" src="/media/file?path=${file.path.value}"></video>
-<p class="links"><a href="/media">Back to my media</a> ·
-<a href="/media/file?path=${file.path.value}" download>Download this file</a></p>`,
+<p class="links"><a href="/media">${viewer.t('Back to my media')}</a> ·
+<a href="/media/file?path=${file.path.value}" download>${viewer.t('Download this file')}</a></p>`,
     viewer,
   );
 }
@@ -849,8 +845,8 @@ export function rutorrentPage(viewer: Viewer, message?: string): string {
 ${flash(viewer.t, message)}
 <form class="inline" method="post" action="/rutorrent/restart">
   <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
-  <button class="ghost" type="submit">Restart my rtorrent</button>
-  <span class="muted">Use this if the interface stops responding.</span>
+  <button class="ghost" type="submit">${viewer.t('Restart my rtorrent')}</button>
+  <span class="muted">${viewer.t('Use this if the interface stops responding.')}</span>
 </form>
 <p class="links"><a href="/ru/" target="_blank" rel="noopener">${viewer.t('Full screen')}</a></p>
 <iframe class="app" src="/ru/" title="ruTorrent"></iframe>`,
