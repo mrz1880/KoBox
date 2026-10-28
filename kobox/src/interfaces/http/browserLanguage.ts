@@ -9,6 +9,9 @@ const DEFAULT_WEIGHT = 1;
 
 const WEIGHT = /^\s*q=([0-9.]+)\s*$/;
 
+// What the account form sends for "same as my browser": no stored choice.
+export const BROWSER_CHOICE = 'browser';
+
 interface Wish {
   readonly primary: string;
   readonly weight: number;

@@ -21,7 +21,7 @@ export interface PortalCredentials {
   // present it as HTTP Basic; the raw token only ever exists on the page that
   // showed it once, so a database read never yields a usable credential.
   readonly appTokenHash?: string;
-  // the member's own choice of language; absent means English
+  // the member's own choice of language; absent means their browser decides
   readonly language?: Language;
   // two-step sign-in, once its first code confirmed it
   readonly twoStep?: TwoStep;

@@ -31,7 +31,7 @@ import type {
   DebridDownloadRepository,
   DebridKeyEncryptorPort,
 } from '../../../domain/ddl/ports.js';
-import type { PortalCredentialsPort } from '../../../domain/portal/ports.js';
+import type { PortalCredentials, PortalCredentialsPort } from '../../../domain/portal/ports.js';
 import type { IssueAppToken } from '../../../application/portal/IssueAppToken.js';
 import { DomainError } from '../../../domain/shared/DomainError.js';
 import type { DynDnsBindingRepository, FairUseRepository } from '../../../domain/security/ports.js';
@@ -61,7 +61,8 @@ import {
   type SignalRow,
 } from '../views/userPages.js';
 import { syncPage } from '../views/syncPage.js';
-import { Language } from '../../../domain/portal/Language.js';
+import { LANGUAGES, Language } from '../../../domain/portal/Language.js';
+import { BROWSER_CHOICE } from '../browserLanguage.js';
 import { IPV4_PATTERN, IpAddress } from '../../../domain/shared/IpAddress.js';
 import { DynDnsHost, InvalidDynDnsHostError } from '../../../domain/security/DynDnsHost.js';
 import { DEFAULT_TRANSFER_MAILS, TRANSFER_MAILS } from '../../../domain/sync/TransferMails.js';
@@ -103,6 +104,14 @@ const downloadSchema = z.object({
 });
 
 const debridKeySchema = z.object({ apiKey: z.string().min(1).max(256) });
+
+// "Same as my browser": the member's credentials with no stored language.
+function withoutLanguageChoice({
+  language: _previous,
+  ...rest
+}: PortalCredentials): PortalCredentials {
+  return rest;
+}
 
 function isVpnVariant(raw: string): raw is VpnVariant {
   return (VPN_VARIANTS as readonly string[]).includes(raw);
@@ -1040,7 +1049,7 @@ export function registerUserRoutes(
       .send();
   });
 
-  const languageSchema = z.object({ language: z.enum(['en', 'fr']) });
+  const languageSchema = z.object({ language: z.enum([BROWSER_CHOICE, ...LANGUAGES]) });
 
   server.post('/access/language', async (request, reply) => {
     const session = await guards.requireCsrf(request, reply);
@@ -1057,8 +1066,11 @@ export function registerUserRoutes(
     if (existing === undefined) {
       return reply.code(400).send();
     }
+    const choice = parsed.data.language;
     await deps.credentials.save(
-      { ...existing, language: Language.parse(parsed.data.language) },
+      choice === BROWSER_CHOICE
+        ? withoutLanguageChoice(existing)
+        : { ...existing, language: Language.parse(choice) },
       deps.now(),
     );
     return redirectWithFlash(reply, '/access', 'Saved.');
