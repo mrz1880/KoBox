@@ -219,14 +219,23 @@ iframe.app { width: 100%; height: calc(100vh - 10rem); border: 1px solid var(--l
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 `;
 
-export interface Viewer {
+// The part of a viewer a page without a session can have: the language it is
+// read in, and the lookup bound to it.
+export interface Reader {
+  readonly language: Language;
+  readonly t: Translate;
+}
+
+// Every view already receives a Viewer, so its language is the one seam that
+// reaches all of them.
+export interface Viewer extends Reader {
   readonly username: string;
   readonly role: Role;
   readonly csrfToken: string;
-  // the member's language, and the lookup bound to it. Every view already
-  // receives a Viewer, so this is the one seam that reaches all of them.
-  readonly language: Language;
-  readonly t: Translate;
+}
+
+function isViewer(reader: Reader): reader is Viewer {
+  return 'username' in reader;
 }
 
 // Two spaces, never one replacing the other: an admin is a member too, and the
@@ -265,19 +274,22 @@ const SPACES: readonly (readonly [string, string])[] = [
   ['/admin', 'Administration'],
 ];
 
+// A reader gets the page in their language; only a signed-in viewer gets the
+// menus and the sign-out button.
 export function page(
   title: string,
   body: RawHtml,
-  viewer?: Viewer,
+  reader?: Reader,
   space: Space = 'seedbox',
 ): string {
   const nav = space === 'admin' ? ADMIN_NAV : SEEDBOX_NAV;
+  const viewer = reader !== undefined && isViewer(reader) ? reader : undefined;
   const document = html`<!doctype html>
-<html lang="${viewer?.language.value ?? 'en'}">
+<html lang="${reader?.language.value ?? 'en'}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${viewer === undefined ? title : viewer.t(title)}, KoBox</title>
+<title>${reader === undefined ? title : reader.t(title)}, KoBox</title>
 <style>${raw(STYLES)}</style>
 </head>
 <body${space === 'admin' ? raw(' class="admin"') : undefined}>

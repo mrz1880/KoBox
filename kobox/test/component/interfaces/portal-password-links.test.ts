@@ -107,3 +107,88 @@ describe('the password link page', () => {
     expect(response.body).toContain('href="/forgot-password"');
   });
 });
+
+// a member locked out has no account to read a choice from: the browser decides
+describe("password pages in the browser's language", () => {
+  const FRENCH = { 'accept-language': 'fr-FR,fr;q=0.9' };
+
+  it('should_offer_the_forgotten_password_form_in_french', async () => {
+    const response = await world.server.inject({
+      method: 'GET',
+      url: '/forgot-password',
+      headers: FRENCH,
+    });
+
+    expect(response.body).toContain('<html lang="fr">');
+    expect(response.body).toContain('Envoyez-moi un lien');
+  });
+
+  it('should_tell_where_the_link_went_in_french', async () => {
+    const response = await world.server.inject({
+      method: 'POST',
+      url: '/forgot-password',
+      headers: { ...FRENCH, 'content-type': 'application/x-www-form-urlencoded' },
+      payload: form({ identifier: 'alice' }),
+    });
+
+    expect(response.body).toContain('Vérifiez votre boîte mail');
+  });
+
+  it('should_say_a_dead_link_no_longer_works_in_french', async () => {
+    const response = await world.server.inject({
+      method: 'GET',
+      url: `/password-link/${'f'.repeat(64)}`,
+      headers: FRENCH,
+    });
+
+    expect(response.body).toContain('Ce lien ne fonctionne plus');
+  });
+
+  it('should_offer_to_choose_a_password_in_french', async () => {
+    await requestReset('alice');
+    const user = await world.users.findByUsername(Username.parse('alice'));
+    const link = await linkMailedTo(user?.email.value ?? '');
+
+    const response = await world.server.inject({ method: 'GET', url: link, headers: FRENCH });
+
+    expect(response.body).toContain('Choisissez votre mot de passe');
+  });
+
+  it('should_explain_a_refused_password_in_french', async () => {
+    await requestReset('alice');
+    const user = await world.users.findByUsername(Username.parse('alice'));
+    const link = await linkMailedTo(user?.email.value ?? '');
+    const headers = { ...FRENCH, 'content-type': 'application/x-www-form-urlencoded' };
+
+    const mismatch = await world.server.inject({
+      method: 'POST',
+      url: link,
+      headers,
+      payload: form({ password: 'my-new-secret-1', confirm: 'my-new-secret-2' }),
+    });
+    const tooShort = await world.server.inject({
+      method: 'POST',
+      url: link,
+      headers,
+      payload: form({ password: 'short', confirm: 'short' }),
+    });
+
+    expect(mismatch.body).toContain('Les deux mots de passe ne correspondent pas.');
+    expect(tooShort.body).toContain('Choisissez un autre mot de passe');
+  });
+
+  it('should_confirm_the_new_password_in_french', async () => {
+    await requestReset('alice');
+    const user = await world.users.findByUsername(Username.parse('alice'));
+    const link = await linkMailedTo(user?.email.value ?? '');
+
+    const response = await world.server.inject({
+      method: 'POST',
+      url: link,
+      headers: { ...FRENCH, 'content-type': 'application/x-www-form-urlencoded' },
+      payload: form({ password: 'my-new-secret-1', confirm: 'my-new-secret-1' }),
+    });
+
+    expect(response.body).toContain('Mot de passe enregistré');
+  });
+});

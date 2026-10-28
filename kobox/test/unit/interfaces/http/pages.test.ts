@@ -47,14 +47,14 @@ function expectGolden(name: string, actual: string): void {
 
 describe('portal pages', () => {
   it('should_render_the_login_page_golden', () => {
-    const content = loginPage();
+    const content = loginPage(ENGLISH);
 
     expect(content).toContain('<meta name="viewport"');
     expectGolden('login.html.golden', content);
   });
 
   it('should_escape_the_error_message_on_the_login_page', () => {
-    const content = loginPage('<img src=x onerror=alert(1)>');
+    const content = loginPage(ENGLISH, '<img src=x onerror=alert(1)>');
 
     expect(content).not.toContain('<img src=x');
     expect(content).toContain('&lt;img src=x');

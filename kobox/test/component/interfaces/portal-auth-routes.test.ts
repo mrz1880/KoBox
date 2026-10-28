@@ -72,6 +72,29 @@ describe('login page and flow', () => {
   });
 });
 
+// before sign-in there is no member to ask: the browser decides
+describe("signing in in the browser's language", () => {
+  const FRENCH = { 'accept-language': 'fr-FR,fr;q=0.9' };
+
+  it('should_offer_the_sign_in_page_in_the_browsers_language', async () => {
+    const response = await world.server.inject({ method: 'GET', url: '/login', headers: FRENCH });
+
+    expect(response.body).toContain('<html lang="fr">');
+    expect(response.body).toContain('Se connecter');
+  });
+
+  it('should_refuse_a_wrong_password_in_the_browsers_language', async () => {
+    const response = await world.server.inject({
+      method: 'POST',
+      url: '/login',
+      payload: 'username=alice&password=wrong-password',
+      headers: { ...FRENCH, 'content-type': 'application/x-www-form-urlencoded' },
+    });
+
+    expect(response.body).toContain('Identifiants incorrects.');
+  });
+});
+
 describe('session guard', () => {
   it('should_call_an_impossible_password_invalid_rather_than_crash', async () => {
     // no member's password is longer than 100 characters: refuse, do not 500
