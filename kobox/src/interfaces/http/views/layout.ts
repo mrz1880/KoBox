@@ -274,6 +274,13 @@ const SPACES: readonly (readonly [string, string])[] = [
   ['/admin', 'Administration'],
 ];
 
+// Where a page sits when its title is not the label of its menu entry: one
+// member's page belongs under Members, and its title names the member.
+export interface MenuPlace {
+  readonly entry: string;
+  readonly titleValues: Readonly<Record<string, string>>;
+}
+
 // A reader gets the page in their language; only a signed-in viewer gets the
 // menus and the sign-out button.
 export function page(
@@ -281,7 +288,9 @@ export function page(
   body: RawHtml,
   reader?: Reader,
   space: Space = 'seedbox',
+  place?: MenuPlace,
 ): string {
+  const current = place?.entry ?? title;
   const nav = space === 'admin' ? ADMIN_NAV : SEEDBOX_NAV;
   const viewer = reader !== undefined && isViewer(reader) ? reader : undefined;
   const document = html`<!doctype html>
@@ -289,7 +298,7 @@ export function page(
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${reader === undefined ? title : reader.t(title)}, KoBox</title>
+<title>${reader === undefined ? title : reader.t(title, place?.titleValues)}, KoBox</title>
 <style>${raw(STYLES)}</style>
 </head>
 <body${space === 'admin' ? raw(' class="admin"') : undefined}>
@@ -319,7 +328,7 @@ ${viewer === undefined
         ([href, label, hint]) =>
           // the page names itself with its entry's label: that is how the
           // entry being read is found, without the page passing its path
-          html`<a href="${href}"${label === title ? raw(' aria-current="page"') : undefined}><span class="label">${viewer.t(label)}</span><span class="hint">${viewer.t(hint)}</span></a>`,
+          html`<a href="${href}"${label === current ? raw(' aria-current="page"') : undefined}><span class="label">${viewer.t(label)}</span><span class="hint">${viewer.t(hint)}</span></a>`,
       )}</nav>`}
 <main>
 ${body}

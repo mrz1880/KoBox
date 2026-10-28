@@ -10,6 +10,8 @@ import {
   adminHomePage,
   signalStrip,
 } from '../../../../src/interfaces/http/views/userPages.js';
+import { adminUserDetailPage } from '../../../../src/interfaces/http/views/adminUsersPage.js';
+import { aUser } from '../../../builders/UserBuilder.js';
 import { accessFacts, G, signalRow as row } from './viewFixtures.js';
 
 const ENGLISH = { language: Language.en, t: translatorFor(Language.en) };
@@ -123,5 +125,14 @@ describe('portal pages', () => {
     );
 
     expect(page).toContain('scp -P 2222 my.torrent alice@seedbox.example.org:rtorrent/watch/FOLDER/');
+  });
+
+  // a tab per member must say which member, while the menu still shows where
+  // in the console the page sits
+  it('should_name_the_member_in_the_title_and_keep_members_highlighted', () => {
+    const page = adminUserDetailPage(aUser().build(), ADMIN, 'user', 'active');
+
+    expect(page).toContain('<title>User alice, KoBox</title>');
+    expect(page).toContain('<a href="/admin/users" aria-current="page">');
   });
 });

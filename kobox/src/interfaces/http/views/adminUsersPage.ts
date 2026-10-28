@@ -213,10 +213,8 @@ export function adminUserDetailPage(
   <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
   <button type="submit">${viewer.t('Suspend')}</button>
 </form>`;
-  // named after the menu entry it belongs to, which marks that entry as the
-  // one being read; a title carrying the name could never be translated
   return page(
-    'Members',
+    'User {name}',
     html`<h1>${name} ${statusChip(user, viewer)}</h1>
 ${flash(viewer.t, message)}
 <div class="card">
@@ -259,5 +257,6 @@ ${flash(viewer.t, message)}
 </form>`,
     viewer,
     'admin',
+    { entry: 'Members', titleValues: { name } },
   );
 }
