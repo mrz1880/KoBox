@@ -7,6 +7,7 @@ import { EnterTwoStepCode } from '../../../../src/application/portal/EnterTwoSte
 import { TwoStepSetup } from '../../../../src/application/portal/TwoStepSetup.js';
 import { TotpSecret } from '../../../../src/domain/portal/TotpSecret.js';
 import { FakeTotp } from '../../../../src/infrastructure/system/fakes/FakeTotp.js';
+import { Language } from '../../../../src/domain/portal/Language.js';
 import { LOCK_MINUTES, MAX_LOGIN_FAILURES } from '../../../../src/domain/portal/policy.js';
 import type { HashedPassword } from '../../../../src/domain/user/HashedPassword.js';
 import { Password } from '../../../../src/domain/user/Password.js';
@@ -202,6 +203,29 @@ describe('Authenticate', () => {
     const auth = await world.authenticate.execute({ token: login.token, now: NOW });
 
     expect(auth?.mustChangePassword).toBe(true);
+  });
+
+  it('should_leave_the_language_open_for_a_member_who_never_chose', async () => {
+    const login = await world.login.execute({ username: alice, password: goodPassword(), now: NOW });
+    if (!login.ok) throw new Error('login failed');
+
+    const auth = await world.authenticate.execute({ token: login.token, now: NOW });
+
+    expect(auth).toBeDefined();
+    expect(auth?.chosenLanguage).toBeUndefined();
+  });
+
+  it('should_carry_the_language_a_member_chose', async () => {
+    await world.credentials.save(
+      { username: alice, passwordHash: goodHash, role: 'user', language: Language.fr },
+      NOW,
+    );
+    const login = await world.login.execute({ username: alice, password: goodPassword(), now: NOW });
+    if (!login.ok) throw new Error('login failed');
+
+    const auth = await world.authenticate.execute({ token: login.token, now: NOW });
+
+    expect(auth?.chosenLanguage).toBe(Language.fr);
   });
 
   it('should_reject_unknown_and_expired_tokens', async () => {

@@ -9,10 +9,11 @@ export class InvalidLanguageError extends DomainError {
   }
 }
 
-// A member's own choice, stored on their account. Not a browser header: an
-// Accept-Language guess changes when someone opens the page from a borrowed
-// machine, and a seedbox shared between two households needs each member's
-// choice to stay put.
+// A language the portal speaks. A member's stored choice always wins: a
+// browser guess changes when someone opens the page from a borrowed machine,
+// and a seedbox shared between two households needs each member's choice to
+// stay put. The browser's Accept-Language only fills in for a member who never
+// chose.
 export class Language {
   private constructor(readonly value: LanguageValue) {}
 

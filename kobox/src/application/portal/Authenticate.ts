@@ -1,4 +1,4 @@
-import { Language } from '../../domain/portal/Language.js';
+import type { Language } from '../../domain/portal/Language.js';
 import type { Role } from '../../domain/portal/Role.js';
 import type {
   PortalCredentialsPort,
@@ -15,7 +15,8 @@ export interface AuthenticatedSession {
   // Phase 7: a migrated user on a temporary password. The portal forces a
   // password change before granting any other access while this is true.
   readonly mustChangePassword: boolean;
-  readonly language: Language;
+  // undefined when the member never chose: the HTTP layer then asks the browser
+  readonly chosenLanguage: Language | undefined;
   // password proven, two-step code not yet: only the code page opens
   readonly awaitingCode: boolean;
   // whether the member has set two-step sign-in up at all
@@ -64,7 +65,7 @@ export class Authenticate {
       role: stored.role,
       csrfToken: session.csrfToken,
       mustChangePassword: stored.mustChangePassword === true,
-      language: stored.language ?? Language.en,
+      chosenLanguage: stored.language,
       awaitingCode: session.awaitingCode,
       hasTwoStep: stored.twoStep !== undefined,
     };
