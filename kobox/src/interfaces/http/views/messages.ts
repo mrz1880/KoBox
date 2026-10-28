@@ -370,6 +370,12 @@ function fill(template: string, values: Readonly<Record<string, string>> | undef
   );
 }
 
+// The fallback to English keeps a page whole, so a missing line shows nowhere;
+// this is how a test finds one.
+export function hasFrench(english: string): boolean {
+  return Object.hasOwn(FR, english);
+}
+
 export function translatorFor(language: Language): Translate {
   const catalogue = CATALOGUES[language.value];
   return (english, values) => fill(catalogue?.[english] ?? english, values);
