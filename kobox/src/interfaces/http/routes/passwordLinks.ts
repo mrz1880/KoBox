@@ -5,6 +5,7 @@ import {
   type RequestPasswordReset,
   type SetPasswordFromLink,
 } from '../../../application/portal/PasswordLinks.js';
+import { readerOf } from '../guards.js';
 import { passwordField } from '../passwordField.js';
 import {
   choosePasswordPage,
@@ -29,8 +30,8 @@ export function registerPasswordLinkRoutes(
   server: FastifyInstance,
   deps: PasswordLinkRouteDeps,
 ): void {
-  server.get('/forgot-password', async (_request, reply) =>
-    reply.type('text/html').send(forgotPasswordPage()),
+  server.get('/forgot-password', async (request, reply) =>
+    reply.type('text/html').send(forgotPasswordPage(readerOf(request))),
   );
 
   server.post('/forgot-password', async (request, reply) => {
@@ -38,42 +39,47 @@ export function registerPasswordLinkRoutes(
     if (parsed.success) {
       await deps.requestPasswordReset.execute(parsed.data.identifier);
     }
-    return reply.type('text/html').send(forgotPasswordSentPage());
+    return reply.type('text/html').send(forgotPasswordSentPage(readerOf(request)));
   });
 
   server.get('/password-link/:token', async (request, reply) => {
     const params = tokenParams.safeParse(request.params);
     const open = params.success && (await deps.setPasswordFromLink.isOpen(params.data.token));
+    const reader = readerOf(request);
     return reply
       .type('text/html')
-      .send(open ? choosePasswordPage(request.url) : passwordLinkClosedPage());
+      .send(open ? choosePasswordPage(reader, request.url) : passwordLinkClosedPage(reader));
   });
 
   server.post('/password-link/:token', async (request, reply) => {
+    const reader = readerOf(request);
     const params = tokenParams.safeParse(request.params);
     if (!params.success) {
-      return reply.type('text/html').send(passwordLinkClosedPage());
+      return reply.type('text/html').send(passwordLinkClosedPage(reader));
     }
     const form = chooseSchema.safeParse(request.body);
     if (!form.success) {
-      return reply.type('text/html').send(choosePasswordPage(request.url, 'Please fill in both fields.'));
+      return reply.type('text/html').send(choosePasswordPage(reader, request.url, 'Please fill in both fields.'));
     }
     if (form.data.password !== form.data.confirm) {
-      return reply.type('text/html').send(choosePasswordPage(request.url, 'The two passwords do not match.'));
+      return reply.type('text/html').send(choosePasswordPage(reader, request.url, 'The two passwords do not match.'));
     }
     const password = passwordField.safeParse(form.data.password);
     if (!password.success) {
       const reason = password.error.issues[0]?.message ?? 'invalid password';
-      return reply.type('text/html').send(choosePasswordPage(request.url, `Please choose another password: ${reason}.`));
+      // the reason is the domain's own words, in English; the sentence around
+      // it is filled here, and the page shows an unknown key as it is
+      const refused = reader.t('Please choose another password: {reason}.', { reason });
+      return reply.type('text/html').send(choosePasswordPage(reader, request.url, refused));
     }
     try {
       await deps.setPasswordFromLink.execute({ token: params.data.token, password: password.data });
     } catch (error) {
       if (error instanceof PasswordLinkUnusableError) {
-        return reply.type('text/html').send(passwordLinkClosedPage());
+        return reply.type('text/html').send(passwordLinkClosedPage(reader));
       }
       throw error;
     }
-    return reply.type('text/html').send(passwordChosenPage());
+    return reply.type('text/html').send(passwordChosenPage(reader));
   });
 }

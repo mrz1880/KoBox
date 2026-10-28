@@ -3,7 +3,7 @@ import { z } from 'zod';
 import type { Authenticate, AuthenticatedSession } from '../../application/portal/Authenticate.js';
 import { browserLanguage } from './browserLanguage.js';
 import { html } from './html.js';
-import { page, type Viewer } from './views/layout.js';
+import { page, type Reader, type Viewer } from './views/layout.js';
 import { translatorFor } from './views/messages.js';
 import { secondStepRequired } from '../../domain/portal/policy.js';
 
@@ -40,6 +40,12 @@ export interface Guards {
 function isPasswordSelfService(url: string): boolean {
   const path = url.split('?')[0] ?? url;
   return path === '/password' || path === '/logout';
+}
+
+// Before sign-in there is no member to ask: the browser alone decides.
+export function readerOf(request: FastifyRequest): Reader {
+  const language = browserLanguage(request.headers['accept-language']);
+  return { language, t: translatorFor(language) };
 }
 
 // The member's stored choice first; a member who never chose reads the portal

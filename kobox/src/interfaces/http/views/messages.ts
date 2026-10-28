@@ -81,6 +81,43 @@ const FR: Readonly<Record<string, string>> = {
   English: 'English',
   'French (Français)': 'Français',
 
+  // signing in
+  'Sign in': 'Se connecter',
+  'Forgot your password?': 'Mot de passe oublié ?',
+  'Your code': 'Votre code',
+  'The 6-digit code from your authenticator app':
+    'Le code à 6 chiffres de votre application d’authentification',
+  Cancel: 'Annuler',
+  'Username or email address': 'Identifiant ou adresse mail',
+  'Send me a link': 'Envoyez-moi un lien',
+  'Back to sign in': 'Retour à la connexion',
+  'Check your mailbox': 'Vérifiez votre boîte mail',
+  'If an account matches, a link to choose a new password is on its way. It works once and for one hour.':
+    'Si un compte correspond, un lien pour choisir un nouveau mot de passe est en route. Il sert une seule fois, pendant une heure.',
+  'This link no longer works': 'Ce lien ne fonctionne plus',
+  'Ask for a new one, it only takes a moment.':
+    'Demandez-en un nouveau, ça ne prend qu’un instant.',
+  'Get a new link': 'Recevoir un nouveau lien',
+  'Choose your password': 'Choisissez votre mot de passe',
+  'New password': 'Nouveau mot de passe',
+  'The same again': 'Le même, une seconde fois',
+  'Save my password': 'Enregistrer mon mot de passe',
+  'It opens the portal, Nextcloud and the network share.':
+    'Il ouvre le portail, Nextcloud et le partage réseau.',
+  'Please fill in both fields.': 'Merci de remplir les deux champs.',
+  'The two passwords do not match.': 'Les deux mots de passe ne correspondent pas.',
+  'Please choose another password: {reason}.':
+    'Choisissez un autre mot de passe ({reason}).',
+  'Password saved': 'Mot de passe enregistré',
+  'It takes effect everywhere within a few seconds.':
+    'Il s’applique partout d’ici quelques secondes.',
+  'Invalid credentials.': 'Identifiants incorrects.',
+  'This account is suspended.': 'Ce compte est suspendu.',
+  'Too many attempts: account temporarily locked.':
+    'Trop de tentatives : compte temporairement bloqué.',
+  'That code did not work. Try the current one.':
+    'Ce code ne fonctionne pas. Essayez celui affiché en ce moment.',
+
   // admin navigation
   Trackers: 'Trackers',
   Blocklists: 'Listes de blocage',

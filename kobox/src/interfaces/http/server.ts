@@ -40,7 +40,7 @@ import type {
   UserRepository,
 } from '../../domain/user/ports.js';
 import type { Logger } from '../../infrastructure/logging/logger.js';
-import { buildGuards, SESSION_COOKIE } from './guards.js';
+import { buildGuards, readerOf, SESSION_COOKIE } from './guards.js';
 import type { DiagnosticsRepositoryPort } from '../../application/maintenance/DiagnosticsPort.js';
 import type { ConfigFileReaderPort } from '../../application/installation/ConfigFileReaderPort.js';
 import type { TorrentInstanceRepository } from '../../domain/torrent/ports.js';
@@ -163,14 +163,14 @@ export function buildPortalServer(deps: PortalServerDeps): FastifyInstance {
     if ((await guards.sessionOf(request)) !== undefined) {
       return reply.code(303).header('location', '/').send();
     }
-    return reply.type('text/html').send(loginPage());
+    return reply.type('text/html').send(loginPage(readerOf(request)));
   });
 
   server.post('/login', async (request, reply) => {
     const parsed = loginFormSchema.safeParse(request.body);
     if (!parsed.success) {
       deps.logger?.warn(`portal login failed for <malformed> from ${request.ip}`);
-      return reply.type('text/html').send(loginPage('Invalid credentials.'));
+      return reply.type('text/html').send(loginPage(readerOf(request), 'Invalid credentials.'));
     }
     const result = await deps.login.execute({
       username: Username.parse(parsed.data.username),
@@ -183,11 +183,11 @@ export function buildPortalServer(deps: PortalServerDeps): FastifyInstance {
       );
       const message =
         result.reason === 'locked'
-          ? 'Too many attempts — account temporarily locked.'
+          ? 'Too many attempts: account temporarily locked.'
           : result.reason === 'suspended'
             ? 'This account is suspended.'
             : 'Invalid credentials.';
-      return reply.type('text/html').send(loginPage(message));
+      return reply.type('text/html').send(loginPage(readerOf(request), message));
     }
     return reply
       .setCookie(SESSION_COOKIE, result.token, {
@@ -205,10 +205,11 @@ export function buildPortalServer(deps: PortalServerDeps): FastifyInstance {
     if ((await guards.pendingSessionOf(request)) === undefined) {
       return reply.code(303).header('location', '/login').send();
     }
-    return reply.type('text/html').send(twoStepCodePage());
+    return reply.type('text/html').send(twoStepCodePage(readerOf(request)));
   });
 
   server.post('/login/code', async (request, reply) => {
+    const reader = readerOf(request);
     const parsed = twoStepCodeSchema.safeParse(request.body);
     const token = request.cookies[SESSION_COOKIE] ?? '';
     const outcome = parsed.success
@@ -226,11 +227,11 @@ export function buildPortalServer(deps: PortalServerDeps): FastifyInstance {
         return reply.code(303).header('location', '/login').send();
       case 'locked':
         deps.logger?.warn(`portal two-step code refused from ${request.ip} (locked)`);
-        return reply.type('text/html').send(twoStepCodePage('Too many attempts: account temporarily locked.'));
+        return reply.type('text/html').send(twoStepCodePage(reader, 'Too many attempts: account temporarily locked.'));
       case 'wrong-code':
         // same line as a wrong password: fail2ban counts both
         deps.logger?.warn(`portal login failed for <two-step> from ${request.ip} (wrong-code)`);
-        return reply.type('text/html').send(twoStepCodePage('That code did not work. Try the current one.'));
+        return reply.type('text/html').send(twoStepCodePage(reader, 'That code did not work. Try the current one.'));
     }
   });
 
