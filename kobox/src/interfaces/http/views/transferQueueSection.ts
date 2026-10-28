@@ -19,19 +19,20 @@ const AGAIN_LABELS: Readonly<Partial<Record<TransferState, string>>> = {
 
 function row(transfer: SyncTransfer, viewer: Viewer): RawHtml {
   const words = STATE_WORDS[transfer.state] ?? { chip: '', text: transfer.state };
+  const again = AGAIN_LABELS[transfer.state];
   return html`<tr>
   <td class="path">${transfer.name}</td>
   <td>${transfer.label.value}</td>
-  <td><span class="chip ${words.chip}">${words.text}</span></td>
+  <td><span class="chip ${words.chip}">${viewer.t(words.text)}</span></td>
   <td class="reason">${transfer.lastError ?? ''}</td>
   <td class="when">${transfer.updatedAt}</td>
   <td>${
-    AGAIN_LABELS[transfer.state] === undefined
+    again === undefined
       ? html``
       : html`<form class="inline" method="post" action="/sync/transfers/retry">
     <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
     <input type="hidden" name="id" value="${String(transfer.id ?? 0)}">
-    <button class="ghost" type="submit">${AGAIN_LABELS[transfer.state]}</button>
+    <button class="ghost" type="submit">${viewer.t(again)}</button>
   </form>`
   }</td>
 </tr>`;
@@ -42,18 +43,15 @@ export function transferQueueSection(
   viewer: Viewer,
 ): RawHtml {
   if (transfers.length === 0) {
-    return html`<h2>What has been sent</h2>
-<p class="muted">Nothing yet. Once a folder set to send finishes a download, it
-turns up here.</p>`;
+    return html`<h2>${viewer.t('What has been sent')}</h2>
+<p class="muted">${viewer.t('Nothing yet. Once a folder set to send finishes a download, it turns up here.')}</p>`;
   }
-  return html`<h2>What has been sent</h2>
+  return html`<h2>${viewer.t('What has been sent')}</h2>
 <table>
   <thead>
-    <tr><th>File</th><th>Folder</th><th>State</th><th>What happened</th><th>Last change</th><th></th></tr>
+    <tr><th>${viewer.t('File')}</th><th>${viewer.t('Folder')}</th><th>${viewer.t('State')}</th><th>${viewer.t('What happened')}</th><th>${viewer.t('Last change')}</th><th></th></tr>
   </thead>
   <tbody>${transfers.map((transfer) => row(transfer, viewer))}</tbody>
 </table>
-<p class="muted">A file that did not arrive stays here until you try it again —
-it is never silently dropped, and trying again resumes where it stopped rather
-than starting the file over.</p>`;
+<p class="muted">${viewer.t('A file that did not arrive stays here until you try it again: it is never silently dropped, and trying again resumes where it stopped rather than starting the file over.')}</p>`;
 }

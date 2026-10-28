@@ -30,13 +30,13 @@ function modeChoice(dir: WatchDir, viewer: Viewer): RawHtml {
   const options = SyncMode.all().map(
     (mode) => html`<option value="${mode.value}"${
       mode.equals(dir.syncMode) ? html` selected` : html``
-    }>${MODE_WORDS[mode.value]?.label ?? mode.value}</option>`,
+    }>${viewer.t(MODE_WORDS[mode.value]?.label ?? mode.value)}</option>`,
   );
   return html`<form class="inline" method="post" action="/sync/categories/mode">
   <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
   <input type="hidden" name="label" value="${label}">
-  <select name="mode" aria-label="What happens to a finished ${label} download">${options}</select>
-  <button class="ghost" type="submit">Save</button>
+  <select name="mode" aria-label="${viewer.t('What happens to a finished {folder} download', { folder: label })}">${options}</select>
+  <button class="ghost" type="submit">${viewer.t('Save')}</button>
 </form>`;
 }
 
@@ -49,7 +49,7 @@ function backlogChoice(dir: WatchDir, viewer: Viewer): RawHtml {
   return html`<form class="inline" method="post" action="/sync/categories/send-existing">
   <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
   <input type="hidden" name="label" value="${dir.label?.value ?? ''}">
-  <button class="ghost" type="submit">Send what is already here</button>
+  <button class="ghost" type="submit">${viewer.t('Send what is already here')}</button>
 </form>`;
 }
 
@@ -58,18 +58,18 @@ function backlogChoice(dir: WatchDir, viewer: Viewer): RawHtml {
 function reshapeChoice(dir: WatchDir, holding: ReadonlySet<string>, viewer: Viewer): RawHtml {
   const label = dir.label?.value ?? '';
   if (holding.has(label)) {
-    return html`<span class="muted">Holds downloads: empty it to rename or remove it.</span>`;
+    return html`<span class="muted">${viewer.t('Holds downloads: empty it to rename or remove it.')}</span>`;
   }
   return html`<form class="inline" method="post" action="/sync/categories/rename">
   <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
   <input type="hidden" name="label" value="${label}">
-  <input name="to" aria-label="New name for ${label}" placeholder="new name" maxlength="64" required>
-  <button class="ghost" type="submit">Rename</button>
+  <input name="to" aria-label="${viewer.t('New name for {folder}', { folder: label })}" placeholder="${viewer.t('new name')}" maxlength="64" required>
+  <button class="ghost" type="submit">${viewer.t('Rename')}</button>
 </form>
 <form class="inline" method="post" action="/sync/categories/remove">
   <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
   <input type="hidden" name="label" value="${label}">
-  <button class="ghost" type="submit">Remove</button>
+  <button class="ghost" type="submit">${viewer.t('Remove')}</button>
 </form>`;
 }
 
@@ -90,33 +90,29 @@ export function syncPage(
     (dir) => html`<tr>
   <td>${dir.label?.value ?? ''}</td>
   <td>${modeChoice(dir, viewer)}</td>
-  <td class="muted">${MODE_WORDS[dir.syncMode.value]?.hint ?? ''}${backlogChoice(dir, viewer)}</td>
+  <td class="muted">${viewer.t(MODE_WORDS[dir.syncMode.value]?.hint ?? '')}${backlogChoice(dir, viewer)}</td>
   <td>${reshapeChoice(dir, holding, viewer)}</td>
 </tr>`,
   );
   return page(
     'Folders',
-    html`<h1>Your folders</h1>
-<p class="muted">A folder is what you sort your downloads into. Drop a torrent in
-a folder's watch directory and what comes out lands in that folder — and, if you
-ask for it here, gets copied on to your own machine.</p>
+    html`<h1>${viewer.t('Your folders')}</h1>
+<p class="muted">${viewer.t("A folder is what you sort your downloads into. Drop a torrent in a folder's watch directory and what comes out lands in that folder, and, if you ask for it here, gets copied on to your own machine.")}</p>
 ${flash(viewer.t, message)}
 ${categories.length === 0
-      ? html`<p class="lead">You have no folders yet.</p>`
+      ? html`<p class="lead">${viewer.t('You have no folders yet.')}</p>`
       : html`<table>
-  <thead><tr><th>Folder</th><th>When a download finishes</th><th></th><th></th></tr></thead>
+  <thead><tr><th>${viewer.t('Folder')}</th><th>${viewer.t('When a download finishes')}</th><th></th><th></th></tr></thead>
   <tbody>${rows}</tbody>
 </table>`}
 
-<h2>Add a folder</h2>
+<h2>${viewer.t('Add a folder')}</h2>
 <form class="inline" method="post" action="/sync/categories">
   <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
   <input name="label" placeholder="films" maxlength="64" required>
-  <button type="submit">Add it</button>
+  <button type="submit">${viewer.t('Add it')}</button>
 </form>
-<p class="muted">Letters, digits, dot, dash or underscore — no spaces and no
-accents, because it becomes a folder name on this box and on your own machine.
-New folders keep everything here until you say otherwise.</p>
+<p class="muted">${viewer.t('Letters, digits, dot, dash or underscore: no spaces and no accents, because it becomes a folder name on this box and on your own machine. New folders keep everything here until you say otherwise.')}</p>
 
 ${destinationSection(destination, viewer)}
 
