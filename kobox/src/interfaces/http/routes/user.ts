@@ -263,7 +263,12 @@ export function registerUserRoutes(
     return reply
       .type('text/html')
       .send(
-        userHomePage(user, viewerOf(session), await signalRowFor(deps, user), flashOf(request)),
+        userHomePage(
+          user,
+          viewerOf(session, request),
+          await signalRowFor(deps, user),
+          flashOf(request),
+        ),
       );
   });
 
@@ -274,7 +279,7 @@ export function registerUserRoutes(
     }
     const nextcloud = await deps.components.get(ComponentName.parse('nextcloud'));
     return reply.type('text/html').send(
-      filesPage(viewerOf(session), {
+      filesPage(viewerOf(session, request), {
         username: session.username.value,
         nextcloudInstalled: nextcloud?.state.value === 'installed',
         nextcloudHref: deps.nextcloudSignsInFromPortal
@@ -304,7 +309,7 @@ export function registerUserRoutes(
     const coverage = blocklistCoverage(await deps.blocklists.listAll());
     return reply
       .type('text/html')
-      .send(adminHomePage(rows, coverage, viewerOf(session), flashOf(request)));
+      .send(adminHomePage(rows, coverage, viewerOf(session, request), flashOf(request)));
   });
 
   server.get('/password', async (request, reply) => {
@@ -312,7 +317,7 @@ export function registerUserRoutes(
     if (session === undefined) {
       return;
     }
-    return reply.type('text/html').send(passwordPage(viewerOf(session)));
+    return reply.type('text/html').send(passwordPage(viewerOf(session, request)));
   });
 
   server.post('/password', async (request, reply) => {
@@ -328,7 +333,7 @@ export function registerUserRoutes(
         .type('text/html')
         .send(
           passwordPage(
-            viewerOf(session),
+            viewerOf(session, request),
             refusal === undefined
               ? 'Please fill in both passwords.'
               : `Please choose another new password: ${refusal.message}.`,
@@ -347,7 +352,7 @@ export function registerUserRoutes(
       return reply
         .code(200)
         .type('text/html')
-        .send(passwordPage(viewerOf(session), 'Your current password is incorrect.'));
+        .send(passwordPage(viewerOf(session, request), 'Your current password is incorrect.'));
     }
     const job = await buildJob.changePassword(
       { username: session.username.value },
@@ -544,7 +549,7 @@ export function registerUserRoutes(
     }
     return reply
       .type('text/html')
-      .send(twoStepSetupPage(viewerOf(session), session.username.value, secret.value));
+      .send(twoStepSetupPage(viewerOf(session, request), session.username.value, secret.value));
   });
 
   for (const [action, done, refused] of [
@@ -613,7 +618,7 @@ export function registerUserRoutes(
       .type('text/html')
       .send(
         downloadsPage(
-          viewerOf(session),
+          viewerOf(session, request),
           rows,
           hasKey,
           await foldersOf(session.username),
@@ -668,7 +673,7 @@ export function registerUserRoutes(
         .type('text/html')
         .send(
           downloadsPage(
-            viewerOf(session),
+            viewerOf(session, request),
             rows,
             hasKey,
             await foldersOf(session.username),
@@ -711,7 +716,7 @@ export function registerUserRoutes(
         .type('text/html')
         .send(
           downloadsPage(
-            viewerOf(session),
+            viewerOf(session, request),
             rows,
             hasKey,
             await foldersOf(session.username),
@@ -768,7 +773,7 @@ export function registerUserRoutes(
           { categories, holding },
           destination,
           transfers,
-          viewerOf(session),
+          viewerOf(session, request),
           flashOf(request),
         ),
       );
@@ -995,7 +1000,12 @@ export function registerUserRoutes(
     return reply
       .type('text/html')
       .send(
-        mediaPage(viewerOf(session), files, await foldersOf(session.username), flashOf(request)),
+        mediaPage(
+          viewerOf(session, request),
+          files,
+          await foldersOf(session.username),
+          flashOf(request),
+        ),
       );
   });
 
@@ -1008,7 +1018,7 @@ export function registerUserRoutes(
     if (file === undefined) {
       return reply.code(404).send();
     }
-    return reply.type('text/html').send(mediaWatchPage(viewerOf(session), file));
+    return reply.type('text/html').send(mediaWatchPage(viewerOf(session, request), file));
   });
 
   // The bytes themselves. The portal only AUTHORISES: it hands nginx an internal
@@ -1065,7 +1075,7 @@ export function registerUserRoutes(
     }
     const sftpHost = sftpHostName();
     return reply.type('text/html').send(
-      accessPage(viewerOf(session), {
+      accessPage(viewerOf(session, request), {
         username: user.username.value,
         hasAppToken: (await deps.credentials.find(session.username))?.appTokenHash !== undefined,
         ...(sftpHost !== undefined && { sftpHost }),
@@ -1098,7 +1108,7 @@ export function registerUserRoutes(
     // rendered straight into THIS response and nowhere else: only its hash is
     // stored, so no redirect could show it afterwards
     return reply.type('text/html').send(
-      accessPage(viewerOf(session), {
+      accessPage(viewerOf(session, request), {
         username: user.username.value,
         ...(sftpHost !== undefined && sftpHost !== '' && { sftpHost }),
         sshPort: deps.sshPort,
@@ -1155,6 +1165,8 @@ export function registerUserRoutes(
     } else {
       reply.setCookie(RUTORRENT_LANGUAGE_COOKIE, chosen.value, cookie);
     }
-    return reply.type('text/html').send(rutorrentPage(viewerOf(session), flashOf(request)));
+    return reply
+      .type('text/html')
+      .send(rutorrentPage(viewerOf(session, request), flashOf(request)));
   });
 }

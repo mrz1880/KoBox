@@ -88,7 +88,7 @@ export function registerAdminNetworkRoutes(
     ]);
     return reply
       .type('text/html')
-      .send(adminAddressesPage(addresses, hostnames, viewerOf(session), flashOf(request)));
+      .send(adminAddressesPage(addresses, hostnames, viewerOf(session, request), flashOf(request)));
   });
 
   const addressActions = [
@@ -162,7 +162,7 @@ export function registerAdminNetworkRoutes(
     }
     return reply
       .type('text/html')
-      .send(adminFairUsePage(rows, viewerOf(session), flashOf(request)));
+      .send(adminFairUsePage(rows, viewerOf(session, request), flashOf(request)));
   });
 
   server.post('/admin/fair-use/override', async (request, reply) => {

@@ -84,7 +84,9 @@ export function registerAdminUserRoutes(
     const users = await deps.users.listAll();
     return reply
       .type('text/html')
-      .send(adminUsersPage(users, await loginsOf(users), viewerOf(session), flashOf(request)));
+      .send(
+        adminUsersPage(users, await loginsOf(users), viewerOf(session, request), flashOf(request)),
+      );
   });
 
   server.post('/admin/users', async (request, reply) => {
@@ -98,7 +100,7 @@ export function registerAdminUserRoutes(
       return reply
         .code(400)
         .type('text/html')
-        .send(adminUsersPage(users, await loginsOf(users), viewerOf(session), undefined));
+        .send(adminUsersPage(users, await loginsOf(users), viewerOf(session, request), undefined));
     }
     // nobody types the member's password: they choose it through the link
     let invitation: { readonly url: string };
@@ -117,7 +119,7 @@ export function registerAdminUserRoutes(
     }
     return reply
       .type('text/html')
-      .send(invitationLinkPage(parsed.data.username, invitation.url, viewerOf(session)));
+      .send(invitationLinkPage(parsed.data.username, invitation.url, viewerOf(session, request)));
   });
 
   server.get('/admin/users/:name', async (request, reply) => {
@@ -139,7 +141,15 @@ export function registerAdminUserRoutes(
     return reply
       .type('text/html')
       .send(
-        adminUserDetailPage(user, viewerOf(session), login?.role, access, instance, usage, flashOf(request)),
+        adminUserDetailPage(
+          user,
+          viewerOf(session, request),
+          login?.role,
+          access,
+          instance,
+          usage,
+          flashOf(request),
+        ),
       );
   });
 
@@ -310,6 +320,6 @@ export function registerAdminUserRoutes(
     }
     return reply
       .type('text/html')
-      .send(invitationLinkPage(params.data.name, sent.url, viewerOf(session)));
+      .send(invitationLinkPage(params.data.name, sent.url, viewerOf(session, request)));
   });
 }

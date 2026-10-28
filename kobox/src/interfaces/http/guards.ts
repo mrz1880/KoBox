@@ -1,10 +1,10 @@
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import type { Authenticate, AuthenticatedSession } from '../../application/portal/Authenticate.js';
+import { browserLanguage } from './browserLanguage.js';
 import { html } from './html.js';
 import { page, type Viewer } from './views/layout.js';
 import { translatorFor } from './views/messages.js';
-import { Language } from '../../domain/portal/Language.js';
 import { secondStepRequired } from '../../domain/portal/policy.js';
 
 export const SESSION_COOKIE = 'kobox_session';
@@ -42,8 +42,10 @@ function isPasswordSelfService(url: string): boolean {
   return path === '/password' || path === '/logout';
 }
 
-export function viewerOf(session: AuthenticatedSession): Viewer {
-  const language = session.chosenLanguage ?? Language.en;
+// The member's stored choice first; a member who never chose reads the portal
+// in their browser's language.
+export function viewerOf(session: AuthenticatedSession, request: FastifyRequest): Viewer {
+  const language = session.chosenLanguage ?? browserLanguage(request.headers['accept-language']);
   return {
     username: session.username.value,
     role: session.role,

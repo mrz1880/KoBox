@@ -42,7 +42,7 @@ export function registerAdminTrackerRoutes(
     const trackers = await deps.trackers.listAll();
     return reply
       .type('text/html')
-      .send(adminTrackersPage(trackers, viewerOf(session), flashOf(request)));
+      .send(adminTrackersPage(trackers, viewerOf(session, request), flashOf(request)));
   });
 
   const hostActions = [
@@ -83,7 +83,7 @@ export function registerAdminTrackerRoutes(
     const blocklists = await deps.blocklists.listAll();
     return reply
       .type('text/html')
-      .send(adminBlocklistsPage(blocklists, viewerOf(session), flashOf(request)));
+      .send(adminBlocklistsPage(blocklists, viewerOf(session, request), flashOf(request)));
   });
 
   server.post('/admin/blocklists/update', async (request, reply) => {
