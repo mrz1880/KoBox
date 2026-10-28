@@ -5,23 +5,24 @@ import type { Speedtest } from '../../../domain/maintenance/speedtest.js';
 import { ManagedService } from '../../../domain/maintenance/ManagedService.js';
 import type { HealthCheckResult } from '../../../domain/user/ports.js';
 import { html, type RawHtml } from '../html.js';
-import { flash, page, type Viewer } from './layout.js';
+import { flash, page, sentence, type Viewer } from './layout.js';
+import type { Translate } from './messages.js';
 
-function healthChip(state: string): RawHtml {
+function healthChip(state: string, t: Translate): RawHtml {
   return state === 'healthy'
-    ? html`<span class="chip ok">healthy</span>`
-    : html`<span class="chip bad">unhealthy</span>`;
+    ? html`<span class="chip ok">${t('healthy')}</span>`
+    : html`<span class="chip bad">${t('unhealthy')}</span>`;
 }
 
-function componentChip(state: string): RawHtml {
+function componentChip(state: string, t: Translate): RawHtml {
   if (state === 'installed') {
-    return html`<span class="chip ok">installed</span>`;
+    return html`<span class="chip ok">${t('installed')}</span>`;
   }
   if (state === 'failed') {
-    return html`<span class="chip bad">failed</span>`;
+    return html`<span class="chip bad">${t('failed')}</span>`;
   }
   if (state === 'skipped') {
-    return html`<span class="chip warn">skipped</span>`;
+    return html`<span class="chip warn">${t('skipped')}</span>`;
   }
   return html`<span class="chip">${state}</span>`;
 }
@@ -48,23 +49,22 @@ function linkSpeedSection(
   <td class="when">${measurement.measuredAt}</td>
 </tr>`,
   );
-  return html`<h2>Link speed</h2>
+  return html`<h2>${viewer.t('Link speed')}</h2>
 ${available
     ? html`<form class="inline" method="post" action="/admin/speedtest">
   <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
-  <button type="submit">Measure now</button>
+  <button type="submit">${viewer.t('Measure now')}</button>
 </form>
-<p class="muted">Saturates the connection for about ten seconds, so downloads
-slow down while it runs — and a measurement taken while the box is busy reads
-low. Nothing schedules it.</p>`
-    : html`<p class="muted">No measurement binary pinned. Set
-<span class="mono">KOBOX_SPEEDTEST_URL</span> and
-<span class="mono">KOBOX_SPEEDTEST_SHA256</span>, then run
-<span class="mono">kobox install</span>.</p>`}
+<p class="muted">${viewer.t('Saturates the connection for about ten seconds, so downloads slow down while it runs, and a measurement taken while the box is busy reads low. Nothing schedules it.')}</p>`
+    : html`<p class="muted">${sentence(viewer.t, 'No measurement binary pinned. Set {url} and {checksum}, then run {install}.', {
+      url: html`<span class="mono">KOBOX_SPEEDTEST_URL</span>`,
+      checksum: html`<span class="mono">KOBOX_SPEEDTEST_SHA256</span>`,
+      install: html`<span class="mono">kobox install</span>`,
+    })}</p>`}
 ${measurements.length === 0
-    ? html`<p class="muted">No measurement yet.</p>`
+    ? html`<p class="muted">${viewer.t('No measurement yet.')}</p>`
     : html`<table>
-  <thead><tr><th>Down</th><th>Up</th><th>Latency</th><th>Server</th><th>Measured</th></tr></thead>
+  <thead><tr><th>${viewer.t('Down')}</th><th>${viewer.t('Up')}</th><th>${viewer.t('Latency')}</th><th>${viewer.t('Server')}</th><th>${viewer.t('Measured')}</th></tr></thead>
   <tbody>${rows}</tbody>
 </table>`}`;
 }
@@ -79,15 +79,14 @@ function managedServicesSection(viewer: Viewer): RawHtml {
   <td><form class="inline" method="post" action="/admin/services/restart">
     <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
     <input type="hidden" name="service" value="${name}">
-    <button class="ghost" type="submit">Restart</button>
+    <button class="ghost" type="submit">${viewer.t('Restart')}</button>
   </form></td>
 </tr>`,
   );
-  return html`<h2>Managed services</h2>
-<p class="muted">The worker itself is not here on purpose: it is what carries out
-the restart, so restarting it from this page would kill the job mid-flight.</p>
+  return html`<h2>${viewer.t('Managed services')}</h2>
+<p class="muted">${viewer.t('The worker itself is not here on purpose: it is what carries out the restart, so restarting it from this page would kill the job mid-flight.')}</p>
 <table>
-  <thead><tr><th>Unit</th><th></th></tr></thead>
+  <thead><tr><th>${viewer.t('Unit')}</th><th></th></tr></thead>
   <tbody>${rows}</tbody>
 </table>`;
 }
@@ -104,14 +103,14 @@ export function adminHealthPage(
   const probeRows = probes.map(
     (probe) => html`<tr>
   <td class="mono">${probe.name}</td>
-  <td>${healthChip(probe.state)}</td>
+  <td>${healthChip(probe.state, viewer.t)}</td>
   <td>${probe.detail ?? ''}</td>
 </tr>`,
   );
   const componentRows = components.map(
     (component) => html`<tr>
   <td>${component.name.value}</td>
-  <td>${componentChip(component.state.value)}</td>
+  <td>${componentChip(component.state.value, viewer.t)}</td>
   <td class="mono">${component.version?.value ?? '—'}</td>
   <td>${component.reason ?? ''}</td>
 </tr>`,
@@ -128,10 +127,10 @@ export function adminHealthPage(
     'Health',
     html`<h1>${viewer.t('Health')}</h1>
 ${flash(viewer.t, message)}
-<p class="links"><a href="/monitoring">Monitoring of the machine: CPU, memory, network, disks</a></p>
-<h2>Service probes</h2>
+<p class="links"><a href="/monitoring">${viewer.t('Monitoring of the machine: CPU, memory, network, disks')}</a></p>
+<h2>${viewer.t('Service probes')}</h2>
 <table>
-  <thead><tr><th>Probe</th><th>State</th><th>${viewer.t('Detail')}</th></tr></thead>
+  <thead><tr><th>${viewer.t('Probe')}</th><th>${viewer.t('State')}</th><th>${viewer.t('Detail')}</th></tr></thead>
   <tbody>${probeRows}</tbody>
 </table>
 
@@ -139,15 +138,15 @@ ${managedServicesSection(viewer)}
 
 ${linkSpeedSection(viewer, measurements, speedtestAvailable)}
 
-<h2>Components</h2>
+<h2>${viewer.t('Components')}</h2>
 <table>
-  <thead><tr><th>Component</th><th>State</th><th>Version</th><th>Reason</th></tr></thead>
+  <thead><tr><th>${viewer.t('Component')}</th><th>${viewer.t('State')}</th><th>${viewer.t('Version')}</th><th>${viewer.t('Reason')}</th></tr></thead>
   <tbody>${componentRows}</tbody>
 </table>
 
-<h2>Releases</h2>
+<h2>${viewer.t('Releases')}</h2>
 <table>
-  <thead><tr><th>Ref</th><th>State</th><th>Created</th><th>Switched</th></tr></thead>
+  <thead><tr><th>${viewer.t('Ref')}</th><th>${viewer.t('State')}</th><th>${viewer.t('Created')}</th><th>${viewer.t('Switched')}</th></tr></thead>
   <tbody>${releaseRows}</tbody>
 </table>`,
     viewer,
@@ -155,14 +154,14 @@ ${linkSpeedSection(viewer, measurements, speedtestAvailable)}
   );
 }
 
-function mailChip(status: string): RawHtml {
+function mailChip(status: string, t: Translate): RawHtml {
   if (status === 'sent') {
-    return html`<span class="chip ok">sent</span>`;
+    return html`<span class="chip ok">${t('sent')}</span>`;
   }
   if (status === 'failed') {
-    return html`<span class="chip bad">failed</span>`;
+    return html`<span class="chip bad">${t('failed')}</span>`;
   }
-  return html`<span class="chip warn">pending</span>`;
+  return html`<span class="chip warn">${t('pending')}</span>`;
 }
 
 export function adminMailsPage(
@@ -175,18 +174,18 @@ export function adminMailsPage(
   <td class="mono">${mail.createdAt}</td>
   <td>${mail.recipient}</td>
   <td>${mail.subject}</td>
-  <td>${mailChip(mail.status)}</td>
+  <td>${mailChip(mail.status, viewer.t)}</td>
   <td class="num">${mail.attempts}</td>
   <td>${mail.lastError ?? ''}</td>
 </tr>`,
   );
   return page(
     'Mails',
-    html`<h1>Mail outbox</h1>
+    html`<h1>${viewer.t('Mail outbox')}</h1>
 ${flash(viewer.t, message)}
 <table>
   <thead>
-    <tr><th>Created</th><th>Recipient</th><th>Subject</th><th>${viewer.t('Status')}</th><th>Attempts</th><th>Last error</th></tr>
+    <tr><th>${viewer.t('Created')}</th><th>${viewer.t('Recipient')}</th><th>${viewer.t('Subject')}</th><th>${viewer.t('Status')}</th><th>${viewer.t('Attempts')}</th><th>${viewer.t('Last error')}</th></tr>
   </thead>
   <tbody>${rows}</tbody>
 </table>`,

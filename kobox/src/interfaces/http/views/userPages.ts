@@ -7,15 +7,16 @@ import type { SeedboxUser } from '../../../domain/user/SeedboxUser.js';
 import { BROWSER_CHOICE } from '../browserLanguage.js';
 import { html, type RawHtml } from '../html.js';
 import { flash, page, sentence, type Viewer } from './layout.js';
+import type { Translate } from './messages.js';
 import type { BlocklistCoverage } from '../../../domain/tracker/BlocklistCoverage.js';
 
-function fairUseChip(level: string): RawHtml {
+function fairUseChip(level: string, t: Translate): RawHtml {
   if (level === 'throttled') {
-    return html`<span class="chip bad">throttled</span>`;
+    return html`<span class="chip bad">${t('throttled')}</span>`;
   }
   return level === 'alerted'
-    ? html`<span class="chip warn">alerted</span>`
-    : html`<span class="chip ok">within fair use</span>`;
+    ? html`<span class="chip warn">${t('alerted')}</span>`
+    : html`<span class="chip ok">${t('within fair use')}</span>`;
 }
 
 // What the portal can honestly know about a user from the database alone.
@@ -55,7 +56,7 @@ function formatBytes(bytes: number): string {
 
 // Segments, not a smooth bar: the eye reads a channel running into the red long
 // before it reads a percentage.
-function vuMeter(egressBytes: number, scaleBytes: number): RawHtml {
+function vuMeter(egressBytes: number, scaleBytes: number, t: Translate): RawHtml {
   const ratio = scaleBytes > 0 ? egressBytes / scaleBytes : 0;
   const lit = Math.min(VU_SEGMENTS, Math.round(ratio * VU_SEGMENTS));
   const segments = Array.from({ length: VU_SEGMENTS }, (_unused, index) => {
@@ -66,7 +67,7 @@ function vuMeter(egressBytes: number, scaleBytes: number): RawHtml {
     return html`<i class="on${tone}"></i>`;
   });
   return html`<div class="vu" role="img"
-    aria-label="Egress ${formatBytes(egressBytes)}, busiest channel ${formatBytes(scaleBytes)}">${segments}</div>`;
+    aria-label="${t('Egress {egress}, busiest channel {busiest}', { egress: formatBytes(egressBytes), busiest: formatBytes(scaleBytes) })}">${segments}</div>`;
 }
 
 function ledClass(row: SignalRow): string {
@@ -79,24 +80,26 @@ function ledClass(row: SignalRow): string {
   return row.level === 'alerted' ? 'warn' : '';
 }
 
-function stateWords(row: SignalRow): string {
-  const service = row.suspended ? 'suspended' : row.healthy ? 'active' : 'service down';
-  return row.level === 'none' ? service : `${service} · ${row.level}`;
+function stateWords(row: SignalRow, t: Translate): string {
+  const service = t(row.suspended ? 'suspended' : row.healthy ? 'active' : 'service down');
+  return row.level === 'none' ? service : `${service} · ${t(row.level)}`;
 }
 
-export function signalStrip(row: SignalRow): RawHtml {
+export function signalStrip(row: SignalRow, t: Translate): RawHtml {
   const name =
     row.linked === true
       ? html`<a href="/admin/users/${row.username}">${row.username}</a>`
       : html`<span class="name">${row.label ?? row.username}</span>`;
   return html`<div class="strip">
   <span class="led ${ledClass(row)}"></span>
-  <span class="who">${name}<span class="eyebrow">${stateWords(row)}</span></span>
+  <span class="who">${name}<span class="eyebrow">${stateWords(row, t)}</span></span>
   ${row.scaleBytes !== undefined && row.scaleBytes > 0
-    ? vuMeter(row.egressBytes, row.scaleBytes)
-    : html`<span>${fairUseChip(row.level)}</span>`}
-  <span class="figures"><b>${formatBytes(row.egressBytes)}</b> sent ·
-  ${row.quotaGib} GiB allowance</span>
+    ? vuMeter(row.egressBytes, row.scaleBytes, t)
+    : html`<span>${fairUseChip(row.level, t)}</span>`}
+  <span class="figures">${sentence(t, '{sent} sent · {allowance} GiB allowance', {
+    sent: html`<b>${formatBytes(row.egressBytes)}</b>`,
+    allowance: html`${row.quotaGib}`,
+  })}</span>
 </div>`;
 }
 
@@ -185,19 +188,19 @@ function blocklistWarning(coverage: BlocklistCoverage, viewer: Viewer): RawHtml 
       return html``;
     case 'no-list-enabled':
       return html`<section class="panel">
-  <p class="lead">Nothing is blocked: no blocklist is enabled.</p>
-  <p class="muted">Importing the catalog enables the lists MySB used, and downloads them.</p>
+  <p class="lead">${viewer.t('Nothing is blocked: no blocklist is enabled.')}</p>
+  <p class="muted">${viewer.t('Importing the catalog enables the lists MySB used, and downloads them.')}</p>
   <form class="inline" method="post" action="/admin/blocklists/import-catalog">
     <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
-    <button type="submit">Import the catalog</button>
+    <button type="submit">${viewer.t('Import the catalog')}</button>
   </form>
 </section>`;
     case 'not-downloaded-yet':
       return html`<section class="panel">
-  <p class="lead">Nothing is blocked yet: the enabled blocklists were never downloaded.</p>
+  <p class="lead">${viewer.t('Nothing is blocked yet: the enabled blocklists were never downloaded.')}</p>
   <form class="inline" method="post" action="/admin/blocklists/update">
     <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
-    <button type="submit">Download them now</button>
+    <button type="submit">${viewer.t('Download them now')}</button>
   </form>
 </section>`;
   }
@@ -218,26 +221,25 @@ export function adminHomePage(
   const scaleBytes = loudestFirst[0]?.egressBytes ?? 0;
   return page(
     'Overview',
-    html`<h1>Fleet console</h1>
+    html`<h1>${viewer.t('Fleet console')}</h1>
 ${flash(viewer.t, message)}
 ${blocklistWarning(coverage, viewer)}
 <div class="ribbon">
-  <span class="metric"><span class="eyebrow">Users active</span>
+  <span class="metric"><span class="eyebrow">${viewer.t('Users active')}</span>
     <span class="val">${active}/${rows.length}</span></span>
-  <span class="metric"><span class="eyebrow">Egress this window</span>
+  <span class="metric"><span class="eyebrow">${viewer.t('Egress this window')}</span>
     <span class="val">${formatBytes(totalEgress)}</span></span>
-  <span class="metric"><span class="eyebrow">Over fair use</span>
+  <span class="metric"><span class="eyebrow">${viewer.t('Over fair use')}</span>
     <span class="val${flagged > 0 ? ' alert' : ''}">${flagged}</span></span>
-  <span class="metric"><span class="eyebrow">Service down</span>
+  <span class="metric"><span class="eyebrow">${viewer.t('Service down')}</span>
     <span class="val${down > 0 ? ' bad' : ''}">${down}</span></span>
 </div>
-<h2>Channels</h2>
-<p class="muted">Meters run full scale at the busiest channel
-(${formatBytes(scaleBytes)}). Loudest first.</p>
-${loudestFirst.map((row) => signalStrip({ ...row, scaleBytes, linked: true }))}
-<p class="links"><a href="/admin/users">Manage users</a> ·
-<a href="/admin/fair-use">Fair use</a> ·
-<a href="/admin/health">Health</a></p>`,
+<h2>${viewer.t('Channels')}</h2>
+<p class="muted">${viewer.t('Meters run full scale at the busiest channel ({scale}). Loudest first.', { scale: formatBytes(scaleBytes) })}</p>
+${loudestFirst.map((row) => signalStrip({ ...row, scaleBytes, linked: true }, viewer.t))}
+<p class="links"><a href="/admin/users">${viewer.t('Manage users')}</a> ·
+<a href="/admin/fair-use">${viewer.t('Fair use')}</a> ·
+<a href="/admin/health">${viewer.t('Health')}</a></p>`,
     viewer,
     'admin',
   );
@@ -861,19 +863,17 @@ export function monitoringPage(viewer: Viewer, available: boolean): string {
   return page(
     'Monitoring',
     available
-      ? html`<h1>Monitoring</h1>
+      ? html`<h1>${viewer.t('Monitoring')}</h1>
 <iframe class="app" src="/monitoring/" title="Monitoring"></iframe>`
-      : html`<h1>Monitoring</h1>
+      : html`<h1>${viewer.t('Monitoring')}</h1>
 <section class="panel">
-  <p class="lead">No monitoring is installed on this box.</p>
-  <p class="muted">KoBox vendors NanoMon from a pinned, checksum-verified
-  release. Nothing is pinned, so the component skipped rather than fetching
-  whatever a URL happened to serve. Set
-  <span class="mono">KOBOX_NANOMON_URL</span> and
-  <span class="mono">KOBOX_NANOMON_SHA256</span>, then run
-  <span class="mono">kobox install</span>.</p>
-  <p class="muted">Health tells you the same thing about every component, with
-  the reason each one gave.</p>
+  <p class="lead">${viewer.t('No monitoring is installed on this box.')}</p>
+  <p class="muted">${sentence(viewer.t, 'KoBox vendors NanoMon from a pinned, checksum-verified release. Nothing is pinned, so the component skipped rather than fetching whatever a URL happened to serve. Set {url} and {checksum}, then run {install}.', {
+    url: html`<span class="mono">KOBOX_NANOMON_URL</span>`,
+    checksum: html`<span class="mono">KOBOX_NANOMON_SHA256</span>`,
+    install: html`<span class="mono">kobox install</span>`,
+  })}</p>
+  <p class="muted">${viewer.t('Health tells you the same thing about every component, with the reason each one gave.')}</p>
 </section>`,
     viewer,
     'admin',

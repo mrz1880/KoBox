@@ -48,9 +48,9 @@ describe('portal pages', () => {
   });
 
   it('should_light_the_meter_in_proportion_to_the_busiest_channel', () => {
-    const full = signalStrip(row({ egressBytes: 200 * G, scaleBytes: 200 * G }));
-    const half = signalStrip(row({ egressBytes: 100 * G, scaleBytes: 200 * G }));
-    const quiet = signalStrip(row({ egressBytes: 0, scaleBytes: 200 * G }));
+    const full = signalStrip(row({ egressBytes: 200 * G, scaleBytes: 200 * G }), ENGLISH.t);
+    const half = signalStrip(row({ egressBytes: 100 * G, scaleBytes: 200 * G }), ENGLISH.t);
+    const quiet = signalStrip(row({ egressBytes: 0, scaleBytes: 200 * G }), ENGLISH.t);
 
     expect(litSegments(full.value)).toBe(24);
     expect(litSegments(half.value)).toBe(12);
@@ -64,7 +64,7 @@ describe('portal pages', () => {
   it('should_drop_the_meter_when_there_is_nothing_honest_to_compare_against', () => {
     // a user looking at their own channel: no fleet to scale against, so the
     // fair-use verdict is shown instead of a meaningless bar
-    const own = signalStrip(row({ label: 'Your channel' }));
+    const own = signalStrip(row({ label: 'Your channel' }), ENGLISH.t);
 
     expect(own.value).not.toContain('<div class="vu"');
     expect(own.value).toContain('within fair use');
@@ -72,12 +72,12 @@ describe('portal pages', () => {
   });
 
   it('should_read_the_state_of_a_channel_from_its_led_and_words', () => {
-    expect(signalStrip(row({ suspended: true })).value).toContain('led off');
-    expect(signalStrip(row({ healthy: false })).value).toContain('led bad');
-    expect(signalStrip(row({ level: 'throttled' })).value).toContain('led bad');
-    expect(signalStrip(row({ level: 'alerted' })).value).toContain('led warn');
-    expect(signalStrip(row({ suspended: true })).value).toContain('suspended');
-    expect(signalStrip(row({ healthy: false })).value).toContain('service down');
+    expect(signalStrip(row({ suspended: true }), ENGLISH.t).value).toContain('led off');
+    expect(signalStrip(row({ healthy: false }), ENGLISH.t).value).toContain('led bad');
+    expect(signalStrip(row({ level: 'throttled' }), ENGLISH.t).value).toContain('led bad');
+    expect(signalStrip(row({ level: 'alerted' }), ENGLISH.t).value).toContain('led warn');
+    expect(signalStrip(row({ suspended: true }), ENGLISH.t).value).toContain('suspended');
+    expect(signalStrip(row({ healthy: false }), ENGLISH.t).value).toContain('service down');
   });
 
   it('should_order_the_fleet_loudest_first_so_an_outlier_is_on_top', () => {

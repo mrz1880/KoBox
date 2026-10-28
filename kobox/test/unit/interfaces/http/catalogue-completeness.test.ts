@@ -84,15 +84,6 @@ import { aUser } from '../../../builders/UserBuilder.js';
 import { TrackerBuilder } from '../../../builders/TrackerBuilder.js';
 import { accessFacts, signalRow } from './viewFixtures.js';
 
-// Keys a page sends to the catalogue that have no French yet. Task 10 of the
-// language plan empties it; the test also fails when a key here gains its
-// French, so the list never claims a gap that is already closed.
-const KNOWN_GAPS: readonly string[] = [
-  'Invitation sent',
-  'User',
-  'User alice',
-];
-
 const NOW = '2026-10-28 10:00:00';
 const ED25519 = 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIB7Kk1p2vQ0Hn3xYqZ8mLsRtWuVdEfGhIjKlMnOpQrSt';
 const alice = Username.parse('alice');
@@ -267,6 +258,8 @@ function keysSentToTheCatalogue(): ReadonlySet<string> {
       admin,
     );
   }
+  // a box where nobody sent anything has no busiest channel to scale against
+  adminHomePage([signalRow({ egressBytes: 0 })], 'blocking', admin);
   for (const available of [true, false]) {
     monitoringPage(admin, available);
   }
@@ -374,6 +367,6 @@ describe('the French catalogue', () => {
   it('should_have_a_french_line_for_every_string_a_page_sends_to_it', () => {
     const missing = [...keysSentToTheCatalogue()].filter((key) => !hasFrench(key)).sort();
 
-    expect(missing).toEqual([...KNOWN_GAPS].sort());
+    expect(missing).toEqual([]);
   });
 });

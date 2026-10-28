@@ -14,16 +14,16 @@ function logCard(unit: string, snapshot: ServiceLogSnapshot | undefined, viewer:
   <div class="eyebrow">
     <span class="mono">${unit}</span>
     ${snapshot === undefined
-      ? html`<span class="muted">never captured</span>`
-      : html`<span class="muted">captured ${snapshot.capturedAt}</span>`}
+      ? html`<span class="muted">${viewer.t('never captured')}</span>`
+      : html`<span class="muted">${viewer.t('captured {at}', { at: snapshot.capturedAt })}</span>`}
   </div>
   <form class="inline" method="post" action="/admin/logs/capture">
     <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
     <input type="hidden" name="service" value="${unit}">
-    <button class="ghost" type="submit">Capture now</button>
+    <button class="ghost" type="submit">${viewer.t('Capture now')}</button>
   </form>
   ${snapshot === undefined
-    ? html`<p class="muted">Capture to see the last lines this unit wrote.</p>`
+    ? html`<p class="muted">${viewer.t('Capture to see the last lines this unit wrote.')}</p>`
     : html`<pre class="log">${snapshot.content}</pre>`}
 </section>`;
 }
@@ -40,9 +40,7 @@ export function adminLogsPage(
   return page(
     'Logs',
     html`<h1>${viewer.t('Logs')}</h1>
-<p class="muted">The last 200 lines each KoBox unit wrote, captured on demand.
-Only these units — reading the whole host journal from a web page is not
-something this portal is allowed to do.</p>
+<p class="muted">${viewer.t('The last 200 lines each KoBox unit wrote, captured on demand. Only these units: reading the whole host journal from a web page is not something this portal is allowed to do.')}</p>
 ${flash(viewer.t, message)}
 ${cards}`,
     viewer,
@@ -61,38 +59,37 @@ export function adminPackagesPage(
   const lines = snapshot === undefined ? [] : snapshot.listing.split('\n').filter(Boolean);
   return page(
     'Updates',
-    html`<h1>System updates</h1>
+    html`<h1>${viewer.t('System updates')}</h1>
 ${flash(viewer.t, message)}
 <section class="panel">
   <div class="eyebrow">
     ${snapshot === undefined
-      ? html`<span class="muted">never checked</span>`
-      : html`<span class="muted">checked ${snapshot.checkedAt}</span>`}
+      ? html`<span class="muted">${viewer.t('never checked')}</span>`
+      : html`<span class="muted">${viewer.t('checked {at}', { at: snapshot.checkedAt })}</span>`}
   </div>
   ${snapshot === undefined
-    ? html`<p class="lead">Nobody has looked yet.</p>`
+    ? html`<p class="lead">${viewer.t('Nobody has looked yet.')}</p>`
     : snapshot.upgradableCount === 0
-      ? html`<p class="lead">Everything is up to date.</p>`
-      : html`<p class="lead">${snapshot.upgradableCount} package${
-          snapshot.upgradableCount === 1 ? '' : 's'
-        } can be updated.</p>`}
+      ? html`<p class="lead">${viewer.t('Everything is up to date.')}</p>`
+      : html`<p class="lead">${snapshot.upgradableCount === 1
+          ? viewer.t('1 package can be updated.')
+          : viewer.t('{count} packages can be updated.', { count: String(snapshot.upgradableCount) })}</p>`}
   <div class="choices">
     <form class="inline" method="post" action="/admin/packages/check">
       <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
-      <button class="ghost" type="submit">Check for updates</button>
+      <button class="ghost" type="submit">${viewer.t('Check for updates')}</button>
     </form>
     <form class="inline" method="post" action="/admin/packages/apply">
       <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
-      <button type="submit">Install them</button>
+      <button type="submit">${viewer.t('Install them')}</button>
     </form>
   </div>
-  <p class="muted">Installing restarts the daemons that were updated, so
-  transfers can drop for a moment. It never reboots and never removes a package.</p>
+  <p class="muted">${viewer.t('Installing restarts the daemons that were updated, so transfers can drop for a moment. It never reboots and never removes a package.')}</p>
 </section>
 ${lines.length === 0
   ? html``
   : html`<table>
-  <thead><tr><th>Package</th></tr></thead>
+  <thead><tr><th>${viewer.t('Package')}</th></tr></thead>
   <tbody>${lines.map((line) => html`<tr><td class="mono">${line}</td></tr>`)}</tbody>
 </table>`}`,
     viewer,

@@ -476,6 +476,289 @@ const FR: Readonly<Record<string, string>> = {
   'Public name': 'Nom public',
   'Where certificate notices go': 'Où arrivent les avis de certificat',
 
+  // admin overview
+  'Fleet console': 'Console des membres',
+  'Users active': 'Membres actifs',
+  'Egress this window': 'Sortant sur la période',
+  'Over fair use': 'Au-delà de l’usage raisonnable',
+  'Service down': 'Service arrêté',
+  'service down': 'service arrêté',
+  Channels: 'Canaux',
+  'Meters run full scale at the busiest channel ({scale}). Loudest first.':
+    'Les vumètres sont à pleine échelle sur le canal le plus chargé ({scale}). Le plus chargé en premier.',
+  'Egress {egress}, busiest channel {busiest}':
+    'Sortant {egress}, canal le plus chargé {busiest}',
+  '{sent} sent · {allowance} GiB allowance': '{sent} envoyés · allocation de {allowance} Gio',
+  'Manage users': 'Gérer les membres',
+  'within fair use': 'usage raisonnable respecté',
+  throttled: 'bridé',
+  alerted: 'alerté',
+  none: 'aucun',
+  'Nothing is blocked: no blocklist is enabled.':
+    'Rien n’est bloqué : aucune liste de blocage n’est activée.',
+  'Importing the catalog enables the lists MySB used, and downloads them.':
+    'Importer le catalogue active les listes qu’utilisait MySB, et les télécharge.',
+  'Nothing is blocked yet: the enabled blocklists were never downloaded.':
+    'Rien n’est encore bloqué : les listes de blocage activées n’ont jamais été téléchargées.',
+  'Download them now': 'Les télécharger maintenant',
+  'No monitoring is installed on this box.': 'Aucune supervision n’est installée sur cette box.',
+  'KoBox vendors NanoMon from a pinned, checksum-verified release. Nothing is pinned, so the component skipped rather than fetching whatever a URL happened to serve. Set {url} and {checksum}, then run {install}.':
+    'KoBox embarque NanoMon depuis une version épinglée, à l’empreinte vérifiée. Rien n’est épinglé, le composant a donc été ignoré plutôt que de récupérer ce qu’une URL aurait servi. Renseignez {url} et {checksum}, puis lancez {install}.',
+  'Health tells you the same thing about every component, with the reason each one gave.':
+    'État du système vous dit la même chose pour chaque composant, avec la raison donnée par chacun.',
+  'Invitation sent': 'Invitation envoyée',
+  'Invitation sent to {name}': 'Invitation envoyée à {name}',
+  'The mail is on its way. You can also pass the link on yourself; it works once and for 7 days.':
+    'Le mail est en route. Vous pouvez aussi transmettre le lien vous-même : il sert une seule fois, pendant 7 jours.',
+  'Copy the link': 'Copier le lien',
+  'Back to {name}': 'Retour à {name}',
+
+  // admin groups
+  'Who reaches the box and how, and what rTorrent talks to.':
+    'Qui accède à la box et comment, et avec qui rTorrent parle.',
+  'Trusted addresses': 'Adresses de confiance',
+  Optional: 'Facultatif',
+  "A member's fixed addresses, such as their home connection, trusted on every port of the box and for NFS without the VPN. Without any, everything works: the portal, ruTorrent, Nextcloud, SFTP and the VPN.":
+    'Les adresses fixes d’un membre, comme sa connexion à la maison, de confiance sur tous les ports de la box et pour NFS sans le VPN. Sans aucune, tout fonctionne : le portail, ruTorrent, Nextcloud, SFTP et le VPN.',
+  'The private trackers allowed, and their certificates.':
+    'Les trackers privés autorisés, et leurs certificats.',
+  'The address ranges rTorrent refuses to talk to.':
+    'Les plages d’adresses avec lesquelles rTorrent refuse de parler.',
+  "Each member's upload compared with the others, and the exceptions.":
+    'L’envoi de chaque membre comparé à celui des autres, et les exceptions.',
+  'What the box needs to run and to reach people.':
+    'Ce dont la box a besoin pour tourner et pour joindre les gens.',
+  'Invitations, forgotten passwords and alerts leave through it.':
+    'Les invitations, les mots de passe oubliés et les alertes partent par lui.',
+  'Sent mails': 'Mails envoyés',
+  'What the box sent, and what it could not.':
+    'Ce que la box a envoyé, et ce qu’elle n’a pas pu envoyer.',
+  "The box's public name and its Let's Encrypt certificate.":
+    'Le nom public de la box et son certificat Let’s Encrypt.',
+  'Debian packages waiting to be installed.': 'Les paquets Debian en attente d’installation.',
+  'To understand a problem. Nothing here changes the box.':
+    'Pour comprendre un problème. Rien ici ne modifie la box.',
+  "A service's latest lines, to read or to hand over for a diagnosis.":
+    'Les dernières lignes d’un service, à lire ou à transmettre pour un diagnostic.',
+  'Configuration files': 'Fichiers de configuration',
+  'What KoBox wrote for nginx, rTorrent, the firewall and the rest, read-only.':
+    'Ce que KoBox a écrit pour nginx, rTorrent, le pare-feu et le reste, en lecture seule.',
+
+  // configuration files: each file's title and purpose come from the catalog
+  // in domain/installation/ConfigDocument.ts
+  Configuration: 'Configuration',
+  'Every file KoBox writes onto this box, as it is on disk right now. Read-only, and only these files: this page cannot edit them, and it cannot open anything else. Files holding a secret (the worker environment, the aria2 password, the VPN keys) are not listed and cannot be reached from here.':
+    'Chaque fichier que KoBox écrit sur cette box, tel qu’il est sur le disque en ce moment. En lecture seule, et seulement ces fichiers : cette page ne peut ni les modifier, ni ouvrir quoi que ce soit d’autre. Les fichiers qui contiennent un secret (l’environnement du worker, le mot de passe aria2, les clés VPN) ne sont pas listés et restent inaccessibles d’ici.',
+  'What it decides': 'Ce qu’il décide',
+  Path: 'Chemin',
+  'This file is not on this box.': 'Ce fichier n’est pas sur cette box.',
+  'That is normal when the component it belongs to was never installed: no NFS means no exports file. Nothing is wrong.':
+    'C’est normal quand le composant auquel il appartient n’a jamais été installé : sans NFS, pas de fichier exports. Rien d’anormal.',
+  'Showing the first 256 KB. The rest is on disk.':
+    'Seuls les 256 premiers Ko sont affichés. Le reste est sur le disque.',
+  Scheduler: 'Planificateur',
+  'Which maintenance jobs run, and when. Every line only enqueues a job.':
+    'Quelles tâches de maintenance tournent, et quand. Chaque ligne ne fait que mettre une tâche en file.',
+  'Web front end': 'Serveur web frontal',
+  'How the portal, ruTorrent and the monitoring page are exposed and gated.':
+    'Comment le portail, ruTorrent et la page de supervision sont exposés et protégés.',
+  'ruTorrent per-user routing': 'Routage ruTorrent par membre',
+  'Which SCGI socket each member reaches. Regenerated when accounts change.':
+    'Quel socket SCGI chaque membre atteint. Régénéré quand les comptes changent.',
+  'Portal service': 'Service du portail',
+  'The non-root web process and everything systemd forbids it from touching.':
+    'Le processus web non root, et tout ce que systemd lui interdit de toucher.',
+  'Worker service': 'Service du worker',
+  'The one privileged process: it executes the typed jobs the portal enqueues.':
+    'Le seul processus privilégié : il exécute les tâches typées que le portail met en file.',
+  'Direct download service': 'Service de téléchargement direct',
+  'The downloader that fetches debrid links into the staging area.':
+    'Le téléchargeur qui récupère les liens débridés dans la zone de transit.',
+  'Monitoring service': 'Service de supervision',
+  'The metrics collector behind /monitoring, bound to the loopback only.':
+    'Le collecteur de métriques derrière /monitoring, lié à la boucle locale uniquement.',
+  'Firewall service': 'Service du pare-feu',
+  'Reapplies the packet filter at boot, before anything listens.':
+    'Réapplique le filtre de paquets au démarrage, avant que quoi que ce soit n’écoute.',
+  'Ban rules': 'Règles de bannissement',
+  'How many failures, over what window, earn how long a ban.':
+    'Combien d’échecs, sur quelle durée, valent un bannissement de combien de temps.',
+  'Ban filter: portal logins': 'Filtre de bannissement : connexions au portail',
+  'The pattern that recognises a failed portal login in the journal.':
+    'Le motif qui reconnaît une connexion ratée au portail dans le journal.',
+  'Ban filter: SSH key flooding': 'Filtre de bannissement : rafales de clés SSH',
+  'The pattern that recognises a client trying key after key.':
+    'Le motif qui reconnaît un client essayant clé après clé.',
+  'NFS shares': 'Partages NFS',
+  'Which directories are offered over NFS, to which addresses.':
+    'Quels répertoires sont partagés en NFS, et vers quelles adresses.',
+  'Windows shares': 'Partages Windows',
+  'The same directories over SMB, for machines that do not speak NFS.':
+    'Les mêmes répertoires en SMB, pour les machines qui ne parlent pas NFS.',
+  'Package sources': 'Sources des paquets',
+  'Where the system updates on the Updates screen actually come from.':
+    'D’où viennent réellement les mises à jour système de l’écran Mises à jour.',
+  'Encrypted DNS': 'DNS chiffré',
+  'Which resolver the box uses, and how its answers are validated.':
+    'Quel résolveur la box utilise, et comment ses réponses sont validées.',
+  'Kernel tuning': 'Réglages du noyau',
+  'Network buffers and limits sized for many simultaneous transfers.':
+    'Tampons réseau et limites dimensionnés pour de nombreux transferts simultanés.',
+
+  // logs and updates
+  'never captured': 'jamais capturé',
+  'captured {at}': 'capturé le {at}',
+  'Capture now': 'Capturer maintenant',
+  'Capture to see the last lines this unit wrote.':
+    'Capturez pour voir les dernières lignes écrites par cette unité.',
+  'The last 200 lines each KoBox unit wrote, captured on demand. Only these units: reading the whole host journal from a web page is not something this portal is allowed to do.':
+    'Les 200 dernières lignes écrites par chaque unité KoBox, capturées à la demande. Seulement ces unités : lire tout le journal de la machine depuis une page web n’est pas permis à ce portail.',
+  'System updates': 'Mises à jour du système',
+  'never checked': 'jamais vérifié',
+  'checked {at}': 'vérifié le {at}',
+  'Nobody has looked yet.': 'Personne n’a encore regardé.',
+  'Everything is up to date.': 'Tout est à jour.',
+  '1 package can be updated.': '1 paquet peut être mis à jour.',
+  '{count} packages can be updated.': '{count} paquets peuvent être mis à jour.',
+  'Check for updates': 'Chercher des mises à jour',
+  'Install them': 'Les installer',
+  'Installing restarts the daemons that were updated, so transfers can drop for a moment. It never reboots and never removes a package.':
+    'L’installation redémarre les démons mis à jour, les transferts peuvent donc couper un instant. Elle ne redémarre jamais la machine et ne retire jamais de paquet.',
+  Package: 'Paquet',
+
+  // domain and mail relay
+  "Out of the box this machine serves its pages under a certificate it signed itself, which every browser refuses loudly. Give it a public name that points here and it can get a real certificate from Let's Encrypt, renewed on its own from then on.":
+    'Au départ, cette machine sert ses pages avec un certificat qu’elle a signé elle-même, que tous les navigateurs refusent bruyamment. Donnez-lui un nom public qui pointe ici et elle pourra obtenir un vrai certificat auprès de Let’s Encrypt, renouvelé tout seul ensuite.',
+  'No public name set, so the self-signed certificate stays.':
+    'Aucun nom public défini, le certificat auto-signé reste donc en place.',
+  'Public name {domain}, certificate notices to {email}.':
+    'Nom public {domain}, avis de certificat envoyés à {email}.',
+  'Two things have to be true before a certificate can be issued: the name must already resolve to this machine, and someone must run {install} on it. Saving here does neither. The renewal afterwards is automatic and needs nobody.':
+    'Deux conditions avant qu’un certificat puisse être émis : le nom doit déjà pointer vers cette machine, et quelqu’un doit y lancer {install}. Enregistrer ici ne fait ni l’un ni l’autre. Le renouvellement est ensuite automatique et ne demande personne.',
+  'KoBox sends mail: a temporary password when you create an account, a warning when a torrent is removed, a report when a backup fails. Most providers refuse mail sent straight from a seedbox, so it goes out through a relay you authenticate against.':
+    'KoBox envoie des mails : un mot de passe temporaire à la création d’un compte, un avertissement quand un torrent est retiré, un rapport quand une sauvegarde échoue. La plupart des fournisseurs refusent les mails envoyés directement depuis une seedbox, ils partent donc par un relais auprès duquel vous vous authentifiez.',
+  'No relay configured yet, so mail stays queued rather than being lost.':
+    'Aucun relais configuré pour l’instant, les mails restent donc en file plutôt que d’être perdus.',
+  'Currently sending through {relay} as {user}.':
+    'Envoi actuellement par {relay} en tant que {user}.',
+  "The password is sealed with this box's key before it is stored. It is never shown again, so type it in full each time you change anything here.":
+    'Le mot de passe est scellé avec la clé de cette box avant d’être stocké. Il n’est plus jamais affiché : retapez-le en entier à chaque modification ici.',
+  'Sends one message to your own address. A relay you have never tested is a relay you find out about on the day it matters.':
+    'Envoie un message à votre propre adresse. Un relais jamais testé, on le découvre le jour où il compte.',
+
+  // member addresses and fair use
+  'Member addresses': 'Adresses des membres',
+  "The portal, ruTorrent, Nextcloud and the VPN are open to all, behind each member's username and password. SSH and SFTP answer only the addresses and hostnames below and the VPN, as soon as one address is declared. Members declare their own addresses and dynamic hostnames in {account}; add one here for them when they ask.":
+    'Le portail, ruTorrent, Nextcloud et le VPN sont ouverts à tous, derrière l’identifiant et le mot de passe de chaque membre. SSH et SFTP ne répondent qu’aux adresses et noms d’hôte ci-dessous et au VPN, dès qu’une adresse est déclarée. Les membres déclarent eux-mêmes leurs adresses et noms d’hôte dynamiques dans {account} ; ajoutez-en une ici pour eux quand ils le demandent.',
+  "An address listed here is a member's own fixed connection, such as their home, trusted beyond that: the firewall accepts it on every port of the box, ahead of the blocklists; fail2ban never bans it; and their folder is shared to it over NFS without the VPN. List only an address you trust that much.":
+    'Une adresse listée ici est la connexion fixe d’un membre, comme celle de chez lui, et elle a droit à plus de confiance : le pare-feu l’accepte sur tous les ports de la box, avant les listes de blocage ; fail2ban ne la bannit jamais ; et son dossier lui est partagé en NFS sans le VPN. N’ajoutez qu’une adresse en laquelle vous avez autant confiance.',
+  'Use a {dyndns} when their home address changes, which it usually does. KoBox re-resolves it on a schedule and follows it without anyone touching the firewall; the last resolved address is shown so you can tell a stale entry from a live one.':
+    'Utilisez un {dyndns} quand leur adresse à la maison change, ce qui est en général le cas. KoBox le résout à nouveau régulièrement et le suit sans que personne ne touche au pare-feu ; la dernière adresse résolue est affichée pour distinguer une entrée périmée d’une entrée à jour.',
+  'DynDNS hostname': 'nom d’hôte DynDNS',
+  'DynDNS hostnames': 'Noms d’hôte DynDNS',
+  User: 'Membre',
+  'Add address': 'Ajouter l’adresse',
+  'Add hostname': 'Ajouter le nom d’hôte',
+  'Last resolved': 'Dernière résolution',
+  unresolved: 'non résolu',
+  When: 'Quand',
+  Event: 'Événement',
+  'One member saturating the link makes the box unusable for everyone else. KoBox samples what each one actually moves and answers in steps rather than cutting them off: {none} is the normal state, {alerted} means they have been told, {throttled} means their bandwidth is capped until they come back under. Nothing here deletes anything or suspends an account.':
+    'Un membre qui sature le lien rend la box inutilisable pour tous les autres. KoBox mesure ce que chacun fait réellement passer et répond par paliers plutôt que de couper : {none} est l’état normal, {alerted} veut dire qu’il a été prévenu, {throttled} que sa bande passante est plafonnée jusqu’à ce qu’il repasse en dessous. Rien ici ne supprime quoi que ce soit ni ne suspend un compte.',
+  'Every decision is recorded below, and every one is reversible: a {override} raises the limit for a member who has a reason, without changing it for anyone else.':
+    'Chaque décision est consignée ci-dessous, et chacune est réversible : une {override} relève la limite pour un membre qui a une raison, sans la changer pour les autres.',
+  'budget override': 'dérogation de budget',
+  'Budget override': 'Dérogation de budget',
+  Level: 'Niveau',
+  Egress: 'Sortant',
+  Ingress: 'Entrant',
+  Sampled: 'Mesuré',
+  'Sustained egress (Mbit/s, empty = keep, "clear" = default)':
+    'Débit sortant soutenu (Mbit/s, vide = garder, « clear » = par défaut)',
+  'SSH auths per hour (empty = keep, "clear" = default)':
+    'Authentifications SSH par heure (vide = garder, « clear » = par défaut)',
+  'Throttle target (Mbit/s, empty = keep, "clear" = default)':
+    'Débit une fois bridé (Mbit/s, vide = garder, « clear » = par défaut)',
+  'Apply override': 'Appliquer la dérogation',
+  'Recent events': 'Événements récents',
+
+  // health and mails
+  healthy: 'opérationnel',
+  unhealthy: 'en panne',
+  installed: 'installé',
+  skipped: 'ignoré',
+  'Monitoring of the machine: CPU, memory, network, disks':
+    'Supervision de la machine : CPU, mémoire, réseau, disques',
+  'Service probes': 'Sondes des services',
+  Probe: 'Sonde',
+  'Managed services': 'Services gérés',
+  'The worker itself is not here on purpose: it is what carries out the restart, so restarting it from this page would kill the job mid-flight.':
+    'Le worker lui-même n’est pas là, exprès : c’est lui qui exécute le redémarrage, le redémarrer depuis cette page tuerait la tâche en cours de route.',
+  Unit: 'Unité',
+  Restart: 'Redémarrer',
+  'Link speed': 'Débit du lien',
+  'Measure now': 'Mesurer maintenant',
+  'Saturates the connection for about ten seconds, so downloads slow down while it runs, and a measurement taken while the box is busy reads low. Nothing schedules it.':
+    'Sature la connexion pendant une dizaine de secondes : les téléchargements ralentissent pendant la mesure, et une mesure prise pendant que la box est occupée sort trop basse. Rien ne la planifie.',
+  'No measurement binary pinned. Set {url} and {checksum}, then run {install}.':
+    'Aucun binaire de mesure épinglé. Renseignez {url} et {checksum}, puis lancez {install}.',
+  'No measurement yet.': 'Aucune mesure pour l’instant.',
+  Down: 'Descendant',
+  Up: 'Montant',
+  Latency: 'Latence',
+  Server: 'Serveur',
+  Measured: 'Mesuré',
+  Components: 'Composants',
+  Component: 'Composant',
+  Version: 'Version',
+  Reason: 'Raison',
+  Releases: 'Versions déployées',
+  Ref: 'Réf.',
+  Created: 'Création',
+  Switched: 'Bascule',
+  sent: 'envoyé',
+  'Mail outbox': 'Mails sortants',
+  Recipient: 'Destinataire',
+  Subject: 'Objet',
+  Attempts: 'Tentatives',
+  'Last error': 'Dernière erreur',
+
+  // trackers and blocklists
+  dead: 'mort',
+  plain: 'en clair',
+  'Fetch cert': 'Récupérer le certificat',
+  'Mark dead': 'Marquer comme mort',
+  'The trackers KoBox knows about, discovered from the torrents members actually add. A {private} is one that expects an account; a {public} is open to anyone. Members can be refused public trackers individually, from their own page under Members.':
+    'Les trackers que KoBox connaît, découverts dans les torrents que les membres ajoutent réellement. Un {private} demande un compte ; un {public} est ouvert à tous. Les trackers publics peuvent être refusés membre par membre, depuis sa propre page dans Membres.',
+  'private tracker': 'tracker privé',
+  'public tracker': 'tracker public',
+  'KoBox watches the certificate of each https tracker and warns before it expires, because an expired one stops announcing and torrents go quiet without saying why. {renew} re-checks them all now instead of waiting for the nightly pass. A tracker marked {dead} is kept but no longer checked.':
+    'KoBox surveille le certificat de chaque tracker https et prévient avant son expiration, car un certificat expiré n’annonce plus et les torrents se taisent sans dire pourquoi. {renew} les revérifie tous maintenant au lieu d’attendre le passage de la nuit. Un tracker marqué {dead} est conservé mais n’est plus vérifié.',
+  Endpoint: 'Point d’accès',
+  'Cert expiry': 'Expiration du certificat',
+  Actions: 'Actions',
+  "Lists of IP ranges that never get to talk to your members' torrent clients: anti-piracy monitors, known bad actors, advertising networks. Each list is published by someone else and fetched by KoBox; the merged ranges go into the kernel's packet filter, so blocking costs nothing at transfer time.":
+    'Des listes de plages IP qui ne peuvent jamais parler aux clients torrent de vos membres : sociétés de surveillance anti-piratage, acteurs malveillants connus, régies publicitaires. Chaque liste est publiée par quelqu’un d’autre et récupérée par KoBox ; les plages fusionnées vont dans le filtre de paquets du noyau, si bien que le blocage ne coûte rien pendant les transferts.',
+  '{enabled} is what decides whether a list counts: a disabled one stays here for later and is not fetched. {update} re-downloads every enabled list instead of waiting for the scheduled pass, and {import} adds the well-known public lists so you can pick from them rather than typing URLs.':
+    '{enabled} décide si une liste compte : une liste désactivée reste ici pour plus tard et n’est pas récupérée. {update} retélécharge toutes les listes activées sans attendre le passage planifié, et {import} ajoute les listes publiques connues pour que vous puissiez choisir parmi elles plutôt que de taper des URL.',
+  'Import catalog': 'Importer le catalogue',
+  'None of this is a guarantee, and it is not a substitute for the VPN under Account. It removes the loudest, best-known watchers.':
+    'Rien de tout cela n’est une garantie, et cela ne remplace pas le VPN de Mon compte. Cela écarte les surveillants les plus bruyants et les plus connus.',
+
+  // one member
+  'Email: {email}': 'Adresse mail : {email}',
+  'Quota: {quota} GiB': 'Quota : {quota} Gio',
+  'SCGI port: {port}': 'Port SCGI : {port}',
+  'rTorrent port: {port}': 'Port rTorrent : {port}',
+  '{name} can currently add torrents from {which}.':
+    '{name} peut actuellement ajouter des torrents depuis {which}.',
+  'any tracker, public ones included': 'n’importe quel tracker, publics compris',
+  'private trackers only': 'les trackers privés uniquement',
+  "Scripts in {path} currently {state} when one of {name}'s downloads finishes.":
+    'Les scripts de {path} {state} actuellement quand un téléchargement de {name} se termine.',
+  run: 's’exécutent',
+  'do not run': 'ne s’exécutent pas',
+
   // admin prose, keyed rather than quoted: a six-line paragraph makes a poor
   // lookup key, and reflowing the English would silently orphan its translation
   'members.intro':

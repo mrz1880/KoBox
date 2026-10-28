@@ -72,11 +72,11 @@ export function passwordLinkClosedPage(reader: Reader): string {
 export function invitationLinkPage(username: string, url: string, viewer: Viewer): string {
   return page(
     'Invitation sent',
-    html`<h1>Invitation sent to ${username}</h1>
-<p>The mail is on its way. You can also pass the link on yourself; it works once and for 7 days.</p>
+    html`<h1>${viewer.t('Invitation sent to {name}', { name: username })}</h1>
+<p>${viewer.t('The mail is on its way. You can also pass the link on yourself; it works once and for 7 days.')}</p>
 <p class="mono" id="invitation-link">${url}</p>
-<button type="button" onclick="navigator.clipboard.writeText(document.getElementById('invitation-link').textContent)">Copy the link</button>
-<p class="muted"><a href="/admin/users/${username}">Back to ${username}</a></p>`,
+<button type="button" onclick="navigator.clipboard.writeText(document.getElementById('invitation-link').textContent)">${viewer.t('Copy the link')}</button>
+<p class="muted"><a href="/admin/users/${username}">${viewer.t('Back to {name}', { name: username })}</a></p>`,
     viewer,
   );
 }
