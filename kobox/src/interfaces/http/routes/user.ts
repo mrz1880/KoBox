@@ -338,15 +338,20 @@ export function registerUserRoutes(
     const parsed = passwordSchema.safeParse(request.body);
     if (!parsed.success) {
       const refusal = parsed.error.issues.find((issue) => issue.path[0] === 'next');
+      const viewer = viewerOf(session, request);
+      // the reason is the domain's own words, in English; the sentence around
+      // it is filled here, and the page shows an unknown key as it is
       return reply
         .code(200)
         .type('text/html')
         .send(
           passwordPage(
-            viewerOf(session, request),
+            viewer,
             refusal === undefined
               ? 'Please fill in both passwords.'
-              : `Please choose another new password: ${refusal.message}.`,
+              : viewer.t('Please choose another new password: {reason}.', {
+                  reason: refusal.message,
+                }),
           ),
         );
     }

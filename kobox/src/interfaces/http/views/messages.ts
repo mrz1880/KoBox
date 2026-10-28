@@ -108,6 +108,8 @@ const FR: Readonly<Record<string, string>> = {
   'The two passwords do not match.': 'Les deux mots de passe ne correspondent pas.',
   'Please choose another password: {reason}.':
     'Choisissez un autre mot de passe ({reason}).',
+  'Please choose another new password: {reason}.':
+    'Choisissez un autre mot de passe ({reason}).',
   'Password saved': 'Mot de passe enregistré',
   'It takes effect everywhere within a few seconds.':
     'Il s’applique partout d’ici quelques secondes.',
