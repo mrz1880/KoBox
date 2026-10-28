@@ -166,7 +166,7 @@ export function userHomePage(
   return page(
     'Home',
     html`<h1>Hello ${user.username.value}</h1>
-${flash(message)}
+${flash(viewer.t, message)}
 ${plainStatus(row)}
 <div class="choices">${actions}</div>
 <p class="links"><a href="/access">My account and connection details</a></p>`,
@@ -221,7 +221,7 @@ export function adminHomePage(
   return page(
     'Overview',
     html`<h1>Fleet console</h1>
-${flash(message)}
+${flash(viewer.t, message)}
 ${blocklistWarning(coverage, viewer)}
 <div class="ribbon">
   <span class="metric"><span class="eyebrow">Users active</span>
@@ -249,8 +249,8 @@ export function passwordPage(viewer: Viewer, error?: string, ok?: string): strin
   return page(
     'Password',
     html`<h1>Change password</h1>
-${flash(ok)}
-${flash(error, 'error')}
+${flash(viewer.t, ok)}
+${flash(viewer.t, error, 'error')}
 <form class="card" method="post" action="/password">
   <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
   <label for="current">Current password</label>
@@ -386,8 +386,8 @@ export function downloadsPage(
   return page(
     'Downloads',
     html`<h1>${viewer.t('Downloads')}</h1>
-${flash(message)}
-${flash(error, 'error')}
+${flash(viewer.t, message)}
+${flash(viewer.t, error, 'error')}
 ${engineNotice(engineReady)}
 ${debridAccountCard(viewer, hasKey)}
 <form class="card" method="post" action="/downloads">
@@ -719,7 +719,7 @@ export function accessPage(viewer: Viewer, facts: AccessFacts, message?: string)
   return page(
     'My access',
     html`<h1>${viewer.t('My access')}</h1>
-${flash(message)}
+${flash(viewer.t, message)}
 <h2>Connect over VPN</h2>
 <p class="muted">Download one profile and open it with your OpenVPN client.</p>
 <div class="choices">${choices}</div>
@@ -819,7 +819,7 @@ export function mediaPage(
   return page(
     'My media',
     html`<h1>${viewer.t('My media')}</h1>
-${flash(message)}
+${flash(viewer.t, message)}
 <p class="lead">${viewer.t('media.playback')}</p>
 ${sections.length === 0
       ? html`<p class="muted">You have no folders yet. Create one under
@@ -846,7 +846,7 @@ export function rutorrentPage(viewer: Viewer, message?: string): string {
   return page(
     'ruTorrent',
     html`<h1>ruTorrent</h1>
-${flash(message)}
+${flash(viewer.t, message)}
 <form class="inline" method="post" action="/rutorrent/restart">
   <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
   <button class="ghost" type="submit">Restart my rtorrent</button>

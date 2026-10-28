@@ -33,7 +33,7 @@ export function choosePasswordPage(reader: Reader, action: string, error?: strin
   return page(
     'Choose your password',
     html`<h1>${reader.t('Choose your password')}</h1>
-${flash(error === undefined ? undefined : reader.t(error), 'error')}
+${flash(reader.t, error, 'error')}
 <form class="card" method="post" action="${action}">
   <label for="password">${reader.t('New password')}</label>
   <input id="password" name="password" type="password" autocomplete="new-password" minlength="8" maxlength="100" autofocus required>

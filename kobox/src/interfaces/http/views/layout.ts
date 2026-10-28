@@ -331,9 +331,16 @@ ${body}
   return document.value;
 }
 
-export function flash(message: string | undefined, kind: 'ok' | 'error' = 'ok'): RawHtml {
+// A flash is one of the server's own sentences, so it is looked up like any
+// other; one arriving from elsewhere (it rides in the query string) matches no
+// key, shows as it came, and is escaped like any other text.
+export function flash(
+  t: Translate,
+  message: string | undefined,
+  kind: 'ok' | 'error' = 'ok',
+): RawHtml {
   if (message === undefined || message === '') {
     return raw('');
   }
-  return html`<div class="flash${kind === 'error' ? ' error' : ''}">${message}</div>`;
+  return html`<div class="flash${kind === 'error' ? ' error' : ''}">${t(message)}</div>`;
 }

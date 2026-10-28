@@ -369,7 +369,7 @@ export function registerUserRoutes(
       deps.passwords,
     );
     await deps.queue.enqueue(job);
-    return redirectWithFlash(reply, '/password', 'Password change under way — it takes a few seconds.');
+    return redirectWithFlash(reply, '/password', 'Password change under way: it takes a few seconds.');
   });
 
   // aria2 is the engine behind every debrid download. Reading its install state

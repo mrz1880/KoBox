@@ -118,6 +118,72 @@ const FR: Readonly<Record<string, string>> = {
   'That code did not work. Try the current one.':
     'Ce code ne fonctionne pas. Essayez celui affiché en ce moment.',
 
+  // what just happened, shown once after a form
+  'Saved.': 'Enregistré.',
+  'Two-step sign-in is on.': 'La connexion en deux étapes est activée.',
+  'Two-step sign-in is off.': 'La connexion en deux étapes est désactivée.',
+  'That code did not work. Set it up again.':
+    'Ce code ne fonctionne pas. Recommencez la configuration.',
+  'That code did not work: it stays on.': 'Ce code ne fonctionne pas : elle reste activée.',
+  'Set up two-step sign-in to open Administration.':
+    'Activez la connexion en deux étapes pour ouvrir l’Administration.',
+  'That does not look like a public key.': 'Cela ne ressemble pas à une clé publique.',
+  'Key removed.': 'Clé retirée.',
+  'Address added.': 'Adresse ajoutée.',
+  'Address removed.': 'Adresse retirée.',
+  'You are connecting over IPv6. Only IPv4 addresses can be declared.':
+    'Vous êtes connecté en IPv6. Seules les adresses IPv4 peuvent être déclarées.',
+  'Updating blocklists.': 'Mise à jour des listes de blocage.',
+  'That token no longer works anywhere.': 'Ce jeton ne fonctionne plus nulle part.',
+  'That one is already gone.': 'Celui-ci n’est déjà plus là.',
+  'That is not an IPv4 address, like 203.0.113.20.':
+    'Ce n’est pas une adresse IPv4, comme 203.0.113.20.',
+  'That is not a hostname, like myhome.duckdns.org. For a fixed address, use the field above.':
+    'Ce n’est pas un nom d’hôte, comme myhome.duckdns.org. Pour une adresse fixe, utilisez le champ au-dessus.',
+  'That address only exists inside a home or office network. Declare the one that place shows to the internet.':
+    'Cette adresse n’existe qu’à l’intérieur d’un réseau domestique ou de bureau. Déclarez celle que ce lieu montre à internet.',
+  'Testing the connection.': 'Test de la connexion.',
+  'Test message queued. It goes out on the next send pass, within five minutes.':
+    'Message de test en file. Il part au prochain envoi, d’ici cinq minutes.',
+  'Saved. Test it before you rely on it.': 'Enregistré. Testez-le avant de compter dessus.',
+  'Saved. Run kobox install on the box to request the certificate.':
+    'Enregistré. Lancez kobox install sur la box pour demander le certificat.',
+  'Saved. It applies to what they add from now on, and changes nothing already on disk.':
+    'Enregistré. Cela s’applique à ce qu’il ajoutera désormais, et ne change rien de ce qui est déjà sur le disque.',
+  'Restarting your rtorrent.': 'Redémarrage de votre rtorrent.',
+  'Renewing certificates.': 'Renouvellement des certificats.',
+  'Removing it now.': 'Suppression en cours.',
+  'Relay saved. Applying it now.': 'Relais enregistré. Application en cours.',
+  'Putting it back in the queue.': 'Remise en file d’attente.',
+  'Password change under way: it takes a few seconds.':
+    'Changement de mot de passe en cours : cela prend quelques secondes.',
+  'Override applied.': 'Dérogation appliquée.',
+  'Measuring the link.': 'Mesure du lien en cours.',
+  'Key saved.': 'Clé enregistrée.',
+  'Key accepted. It is being installed.': 'Clé acceptée. Elle est en cours d’installation.',
+  'Installing the updates.': 'Installation des mises à jour.',
+  'Importing the catalog.': 'Import du catalogue.',
+  'Hostname removed.': 'Nom d’hôte retiré.',
+  'Hostname added. Its address opens within five minutes.':
+    'Nom d’hôte ajouté. Son adresse s’ouvre d’ici cinq minutes.',
+  'Download started. It will appear in the list below.':
+    'Téléchargement lancé. Il apparaîtra dans la liste ci-dessous.',
+  'Checking for updates.': 'Recherche de mises à jour.',
+  'An update is already running.': 'Une mise à jour est déjà en cours.',
+  'A test is already running.': 'Un test est déjà en cours.',
+  'A measurement is already running.': 'Une mesure est déjà en cours.',
+  'A check is already running.': 'Une vérification est déjà en cours.',
+  'Your current password is incorrect.': 'Votre mot de passe actuel est incorrect.',
+  'Please fill in both passwords.': 'Merci de remplir les deux mots de passe.',
+  "That doesn't look like an AllDebrid API key.":
+    'Cela ne ressemble pas à une clé d’API AllDebrid.',
+  'Please provide a valid http(s) link and a category.':
+    'Merci de donner un lien http(s) valide et une catégorie.',
+  'A relay needs a hostname, a port between 1 and 65535, a login and a password.':
+    'Un relais a besoin d’un nom d’hôte, d’un port entre 1 et 65535, d’un identifiant et d’un mot de passe.',
+  'That is not a hostname. Give the name on its own, with no https:// and no trailing slash.':
+    'Ce n’est pas un nom d’hôte. Donnez le nom seul, sans https:// ni barre oblique finale.',
+
   // admin navigation
   Trackers: 'Trackers',
   Blocklists: 'Listes de blocage',
