@@ -111,11 +111,19 @@ export function buildGuards(authenticate: Authenticate, now: () => string): Guar
     return session;
   };
 
-  const forbid = async (reply: FastifyReply, message: string): Promise<undefined> => {
+  // Read in the member's language, but as a reader, not a viewer: the refusal
+  // page offers no menu into what was just refused.
+  const forbid = async (
+    session: AuthenticatedSession,
+    request: FastifyRequest,
+    reply: FastifyReply,
+    message: string,
+  ): Promise<undefined> => {
+    const { language, t } = viewerOf(session, request);
     await reply
       .code(403)
       .type('text/html')
-      .send(page('Forbidden', html`<h1>Forbidden</h1><p>${message}</p>`));
+      .send(page('Forbidden', html`<h1>${t('Forbidden')}</h1><p>${t(message)}</p>`, { language, t }));
     return undefined;
   };
 
@@ -129,7 +137,7 @@ export function buildGuards(authenticate: Authenticate, now: () => string): Guar
     }
     const parsed = csrfFormSchema.safeParse(request.body);
     if (!parsed.success || parsed.data._csrf !== session.csrfToken) {
-      return forbid(reply, 'Invalid or missing CSRF token.');
+      return forbid(session, request, reply, 'Invalid or missing CSRF token.');
     }
     return session;
   };
@@ -159,7 +167,7 @@ export function buildGuards(authenticate: Authenticate, now: () => string): Guar
       return undefined;
     }
     if (session.role !== 'admin') {
-      return forbid(reply, 'This area requires the admin role.');
+      return forbid(session, request, reply, 'This area requires the admin role.');
     }
     return requireTwoStep(session, reply);
   };
@@ -173,7 +181,7 @@ export function buildGuards(authenticate: Authenticate, now: () => string): Guar
       return undefined;
     }
     if (session.role !== 'admin') {
-      return forbid(reply, 'This area requires the admin role.');
+      return forbid(session, request, reply, 'This area requires the admin role.');
     }
     return requireTwoStep(session, reply);
   };

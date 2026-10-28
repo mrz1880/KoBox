@@ -418,6 +418,12 @@ const FR: Readonly<Record<string, string>> = {
   'Capturing the {service} journal.': 'Capture du journal de {service}.',
   'Updating {host}.': 'Mise à jour de {host}.',
 
+  // refusal page
+  Forbidden: 'Accès refusé',
+  'This area requires the admin role.': 'Cet espace est réservé aux administrateurs.',
+  'Invalid or missing CSRF token.':
+    'Jeton de sécurité du formulaire absent ou invalide. Rechargez la page et recommencez.',
+
   // admin navigation
   Trackers: 'Trackers',
   Blocklists: 'Listes de blocage',
