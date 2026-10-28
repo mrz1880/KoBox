@@ -193,6 +193,23 @@ describe('self password change', () => {
 });
 
 describe('my access', () => {
+  it('should_show_what_just_happened_on_the_account_page', async () => {
+    const saved = await world.server.inject({
+      method: 'POST',
+      url: '/access/language',
+      headers: { cookie: user.cookie, 'content-type': 'application/x-www-form-urlencoded' },
+      payload: form({ _csrf: user.csrf, language: 'en' }),
+    });
+
+    const response = await world.server.inject({
+      method: 'GET',
+      url: saved.headers.location ?? '',
+      headers: { cookie: user.cookie },
+    });
+
+    expect(response.body).toContain('<div class="flash">Saved.</div>');
+  });
+
   it('should_list_the_three_ovpn_variants', async () => {
     const response = await world.server.inject({
       method: 'GET',

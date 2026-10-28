@@ -1100,7 +1100,7 @@ export function registerUserRoutes(
         ...(await addressFacts(session.username, request.ip)),
         hasTwoStep: session.hasTwoStep,
         ...(session.chosenLanguage !== undefined && { chosenLanguage: session.chosenLanguage }),
-      }),
+      }, flashOf(request)),
     );
   });
 
