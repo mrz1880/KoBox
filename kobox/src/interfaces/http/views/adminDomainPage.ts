@@ -1,6 +1,6 @@
 import type { SiteSettings } from '../../../domain/installation/ports.js';
 import { html } from '../html.js';
-import { flash, page, type Viewer } from './layout.js';
+import { flash, page, sentence, type Viewer } from './layout.js';
 
 // Saving a name issues nothing. Let's Encrypt needs the name to resolve to this
 // machine and a component run to request the certificate, so the page says what
@@ -16,14 +16,13 @@ export function adminDomainPage(
     html`<h1>${viewer.t('Domain and certificate')}</h1>
 ${flash(viewer.t, message)}
 ${flash(viewer.t, error, 'error')}
-<p class="muted">Out of the box this machine serves its pages under a certificate
-it signed itself, which every browser refuses loudly. Give it a public name that
-points here and it can get a real certificate from Let's Encrypt, renewed on its
-own from then on.</p>
+<p class="muted">${viewer.t("Out of the box this machine serves its pages under a certificate it signed itself, which every browser refuses loudly. Give it a public name that points here and it can get a real certificate from Let's Encrypt, renewed on its own from then on.")}</p>
 ${settings === undefined
-      ? html`<p class="muted">No public name set, so the self-signed certificate stays.</p>`
-      : html`<p>Public name <span class="mono">${settings.domain}</span>, certificate
-notices to <span class="mono">${settings.email}</span>.</p>`}
+      ? html`<p class="muted">${viewer.t('No public name set, so the self-signed certificate stays.')}</p>`
+      : html`<p>${sentence(viewer.t, 'Public name {domain}, certificate notices to {email}.', {
+        domain: html`<span class="mono">${settings.domain}</span>`,
+        email: html`<span class="mono">${settings.email}</span>`,
+      })}</p>`}
 <form class="card" method="post" action="/admin/domain">
   <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
   <label for="domain">${viewer.t('Public name')}</label>
@@ -33,10 +32,9 @@ notices to <span class="mono">${settings.email}</span>.</p>`}
   <input id="email" name="email" type="email" required value="${settings?.email ?? ''}">
   <button type="submit">${viewer.t('Save')}</button>
 </form>
-<p class="muted">Two things have to be true before a certificate can be issued:
-the name must already resolve to this machine, and someone must run
-<span class="mono">kobox install</span> on it. Saving here does neither. The
-renewal afterwards is automatic and needs nobody.</p>`,
+<p class="muted">${sentence(viewer.t, 'Two things have to be true before a certificate can be issued: the name must already resolve to this machine, and someone must run {install} on it. Saving here does neither. The renewal afterwards is automatic and needs nobody.', {
+  install: html`<span class="mono">kobox install</span>`,
+})}</p>`,
     viewer,
     'admin',
   );

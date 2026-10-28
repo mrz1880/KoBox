@@ -3,7 +3,7 @@ import type { TorrentInstance } from '../../../domain/torrent/TorrentInstance.js
 import type { SeedboxUser } from '../../../domain/user/SeedboxUser.js';
 import type { DiskUsageSample } from '../../../domain/user/ports.js';
 import { html, type RawHtml } from '../html.js';
-import { flash, page, type Viewer } from './layout.js';
+import { flash, page, sentence, type Viewer } from './layout.js';
 import { HOME_BASE } from '../../../domain/user/homeDirectory.js';
 
 function roleOptions(selected: Role): RawHtml[] {
@@ -75,9 +75,9 @@ ${flash(viewer.t, message)}
 <p class="muted">${viewer.t('members.invite')}</p>
 <form class="card" method="post" action="/admin/users">
   <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
-  <label for="username">Username</label>
+  <label for="username">${viewer.t('Username')}</label>
   <input id="username" name="username" required pattern="[a-z][a-z0-9]{0,31}">
-  <label for="email">Email</label>
+  <label for="email">${viewer.t('Email')}</label>
   <input id="email" name="email" type="email" required>
   <label for="quotaGib">${viewer.t('Quota (GiB)')}</label>
   <input id="quotaGib" name="quotaGib" type="number" min="1" value="412">
@@ -95,11 +95,13 @@ ${flash(viewer.t, message)}
 // nothing about the consequence, and the consequence is the whole decision.
 function publicTrackers(name: string, instance: TorrentInstance | undefined, viewer: Viewer): RawHtml {
   if (instance === undefined) {
-    return html`<p class="muted">No rTorrent instance yet, so there is nothing to allow.</p>`;
+    return html`<p class="muted">${viewer.t('No rTorrent instance yet, so there is nothing to allow.')}</p>`;
   }
   const allowed = instance.allowPublicTracker;
-  return html`<p>${name} can currently add torrents from
-${allowed ? html`<strong>any tracker, public ones included</strong>` : html`<strong>private trackers only</strong>`}.</p>
+  return html`<p>${sentence(viewer.t, '{name} can currently add torrents from {which}.', {
+    name: html`${name}`,
+    which: html`<strong>${viewer.t(allowed ? 'any tracker, public ones included' : 'private trackers only')}</strong>`,
+  })}</p>
 <p class="muted">${viewer.t('trackers.public.why')}</p>
 <form method="post" action="/admin/users/${name}/public-trackers">
   <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
@@ -115,12 +117,14 @@ ${allowed ? html`<strong>any tracker, public ones included</strong>` : html`<str
 // until now nothing could turn them back on.
 function finishScripts(name: string, instance: TorrentInstance | undefined, viewer: Viewer): RawHtml {
   if (instance === undefined) {
-    return html`<p class="muted">No rTorrent instance yet, so nothing runs.</p>`;
+    return html`<p class="muted">${viewer.t('No rTorrent instance yet, so nothing runs.')}</p>`;
   }
   const run = !instance.syncDisabled;
-  return html`<p>Scripts in <span class="mono">${HOME_BASE}/${name}/scripts</span> currently
-${run ? html`<strong>run</strong>` : html`<strong>do not run</strong>`} when one of
-${name}'s downloads finishes.</p>
+  return html`<p>${sentence(viewer.t, "Scripts in {path} currently {state} when one of {name}'s downloads finishes.", {
+    path: html`<span class="mono">${HOME_BASE}/${name}/scripts</span>`,
+    state: html`<strong>${viewer.t(run ? 'run' : 'do not run')}</strong>`,
+    name: html`${name}`,
+  })}</p>
 <p class="muted">${viewer.t('scripts.theirs')}</p>
 <form method="post" action="/admin/users/${name}/finish-scripts">
   <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
@@ -138,7 +142,7 @@ function storage(user: SeedboxUser, usage: DiskUsageSample | undefined, viewer: 
   const allowance = user.quota.toGib();
   const used =
     usage === undefined
-      ? html`<p class="muted">Nothing measured yet. The hourly pass writes this down.</p>`
+      ? html`<p class="muted">${viewer.t('Nothing measured yet. The hourly pass writes this down.')}</p>`
       : html`<p>${viewer.t('storage.using', { used: String(usage.used.toGib()), allowance: String(allowance) })}
 (<span class="muted">${viewer.t('storage.measured', { at: usage.sampledAt })}</span>).</p>`;
   return html`${used}
@@ -156,7 +160,7 @@ function storage(user: SeedboxUser, usage: DiskUsageSample | undefined, viewer: 
 // it says that where the choice is made rather than in a manual.
 function recycling(name: string, instance: TorrentInstance | undefined, viewer: Viewer): RawHtml {
   if (instance === undefined) {
-    return html`<p class="muted">No rTorrent instance yet.</p>`;
+    return html`<p class="muted">${viewer.t('No rTorrent instance yet.')}</p>`;
   }
   const current = instance.recycling.value;
   const option = (value: string, label: string): RawHtml =>
@@ -166,9 +170,9 @@ function recycling(name: string, instance: TorrentInstance | undefined, viewer: 
   <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
   <label for="mode">${viewer.t('What to do')}</label>
   <select id="mode" name="mode">
-    ${option('none', 'Download it again (default)')}
-    ${option('copy', 'Copy the files, so they get their own')}
-    ${option('hardlink', 'Share the same files on disk')}
+    ${option('none', viewer.t('Download it again (default)'))}
+    ${option('copy', viewer.t('Copy the files, so they get their own'))}
+    ${option('hardlink', viewer.t('Share the same files on disk'))}
   </select>
   <button type="submit">${viewer.t('Save')}</button>
 </form>
@@ -209,15 +213,17 @@ export function adminUserDetailPage(
   <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
   <button type="submit">${viewer.t('Suspend')}</button>
 </form>`;
+  // named after the menu entry it belongs to, which marks that entry as the
+  // one being read; a title carrying the name could never be translated
   return page(
-    `User ${name}`,
+    'Members',
     html`<h1>${name} ${statusChip(user, viewer)}</h1>
 ${flash(viewer.t, message)}
 <div class="card">
-  <p>Email: ${user.email.value}<br>
-  Quota: ${user.quota.toGib()} GiB<br>
-  SCGI port: <span class="mono">${user.scgiPort.value}</span> ·
-  rTorrent port: <span class="mono">${user.rtorrentPort.value}</span></p>
+  <p>${viewer.t('Email: {email}', { email: user.email.value })}<br>
+  ${viewer.t('Quota: {quota} GiB', { quota: String(user.quota.toGib()) })}<br>
+  ${sentence(viewer.t, 'SCGI port: {port}', { port: html`<span class="mono">${user.scgiPort.value}</span>` })} ·
+  ${sentence(viewer.t, 'rTorrent port: {port}', { port: html`<span class="mono">${user.rtorrentPort.value}</span>` })}</p>
   ${lifecycle}
   <form class="inline" method="post" action="/admin/users/${name}/delete">
     <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
