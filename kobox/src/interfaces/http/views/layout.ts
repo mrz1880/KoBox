@@ -344,3 +344,20 @@ export function flash(
   }
   return html`<div class="flash${kind === 'error' ? ' error' : ''}">${t(message)}</div>`;
 }
+
+// A sentence holding a link or a monospaced value. The sentence is looked up
+// and escaped like any text, then each {name} becomes its markup, so a
+// translation keeps the markup wherever its own grammar puts it. One pass: a
+// value's markup is never scanned for placeholders of its own.
+export function sentence(
+  t: Translate,
+  english: string,
+  values: Readonly<Record<string, RawHtml>>,
+): RawHtml {
+  return raw(
+    html`${t(english)}`.value.replace(
+      /\{(\w+)\}/g,
+      (placeholder, name: string) => values[name]?.value ?? placeholder,
+    ),
+  );
+}
