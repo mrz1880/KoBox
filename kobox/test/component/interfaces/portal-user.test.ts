@@ -1337,6 +1337,34 @@ describe('the language a member reads the portal in', () => {
     expect(response.body).toContain('<html lang="en">');
   });
 
+  it('should_hand_the_language_back_to_the_browser_when_a_member_asks', async () => {
+    for (const language of ['fr', 'browser']) {
+      await world.server.inject({
+        method: 'POST',
+        url: '/access/language',
+        headers: { cookie: user.cookie, 'content-type': 'application/x-www-form-urlencoded' },
+        payload: form({ _csrf: user.csrf, language }),
+      });
+    }
+
+    const page = await world.server.inject({
+      method: 'GET',
+      url: '/',
+      headers: { cookie: user.cookie, 'accept-language': 'en' },
+    });
+    const rutorrent = await world.server.inject({
+      method: 'GET',
+      url: '/rutorrent',
+      headers: { cookie: user.cookie },
+    });
+
+    expect(page.body).toContain('<html lang="en">');
+    const cookie = [rutorrent.headers['set-cookie']]
+      .flat()
+      .find((line) => line?.startsWith('Language='));
+    expect(cookie).toMatch(/^Language=; Max-Age=0; Path=\//);
+  });
+
   // a cache in front of the portal must not hand one browser's French page to
   // another browser asking for English
   it('should_tell_caches_a_page_depends_on_the_browsers_language', async () => {
