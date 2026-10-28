@@ -1,8 +1,10 @@
 import type { DebridDownload } from '../../../domain/ddl/DebridDownload.js';
+import { Language } from '../../../domain/portal/Language.js';
 import type { MediaFile } from '../../../domain/media/MediaFile.js';
 import type { Label } from '../../../domain/torrent/Label.js';
 import type { SshPublicKey } from '../../../domain/user/SshPublicKey.js';
 import type { SeedboxUser } from '../../../domain/user/SeedboxUser.js';
+import { BROWSER_CHOICE } from '../browserLanguage.js';
 import { html, type RawHtml } from '../html.js';
 import { flash, page, type Viewer } from './layout.js';
 import type { BlocklistCoverage } from '../../../domain/tracker/BlocklistCoverage.js';
@@ -453,6 +455,8 @@ export interface AccessFacts {
   readonly hasTwoStep: boolean;
   // where this request came from; absent over IPv6, which cannot be declared
   readonly currentAddress?: string;
+  // absent while the member lets their browser decide
+  readonly chosenLanguage?: Language;
 }
 
 function twoStepSection(viewer: Viewer, facts: AccessFacts): RawHtml {
@@ -681,6 +685,28 @@ export function filesPage(viewer: Viewer, facts: FileAccessFacts): string {
   );
 }
 
+// Each language is offered in its own name, so a member who cannot read the
+// page they landed on still finds theirs.
+function languageSection(viewer: Viewer, facts: AccessFacts): RawHtml {
+  const options: readonly (readonly [string, string])[] = [
+    [BROWSER_CHOICE, 'Same as my browser'],
+    [Language.fr.value, 'French (Français)'],
+    [Language.en.value, 'English'],
+  ];
+  const current = facts.chosenLanguage?.value ?? BROWSER_CHOICE;
+  const ticked = (value: string): RawHtml => (value === current ? html`checked` : html``);
+  return html`<h2>${viewer.t('Language')}</h2>
+<form class="card" method="post" action="/access/language">
+  <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
+  ${options.map(
+    ([value, label]) => html`<label class="check">
+    <input type="radio" name="language" value="${value}" ${ticked(value)}>
+    ${viewer.t(label)}</label>`,
+  )}
+  <button type="submit">${viewer.t('Save language')}</button>
+</form>`;
+}
+
 export function accessPage(viewer: Viewer, facts: AccessFacts): string {
   const choices = VPN_CHOICES.map(
     (choice) => html`<div class="choice${choice.usual === true ? ' pick' : ''}">
@@ -714,6 +740,8 @@ ${twoStepSection(viewer, facts)}
 ${addressesSection(viewer, facts)}
 
 ${sshKeySection(viewer, facts)}
+
+${languageSection(viewer, facts)}
 
 <p class="links"><a href="/rutorrent">Open ruTorrent</a> ·
 <a href="/downloads">Downloads</a> ·

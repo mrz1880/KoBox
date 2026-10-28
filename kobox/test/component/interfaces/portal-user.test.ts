@@ -1365,6 +1365,50 @@ describe('the language a member reads the portal in', () => {
     expect(cookie).toMatch(/^Language=; Max-Age=0; Path=\//);
   });
 
+  it('should_offer_the_three_choices_on_the_account_page', async () => {
+    const response = await world.server.inject({
+      method: 'GET',
+      url: '/access',
+      headers: { cookie: user.cookie },
+    });
+
+    expect(response.body).toContain('action="/access/language"');
+    expect(response.body.match(/name="language"/g)).toHaveLength(3);
+    expect(response.body).toContain('value="browser" checked');
+  });
+
+  it('should_tick_the_language_a_member_chose', async () => {
+    await world.server.inject({
+      method: 'POST',
+      url: '/access/language',
+      headers: { cookie: user.cookie, 'content-type': 'application/x-www-form-urlencoded' },
+      payload: form({ _csrf: user.csrf, language: 'fr' }),
+    });
+
+    const response = await world.server.inject({
+      method: 'GET',
+      url: '/access',
+      headers: { cookie: user.cookie },
+    });
+
+    expect(response.body).toContain('value="fr" checked');
+    expect(response.body).not.toContain('value="browser" checked');
+  });
+
+  // someone landed on a page in the wrong language still finds their own
+  it('should_name_each_language_in_its_own_tongue_to_a_french_reader', async () => {
+    const response = await world.server.inject({
+      method: 'GET',
+      url: '/access',
+      headers: { cookie: user.cookie, 'accept-language': 'fr' },
+    });
+
+    expect(response.body).toContain('Comme mon navigateur');
+    expect(response.body).toContain('Français');
+    expect(response.body).toContain('English');
+    expect(response.body).not.toContain('Anglais');
+  });
+
   // a cache in front of the portal must not hand one browser's French page to
   // another browser asking for English
   it('should_tell_caches_a_page_depends_on_the_browsers_language', async () => {

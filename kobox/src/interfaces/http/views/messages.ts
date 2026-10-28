@@ -75,7 +75,10 @@ const FR: Readonly<Record<string, string>> = {
   'Remove it': 'La retirer',
   Language: 'Langue',
   'Save language': 'Enregistrer la langue',
-  English: 'Anglais',
+  'Same as my browser': 'Comme mon navigateur',
+  // a language is offered in its own name, so a reader lost in the other one
+  // still finds theirs
+  English: 'English',
   'French (Français)': 'Français',
 
   // admin navigation
