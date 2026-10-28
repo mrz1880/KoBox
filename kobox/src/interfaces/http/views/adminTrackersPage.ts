@@ -52,7 +52,7 @@ before it expires, because an expired one stops announcing and torrents go quiet
 without saying why. <strong>Renew certificates</strong> re-checks them all now
 instead of waiting for the nightly pass. A tracker marked <strong>dead</strong>
 is kept but no longer checked.</p>
-${flash(message)}
+${flash(viewer.t, message)}
 <form class="inline" method="post" action="/admin/trackers/renew-certs">
   <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
   <button type="submit">Renew certificates</button>
@@ -114,7 +114,7 @@ re-downloads every enabled list instead of waiting for the scheduled pass, and
 from them rather than typing URLs.</p>
 <p class="muted">None of this is a guarantee, and it is not a substitute for the
 VPN under Account. It removes the loudest, best-known watchers.</p>
-${flash(message)}
+${flash(viewer.t, message)}
 <form class="inline" method="post" action="/admin/blocklists/update">
   <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
   <button type="submit">Update now</button>

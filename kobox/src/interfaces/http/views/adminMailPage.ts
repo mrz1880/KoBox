@@ -14,8 +14,8 @@ export function adminMailPage(
   return page(
     'Mail',
     html`<h1>${viewer.t('Mail')}</h1>
-${flash(message)}
-${flash(error, 'error')}
+${flash(viewer.t, message)}
+${flash(viewer.t, error, 'error')}
 <p class="muted">KoBox sends mail: a temporary password when you create an account,
 a warning when a torrent is removed, a report when a backup fails. Most providers
 refuse mail sent straight from a seedbox, so it goes out through a relay you

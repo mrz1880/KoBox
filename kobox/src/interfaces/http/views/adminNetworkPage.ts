@@ -57,7 +57,7 @@ that much.</p>
 changes, which it usually does. KoBox re-resolves it on a schedule and follows it
 without anyone touching the firewall; the last resolved address is shown so you
 can tell a stale entry from a live one.</p>
-${flash(message)}
+${flash(viewer.t, message)}
 <table>
   <thead><tr><th>User</th><th>IPv4</th><th></th></tr></thead>
   <tbody>${addressRows}</tbody>
@@ -156,7 +156,7 @@ anything or suspends an account.</p>
 <p class="muted">Every decision is recorded below, and every one is reversible:
 a <strong>budget override</strong> raises the limit for a member who has a
 reason, without changing it for anyone else.</p>
-${flash(message)}
+${flash(viewer.t, message)}
 <table>
   <thead>
     <tr><th>User</th><th>Level</th><th>${viewer.t('Health')}</th><th>Egress</th><th>Ingress</th><th>Sampled</th></tr>

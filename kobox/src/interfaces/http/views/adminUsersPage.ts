@@ -63,7 +63,7 @@ export function adminUsersPage(
     html`<h1>${viewer.t('Members')}</h1>
 <p class="muted">${viewer.t('members.intro')}</p>
 <p class="muted">${viewer.t('members.suspend')}</p>
-${flash(message)}
+${flash(viewer.t, message)}
 <table>
   <thead>
     <tr><th>${viewer.t('User')}</th><th>${viewer.t('Email')}</th><th>${viewer.t('Quota')}</th><th>${viewer.t('Role')}</th><th>${viewer.t('SCGI')}</th><th>${viewer.t('Status')}</th></tr>
@@ -212,7 +212,7 @@ export function adminUserDetailPage(
   return page(
     `User ${name}`,
     html`<h1>${name} ${statusChip(user, viewer)}</h1>
-${flash(message)}
+${flash(viewer.t, message)}
 <div class="card">
   <p>Email: ${user.email.value}<br>
   Quota: ${user.quota.toGib()} GiB<br>

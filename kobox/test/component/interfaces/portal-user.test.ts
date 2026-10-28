@@ -1426,6 +1426,37 @@ describe('the language a member reads the portal in', () => {
     expect(response.body).not.toContain('Anglais');
   });
 
+  it('should_confirm_a_change_in_the_members_language', async () => {
+    const saved = await world.server.inject({
+      method: 'POST',
+      url: '/access/language',
+      headers: { cookie: user.cookie, 'content-type': 'application/x-www-form-urlencoded' },
+      payload: form({ _csrf: user.csrf, language: 'fr' }),
+    });
+
+    const response = await world.server.inject({
+      method: 'GET',
+      url: saved.headers.location ?? '',
+      headers: { cookie: user.cookie },
+    });
+
+    expect(response.body).toContain('<div class="flash">Enregistré.</div>');
+  });
+
+  // the flash rides in the query string: anyone can put anything there, so a
+  // text the catalogue does not know shows as it came, and escaped
+  it('should_show_an_unknown_flash_as_it_came_and_escaped', async () => {
+    const forged = '<script>alert(1)</script>';
+    const response = await world.server.inject({
+      method: 'GET',
+      url: `/access?flash=${encodeURIComponent(forged)}`,
+      headers: { cookie: user.cookie, 'accept-language': 'fr' },
+    });
+
+    expect(response.body).not.toContain(forged);
+    expect(response.body).toContain('&lt;script&gt;alert(1)&lt;/script&gt;');
+  });
+
   // a cache in front of the portal must not hand one browser's French page to
   // another browser asking for English
   it('should_tell_caches_a_page_depends_on_the_browsers_language', async () => {

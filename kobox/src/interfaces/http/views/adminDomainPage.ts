@@ -14,8 +14,8 @@ export function adminDomainPage(
   return page(
     'Domain',
     html`<h1>${viewer.t('Domain and certificate')}</h1>
-${flash(message)}
-${flash(error, 'error')}
+${flash(viewer.t, message)}
+${flash(viewer.t, error, 'error')}
 <p class="muted">Out of the box this machine serves its pages under a certificate
 it signed itself, which every browser refuses loudly. Give it a public name that
 points here and it can get a real certificate from Let's Encrypt, renewed on its

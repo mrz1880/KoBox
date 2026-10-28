@@ -127,7 +127,7 @@ export function adminHealthPage(
   return page(
     'Health',
     html`<h1>${viewer.t('Health')}</h1>
-${flash(message)}
+${flash(viewer.t, message)}
 <p class="links"><a href="/monitoring">Monitoring of the machine: CPU, memory, network, disks</a></p>
 <h2>Service probes</h2>
 <table>
@@ -183,7 +183,7 @@ export function adminMailsPage(
   return page(
     'Mails',
     html`<h1>Mail outbox</h1>
-${flash(message)}
+${flash(viewer.t, message)}
 <table>
   <thead>
     <tr><th>Created</th><th>Recipient</th><th>Subject</th><th>${viewer.t('Status')}</th><th>Attempts</th><th>Last error</th></tr>

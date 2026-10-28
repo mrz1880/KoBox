@@ -43,7 +43,7 @@ export function adminLogsPage(
 <p class="muted">The last 200 lines each KoBox unit wrote, captured on demand.
 Only these units — reading the whole host journal from a web page is not
 something this portal is allowed to do.</p>
-${flash(message)}
+${flash(viewer.t, message)}
 ${cards}`,
     viewer,
     'admin',
@@ -62,7 +62,7 @@ export function adminPackagesPage(
   return page(
     'Updates',
     html`<h1>System updates</h1>
-${flash(message)}
+${flash(viewer.t, message)}
 <section class="panel">
   <div class="eyebrow">
     ${snapshot === undefined

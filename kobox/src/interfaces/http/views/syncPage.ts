@@ -100,7 +100,7 @@ export function syncPage(
 <p class="muted">A folder is what you sort your downloads into. Drop a torrent in
 a folder's watch directory and what comes out lands in that folder — and, if you
 ask for it here, gets copied on to your own machine.</p>
-${flash(message)}
+${flash(viewer.t, message)}
 ${categories.length === 0
       ? html`<p class="lead">You have no folders yet.</p>`
       : html`<table>

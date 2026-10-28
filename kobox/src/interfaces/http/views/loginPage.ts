@@ -5,7 +5,7 @@ export function loginPage(reader: Reader, error?: string): string {
   return page(
     'Sign in',
     html`<h1>${reader.t('Sign in')}</h1>
-${flash(error === undefined ? undefined : reader.t(error), 'error')}
+${flash(reader.t, error, 'error')}
 <form class="card" method="post" action="/login">
   <label for="username">${reader.t('Username')}</label>
   <input id="username" name="username" autocomplete="username" autofocus required>
@@ -24,7 +24,7 @@ export function twoStepCodePage(reader: Reader, error?: string): string {
   return page(
     'Sign in',
     html`<h1>${reader.t('Your code')}</h1>
-${flash(error === undefined ? undefined : reader.t(error), 'error')}
+${flash(reader.t, error, 'error')}
 <form class="card" method="post" action="/login/code">
   <label for="code">${reader.t('The 6-digit code from your authenticator app')}</label>
   <input id="code" name="code" inputmode="numeric" autocomplete="one-time-code"
