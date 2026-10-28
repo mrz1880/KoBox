@@ -707,7 +707,7 @@ function languageSection(viewer: Viewer, facts: AccessFacts): RawHtml {
 </form>`;
 }
 
-export function accessPage(viewer: Viewer, facts: AccessFacts): string {
+export function accessPage(viewer: Viewer, facts: AccessFacts, message?: string): string {
   const choices = VPN_CHOICES.map(
     (choice) => html`<div class="choice${choice.usual === true ? ' pick' : ''}">
   ${choice.usual === true ? html`<span class="tag">Usual choice</span>` : undefined}
@@ -719,6 +719,7 @@ export function accessPage(viewer: Viewer, facts: AccessFacts): string {
   return page(
     'My access',
     html`<h1>${viewer.t('My access')}</h1>
+${flash(message)}
 <h2>Connect over VPN</h2>
 <p class="muted">Download one profile and open it with your OpenVPN client.</p>
 <div class="choices">${choices}</div>
