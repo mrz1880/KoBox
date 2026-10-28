@@ -4,6 +4,7 @@ import type { Authenticate, AuthenticatedSession } from '../../application/porta
 import { html } from './html.js';
 import { page, type Viewer } from './views/layout.js';
 import { translatorFor } from './views/messages.js';
+import { Language } from '../../domain/portal/Language.js';
 import { secondStepRequired } from '../../domain/portal/policy.js';
 
 export const SESSION_COOKIE = 'kobox_session';
@@ -42,12 +43,13 @@ function isPasswordSelfService(url: string): boolean {
 }
 
 export function viewerOf(session: AuthenticatedSession): Viewer {
+  const language = session.chosenLanguage ?? Language.en;
   return {
     username: session.username.value,
     role: session.role,
     csrfToken: session.csrfToken,
-    language: session.language,
-    t: translatorFor(session.language),
+    language,
+    t: translatorFor(language),
   };
 }
 
