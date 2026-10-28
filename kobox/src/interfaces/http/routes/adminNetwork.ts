@@ -111,11 +111,18 @@ export function registerAdminNetworkRoutes(
         return redirectWithFlash(
           reply,
           '/admin/addresses',
-          `${parsed.data.ipv4} is a private address: no connection from the internet comes from it.`,
+          viewerOf(session, request).t(
+            '{address} is a private address: no connection from the internet comes from it.',
+            { address: parsed.data.ipv4 },
+          ),
         );
       }
       await deps.queue.enqueue(build(parsed.data));
-      return redirectWithFlash(reply, '/admin/addresses', `${action === 'add' ? 'Adding' : 'Removing'} the address.`);
+      return redirectWithFlash(
+        reply,
+        '/admin/addresses',
+        action === 'add' ? 'Adding the address.' : 'Removing the address.',
+      );
     });
   }
 
@@ -138,7 +145,11 @@ export function registerAdminNetworkRoutes(
         return reply.code(400).send();
       }
       await deps.queue.enqueue(build(parsed.data));
-      return redirectWithFlash(reply, '/admin/addresses', `${action === 'add-hostname' ? 'Adding' : 'Removing'} the hostname.`);
+      return redirectWithFlash(
+        reply,
+        '/admin/addresses',
+        action === 'add-hostname' ? 'Adding the hostname.' : 'Removing the hostname.',
+      );
     });
   }
 

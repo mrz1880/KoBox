@@ -112,7 +112,11 @@ export function registerAdminOpsRoutes(
       throw error;
     }
     await deps.queue.enqueue(buildJob.restartService({ service: service.value }));
-    return redirectWithFlash(reply, '/admin/health', `Restarting ${service.value}.`);
+    return redirectWithFlash(
+      reply,
+      '/admin/health',
+      viewerOf(session, request).t('Restarting {service}.', { service: service.value }),
+    );
   });
 
   server.post('/admin/speedtest', async (request, reply) => {
@@ -166,7 +170,11 @@ export function registerAdminOpsRoutes(
       throw error;
     }
     await deps.queue.enqueue(buildJob.captureServiceLog({ service: service.value }));
-    return redirectWithFlash(reply, '/admin/logs', `Capturing the ${service.value} journal.`);
+    return redirectWithFlash(
+      reply,
+      '/admin/logs',
+      viewerOf(session, request).t('Capturing the {service} journal.', { service: service.value }),
+    );
   });
 
   server.get('/admin/packages', async (request, reply) => {
