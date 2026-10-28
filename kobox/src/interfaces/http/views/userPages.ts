@@ -823,6 +823,7 @@ ${flash(message)}
   <button class="ghost" type="submit">Restart my rtorrent</button>
   <span class="muted">Use this if the interface stops responding.</span>
 </form>
+<p class="links"><a href="/ru/" target="_blank" rel="noopener">${viewer.t('Full screen')}</a></p>
 <iframe class="app" src="/ru/" title="ruTorrent"></iframe>`,
     viewer,
   );

@@ -664,6 +664,18 @@ describe('ruTorrent iframe', () => {
     expect(response.body).toContain('/ru/');
   });
 
+  // the frame leaves ruTorrent the room the portal does not take: on a small
+  // screen a member wants the whole window for it
+  it('should_offer_rutorrent_on_its_own_in_a_new_tab', async () => {
+    const response = await world.server.inject({
+      method: 'GET',
+      url: '/rutorrent',
+      headers: { cookie: user.cookie },
+    });
+
+    expect(response.body).toMatch(/<a href="\/ru\/" target="_blank" rel="noopener">Full screen<\/a>/);
+  });
+
   // ruTorrent read its language from the browser: it follows the one the
   // member chose on the portal, through the cookie ruTorrent itself reads
   it('should_open_rutorrent_in_the_language_chosen_on_the_portal', async () => {

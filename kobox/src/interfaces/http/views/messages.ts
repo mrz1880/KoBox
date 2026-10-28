@@ -12,6 +12,7 @@ const FR: Readonly<Record<string, string>> = {
   'In the browser': 'Dans le navigateur',
   'Plays here': 'Se lit ici',
   'Download to watch': 'À télécharger',
+  'Full screen': 'Plein écran',
   '{container}: browsers do not play it': '{container} : les navigateurs ne le lisent pas',
   'Your seedbox at a glance': 'Ta seedbox en un coup d’œil',
   'Nextcloud, SFTP, network share': 'Nextcloud, SFTP, partage réseau',
