@@ -1336,6 +1336,14 @@ describe('the language a member reads the portal in', () => {
 
     expect(response.body).toContain('<html lang="en">');
   });
+
+  // a cache in front of the portal must not hand one browser's French page to
+  // another browser asking for English
+  it('should_tell_caches_a_page_depends_on_the_browsers_language', async () => {
+    const response = await world.server.inject({ method: 'GET', url: '/login' });
+
+    expect(response.headers.vary).toContain('Accept-Language');
+  });
 });
 
 describe("a member's own SSH key", () => {

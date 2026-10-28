@@ -138,10 +138,23 @@ const loginFormSchema = z.object({
   password: passwordField,
 });
 
+const HTML_CONTENT_TYPE = 'text/html';
+const LANGUAGE_HEADER = 'Accept-Language';
+
 export function buildPortalServer(deps: PortalServerDeps): FastifyInstance {
   const server = Fastify({ logger: false, trustProxy: '127.0.0.1' });
   void server.register(fastifyCookie);
   void server.register(fastifyFormbody);
+
+  // A page's language follows Accept-Language for a member who never chose
+  // (and on every page before sign-in): a cache must key on it.
+  server.addHook('onSend', async (_request, reply, payload) => {
+    const type = reply.getHeader('content-type');
+    if (typeof type === 'string' && type.startsWith(HTML_CONTENT_TYPE)) {
+      reply.header('vary', LANGUAGE_HEADER);
+    }
+    return payload;
+  });
 
   const guards = buildGuards(deps.authenticate, deps.now);
   const twoStepCodeSchema = z.object({ code: z.string().regex(/^[0-9]{6}$/) });
