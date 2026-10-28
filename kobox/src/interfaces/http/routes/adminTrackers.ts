@@ -61,7 +61,11 @@ export function registerAdminTrackerRoutes(
         return reply.code(400).send();
       }
       await deps.queue.enqueue(build(parsed.data.host));
-      return redirectWithFlash(reply, '/admin/trackers', `Updating ${parsed.data.host}.`);
+      return redirectWithFlash(
+        reply,
+        '/admin/trackers',
+        viewerOf(session, request).t('Updating {host}.', { host: parsed.data.host }),
+      );
     });
   }
 

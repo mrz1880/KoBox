@@ -45,6 +45,7 @@ import type { SeedboxUser } from '../../../domain/user/SeedboxUser.js';
 import { buildJob } from '../../cli/buildJob.js';
 import { passwordField } from '../passwordField.js';
 import { flashOf, redirectWithFlash, viewerOf, type Guards } from '../guards.js';
+import type { Viewer } from '../views/layout.js';
 import {
   accessPage,
   twoStepSetupPage,
@@ -760,8 +761,11 @@ export function registerUserRoutes(
   const foldersHoldingDownloads = async (username: Username): Promise<ReadonlySet<string>> =>
     new Set((await deps.media.listFor(username)).map((file) => file.path.category));
 
-  const holdsDownloadsFlash = (label: Label): string =>
-    `${label.value} still holds downloads: they seed from its path. Remove them first, then the folder.`;
+  // A flash naming a folder cannot be a fixed sentence looked up at render, so
+  // it leaves already in the reader's language; a translated sentence matches no
+  // key and renders as it came.
+  const holdsDownloadsFlash = (label: Label, viewer: Viewer): string =>
+    viewer.t('{folder} still holds downloads: they seed from its path. Remove them first, then the folder.', { folder: label.value });
 
   server.get('/sync', async (request, reply) => {
     const session = await guards.requireSession(request, reply);
@@ -811,7 +815,11 @@ export function registerUserRoutes(
     await deps.queue.enqueue(
       buildJob.addWatchDir({ username: session.username.value, label: label.value }),
     );
-    return redirectWithFlash(reply, '/sync', `Creating the ${label.value} folder.`);
+    return redirectWithFlash(
+      reply,
+      '/sync',
+      viewerOf(session, request).t('Creating the {folder} folder.', { folder: label.value }),
+    );
   });
 
   server.post('/sync/categories/mode', async (request, reply) => {
@@ -841,7 +849,11 @@ export function registerUserRoutes(
         mode: mode.value,
       }),
     );
-    return redirectWithFlash(reply, '/sync', `Saved what happens to ${label.value}.`);
+    return redirectWithFlash(
+      reply,
+      '/sync',
+      viewerOf(session, request).t('Saved what happens to {folder}.', { folder: label.value }),
+    );
   });
 
   // A folder set to send only queues what finishes from then on; this sends
@@ -864,7 +876,9 @@ export function registerUserRoutes(
       return redirectWithFlash(
         reply,
         '/sync',
-        `${label.value} keeps everything here. Choose when it goes out first.`,
+        viewerOf(session, request).t('{folder} keeps everything here. Choose when it goes out first.', {
+          folder: label.value,
+        }),
       );
     }
     await deps.queue.enqueue(
@@ -873,7 +887,10 @@ export function registerUserRoutes(
     return redirectWithFlash(
       reply,
       '/sync',
-      `Queuing what ${label.value} already holds. Anything already sent stays as it is.`,
+      viewerOf(session, request).t(
+        'Queuing what {folder} already holds. Anything already sent stays as it is.',
+        { folder: label.value },
+      ),
     );
   });
 
@@ -892,12 +909,16 @@ export function registerUserRoutes(
       return reply.code(404).send();
     }
     if ((await foldersHoldingDownloads(session.username)).has(label.value)) {
-      return redirectWithFlash(reply, '/sync', holdsDownloadsFlash(label));
+      return redirectWithFlash(reply, '/sync', holdsDownloadsFlash(label, viewerOf(session, request)));
     }
     await deps.queue.enqueue(
       buildJob.removeWatchDir({ username: session.username.value, label: label.value }),
     );
-    return redirectWithFlash(reply, '/sync', `Removing the ${label.value} folder.`);
+    return redirectWithFlash(
+      reply,
+      '/sync',
+      viewerOf(session, request).t('Removing the {folder} folder.', { folder: label.value }),
+    );
   });
 
   server.post('/sync/categories/rename', async (request, reply) => {
@@ -915,11 +936,16 @@ export function registerUserRoutes(
     if (instance?.hasFolder(label) !== true) {
       return reply.code(404).send();
     }
+    const viewer = viewerOf(session, request);
     if (instance.hasFolder(to)) {
-      return redirectWithFlash(reply, '/sync', `There is already a folder named ${to.value}.`);
+      return redirectWithFlash(
+        reply,
+        '/sync',
+        viewer.t('There is already a folder named {folder}.', { folder: to.value }),
+      );
     }
     if ((await foldersHoldingDownloads(session.username)).has(label.value)) {
-      return redirectWithFlash(reply, '/sync', holdsDownloadsFlash(label));
+      return redirectWithFlash(reply, '/sync', holdsDownloadsFlash(label, viewer));
     }
     await deps.queue.enqueue(
       buildJob.renameWatchDir({
@@ -928,7 +954,11 @@ export function registerUserRoutes(
         to: to.value,
       }),
     );
-    return redirectWithFlash(reply, '/sync', `Renaming ${label.value} to ${to.value}.`);
+    return redirectWithFlash(
+      reply,
+      '/sync',
+      viewer.t('Renaming {from} to {to}.', { from: label.value, to: to.value }),
+    );
   });
 
   server.post('/sync/destination', async (request, reply) => {

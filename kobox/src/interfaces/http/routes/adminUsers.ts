@@ -45,10 +45,10 @@ export interface AdminUsersDeps {
 // portal holds no privileged port.
 // What each action is called from the operator's side, rather than the job type
 // name that happens to implement it.
-const ACTION_WORDS: Readonly<Record<string, string>> = {
-  delete: 'Deleting',
-  suspend: 'Suspending',
-  resume: 'Restoring',
+const ACTION_WORDS: Readonly<Record<'delete' | 'suspend' | 'resume', string>> = {
+  delete: 'Deleting {name}.',
+  suspend: 'Suspending {name}.',
+  resume: 'Restoring {name}.',
 };
 
 // A login with no password yet: they have not followed their invitation.
@@ -113,7 +113,11 @@ export function registerAdminUserRoutes(
       });
     } catch (error) {
       if (error instanceof UserAlreadyExistsError) {
-        return redirectWithFlash(reply, '/admin/users', `${parsed.data.username} already exists.`);
+        return redirectWithFlash(
+          reply,
+          '/admin/users',
+          viewerOf(session, request).t('{name} already exists.', { name: parsed.data.username }),
+        );
       }
       throw error;
     }
@@ -171,7 +175,11 @@ export function registerAdminUserRoutes(
       }
       await deps.queue.enqueue(build(params.data.name));
       const target = action === 'delete' ? '/admin/users' : `/admin/users/${params.data.name}`;
-      return redirectWithFlash(reply, target, `${ACTION_WORDS[action]} ${params.data.name}.`);
+      return redirectWithFlash(
+        reply,
+        target,
+        viewerOf(session, request).t(ACTION_WORDS[action], { name: params.data.name }),
+      );
     });
   }
 
@@ -316,7 +324,13 @@ export function registerAdminUserRoutes(
       throw error;
     }
     if (sent.url === undefined) {
-      return redirectWithFlash(reply, target, `A reset link is on its way to ${params.data.name}.`);
+      return redirectWithFlash(
+        reply,
+        target,
+        viewerOf(session, request).t('A reset link is on its way to {name}.', {
+          name: params.data.name,
+        }),
+      );
     }
     return reply
       .type('text/html')

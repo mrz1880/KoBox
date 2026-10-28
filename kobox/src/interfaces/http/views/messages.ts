@@ -389,6 +389,33 @@ const FR: Readonly<Record<string, string>> = {
   'A file that did not arrive stays here until you try it again: it is never silently dropped, and trying again resumes where it stopped rather than starting the file over.':
     'Un fichier qui n’est pas arrivé reste ici jusqu’à ce que vous réessayiez : il n’est jamais abandonné en silence, et réessayer reprend là où le transfert s’est arrêté au lieu de recommencer le fichier.',
 
+  // flashes naming something, put in the reader's language at the redirect
+  'Creating the {folder} folder.': 'Création du dossier {folder}.',
+  'Saved what happens to {folder}.': 'Réglage de {folder} enregistré.',
+  '{folder} keeps everything here. Choose when it goes out first.':
+    '{folder} garde tout ici. Choisissez d’abord quand il part.',
+  'Queuing what {folder} already holds. Anything already sent stays as it is.':
+    'Mise en file de ce que contient déjà {folder}. Ce qui a déjà été envoyé reste tel quel.',
+  '{folder} still holds downloads: they seed from its path. Remove them first, then the folder.':
+    '{folder} contient encore des téléchargements : ils partagent depuis son chemin. Retirez-les d’abord, puis le dossier.',
+  'Removing the {folder} folder.': 'Suppression du dossier {folder}.',
+  'There is already a folder named {folder}.': 'Il existe déjà un dossier nommé {folder}.',
+  'Renaming {from} to {to}.': 'Renommage de {from} en {to}.',
+  '{name} already exists.': '{name} existe déjà.',
+  'Deleting {name}.': 'Suppression de {name}.',
+  'Suspending {name}.': 'Suspension de {name}.',
+  'Restoring {name}.': 'Réactivation de {name}.',
+  'A reset link is on its way to {name}.': 'Un lien de réinitialisation est en route vers {name}.',
+  '{address} is a private address: no connection from the internet comes from it.':
+    '{address} est une adresse privée : aucune connexion depuis internet n’en vient.',
+  'Adding the address.': 'Ajout de l’adresse.',
+  'Removing the address.': 'Retrait de l’adresse.',
+  'Adding the hostname.': 'Ajout du nom d’hôte.',
+  'Removing the hostname.': 'Retrait du nom d’hôte.',
+  'Restarting {service}.': 'Redémarrage de {service}.',
+  'Capturing the {service} journal.': 'Capture du journal de {service}.',
+  'Updating {host}.': 'Mise à jour de {host}.',
+
   // admin navigation
   Trackers: 'Trackers',
   Blocklists: 'Listes de blocage',
