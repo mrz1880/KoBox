@@ -1099,6 +1099,7 @@ export function registerUserRoutes(
         })()),
         ...(await addressFacts(session.username, request.ip)),
         hasTwoStep: session.hasTwoStep,
+        ...(session.chosenLanguage !== undefined && { chosenLanguage: session.chosenLanguage }),
       }),
     );
   });
@@ -1129,6 +1130,7 @@ export function registerUserRoutes(
         freshToken: token.reveal(),
         ...(await addressFacts(session.username, request.ip)),
         hasTwoStep: session.hasTwoStep,
+        ...(session.chosenLanguage !== undefined && { chosenLanguage: session.chosenLanguage }),
       }),
     );
   });
