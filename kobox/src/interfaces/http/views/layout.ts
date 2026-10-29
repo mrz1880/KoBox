@@ -281,6 +281,16 @@ export interface MenuPlace {
   readonly titleValues: Readonly<Record<string, string>>;
 }
 
+// KoBox's tab icon: a K in the console's green on its panel colour. Carried
+// inside every page, so neither nginx nor the portal serves a file for it.
+const ICON_SVG =
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">' +
+  '<rect width="64" height="64" rx="14" fill="#151d28"/>' +
+  '<rect x="3" y="3" width="58" height="58" rx="12" fill="none" stroke="#26313f" stroke-width="2"/>' +
+  '<path d="M21 15v34M43 15L22 32l21 17" fill="none" stroke="#5fb98a" stroke-width="8"' +
+  ' stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const ICON_LINK = `<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,${encodeURIComponent(ICON_SVG)}">`;
+
 // A reader gets the page in their language; only a signed-in viewer gets the
 // menus and the sign-out button.
 export function page(
@@ -299,6 +309,7 @@ export function page(
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${reader === undefined ? title : reader.t(title, place?.titleValues)}, KoBox</title>
+${raw(ICON_LINK)}
 <style>${raw(STYLES)}</style>
 </head>
 <body${space === 'admin' ? raw(' class="admin"') : undefined}>
