@@ -1,8 +1,10 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { Job } from '../../../../src/application/jobs/contract.js';
 import type { JobQueuePort } from '../../../../src/application/jobs/JobQueuePort.js';
+import { UserNotFoundError } from '../../../../src/application/user/errors.js';
 import {
   InviteMember,
+  MemberSuspendedError,
   PasswordLinkUnusableError,
   RequestPasswordReset,
   SendPasswordLink,
@@ -277,5 +279,148 @@ describe('RequestPasswordReset', () => {
     await resetWith().execute('alice');
 
     expect(await mails()).toHaveLength(0);
+  });
+});
+
+describe('InviteMember account', () => {
+  it('should_open_the_account_with_the_address_and_the_shared_proxy_port', async () => {
+    await new InviteMember(deps).execute({
+      username: alice,
+      email: EmailAddress.parse('alice@example.org'),
+      quota: Quota.gib(400),
+      role: 'user',
+    });
+
+    const job = queue.jobs[0];
+    expect(job?.type).toBe('create-user');
+    if (job?.type === 'create-user') {
+      expect(job.payload).toMatchObject({ email: 'alice@example.org', proxyPort: 8080 });
+    }
+  });
+});
+
+describe('SendPasswordLink refusals', () => {
+  it('should_refuse_a_member_who_does_not_exist', async () => {
+    await expect(new SendPasswordLink(deps).execute(alice)).rejects.toThrow(UserNotFoundError);
+  });
+
+  it('should_send_no_link_to_a_suspended_member', async () => {
+    await users.save(new UserBuilder().withUsername('alice').suspended());
+    await credentials.save({ username: alice, role: 'user' }, now);
+
+    await expect(new SendPasswordLink(deps).execute(alice)).rejects.toThrow(MemberSuspendedError);
+    await expect(new SendPasswordLink(deps).execute(alice)).rejects.toThrow(
+      'alice is suspended: no password link is sent to a suspended member',
+    );
+    expect(await mails()).toHaveLength(0);
+  });
+
+  it('should_count_the_whole_hour_before_letting_a_fourth_link_out', async () => {
+    await users.save(new UserBuilder().withUsername('alice').build());
+    await credentials.save({ username: alice, role: 'user' }, now);
+    const send = new SendPasswordLink(deps);
+    for (let i = 0; i < 3; i += 1) {
+      await send.execute(alice);
+    }
+
+    now = '2026-10-24 10:59:59';
+    await expect(send.execute(alice)).rejects.toThrow(
+      'alice already got 3 password links this hour',
+    );
+    // the first three went out at 10:00:00: one hour later to the second, they still count
+    now = '2026-10-24 11:00:00';
+    await expect(send.execute(alice)).rejects.toThrow(TooManyPasswordLinksError);
+  });
+
+  it('should_write_the_reset_in_the_language_the_member_chose', async () => {
+    await users.save(new UserBuilder().withUsername('alice').build());
+    const passwordHash = await new FakePasswordHasher().hash(Password.parse('the-current-one'));
+    await credentials.save({ username: alice, role: 'user', language: Language.en, passwordHash }, now);
+
+    await new SendPasswordLink(deps).execute(alice);
+
+    expect((await mails())[0]?.subject).toBe('Choose a new password');
+  });
+});
+
+describe('RequestPasswordReset identifiers', () => {
+  const resetWith = (overrides: Partial<typeof deps> = {}) =>
+    new RequestPasswordReset({
+      ...deps,
+      ...overrides,
+      notifications: { notify: () => Promise.resolve() },
+    });
+
+  beforeEach(async () => {
+    await users.save(new UserBuilder().withUsername('alice').withEmail('alice@example.org').build());
+    await credentials.save({ username: alice, role: 'user' }, now);
+  });
+
+  it('should_find_a_member_named_with_capitals_and_surrounding_spaces', async () => {
+    await resetWith().execute('  Alice  ');
+
+    expect((await mails()).map((mail) => mail.recipient)).toEqual(['alice@example.org']);
+  });
+
+  it('should_mail_the_member_whose_address_was_given_and_no_other', async () => {
+    const bob = Username.parse('bob');
+    await users.save(new UserBuilder().withUsername('bob').withEmail('bob@example.org').build());
+    await credentials.save({ username: bob, role: 'user' }, now);
+
+    await resetWith().execute('bob@example.org');
+
+    expect((await mails()).map((mail) => mail.recipient)).toEqual(['bob@example.org']);
+  });
+
+  it('should_stay_silent_for_something_that_is_neither_a_name_nor_an_address', async () => {
+    await resetWith().execute('alice@@example.org');
+    await resetWith().execute('alice smith');
+
+    expect(await mails()).toHaveLength(0);
+  });
+
+  it('should_not_hide_a_failure_other_than_the_hourly_limit', async () => {
+    class BrokenOutbox extends InMemoryMailOutbox {
+      override enqueue(): Promise<number> {
+        return Promise.reject(new Error('outbox unavailable'));
+      }
+    }
+    const broken = new BrokenOutbox();
+
+    await expect(resetWith({ outbox: broken }).execute('alice')).rejects.toThrow(
+      'outbox unavailable',
+    );
+  });
+});
+
+describe('SetPasswordFromLink.isOpen', () => {
+  it('should_say_a_fresh_link_is_open_without_using_it', async () => {
+    const { url } = await new InviteMember(deps).execute({
+      username: alice,
+      email: EmailAddress.parse('alice@example.org'),
+      quota: Quota.gib(400),
+      role: 'user',
+    });
+    const set = new SetPasswordFromLink(deps);
+
+    expect(await set.isOpen(tokenOf(url))).toBe(true);
+    expect(await set.isOpen(tokenOf(url))).toBe(true);
+  });
+
+  it('should_say_an_unknown_or_used_link_is_closed', async () => {
+    const { url } = await new InviteMember(deps).execute({
+      username: alice,
+      email: EmailAddress.parse('alice@example.org'),
+      quota: Quota.gib(400),
+      role: 'user',
+    });
+    const set = new SetPasswordFromLink(deps);
+    await set.execute({ token: tokenOf(url), password: Password.parse('chosen-by-alice') });
+
+    expect(await set.isOpen(tokenOf(url))).toBe(false);
+    expect(await set.isOpen('f'.repeat(64))).toBe(false);
+    await expect(
+      set.execute({ token: tokenOf(url), password: Password.parse('chosen-again') }),
+    ).rejects.toThrow('this password link no longer works');
   });
 });

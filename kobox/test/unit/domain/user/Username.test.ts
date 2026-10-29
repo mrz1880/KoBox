@@ -50,3 +50,24 @@ describe('Username', () => {
     expect(Username.parse('alice').equals(Username.parse('bob'))).toBe(false);
   });
 });
+
+describe('Username reserved names', () => {
+  // every system account a member must never be able to become; www-data is
+  // left out because the pattern alone already refuses its dash
+  it.each(Username.RESERVED.filter((name) => name !== 'www-data'))(
+    'should_refuse_the_system_account_%s_as_reserved',
+    (raw) => {
+      expect(() => Username.parse(raw)).toThrow(`invalid username "${raw}": name is reserved`);
+    },
+  );
+
+  it('should_tell_why_it_refuses_a_name_outside_the_charset', () => {
+    expect(() => Username.parse('Alice')).toThrow(
+      'invalid username "Alice": must match [a-z][a-z0-9]{0,31}',
+    );
+  });
+
+  it('should_print_as_its_value', () => {
+    expect(String(Username.parse('alice'))).toBe('alice');
+  });
+});
