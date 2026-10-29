@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { SCHEDULED_JOBS } from '../../src/domain/maintenance/schedule.js';
 import { KoboxDatabase } from '../../src/infrastructure/persistence/db.js';
 
 // The Phase 5 product on an installed box: the declarative scheduler ticks
@@ -242,7 +243,8 @@ describe.skipIf(!onDebianAsRoot)('E2E: maintenance keeps the installed box alive
         .split('\n')
         .filter((line) => line !== '' && !line.startsWith('#') && !/^[A-Z]+=/.test(line))
         .map((line) => line.split(' ').slice(6)); // five schedule fields + 'root'
-      expect(entries).toHaveLength(11);
+      // one cron line per scheduled job, none dropped or added on the way
+      expect(entries).toHaveLength(SCHEDULED_JOBS.length);
 
       // a real tick: run the exact command cron would run — twice
       for (const round of [1, 2]) {
