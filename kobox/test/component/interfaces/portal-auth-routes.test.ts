@@ -317,3 +317,12 @@ describe('a machine presenting HTTP Basic', () => {
     expect(response.statusCode).toBe(401);
   });
 });
+
+describe('the browser tab', () => {
+  // the icon travels inside the page: no file for nginx or the portal to serve
+  it('should_show_the_kobox_icon_beside_the_page_title', async () => {
+    const response = await world.server.inject({ method: 'GET', url: '/login' });
+
+    expect(response.body).toMatch(/<link rel="icon" type="image\/svg\+xml" href="data:image\/svg\+xml,[^"]+">/);
+  });
+});
