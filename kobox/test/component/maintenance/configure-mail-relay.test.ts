@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   ApplyStoredMailRelay,
+  InvalidRelaySettingsError,
   ConfigureMailRelay,
   SaveMailRelay,
 } from '../../../src/application/maintenance/ConfigureMailRelay.js';
@@ -78,6 +79,125 @@ describe('ConfigureMailRelay', () => {
     ).rejects.toThrow();
     await expect(configure.execute({ ...INPUT, port: 0 })).rejects.toThrow();
     await expect(configure.execute({ ...INPUT, user: 'bad user' })).rejects.toThrow();
+  });
+
+  it('should_accept_the_first_and_last_valid_port', async () => {
+    for (const port of [1, 65535]) {
+      const { host, configure } = world();
+
+      await configure.execute({ ...INPUT, port });
+
+      expect(host.postconfSettings.relayhost).toBe(`[smtp.example.net]:${String(port)}`);
+    }
+  });
+
+  it('should_refuse_a_port_outside_the_tcp_range_or_not_whole', async () => {
+    for (const port of [0, 65536, 587.5]) {
+      const { host, configure } = world();
+
+      await expect(configure.execute({ ...INPUT, port })).rejects.toThrow(
+        new InvalidRelaySettingsError(`port ${String(port)}`),
+      );
+      expect(host.postmapped).toEqual([]);
+    }
+  });
+
+  it('should_refuse_a_relay_host_without_a_dot', async () => {
+    const { configure } = world();
+
+    await expect(configure.execute({ ...INPUT, host: 'localhost' })).rejects.toThrow(
+      new InvalidRelaySettingsError('relay host "localhost"'),
+    );
+  });
+
+  it('should_refuse_a_relay_host_with_junk_before_or_after_the_name', async () => {
+    for (const relayHost of [
+      ' smtp.example.net',
+      'smtp.example.net ',
+      '-smtp.example.net',
+      'smtp-.example.net',
+      'smtp..example.net',
+      `${'a'.repeat(64)}.example.net`,
+    ]) {
+      const { configure } = world();
+
+      await expect(configure.execute({ ...INPUT, host: relayHost })).rejects.toThrow(
+        InvalidRelaySettingsError,
+      );
+    }
+  });
+
+  it('should_accept_a_relay_host_in_capitals_or_with_inner_hyphens', async () => {
+    for (const relayHost of ['SMTP.Example.NET', 'mail-relay.example.net', `${'a'.repeat(63)}.example.net`, 'a.b']) {
+      const { host, configure } = world();
+
+      await configure.execute({ ...INPUT, host: relayHost });
+
+      expect(host.postconfSettings.relayhost).toBe(`[${relayHost}]:587`);
+    }
+  });
+
+  it('should_accept_a_login_that_is_an_email_address', async () => {
+    const { host, configure } = world();
+
+    await configure.execute({ ...INPUT, user: 'alice.relay+box@example.org' });
+
+    expect(host.contentAt('/etc/postfix/sasl_passwd')).toBe(
+      '[smtp.example.net]:587 alice.relay+box@example.org:s3cret relay pass\n',
+    );
+  });
+
+  it('should_refuse_a_login_with_junk_before_or_after_it', async () => {
+    for (const user of ['', ' alice', 'alice ', 'alice:x', 'alice\n']) {
+      const { configure } = world();
+
+      await expect(configure.execute({ ...INPUT, user })).rejects.toThrow(
+        new InvalidRelaySettingsError(`user ${JSON.stringify(user)}`),
+      );
+    }
+  });
+
+  it('should_refuse_an_empty_or_multi_line_password', async () => {
+    for (const password of ['', 'first\nsecond']) {
+      const { host, configure } = world();
+
+      await expect(configure.execute({ ...INPUT, password })).rejects.toThrow(
+        new InvalidRelaySettingsError('password must be a non-empty single line'),
+      );
+      expect(host.fileAt('/etc/postfix/sasl_passwd')).toBeUndefined();
+    }
+  });
+
+  it('should_keep_the_password_file_owned_by_the_root_group', async () => {
+    const { host, configure } = world();
+
+    await configure.execute(INPUT);
+
+    expect(host.fileAt('/etc/postfix/sasl_passwd')?.group).toBe('root');
+  });
+
+  it('should_name_its_error_so_callers_can_tell_it_apart', () => {
+    const error = new InvalidRelaySettingsError('port 0');
+
+    expect(error.name).toBe('InvalidRelaySettingsError');
+    expect(error.message).toBe('invalid relay settings: port 0');
+  });
+});
+
+describe('ApplyStoredMailRelay with nothing stored', () => {
+  it('should_leave_postfix_as_it_is', async () => {
+    const { host, systemd, configure } = world();
+
+    await new ApplyStoredMailRelay({
+      settings: new InMemoryMailRelayRepository(),
+      opener: {
+        open: () => Promise.reject(new Error('nothing should be opened')),
+      },
+      configure,
+    }).execute();
+
+    expect(host.postconfSettings).toEqual({});
+    expect(systemd.log).toEqual([]);
   });
 });
 

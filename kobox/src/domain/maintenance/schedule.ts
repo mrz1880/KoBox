@@ -8,7 +8,9 @@ export interface ScheduledJob {
 const SUBCOMMAND_PATTERN = /^[a-z0-9-]+$/;
 
 function entry(schedule: string, command: string): ScheduledJob {
+  // Stryker disable next-line BlockStatement: every entry of the constant table passes the guard, so no test can reach the throw
   if (!SUBCOMMAND_PATTERN.test(command)) {
+    // Stryker disable next-line StringLiteral: unreachable with the constant table, as above
     throw new Error(`unsafe scheduler subcommand ${JSON.stringify(command)}`);
   }
   return { schedule: CronSchedule.parse(schedule), command };

@@ -5,7 +5,7 @@ import type {
   ReleaseRepositoryPort,
   ReleaseState,
 } from '../../../src/application/maintenance/ReleaseRepositoryPort.js';
-import { UpgradeRelease } from '../../../src/application/maintenance/UpgradeRelease.js';
+import { UpgradeError, UpgradeRelease } from '../../../src/application/maintenance/UpgradeRelease.js';
 import type { UpgradeHostPort } from '../../../src/application/maintenance/UpgradeHostPort.js';
 
 const SETTINGS = {
@@ -45,7 +45,12 @@ class FakeGit implements GitPort {
     return Promise.resolve();
   }
 
+  failRemove = false;
+
   worktreeRemove(_repo: string, path: string): Promise<void> {
+    if (this.failRemove) {
+      return Promise.reject(new Error('fatal: not a working tree'));
+    }
     this.worktrees.delete(path);
     return Promise.resolve();
   }
@@ -122,10 +127,17 @@ class FakeUpgradeHost implements UpgradeHostPort {
   failBuild = false;
   failMigrate = false;
   failVerifyOnce = false;
+  failVerifyAlways = false;
+  // what a failing build rejects with, when it is not an Error
+  buildRejection: unknown = undefined;
 
   buildRelease(path: string): Promise<void> {
     if (this.failBuild) {
       return Promise.reject(new Error('pnpm build exited 2'));
+    }
+    if (this.buildRejection !== undefined) {
+      // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors -- a dependency may reject with a bare value
+      return Promise.reject(this.buildRejection);
     }
     this.built.push(path);
     return Promise.resolve();
@@ -158,6 +170,9 @@ class FakeUpgradeHost implements UpgradeHostPort {
 
   restartWorkerAndVerify(): Promise<boolean> {
     this.restarts += 1;
+    if (this.failVerifyAlways) {
+      return Promise.resolve(false);
+    }
     if (this.failVerifyOnce) {
       this.failVerifyOnce = false;
       return Promise.resolve(false);
@@ -363,5 +378,161 @@ describe('the portal after an upgrade', () => {
     await w.upgrade.rollback({ now: '2026-07-25 12:00:00' });
 
     expect(w.host.portalRestarts).toHaveLength(1);
+  });
+});
+
+describe('UpgradeRelease edges', () => {
+  it('should_not_fetch_when_asked_to_upgrade_offline', async () => {
+    const w = world();
+
+    await w.upgrade.execute({ to: 'v2.0.0', now: NOW, offline: true });
+
+    expect(w.git.fetched).toBe(0);
+    expect(w.host.current).toBe(STAGED_PATH);
+  });
+
+  it('should_fetch_when_offline_is_explicitly_off', async () => {
+    const w = world();
+
+    await w.upgrade.execute({ to: 'v2.0.0', now: NOW, offline: false });
+
+    expect(w.git.fetched).toBe(1);
+  });
+
+  it('should_say_where_the_missing_ref_was_looked_for', async () => {
+    const w = world();
+    // a repo that lists no such ref but could still resolve it must not be trusted
+    w.git.refs.set('v9.9.9', SHA);
+    w.git.refExists = () => Promise.resolve(false);
+
+    await expect(w.upgrade.execute({ to: 'v9.9.9', now: NOW })).rejects.toThrow(
+      'ref "v9.9.9" not found in /opt/KoBox',
+    );
+    expect(w.host.built).toEqual([]);
+  });
+
+  it('should_name_the_release_it_upgraded_from', async () => {
+    const w = world();
+    const first = await w.upgrade.execute({ to: 'v2.0.0', now: NOW });
+    w.git.refs.set('v3.0.0', 'c'.repeat(40));
+
+    const second = await w.upgrade.execute({ to: 'v3.0.0', now: '2026-07-25 11:00:00' });
+
+    expect(first.from).toBeUndefined();
+    expect(second.from).toBe('v2.0.0');
+    expect(second.backupDir).toBe('/var/backups/kobox/x');
+    expect((await w.releases.findByState('previous'))?.ref).toBe('v2.0.0');
+    expect((await w.releases.findByState('current'))?.switchedAt).toBe('2026-07-25 11:00:00');
+  });
+
+  it('should_keep_the_running_release_current_when_the_new_worker_does_not_come_up', async () => {
+    const w = world();
+    await w.upgrade.execute({ to: 'v2.0.0', now: NOW });
+    w.git.refs.set('v3.0.0', 'c'.repeat(40));
+    w.host.failVerifyOnce = true;
+
+    await expect(
+      w.upgrade.execute({ to: 'v3.0.0', now: '2026-07-25 11:00:00' }),
+    ).rejects.toThrow(/^worker did not come up on v3\.0\.0 .* reverted to the previous release \(DB backup at \/var\/backups\/kobox\/x\)$/);
+    expect((await w.releases.findByState('current'))?.ref).toBe('v2.0.0');
+    expect(await w.releases.findByState('previous')).toBeUndefined();
+  });
+
+  it('should_say_loudly_when_the_revert_restart_failed_too', async () => {
+    const w = world();
+    w.host.failVerifyAlways = true;
+
+    await expect(w.upgrade.execute({ to: 'v2.0.0', now: NOW })).rejects.toThrow(
+      'worker did not come up on v2.0.0 AND the revert restart failed too',
+    );
+    expect(w.host.current).toBe('/opt/KoBox/kobox');
+    expect(w.host.portalRestarts).toHaveLength(1);
+  });
+
+  it('should_not_claim_a_revert_when_there_was_nothing_to_flip_back_to', async () => {
+    const w = world();
+    w.host.current = undefined;
+    w.host.failVerifyOnce = true;
+
+    await expect(w.upgrade.execute({ to: 'v2.0.0', now: NOW })).rejects.toThrow(
+      'AND the revert restart failed too',
+    );
+    expect(w.host.switches).toEqual([STAGED_PATH]);
+    expect(w.host.restarts).toBe(1);
+    expect(w.host.portalRestarts).toEqual([]);
+  });
+
+  it('should_link_the_worktree_root_when_the_package_subdir_is_empty', async () => {
+    const w = world();
+    const flat = new UpgradeRelease({
+      git: w.git,
+      releases: w.releases,
+      host: w.host,
+      backup: { execute: () => Promise.resolve({ created: '/b', skippedDirs: [], deleted: [] }) },
+      settings: { ...SETTINGS, packageSubdir: '' },
+    });
+
+    await flat.execute({ to: 'v2.0.0', now: NOW });
+
+    expect(w.host.built).toEqual([STAGED_PATH]);
+    expect(w.host.current).toBe(STAGED_PATH);
+  });
+
+  it('should_surface_the_build_failure_even_when_the_cleanup_fails_too', async () => {
+    const w = world();
+    w.git.failRemove = true;
+    w.host.failBuild = true;
+
+    await expect(w.upgrade.execute({ to: 'v2.0.0', now: NOW })).rejects.toThrow('pnpm build exited 2');
+    expect((await w.releases.list())[0]?.state).toBe('failed');
+  });
+
+  it('should_turn_a_bare_rejection_from_the_build_into_an_error', async () => {
+    const w = world();
+    w.host.buildRejection = 'exit status 2';
+
+    await expect(w.upgrade.execute({ to: 'v2.0.0', now: NOW })).rejects.toThrow(
+      new Error('exit status 2'),
+    );
+  });
+
+  it('should_leave_the_ledger_alone_when_the_rolled_back_worker_does_not_come_up', async () => {
+    const w = world();
+    await w.upgrade.execute({ to: 'v2.0.0', now: NOW });
+    w.git.refs.set('v3.0.0', 'c'.repeat(40));
+    await w.upgrade.execute({ to: 'v3.0.0', now: '2026-07-25 11:00:00' });
+    w.host.portalRestarts.length = 0;
+    w.host.failVerifyOnce = true;
+
+    await expect(w.upgrade.rollback({ now: '2026-07-25 12:00:00' })).rejects.toThrow(
+      new UpgradeError(
+        'worker did not come up on v2.0.0 after rollback: inspect journalctl -u kobox-worker',
+      ),
+    );
+    expect((await w.releases.findByState('current'))?.ref).toBe('v3.0.0');
+    expect(w.host.portalRestarts).toEqual([]);
+  });
+
+  it('should_roll_back_into_the_package_subdir_and_report_the_worktree_root', async () => {
+    const w = world();
+    const nested = new UpgradeRelease({
+      git: w.git,
+      releases: w.releases,
+      host: w.host,
+      backup: { execute: () => Promise.resolve({ created: '/b', skippedDirs: [], deleted: [] }) },
+      settings: { ...SETTINGS, packageSubdir: 'kobox' },
+    });
+    await nested.execute({ to: 'v2.0.0', now: NOW });
+    w.git.refs.set('v3.0.0', 'c'.repeat(40));
+    await nested.execute({ to: 'v3.0.0', now: '2026-07-25 11:00:00' });
+
+    const report = await nested.rollback({ now: '2026-07-25 12:00:00' });
+
+    expect(w.host.current).toBe(`${STAGED_PATH}/kobox`);
+    expect(report).toEqual({ to: 'v2.0.0', path: STAGED_PATH });
+  });
+
+  it('should_name_its_error_so_callers_can_tell_it_apart', () => {
+    expect(new UpgradeError('x').name).toBe('UpgradeError');
   });
 });
