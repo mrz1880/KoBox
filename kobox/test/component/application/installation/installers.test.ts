@@ -8,9 +8,9 @@ import {
   type InstallerContext,
 } from '../../../../src/application/installation/installers.js';
 import type { CertbotRequest } from '../../../../src/application/maintenance/CertbotPort.js';
-import type { DebridKeyPairPort } from '../../../../src/domain/ddl/ports.js';
 import type { SystemFacts } from '../../../../src/domain/installation/ports.js';
 import { Cidr } from '../../../../src/domain/security/Cidr.js';
+import type { HostKeyPairPort } from '../../../../src/domain/security/ports.js';
 import { FakeConfigChecks } from '../../../../src/infrastructure/system/fakes/FakeConfigChecks.js';
 import { FakeInstallHost } from '../../../../src/infrastructure/system/fakes/FakeInstallHost.js';
 import { FakeIpset } from '../../../../src/infrastructure/system/fakes/FakeIpset.js';
@@ -36,7 +36,7 @@ interface World {
   readonly checks: FakeConfigChecks;
   readonly pki: FakeVpnPki;
   readonly ipset: FakeIpset;
-  readonly debridKeys: FakeDebridKeyPair;
+  readonly hostKeys: FakeHostKeyPair;
   readonly certbot: FakeCertbot;
   readonly nextcloud: RecordingNextcloud;
   readonly installers: ReadonlyMap<string, ComponentInstaller>;
@@ -66,7 +66,7 @@ class FakeCertbot {
 
 // Records that the sealing pair was provisioned; the real generation is
 // integration-tested (it must never regenerate over an existing private key).
-class FakeDebridKeyPair implements DebridKeyPairPort {
+class FakeHostKeyPair implements HostKeyPairPort {
   calls = 0;
   ensurePair(): Promise<void> {
     this.calls += 1;
@@ -109,7 +109,7 @@ function buildWorld(overrides?: {
   const checks = new FakeConfigChecks();
   const pki = new FakeVpnPki();
   const ipset = new FakeIpset();
-  const debridKeys = new FakeDebridKeyPair();
+  const hostKeys = new FakeHostKeyPair();
   const certbot = new FakeCertbot(host);
   const nextcloud = new RecordingNextcloud();
   const ctx: InstallerContext = {
@@ -120,7 +120,7 @@ function buildWorld(overrides?: {
     checks,
     host,
     ipset,
-    debridKeys,
+    hostKeys,
     certbot,
     pki,
     pkiProvision: pki,
@@ -189,7 +189,7 @@ function buildWorld(overrides?: {
     },
   };
   return {
-    packages, host, systemd, checks, pki, ipset, debridKeys, certbot, nextcloud,
+    packages, host, systemd, checks, pki, ipset, hostKeys, certbot, nextcloud,
     installers: buildInstallers(ctx),
   };
 }
@@ -276,7 +276,7 @@ describe('kobox-core installer', () => {
 
     // per-user debrid keys are useless without it; the adapter itself guarantees
     // an existing private half is never regenerated
-    expect(world.debridKeys.calls).toBe(1);
+    expect(world.hostKeys.calls).toBe(1);
   });
 
   it('should_uninstall_units_but_never_touch_the_database_dir', async () => {

@@ -50,12 +50,12 @@ import { SqliteMediaRepository } from '../infrastructure/persistence/SqliteMedia
 import { SqliteDiagnosticsRepository } from '../infrastructure/persistence/SqliteDiagnosticsRepository.js';
 import { SqliteSpeedtestRepository } from '../infrastructure/persistence/SqliteSpeedtestRepository.js';
 import { SqliteDebridDownloadRepository } from '../infrastructure/persistence/SqliteDebridDownloadRepository.js';
+import { RsaDebridKeyCipher } from '../infrastructure/system/RsaDebridKeyCipher.js';
 import {
-  RsaDebridKeyCipher,
-  DEFAULT_DEBRID_PUBLIC_KEY,
-  DEFAULT_DEBRID_PRIVATE_KEY,
-} from '../infrastructure/system/RsaDebridKeyCipher.js';
-import { FsDebridKeyPair } from '../infrastructure/system/FsDebridKeyPair.js';
+  DEFAULT_HOST_PRIVATE_KEY,
+  DEFAULT_HOST_PUBLIC_KEY,
+  FsHostKeyPair,
+} from '../infrastructure/system/HostKeyPair.js';
 import { RequestDebridDownload } from '../application/ddl/RequestDebridDownload.js';
 import type { DebridKeyEncryptorPort } from '../domain/ddl/ports.js';
 import type { JobQueuePort } from '../application/jobs/JobQueuePort.js';
@@ -202,14 +202,14 @@ function envInt(name: string, fallback: number): number {
 // so every cipher built here seals and opens with the same pair.
 function hostKeyPair(): { readonly publicKey: string; readonly privateKey: string } {
   return {
-    publicKey: process.env.KOBOX_DEBRID_PUBLIC_KEY ?? DEFAULT_DEBRID_PUBLIC_KEY,
-    privateKey: process.env.KOBOX_DEBRID_PRIVATE_KEY ?? DEFAULT_DEBRID_PRIVATE_KEY,
+    publicKey: process.env.KOBOX_DEBRID_PUBLIC_KEY ?? DEFAULT_HOST_PUBLIC_KEY,
+    privateKey: process.env.KOBOX_DEBRID_PRIVATE_KEY ?? DEFAULT_HOST_PRIVATE_KEY,
   };
 }
 
-function hostKeyFiles(): FsDebridKeyPair {
+function hostKeyFiles(): FsHostKeyPair {
   const keys = hostKeyPair();
-  return new FsDebridKeyPair(keys.publicKey, keys.privateKey);
+  return new FsHostKeyPair(keys.publicKey, keys.privateKey);
 }
 
 function passwordCipher(): RsaPasswordCipher {
@@ -407,7 +407,7 @@ export async function buildInstallation(
     checks: new ConfigCheckAdapter(runner),
     host: new InstallHostAdapter(runner),
     ipset: new IpsetAdapter(runner),
-    debridKeys: hostKeyFiles(),
+    hostKeys: hostKeyFiles(),
     certbot: new CertbotAdapter(runner, process.env.KOBOX_ACME_CA_BUNDLE),
     pki: installPki,
     pkiProvision: installPki,

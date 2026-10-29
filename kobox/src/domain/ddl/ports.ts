@@ -72,14 +72,6 @@ export interface DebridKeyDecryptorPort {
   decrypt(sealed: string): Promise<DebridApiKey>;
 }
 
-// Provisions the RSA pair that seals per-user debrid keys, at install time.
-// MUST be idempotent: regenerating an existing private half would silently
-// orphan every stored key. A missing public half is re-derived, never a pretext
-// to make a new pair.
-export interface DebridKeyPairPort {
-  ensurePair(): Promise<void>;
-}
-
 export interface DebridAccountRepository {
   // upsert: one key per user, replacing any previous one
   save(username: Username, encryptedKey: string, now: string): Promise<void>;

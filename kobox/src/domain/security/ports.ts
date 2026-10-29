@@ -141,3 +141,13 @@ export interface VpnPkiProvisionPort {
   ensureClientMaterial(username: Username): Promise<void>;
   removeClientMaterial(username: Username): Promise<void>;
 }
+
+// Provisions the host's RSA pair at install time: the portal seals with its
+// public half (a member's NAS password, a password change on its way through
+// the job queue) and only the root worker opens with the private one.
+// MUST be idempotent: regenerating an existing private half would silently
+// orphan everything sealed with it. A missing public half is re-derived, never
+// a pretext to make a new pair.
+export interface HostKeyPairPort {
+  ensurePair(): Promise<void>;
+}
