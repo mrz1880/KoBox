@@ -54,6 +54,7 @@ export class CronSchedule {
       throw new InvalidCronScheduleError(raw, `expected 5 space-separated fields`);
     }
     for (const [index, range] of FIELD_RANGES.entries()) {
+      // Stryker disable next-line StringLiteral: the length check above guarantees fields[index] exists, so the fallback never applies
       const detail = checkField(fields[index] ?? '', range);
       if (detail !== undefined) {
         throw new InvalidCronScheduleError(raw, detail);

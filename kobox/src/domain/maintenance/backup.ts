@@ -19,6 +19,7 @@ function parseStamp(stamp: string): number | undefined {
     return undefined;
   }
   const ms = Date.parse(
+    // Stryker disable next-line StringLiteral: the pattern matched, so all six groups are defined and the `?? ''` fallbacks never apply
     `${m[1] ?? ''}-${m[2] ?? ''}-${m[3] ?? ''}T${m[4] ?? ''}:${m[5] ?? ''}:${m[6] ?? ''}Z`,
   );
   return Number.isNaN(ms) ? undefined : ms;

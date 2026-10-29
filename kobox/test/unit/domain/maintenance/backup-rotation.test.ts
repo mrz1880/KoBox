@@ -69,3 +69,61 @@ function parseStamp(stamp: string): number {
   if (!m) throw new Error(`bad stamp ${stamp}`);
   return Date.parse(`${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:${m[6]}Z`);
 }
+
+describe('planBackupRotation edges', () => {
+  const opts = { ttlDays: 7, keepMin: 0 };
+
+  it('should_keep_a_backup_exactly_ttl_old_and_delete_one_a_second_older', () => {
+    // NOW is 2026-07-25 10:00:00, so 2026-07-18 10:00:00 is exactly 7 days old
+    const stamps = ['20260718T100000Z', '20260718T095959Z'];
+
+    expect(planBackupRotation(stamps, NOW, opts)).toEqual(['20260718T095959Z']);
+  });
+
+  it('should_return_the_deletions_in_chronological_order_whatever_the_listing_order', () => {
+    const stamps = ['20260702T053000Z', '20260710T053000Z', '20260701T053000Z'];
+
+    expect(planBackupRotation(stamps, NOW, opts)).toEqual([
+      '20260701T053000Z',
+      '20260702T053000Z',
+      '20260710T053000Z',
+    ]);
+  });
+
+  it('should_spare_the_newest_backups_not_the_first_listed', () => {
+    const stamps = ['20260601T053000Z', '20260603T053000Z', '20260602T053000Z'];
+
+    expect(planBackupRotation(stamps, NOW, { ttlDays: 7, keepMin: 1 })).toEqual([
+      '20260601T053000Z',
+      '20260602T053000Z',
+    ]);
+  });
+
+  it('should_never_delete_a_directory_that_is_not_a_backup_stamp', () => {
+    const stamps = [
+      'lost+found',
+      'x20260601T053000Z',
+      '20260601T053000Zx',
+      '20261301T053000Z', // month 13: shaped like a stamp, not a date
+      '20260601T053000Z',
+    ];
+
+    expect(planBackupRotation(stamps, NOW, opts)).toEqual(['20260601T053000Z']);
+  });
+
+  it('should_refuse_a_malformed_clock_instead_of_skipping_the_rotation', () => {
+    expect(() => planBackupRotation([], 'not a date', opts)).toThrow(
+      new RangeError('invalid timestamp "not a date"'),
+    );
+  });
+});
+
+describe('planBackupRotation among stray directories', () => {
+  it('should_not_let_a_stray_directory_take_the_place_of_a_kept_backup', () => {
+    const stamps = ['lost+found', '20260601T053000Z', '20260602T053000Z'];
+
+    expect(planBackupRotation(stamps, NOW, { ttlDays: 7, keepMin: 1 })).toEqual([
+      '20260601T053000Z',
+    ]);
+  });
+});
