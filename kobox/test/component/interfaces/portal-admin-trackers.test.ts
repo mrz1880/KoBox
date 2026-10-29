@@ -188,4 +188,23 @@ describe('turning a blocklist on and off', () => {
     // no "enabled" field means an unticked box, which is the off case
     expect(job?.payload).toMatchObject({ source: 'personal', author: 'me', name: 'ads', enabled: false });
   });
+
+  it.each([
+    [{ enabled: 'on' }, 'ads revient dans le filtre, qui est reconstruit immédiatement.'],
+    [{}, 'ads sort du filtre, qui est reconstruit immédiatement.'],
+  ])('should_confirm_the_toggle_in_the_admins_language', async (fields, french) => {
+    const response = await world.server.inject({
+      method: 'POST',
+      url: '/admin/blocklists/enabled',
+      headers: {
+        cookie: admin.cookie,
+        'accept-language': 'fr-FR,fr;q=0.9',
+        'content-type': 'application/x-www-form-urlencoded',
+      },
+      payload: form({ _csrf: admin.csrf, source: 'personal', author: 'me', name: 'ads', ...fields }),
+    });
+
+    const location = new URL(String(response.headers.location), 'https://box.example.org');
+    expect(location.searchParams.get('flash')).toBe(french);
+  });
 });

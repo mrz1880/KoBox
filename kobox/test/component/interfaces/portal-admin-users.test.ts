@@ -446,6 +446,31 @@ describe('reusing content already on the box', () => {
 });
 
 describe('the admin console in French', () => {
+  // the member's name sits inside these sentences: built as one English string,
+  // they never matched the catalogue and stayed English for a French admin
+  it.each([
+    ['quota', { quotaGib: '50' }, 'alice a maintenant 50 Gio. Personne d’autre n’est concerné.'],
+    ['role', { role: 'admin' }, 'alice est maintenant admin sur le portail.'],
+    ['public-trackers', { allowed: 'on' }, 'alice peut désormais ajouter des torrents depuis des trackers publics.'],
+    ['public-trackers', {}, 'alice revient aux trackers privés uniquement.'],
+    ['finish-scripts', { run: 'on' }, 'Les scripts de alice s’exécuteront de nouveau après un téléchargement.'],
+    ['finish-scripts', {}, 'Les scripts de alice ne s’exécuteront plus après un téléchargement.'],
+  ])('should_confirm_a_%s_change_in_the_admins_language', async (setting, fields, french) => {
+    const response = await world.server.inject({
+      method: 'POST',
+      url: `/admin/users/alice/${setting}`,
+      headers: {
+        cookie: admin.cookie,
+        'accept-language': 'fr-FR,fr;q=0.9',
+        'content-type': 'application/x-www-form-urlencoded',
+      },
+      payload: form({ _csrf: admin.csrf, ...fields }),
+    });
+
+    const location = new URL(String(response.headers.location), 'https://box.example.org');
+    expect(location.searchParams.get('flash')).toBe(french);
+  });
+
   it('should_translate_the_console_for_an_admin_who_asked_for_french', async () => {
     await world.server.inject({
       method: 'POST',

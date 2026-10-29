@@ -201,7 +201,10 @@ export function registerAdminUserRoutes(
     return redirectWithFlash(
       reply,
       `/admin/users/${params.data.name}`,
-      `${params.data.name} now has ${parsed.data.quotaGib} GiB. Nobody else is affected.`,
+      viewerOf(session, request).t('{name} now has {gib} GiB. Nobody else is affected.', {
+        name: params.data.name,
+        gib: String(parsed.data.quotaGib),
+      }),
     );
   });
 
@@ -223,7 +226,10 @@ export function registerAdminUserRoutes(
     return redirectWithFlash(
       reply,
       `/admin/users/${params.data.name}`,
-      `${params.data.name} is now ${parsed.data.role} on the portal.`,
+      viewerOf(session, request).t('{name} is now {role} on the portal.', {
+        name: params.data.name,
+        role: parsed.data.role,
+      }),
     );
   });
 
@@ -247,9 +253,12 @@ export function registerAdminUserRoutes(
     return redirectWithFlash(
       reply,
       `/admin/users/${params.data.name}`,
-      allowed
-        ? `${params.data.name} may now add torrents from public trackers.`
-        : `${params.data.name} is back to private trackers only.`,
+      viewerOf(session, request).t(
+        allowed
+          ? '{name} may now add torrents from public trackers.'
+          : '{name} is back to private trackers only.',
+        { name: params.data.name },
+      ),
     );
   });
 
@@ -296,9 +305,12 @@ export function registerAdminUserRoutes(
     return redirectWithFlash(
       reply,
       `/admin/users/${params.data.name}`,
-      run
-        ? `${params.data.name}'s own scripts will run again after a download.`
-        : `${params.data.name}'s own scripts will no longer run after a download.`,
+      viewerOf(session, request).t(
+        run
+          ? "{name}'s own scripts will run again after a download."
+          : "{name}'s own scripts will no longer run after a download.",
+        { name: params.data.name },
+      ),
     );
   });
 

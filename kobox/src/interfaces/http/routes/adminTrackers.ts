@@ -129,9 +129,12 @@ export function registerAdminTrackerRoutes(
     return redirectWithFlash(
       reply,
       '/admin/blocklists',
-      enabled
-        ? `${parsed.data.name} is going back into the filter, which is rebuilt straight away.`
-        : `${parsed.data.name} is coming out of the filter, which is rebuilt straight away.`,
+      viewerOf(session, request).t(
+        enabled
+          ? '{name} is going back into the filter, which is rebuilt straight away.'
+          : '{name} is coming out of the filter, which is rebuilt straight away.',
+        { name: parsed.data.name },
+      ),
     );
   });
 
