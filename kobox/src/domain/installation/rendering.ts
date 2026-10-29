@@ -257,11 +257,15 @@ const ENV_KEY_PATTERN = /^[A-Z][A-Z0-9_]*$/;
 // credentials, notification webhooks). The non-root portal never calls those
 // paths — it reads repositories and enqueues jobs — so it must not receive them.
 const WORKER_ONLY_ENV_NAMES: readonly string[] = [
+  // Stryker disable next-line StringLiteral: equivalent, the _APIKEY suffix convention below withholds this key too
   'KOBOX_ALLDEBRID_APIKEY',
+  // Stryker disable next-line StringLiteral: equivalent, the _SECRET suffix convention below withholds this key too
   'KOBOX_ARIA2_RPC_SECRET',
   'KOBOX_IBLOCKLIST_USER',
+  // Stryker disable next-line StringLiteral: equivalent, the _PIN suffix convention below withholds this key too
   'KOBOX_IBLOCKLIST_PIN',
   'KOBOX_NTFY_URL',
+  // Stryker disable next-line StringLiteral: equivalent, the _WEBHOOK suffix convention below withholds this key too
   'KOBOX_DISCORD_WEBHOOK',
 ];
 

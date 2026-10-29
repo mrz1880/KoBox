@@ -105,7 +105,9 @@ export function mergeBlocklistRanges(
     .filter((line) => line.includes('.'));
   const unique = [...new Set(kept)];
   return unique.sort((a, b) => {
+    // Stryker disable next-line StringLiteral: unreachable fallback, split with a limit of 1 always yields one element
     const aKey = ipSortKey(a.split(/[-/]/, 1)[0] ?? '');
+    // Stryker disable next-line StringLiteral: unreachable fallback, split with a limit of 1 always yields one element
     const bKey = ipSortKey(b.split(/[-/]/, 1)[0] ?? '');
     return aKey - bKey || a.localeCompare(b);
   });
