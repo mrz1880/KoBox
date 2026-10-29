@@ -3,6 +3,7 @@ import { NFS_MOUNTD_PORT } from '../../../../src/domain/installation/rendering.j
 import {
   InstallGuardError,
   buildInstallers,
+  nextcloudSsoRelease,
   type ComponentInstaller,
   type InstallerContext,
 } from '../../../../src/application/installation/installers.js';
@@ -37,7 +38,7 @@ interface World {
   readonly ipset: FakeIpset;
   readonly debridKeys: FakeDebridKeyPair;
   readonly certbot: FakeCertbot;
-  readonly nextcloud: FakeNextcloud;
+  readonly nextcloud: RecordingNextcloud;
   readonly installers: ReadonlyMap<string, ComponentInstaller>;
 }
 
@@ -73,6 +74,18 @@ class FakeDebridKeyPair implements DebridKeyPairPort {
   }
 }
 
+// remembers which admin account Nextcloud was installed with
+class RecordingNextcloud extends FakeNextcloud {
+  readonly installedWith: { adminUser: string; adminPassword: string }[] = [];
+
+  // the base fake ignores its arguments; the port passes (adminUser, adminPassword)
+  override install(...args: readonly string[]): Promise<void> {
+    const [adminUser = '', adminPassword = ''] = args;
+    this.installedWith.push({ adminUser, adminPassword });
+    return super.install();
+  }
+}
+
 function buildWorld(overrides?: {
   facts?: Partial<SystemFacts>;
   manageAptSources?: boolean;
@@ -86,6 +99,7 @@ function buildWorld(overrides?: {
     sso?: { url: string; sha256: string };
   };
   aria2Pin?: 'none';
+  aria2?: { secret: string; stagingDir?: string };
   speedtestPin?: 'none';
   letsencrypt?: { domain: string; email: string; acmeUrl?: string };
 }): World {
@@ -97,7 +111,7 @@ function buildWorld(overrides?: {
   const ipset = new FakeIpset();
   const debridKeys = new FakeDebridKeyPair();
   const certbot = new FakeCertbot(host);
-  const nextcloud = new FakeNextcloud();
+  const nextcloud = new RecordingNextcloud();
   const ctx: InstallerContext = {
     packages,
     nextcloud,
@@ -153,9 +167,16 @@ function buildWorld(overrides?: {
         speedtestUrl: 'https://releases.example.net/librespeed-cli',
         speedtestSha256: 'c'.repeat(64),
       }),
-      ...(overrides?.aria2Pin !== 'none' && {
-        aria2RpcSecret: 'test-rpc-secret',
-        ddlStagingDir: '/var/lib/kobox-aria2',
+      ...(overrides?.aria2Pin !== 'none' &&
+        overrides?.aria2 === undefined && {
+          aria2RpcSecret: 'test-rpc-secret',
+          ddlStagingDir: '/var/lib/kobox-aria2',
+        }),
+      ...(overrides?.aria2 !== undefined && {
+        aria2RpcSecret: overrides.aria2.secret,
+        ...(overrides.aria2.stagingDir !== undefined && {
+          ddlStagingDir: overrides.aria2.stagingDir,
+        }),
       }),
       ...(overrides?.quotaFs !== undefined && { quotaFs: overrides.quotaFs }),
       ...(overrides?.letsencrypt !== undefined && { letsencrypt: overrides.letsencrypt }),
@@ -992,7 +1013,7 @@ describe('aria2 installer', () => {
     await installer(unpinned, 'aria2').uninstall();
 
     // no systemctl disable / daemon-reload paid for a component that was skipped
-    expect(unpinned.systemd.log).not.toContain('kobox-aria2');
+    expect(unpinned.systemd.log).toEqual([]);
   });
 });
 
@@ -1213,5 +1234,1045 @@ describe('nextcloud installer', () => {
     await installer(pinned, 'nextcloud').install();
 
     expect(pinned.nextcloud.servedAt).toEqual({ host: 'box.example.org', port: 8189 });
+  });
+});
+
+describe('installer catalog', () => {
+  it('should_build_one_installer_per_catalog_component_under_its_own_name', () => {
+    expect([...world.installers.keys()].sort()).toEqual([
+      'apt-sources', 'aria2', 'bind', 'dnscrypt', 'fail2ban', 'ipset', 'kobox-core',
+      'letsencrypt', 'nanomon', 'nextcloud', 'nfs', 'nginx', 'openvpn', 'portal', 'postfix',
+      'quota', 'rtorrent', 'rutorrent', 'samba', 'scheduler', 'shellinabox', 'speedtest',
+      'sshd', 'tweaks',
+    ]);
+  });
+});
+
+describe('the config check guard', () => {
+  it('should_name_the_component_and_the_checker_complaint_when_it_rolls_back', async () => {
+    world.checks.failSshd('Bad configuration option: Foo');
+
+    const failure = installer(world, 'sshd').install();
+
+    await expect(failure).rejects.toThrow('sshd: config check failed, changes rolled back');
+    await expect(failure).rejects.toThrow(/rolled back \S+ Bad configuration option: Foo$/);
+    await expect(failure).rejects.toHaveProperty('name', 'InstallGuardError');
+  });
+
+  it('should_put_the_previous_file_back_when_the_checker_itself_dies', async () => {
+    const previous = {
+      path: '/etc/ssh/sshd_config.d/90-kobox.conf',
+      content: 'Port 2222\n',
+      mode: '0644',
+      owner: 'root',
+      group: 'root',
+    };
+    await world.host.apply([previous]);
+    world.checks.throwSshd(new Error('sshd binary vanished'));
+
+    await expect(installer(world, 'sshd').install()).rejects.toThrow('sshd binary vanished');
+
+    expect(world.host.contentAt('/etc/ssh/sshd_config.d/90-kobox.conf')).toBe('Port 2222\n');
+  });
+});
+
+describe('kobox-core installer: the command and the units', () => {
+  it('should_install_the_kobox_command_running_the_cli_through_the_current_link', async () => {
+    await installer(world, 'kobox-core').install();
+
+    const command = world.host.fileAt('/usr/local/bin/kobox');
+    expect(command?.content).toContain(
+      'exec /usr/bin/node /opt/kobox/current/dist/interfaces/cli/main.js "$@"',
+    );
+    expect(command?.mode).toBe('0755');
+  });
+
+  it('should_lay_down_the_firewall_boot_unit_and_enable_the_worker_after_reloading_systemd', async () => {
+    await installer(world, 'kobox-core').install();
+
+    expect(world.host.contentAt('/etc/systemd/system/kobox-firewall.service')).toBeDefined();
+    expect(world.systemd.log).toEqual([
+      'daemon-reload',
+      'enable-now kobox-worker',
+      'enable kobox-firewall',
+    ]);
+  });
+
+  it('should_stop_both_units_and_forget_them_on_uninstall', async () => {
+    await installer(world, 'kobox-core').install();
+    world.systemd.log.length = 0;
+
+    await installer(world, 'kobox-core').uninstall();
+
+    expect(world.systemd.log).toEqual([
+      'disable-now kobox-worker',
+      'disable-now kobox-firewall',
+      'daemon-reload',
+    ]);
+    expect(world.host.contentAt('/etc/systemd/system/kobox-firewall.service')).toBeUndefined();
+    // the spool holds data too
+    expect(world.host.dirs.has('/var/spool/kobox/events')).toBe(true);
+  });
+});
+
+describe('apt-sources installer: opting in', () => {
+  it('should_say_how_to_opt_in_and_leave_the_package_index_alone_when_skipping', async () => {
+    const outcome = await installer(world, 'apt-sources').install();
+
+    expect(outcome.state === 'skipped' && outcome.reason).toContain('--manage-apt-sources');
+    expect(world.packages.refreshCount).toBe(0);
+  });
+
+  it('should_leave_the_sources_in_place_on_uninstall', async () => {
+    const opted = buildWorld({ manageAptSources: true });
+    await installer(opted, 'apt-sources').install();
+
+    await installer(opted, 'apt-sources').uninstall();
+
+    expect(opted.host.contentAt('/etc/apt/sources.list.d/debian.sources')).toBeDefined();
+  });
+});
+
+describe('sshd installer: outcome and uninstall', () => {
+  it('should_report_the_installed_openssh_version', async () => {
+    const outcome = await installer(world, 'sshd').install();
+
+    expect(outcome).toEqual({ state: 'installed', version: '1.0-1' });
+  });
+
+  it('should_remove_the_dropin_and_reload_ssh_on_uninstall', async () => {
+    await installer(world, 'sshd').install();
+    world.systemd.log.length = 0;
+
+    await installer(world, 'sshd').uninstall();
+
+    expect(world.host.contentAt('/etc/ssh/sshd_config.d/90-kobox.conf')).toBeUndefined();
+    expect(world.systemd.log).toEqual(['reload-or-restart ssh']);
+  });
+});
+
+describe('tweaks installer', () => {
+  it('should_render_the_sysctl_dropin_and_apply_it', async () => {
+    const outcome = await installer(world, 'tweaks').install();
+
+    expect(outcome).toEqual({ state: 'installed' });
+    expect(world.host.contentAt('/etc/sysctl.d/90-kobox.conf')).toBeDefined();
+    expect(world.host.sysctlApplies).toBe(1);
+  });
+
+  it('should_remove_the_dropin_and_apply_sysctl_again_on_uninstall', async () => {
+    await installer(world, 'tweaks').install();
+
+    await installer(world, 'tweaks').uninstall();
+
+    expect(world.host.contentAt('/etc/sysctl.d/90-kobox.conf')).toBeUndefined();
+    expect(world.host.sysctlApplies).toBe(2);
+  });
+});
+
+describe('quota installer: guidance', () => {
+  it('should_install_the_tools_and_say_which_setting_activates_enforcement_when_no_fs_is_set', async () => {
+    const outcome = await installer(world, 'quota').install();
+
+    expect(world.packages.installed).toContain('quota');
+    expect(outcome).toEqual({
+      state: 'installed',
+      detail: 'tools installed; set KOBOX_QUOTA_FS to activate enforcement',
+    });
+    expect(world.host.quotaActivated).toEqual([]);
+  });
+
+  it('should_name_the_filesystem_to_remount_when_fstab_is_not_ready', async () => {
+    const withQuota = buildWorld({ quotaFs: '/srv' });
+    withQuota.host.setMountOptions('/srv', ['rw']);
+
+    const outcome = await installer(withQuota, 'quota').install();
+
+    expect(outcome.state === 'installed' && outcome.detail).toBe(
+      'tools installed; add usrquota to the /srv mount options in /etc/fstab, remount, then re-run kobox install',
+    );
+  });
+
+  it('should_say_quotas_are_active_on_the_filesystem_once_activated', async () => {
+    const withQuota = buildWorld({ quotaFs: '/srv' });
+    withQuota.host.setMountOptions('/srv', ['rw', 'usrquota']);
+
+    const outcome = await installer(withQuota, 'quota').install();
+
+    expect(outcome.state === 'installed' && outcome.detail).toBe('hard quotas active on /srv');
+  });
+});
+
+describe('nginx installer: reloads and uninstall', () => {
+  it('should_reload_nginx_on_a_changed_vhost_and_report_its_version', async () => {
+    const outcome = await installer(world, 'nginx').install();
+
+    expect(outcome).toEqual({ state: 'installed', version: '1.0-1' });
+    expect(world.systemd.log).toEqual(['enable-now nginx', 'reload-or-restart nginx']);
+  });
+
+  it('should_not_reload_nginx_when_the_vhost_did_not_change', async () => {
+    await installer(world, 'nginx').install();
+    world.systemd.log.length = 0;
+
+    await installer(world, 'nginx').install();
+
+    expect(world.systemd.log).toEqual(['enable-now nginx']);
+  });
+
+  it('should_stay_on_snakeoil_while_a_configured_domain_has_no_certificate_yet', async () => {
+    const w = buildWorld({ letsencrypt: { domain: 'box.example.org', email: 'ops@example.org' } });
+
+    await installer(w, 'nginx').install();
+
+    expect(w.host.contentAt('/etc/nginx/conf.d/kobox.conf')).toContain('snakeoil');
+  });
+
+  it('should_drop_the_vhost_and_reload_a_running_nginx_on_uninstall', async () => {
+    await installer(world, 'nginx').install();
+    world.systemd.log.length = 0;
+
+    await installer(world, 'nginx').uninstall();
+
+    expect(world.host.contentAt('/etc/nginx/conf.d/kobox.conf')).toBeUndefined();
+    expect(world.systemd.log).toEqual(['reload-or-restart nginx']);
+  });
+
+  it('should_not_start_a_stopped_nginx_on_uninstall', async () => {
+    await installer(world, 'nginx').uninstall();
+
+    expect(world.systemd.log).toEqual([]);
+  });
+});
+
+describe('rtorrent installer', () => {
+  it('should_install_rtorrent_with_the_tools_that_carry_downloads_home', async () => {
+    const outcome = await installer(world, 'rtorrent').install();
+
+    expect(world.packages.installed).toEqual(['rtorrent', 'rsync', 'sshpass']);
+    expect(outcome).toEqual({ state: 'installed', version: '1.0-1' });
+  });
+
+  it('should_leave_the_package_on_uninstall', async () => {
+    await installer(world, 'rtorrent').install();
+
+    await installer(world, 'rtorrent').uninstall();
+
+    expect(world.packages.installed).toContain('rtorrent');
+  });
+});
+
+describe('rutorrent installer: the vendored release', () => {
+  it('should_install_php_and_unzip_and_report_no_note_when_unrar_is_available', async () => {
+    const outcome = await installer(world, 'rutorrent').install();
+
+    expect(world.packages.installed).toEqual(expect.arrayContaining(['php-fpm', 'php-cli', 'unzip']));
+    expect(outcome).toEqual({ state: 'installed' });
+  });
+
+  it('should_unpack_the_verified_archive_into_the_web_tree_and_record_its_sum', async () => {
+    await installer(world, 'rutorrent').install();
+
+    expect(world.host.contentAt('/var/tmp/kobox/rutorrent.tar.gz')).toBe(
+      'ARTIFACT:https://releases.example.net/rutorrent-4.3.9.tar.gz',
+    );
+    expect(world.host.dirs.get('/var/www/rutorrent')).toBe('0755');
+    expect(world.host.extracted).toEqual([['/var/tmp/kobox/rutorrent.tar.gz', '/var/www/rutorrent']]);
+    expect(world.host.fileAt('/var/www/rutorrent/.kobox-artifact-sha256')).toEqual({
+      path: '/var/www/rutorrent/.kobox-artifact-sha256',
+      content: `${'a'.repeat(64)}\n`,
+      mode: '0644',
+      owner: 'root',
+      group: 'root',
+    });
+  });
+
+  it('should_fetch_again_when_the_recorded_release_is_another_one', async () => {
+    await world.host.apply([
+      {
+        path: '/var/www/rutorrent/.kobox-artifact-sha256',
+        content: `${'f'.repeat(64)}\n`,
+        mode: '0644',
+        owner: 'root',
+        group: 'root',
+      },
+    ]);
+
+    await installer(world, 'rutorrent').install();
+
+    expect(world.host.fetched).toHaveLength(1);
+  });
+
+  it('should_keep_a_config_php_that_kobox_never_overwrote', async () => {
+    await installer(world, 'rutorrent').install();
+    await world.host.ensureFile({
+      path: '/var/www/rutorrent/conf/config.php',
+      content: '<?php\n$scgi_port = 5000;\n',
+      mode: '0644',
+      owner: 'root',
+      group: 'root',
+    });
+
+    await installer(world, 'rutorrent').install();
+
+    expect(world.host.fetched).toHaveLength(1);
+  });
+});
+
+describe('nextcloud installer: the release and its site', () => {
+  const pins = {
+    url: 'https://example.net/nc.tar.bz2',
+    sha256: 'd'.repeat(64),
+    adminPassword: 'chosen-by-the-operator',
+  };
+
+  it('should_install_nextcloud_once_with_the_admin_password_the_operator_chose', async () => {
+    const pinned = buildWorld({ nextcloud: pins });
+
+    await installer(pinned, 'nextcloud').install();
+    await installer(pinned, 'nextcloud').install();
+
+    expect(pinned.nextcloud.installedWith).toEqual([
+      { adminUser: 'kobox-admin', adminPassword: 'chosen-by-the-operator' },
+    ]);
+  });
+
+  it('should_unpack_the_verified_release_into_its_tree_and_record_it_outside', async () => {
+    const pinned = buildWorld({ nextcloud: pins });
+
+    await installer(pinned, 'nextcloud').install();
+
+    expect(pinned.host.fetched).toContainEqual(['https://example.net/nc.tar.bz2', 'd'.repeat(64)]);
+    expect(pinned.host.contentAt('/var/tmp/kobox/nextcloud.tar.bz2')).toBe(
+      'ARTIFACT:https://example.net/nc.tar.bz2',
+    );
+    expect(pinned.host.dirs.get('/var/www/nextcloud')).toBe('0755');
+    expect(pinned.host.extracted).toContainEqual(['/var/tmp/kobox/nextcloud.tar.bz2', '/var/www/nextcloud']);
+    expect(pinned.host.fileAt('/var/lib/kobox/nextcloud.release-sha256')).toEqual({
+      path: '/var/lib/kobox/nextcloud.release-sha256',
+      content: `${'d'.repeat(64)}\n`,
+      mode: '0644',
+      owner: 'root',
+      group: 'root',
+    });
+  });
+
+  it('should_not_fetch_a_release_already_recorded', async () => {
+    const pinned = buildWorld({ nextcloud: pins });
+    await installer(pinned, 'nextcloud').install();
+
+    await installer(pinned, 'nextcloud').install();
+
+    expect(pinned.host.fetched.filter(([url]) => url === pins.url)).toHaveLength(1);
+  });
+
+  it('should_move_the_old_in_tree_marker_out_with_root_ownership', async () => {
+    const pinned = buildWorld({ nextcloud: pins });
+    await pinned.host.apply([
+      { path: '/var/www/nextcloud/.kobox-artifact-sha256', content: 'old-sum\n', mode: '0600', owner: 'www-data', group: 'www-data' },
+    ]);
+
+    await installer(pinned, 'nextcloud').install();
+
+    // the moved marker records another release: this one is fetched and recorded
+    expect(pinned.host.fetched.map(([url]) => url)).toContain(pins.url);
+    expect(pinned.host.fileAt('/var/lib/kobox/nextcloud.release-sha256')).toEqual(
+      expect.objectContaining({ mode: '0644', owner: 'root', group: 'root' }),
+    );
+  });
+
+  it('should_install_the_php_modules_and_archive_tools_nextcloud_runs_on', async () => {
+    const pinned = buildWorld({ nextcloud: pins });
+
+    await installer(pinned, 'nextcloud').install();
+
+    expect(pinned.packages.installed).toEqual([
+      'bzip2', 'php-fpm', 'php-cli', 'php-sqlite3', 'php-gd', 'php-curl', 'php-mbstring',
+      'php-xml', 'php-zip', 'php-intl', 'php-bcmath', 'php-gmp', 'php-apcu', 'php-imagick',
+      'unzip',
+    ]);
+  });
+
+  it('should_restart_php_when_its_settings_change_and_only_then', async () => {
+    const pinned = buildWorld({ nextcloud: pins });
+
+    await installer(pinned, 'nextcloud').install();
+    expect(pinned.systemd.log).toContain('reload-or-restart php8.4-fpm');
+    pinned.systemd.log.length = 0;
+    await installer(pinned, 'nextcloud').install();
+
+    expect(pinned.systemd.log).not.toContain('reload-or-restart php8.4-fpm');
+    expect(pinned.systemd.log).toContain('enable-now php8.4-fpm');
+  });
+
+  it('should_lay_down_its_site_and_reload_nginx', async () => {
+    const pinned = buildWorld({ nextcloud: pins });
+
+    await installer(pinned, 'nextcloud').install();
+
+    expect(pinned.host.contentAt('/etc/nginx/kobox.d/nextcloud.conf')).toBeDefined();
+    expect(pinned.systemd.log.at(-1)).toBe('reload-or-restart nginx');
+  });
+
+  it('should_answer_on_the_machine_name_when_no_public_name_is_configured', async () => {
+    const pinned = buildWorld({ nextcloud: pins });
+
+    await installer(pinned, 'nextcloud').install();
+
+    expect(pinned.nextcloud.servedAt).toEqual({ host: 'kobox-test', port: 8189 });
+  });
+
+  it('should_drop_its_site_and_reload_nginx_on_uninstall_keeping_the_data', async () => {
+    const pinned = buildWorld({ nextcloud: pins });
+    await installer(pinned, 'nextcloud').install();
+    pinned.systemd.log.length = 0;
+
+    await installer(pinned, 'nextcloud').uninstall();
+
+    expect(pinned.host.contentAt('/etc/nginx/kobox.d/nextcloud.conf')).toBeUndefined();
+    expect(pinned.systemd.log).toEqual(['reload-or-restart nginx']);
+    expect(pinned.host.contentAt('/var/lib/kobox/nextcloud.release-sha256')).toBeDefined();
+  });
+
+  it('should_unpack_the_sso_app_for_the_web_server_and_record_its_release', async () => {
+    const pinned = buildWorld({
+      nextcloud: { ...pins, sso: { url: 'https://example.net/user_saml.tar.gz', sha256: 'e'.repeat(64) } },
+    });
+
+    const outcome = await installer(pinned, 'nextcloud').install();
+
+    expect(outcome).toEqual({ state: 'installed' });
+    expect(pinned.host.contentAt('/var/tmp/kobox/user_saml.tar.gz')).toBe(
+      'ARTIFACT:https://example.net/user_saml.tar.gz',
+    );
+    expect(pinned.host.dirs.get('/var/www/nextcloud/apps/user_saml')).toBe('0755');
+    expect(pinned.host.extracted).toContainEqual([
+      '/var/tmp/kobox/user_saml.tar.gz',
+      '/var/www/nextcloud/apps/user_saml',
+    ]);
+    expect(pinned.host.fileAt('/var/lib/kobox/user_saml.release-sha256')).toEqual({
+      path: '/var/lib/kobox/user_saml.release-sha256',
+      content: `${'e'.repeat(64)}\n`,
+      mode: '0644',
+      owner: 'root',
+      group: 'root',
+    });
+    expect(pinned.host.chowned).toContainEqual({
+      path: '/var/www/nextcloud/apps/user_saml',
+      owner: 'www-data',
+      group: 'www-data',
+    });
+  });
+
+  it('should_move_the_sso_marker_out_of_nextclouds_tree', async () => {
+    const pinned = buildWorld({
+      nextcloud: { ...pins, sso: { url: 'https://example.net/user_saml.tar.gz', sha256: 'e'.repeat(64) } },
+    });
+    await pinned.host.apply([
+      {
+        path: '/var/www/nextcloud/apps/user_saml/.kobox-artifact-sha256',
+        content: `${'e'.repeat(64)}\n`,
+        mode: '0644',
+        owner: 'root',
+        group: 'root',
+      },
+    ]);
+
+    await installer(pinned, 'nextcloud').install();
+
+    expect(pinned.host.contentAt('/var/www/nextcloud/apps/user_saml/.kobox-artifact-sha256')).toBeUndefined();
+    expect(pinned.host.fileAt('/var/lib/kobox/user_saml.release-sha256')).toEqual({
+      path: '/var/lib/kobox/user_saml.release-sha256',
+      content: `${'e'.repeat(64)}\n`,
+      mode: '0644',
+      owner: 'root',
+      group: 'root',
+    });
+    expect(pinned.host.fetched.map(([url]) => url)).not.toContain('https://example.net/user_saml.tar.gz');
+  });
+
+  it('should_say_how_to_open_nextcloud_from_the_portal_session_when_sso_is_not_pinned', async () => {
+    const pinned = buildWorld({ nextcloud: pins });
+
+    const outcome = await installer(pinned, 'nextcloud').install();
+
+    expect(outcome).toEqual({
+      state: 'installed',
+      detail:
+        'Nextcloud asks for the password again: set KOBOX_NEXTCLOUD_SSO_URL and KOBOX_NEXTCLOUD_SSO_SHA256 (its user_saml app), then re-run kobox install, to open it from the portal session',
+    });
+    expect(pinned.nextcloud.portalSignIn).toBeUndefined();
+  });
+
+  it('should_skip_without_touching_the_box_when_the_release_is_half_pinned', async () => {
+    const outcome = await installer(world, 'nextcloud').install();
+
+    expect(outcome).toEqual({
+      state: 'skipped',
+      reason:
+        'no Nextcloud release pinned: set KOBOX_NEXTCLOUD_URL and KOBOX_NEXTCLOUD_SHA256, then re-run kobox install',
+    });
+    expect(world.packages.installed).toEqual([]);
+  });
+});
+
+describe('nextcloudSsoRelease', () => {
+  it('should_give_the_release_when_both_its_url_and_its_sum_are_pinned', () => {
+    expect(
+      nextcloudSsoRelease({ nextcloudSsoUrl: 'https://example.net/s.tar.gz', nextcloudSsoSha256: 'e'.repeat(64) }),
+    ).toEqual({ url: 'https://example.net/s.tar.gz', sha256: 'e'.repeat(64) });
+  });
+
+  it('should_give_nothing_when_only_the_url_is_pinned', () => {
+    expect(nextcloudSsoRelease({ nextcloudSsoUrl: 'https://example.net/s.tar.gz' })).toBeUndefined();
+  });
+
+  it('should_give_nothing_when_only_the_sum_is_pinned', () => {
+    expect(nextcloudSsoRelease({ nextcloudSsoSha256: 'e'.repeat(64) })).toBeUndefined();
+  });
+});
+
+describe('bind installer: reloads and uninstall', () => {
+  it('should_seed_a_zones_file_bind_can_read', async () => {
+    await installer(world, 'bind').install();
+
+    expect(world.host.fileAt('/etc/bind/kobox.zones.blacklists')).toEqual({
+      path: '/etc/bind/kobox.zones.blacklists',
+      content: '// rendered by kobox render-whitelist\n',
+      mode: '0644',
+      owner: 'root',
+      group: 'bind',
+    });
+    expect(world.host.contentAt('/etc/bind/named.conf.local')).toBeDefined();
+  });
+
+  it('should_start_named_reload_it_on_change_and_report_its_version', async () => {
+    const outcome = await installer(world, 'bind').install();
+
+    expect(world.packages.installed).toContain('bind9');
+    expect(outcome).toEqual({ state: 'installed', version: '1.0-1' });
+    expect(world.systemd.log).toEqual(['enable-now named', 'reload-or-restart named']);
+  });
+
+  it('should_not_reload_named_when_nothing_changed', async () => {
+    await installer(world, 'bind').install();
+    world.systemd.log.length = 0;
+
+    await installer(world, 'bind').install();
+
+    expect(world.systemd.log).toEqual(['enable-now named']);
+  });
+
+  it('should_stop_named_on_uninstall_and_keep_its_config', async () => {
+    await installer(world, 'bind').install();
+
+    await installer(world, 'bind').uninstall();
+
+    expect(world.systemd.log.at(-1)).toBe('disable-now named');
+    expect(world.host.contentAt('/etc/bind/named.conf.options')).toBeDefined();
+  });
+});
+
+describe('dnscrypt installer: reloads and uninstall', () => {
+  it('should_seed_an_empty_blocked_names_list_and_report_the_version', async () => {
+    const outcome = await installer(world, 'dnscrypt').install();
+
+    expect(world.host.fileAt('/etc/dnscrypt-proxy/blocked-names.txt')).toEqual({
+      path: '/etc/dnscrypt-proxy/blocked-names.txt',
+      content: '',
+      mode: '0644',
+      owner: 'root',
+      group: 'root',
+    });
+    expect(outcome).toEqual({ state: 'installed', version: '1.0-1' });
+  });
+
+  it('should_restart_the_service_on_a_changed_config_and_only_then', async () => {
+    await installer(world, 'dnscrypt').install();
+    expect(world.systemd.log.at(-1)).toBe('reload-or-restart dnscrypt-proxy');
+    world.systemd.log.length = 0;
+
+    await installer(world, 'dnscrypt').install();
+
+    expect(world.systemd.log).toEqual(['enable-now dnscrypt-proxy.socket', 'enable-now dnscrypt-proxy']);
+  });
+
+  it('should_stop_the_service_on_uninstall', async () => {
+    await installer(world, 'dnscrypt').uninstall();
+
+    expect(world.systemd.log).toEqual(['disable-now dnscrypt-proxy']);
+  });
+});
+
+describe('letsencrypt installer: reloads and uninstall', () => {
+  const le = { domain: 'box.example.org', email: 'ops@example.org' };
+
+  it('should_reload_nginx_once_the_vhost_points_at_the_live_chain_and_report_certbots_version', async () => {
+    const w = buildWorld({ letsencrypt: le });
+    await installer(w, 'nginx').install();
+    w.systemd.log.length = 0;
+
+    const outcome = await installer(w, 'letsencrypt').install();
+
+    expect(outcome).toEqual({ state: 'installed', version: '1.0-1' });
+    expect(w.systemd.log).toEqual(['reload-or-restart nginx', 'enable-now certbot.timer']);
+  });
+
+  it('should_not_reload_nginx_when_the_vhost_already_points_at_the_live_chain', async () => {
+    const w = buildWorld({ letsencrypt: le });
+    await installer(w, 'letsencrypt').install();
+    w.systemd.log.length = 0;
+
+    await installer(w, 'letsencrypt').install();
+
+    expect(w.systemd.log).toEqual(['enable-now certbot.timer']);
+  });
+
+  it('should_roll_the_vhost_back_when_nginx_refuses_the_live_chain', async () => {
+    const w = buildWorld({ letsencrypt: le });
+    await installer(w, 'nginx').install();
+    w.checks.failNginx('cannot load certificate');
+
+    await expect(installer(w, 'letsencrypt').install()).rejects.toThrow(
+      'letsencrypt: config check failed',
+    );
+
+    expect(w.host.contentAt('/etc/nginx/conf.d/kobox.conf')).toContain('snakeoil');
+  });
+
+  it('should_fall_back_to_snakeoil_on_uninstall_while_nginx_runs', async () => {
+    const w = buildWorld({ letsencrypt: le });
+    await installer(w, 'nginx').install();
+    await installer(w, 'letsencrypt').install();
+    w.systemd.log.length = 0;
+
+    await installer(w, 'letsencrypt').uninstall();
+
+    expect(w.host.contentAt('/etc/letsencrypt/renewal-hooks/deploy/kobox-nginx')).toBeUndefined();
+    expect(w.host.contentAt('/etc/nginx/conf.d/kobox.conf')).toContain('snakeoil');
+    expect(w.systemd.log).toEqual(['disable-now certbot.timer', 'reload-or-restart nginx']);
+  });
+
+  it('should_leave_a_stopped_nginx_alone_on_uninstall', async () => {
+    const w = buildWorld({ letsencrypt: le });
+
+    await installer(w, 'letsencrypt').uninstall();
+
+    expect(w.systemd.log).toEqual(['disable-now certbot.timer']);
+    expect(w.host.contentAt('/etc/nginx/conf.d/kobox.conf')).toBeUndefined();
+  });
+
+  it('should_roll_back_the_snakeoil_render_when_nginx_refuses_it_on_uninstall', async () => {
+    const w = buildWorld({ letsencrypt: le });
+    await installer(w, 'nginx').install();
+    await installer(w, 'letsencrypt').install();
+    w.checks.failNginx('unexpected token');
+
+    await expect(installer(w, 'letsencrypt').uninstall()).rejects.toThrow(InstallGuardError);
+
+    expect(w.host.contentAt('/etc/nginx/conf.d/kobox.conf')).not.toContain('snakeoil');
+  });
+});
+
+describe('ipset installer: outcome', () => {
+  it('should_report_the_ipset_version', async () => {
+    expect(await installer(world, 'ipset').install()).toEqual({ state: 'installed', version: '1.0-1' });
+  });
+});
+
+describe('scheduler installer: outcome', () => {
+  it('should_report_the_cron_version', async () => {
+    expect(await installer(world, 'scheduler').install()).toEqual({ state: 'installed', version: '1.0-1' });
+  });
+});
+
+describe('fail2ban installer: outcome and uninstall', () => {
+  it('should_report_the_fail2ban_version', async () => {
+    expect(await installer(world, 'fail2ban').install()).toEqual({ state: 'installed', version: '1.0-1' });
+  });
+
+  it('should_stop_the_service_and_remove_every_kobox_jail_and_filter_on_uninstall', async () => {
+    const managed = [
+      '/etc/fail2ban/jail.d/kobox.local',
+      '/etc/fail2ban/filter.d/kobox-publickey-flood.conf',
+      '/etc/fail2ban/filter.d/kobox-portal.conf',
+    ];
+    await world.host.apply(
+      managed.map((path) => ({ path, content: '[x]', mode: '0644', owner: 'root', group: 'root' })),
+    );
+
+    await installer(world, 'fail2ban').uninstall();
+
+    expect(world.systemd.log).toEqual(['disable-now fail2ban']);
+    for (const path of managed) {
+      expect(world.host.contentAt(path), path).toBeUndefined();
+    }
+  });
+});
+
+describe('portal installer: restarts', () => {
+  it('should_restart_the_portal_when_its_unit_or_env_changed', async () => {
+    await installer(world, 'portal').install();
+
+    expect(world.systemd.log).toEqual(['daemon-reload', 'enable-now kobox-portal', 'reload-or-restart kobox-portal']);
+  });
+
+  it('should_leave_a_running_portal_alone_when_nothing_changed', async () => {
+    await installer(world, 'portal').install();
+    world.systemd.log.length = 0;
+
+    await installer(world, 'portal').install();
+
+    expect(world.systemd.log).not.toContain('reload-or-restart kobox-portal');
+  });
+
+  it('should_reload_systemd_after_removing_the_unit_on_uninstall', async () => {
+    await installer(world, 'portal').install();
+    world.systemd.log.length = 0;
+
+    await installer(world, 'portal').uninstall();
+
+    expect(world.systemd.log).toEqual(['disable-now kobox-portal', 'daemon-reload']);
+  });
+});
+
+describe('openvpn installer: outcome and uninstall', () => {
+  it('should_hold_the_log_dir_and_report_the_openvpn_version', async () => {
+    const outcome = await installer(world, 'openvpn').install();
+
+    expect(world.packages.installed).toEqual(expect.arrayContaining(['openvpn', 'easy-rsa']));
+    expect(world.host.dirs.get('/var/log/openvpn')).toBe('0755');
+    expect(outcome).toEqual({ state: 'installed', version: '1.0-1' });
+  });
+
+  it('should_render_every_variant_server', async () => {
+    await installer(world, 'openvpn').install();
+
+    for (const variant of ['tun-gw', 'tun', 'tap']) {
+      expect(world.host.contentAt(`/etc/openvpn/server/kobox-${variant}.conf`), variant).toBeDefined();
+    }
+  });
+
+  it('should_enable_without_starting_the_tunnels_and_say_why_without_a_tun_device', async () => {
+    const container = buildWorld({ facts: { hasTunDevice: false } });
+
+    const outcome = await installer(container, 'openvpn').install();
+
+    expect(outcome).toMatchObject({ state: 'installed', version: '1.0-1' });
+    expect(outcome.state === 'installed' && outcome.detail).toMatch(
+      /^no \/dev\/net\/tun here \S+ units enabled, tunnels validated on the VM$/,
+    );
+    expect(container.systemd.log).toEqual([
+      'enable openvpn-server@kobox-tun-gw',
+      'enable openvpn-server@kobox-tun',
+      'enable openvpn-server@kobox-tap',
+    ]);
+  });
+
+  it('should_stop_every_tunnel_on_uninstall', async () => {
+    await installer(world, 'openvpn').uninstall();
+
+    expect(world.systemd.log).toEqual([
+      'disable-now openvpn-server@kobox-tun-gw',
+      'disable-now openvpn-server@kobox-tun',
+      'disable-now openvpn-server@kobox-tap',
+    ]);
+  });
+});
+
+describe('postfix installer: outcome and uninstall', () => {
+  it('should_preseed_a_local_only_mailer_named_after_the_machine', async () => {
+    await installer(world, 'postfix').install();
+
+    expect(world.host.preseeded).toEqual([
+      'postfix postfix/main_mailer_type select Local only',
+      'postfix postfix/mailname string kobox-test',
+    ]);
+  });
+
+  it('should_relay_only_for_the_machine_itself_and_report_its_version', async () => {
+    const outcome = await installer(world, 'postfix').install();
+
+    expect(world.packages.installed).toContain('postfix');
+    expect(world.host.postconfSettings.mynetworks).toBe('127.0.0.0/8 [::1]/128');
+    expect(outcome).toEqual({ state: 'installed', version: '1.0-1' });
+  });
+
+  it('should_stop_postfix_on_uninstall', async () => {
+    await installer(world, 'postfix').uninstall();
+
+    expect(world.systemd.log).toEqual(['disable-now postfix']);
+  });
+});
+
+describe('nfs installer: restarts and uninstall', () => {
+  it('should_report_the_nfs_server_version', async () => {
+    expect(await installer(world, 'nfs').install()).toEqual({ state: 'installed', version: '1.0-1' });
+  });
+
+  it('should_not_restart_mountd_when_its_pin_did_not_change', async () => {
+    await installer(world, 'nfs').install();
+    world.systemd.log.length = 0;
+
+    await installer(world, 'nfs').install();
+
+    expect(world.systemd.log).toEqual(['enable-now nfs-server']);
+  });
+
+  it('should_stop_the_server_and_drop_the_exports_on_uninstall', async () => {
+    await world.host.apply([
+      { path: '/etc/exports.d/kobox.exports', content: '/home/alice 10.0.0.2(rw)', mode: '0644', owner: 'root', group: 'root' },
+    ]);
+
+    await installer(world, 'nfs').uninstall();
+
+    expect(world.systemd.log).toEqual(['disable-now nfs-server']);
+    expect(world.host.contentAt('/etc/exports.d/kobox.exports')).toBeUndefined();
+  });
+});
+
+describe('samba installer: reloads and uninstall', () => {
+  it('should_reload_smbd_on_a_changed_config_and_report_its_version', async () => {
+    const outcome = await installer(world, 'samba').install();
+
+    expect(world.packages.installed).toContain('samba');
+    expect(outcome).toEqual({ state: 'installed', version: '1.0-1' });
+    expect(world.systemd.log).toEqual(['enable-now smbd', 'reload-or-restart smbd']);
+  });
+
+  it('should_not_reload_smbd_when_nothing_changed', async () => {
+    await installer(world, 'samba').install();
+    world.systemd.log.length = 0;
+
+    await installer(world, 'samba').install();
+
+    expect(world.systemd.log).toEqual(['enable-now smbd']);
+  });
+
+  it('should_stop_smbd_and_remove_its_config_on_uninstall', async () => {
+    await installer(world, 'samba').install();
+    world.systemd.log.length = 0;
+
+    await installer(world, 'samba').uninstall();
+
+    expect(world.systemd.log).toEqual(['disable-now smbd']);
+    expect(world.host.contentAt('/etc/samba/smb.conf')).toBeUndefined();
+  });
+});
+
+describe('shellinabox installer: reloads and uninstall', () => {
+  it('should_reload_shellinabox_on_a_changed_default_and_report_its_version', async () => {
+    const outcome = await installer(world, 'shellinabox').install();
+
+    expect(world.packages.installed).toContain('shellinabox');
+    expect(outcome).toEqual({ state: 'installed', version: '1.0-1' });
+    expect(world.systemd.log).toEqual(['enable-now shellinabox', 'reload-or-restart shellinabox']);
+  });
+
+  it('should_not_reload_shellinabox_when_nothing_changed', async () => {
+    await installer(world, 'shellinabox').install();
+    world.systemd.log.length = 0;
+
+    await installer(world, 'shellinabox').install();
+
+    expect(world.systemd.log).toEqual(['enable-now shellinabox']);
+  });
+
+  it('should_stop_it_and_remove_its_default_on_uninstall', async () => {
+    await installer(world, 'shellinabox').install();
+    world.systemd.log.length = 0;
+
+    await installer(world, 'shellinabox').uninstall();
+
+    expect(world.systemd.log).toEqual(['disable-now shellinabox']);
+    expect(world.host.contentAt('/etc/default/shellinabox')).toBeUndefined();
+  });
+});
+
+describe('nanomon installer: the binary and restarts', () => {
+  it('should_make_the_fetched_binary_root_owned_and_executable_and_record_its_sum', async () => {
+    const outcome = await installer(world, 'nanomon').install();
+
+    expect(outcome).toEqual({ state: 'installed' });
+    expect(world.host.contentAt('/usr/local/bin/nanomon')).toBe(
+      'ARTIFACT:https://releases.example.net/nanomon-x86_64',
+    );
+    expect(world.host.ownership.get('/usr/local/bin/nanomon')).toEqual({
+      owner: 'root',
+      group: 'root',
+      mode: '0755',
+    });
+    expect(world.host.fileAt('/etc/kobox/nanomon.sha256')).toEqual({
+      path: '/etc/kobox/nanomon.sha256',
+      content: `${'b'.repeat(64)}\n`,
+      mode: '0644',
+      owner: 'root',
+      group: 'root',
+    });
+  });
+
+  it('should_restart_nanomon_on_first_install', async () => {
+    await installer(world, 'nanomon').install();
+
+    expect(world.systemd.log).toEqual([
+      'daemon-reload',
+      'enable-now kobox-nanomon',
+      'reload-or-restart kobox-nanomon',
+    ]);
+  });
+
+  it('should_leave_nanomon_running_when_neither_binary_nor_unit_changed', async () => {
+    await installer(world, 'nanomon').install();
+    world.systemd.log.length = 0;
+
+    await installer(world, 'nanomon').install();
+
+    expect(world.systemd.log).toEqual(['daemon-reload', 'enable-now kobox-nanomon']);
+  });
+
+  it('should_restart_nanomon_on_a_new_binary_even_when_its_unit_did_not_change', async () => {
+    await installer(world, 'nanomon').install();
+    await world.host.apply([
+      { path: '/etc/kobox/nanomon.sha256', content: `${'0'.repeat(64)}\n`, mode: '0644', owner: 'root', group: 'root' },
+    ]);
+    world.systemd.log.length = 0;
+
+    await installer(world, 'nanomon').install();
+
+    expect(world.host.fetched).toHaveLength(2);
+    expect(world.systemd.log).toContain('reload-or-restart kobox-nanomon');
+  });
+
+  it('should_restart_nanomon_on_a_changed_unit_even_when_the_binary_did_not_change', async () => {
+    await installer(world, 'nanomon').install();
+    await world.host.apply([
+      { path: '/etc/systemd/system/kobox-nanomon.service', content: '[Unit]\n', mode: '0644', owner: 'root', group: 'root' },
+    ]);
+    world.systemd.log.length = 0;
+
+    await installer(world, 'nanomon').install();
+
+    expect(world.host.fetched).toHaveLength(1);
+    expect(world.systemd.log).toContain('reload-or-restart kobox-nanomon');
+  });
+
+  it('should_remove_the_unit_and_reload_systemd_on_uninstall', async () => {
+    await installer(world, 'nanomon').install();
+    world.systemd.log.length = 0;
+
+    await installer(world, 'nanomon').uninstall();
+
+    expect(world.host.contentAt('/etc/systemd/system/kobox-nanomon.service')).toBeUndefined();
+    expect(world.systemd.log).toEqual(['disable-now kobox-nanomon', 'daemon-reload']);
+  });
+});
+
+describe('speedtest installer: the vendored binary', () => {
+  it('should_report_the_first_twelve_characters_of_the_pinned_sum_as_its_version', async () => {
+    const outcome = await installer(world, 'speedtest').install();
+
+    expect(outcome).toEqual({ state: 'installed', version: 'cccccccccccc' });
+  });
+
+  it('should_report_the_same_version_when_already_vendored', async () => {
+    await installer(world, 'speedtest').install();
+
+    expect(await installer(world, 'speedtest').install()).toEqual({
+      state: 'installed',
+      version: 'cccccccccccc',
+    });
+  });
+
+  it('should_fetch_the_archive_into_its_own_directory_and_make_the_binary_executable', async () => {
+    await installer(world, 'speedtest').install();
+
+    expect(world.host.fetched).toEqual([['https://releases.example.net/librespeed-cli', 'c'.repeat(64)]]);
+    expect(world.host.contentAt('/var/tmp/kobox/librespeed-cli.tar.gz')).toBe(
+      'ARTIFACT:https://releases.example.net/librespeed-cli',
+    );
+    expect(world.host.dirs.get('/usr/local/lib/kobox-speedtest')).toBe('0755');
+    expect(world.host.ownership.get('/usr/local/lib/kobox-speedtest/librespeed-cli')).toEqual({
+      owner: 'root',
+      group: 'root',
+      mode: '0755',
+    });
+    expect(world.host.fileAt('/etc/kobox/speedtest.sha256')).toEqual({
+      path: '/etc/kobox/speedtest.sha256',
+      content: `${'c'.repeat(64)}\n`,
+      mode: '0644',
+      owner: 'root',
+      group: 'root',
+    });
+  });
+
+  it('should_remove_the_archive_and_the_recorded_sum_on_uninstall', async () => {
+    await installer(world, 'speedtest').install();
+
+    await installer(world, 'speedtest').uninstall();
+
+    expect(world.host.contentAt('/var/tmp/kobox/librespeed-cli.tar.gz')).toBeUndefined();
+    expect(world.host.contentAt('/etc/kobox/speedtest.sha256')).toBeUndefined();
+  });
+});
+
+describe('aria2 installer: staging and restarts', () => {
+  it('should_skip_when_the_rpc_secret_is_empty', async () => {
+    const empty = buildWorld({ aria2: { secret: '' } });
+
+    const outcome = await installer(empty, 'aria2').install();
+
+    expect(outcome.state === 'skipped' && outcome.reason).toContain('set KOBOX_ARIA2_RPC_SECRET');
+    expect(empty.packages.installed).toEqual([]);
+  });
+
+  it('should_give_the_staging_dir_to_the_aria2_account_alone', async () => {
+    const custom = buildWorld({ aria2: { secret: 's3cret', stagingDir: '/srv/ddl-staging' } });
+
+    await installer(custom, 'aria2').install();
+
+    expect(custom.host.dirs.get('/srv/ddl-staging')).toBe('0750');
+    expect(custom.host.ownership.get('/srv/ddl-staging')).toEqual({
+      owner: 'kobox-aria2',
+      group: 'kobox-aria2',
+      mode: '0750',
+    });
+    expect(custom.host.contentAt('/etc/kobox/aria2.conf')).toContain('/srv/ddl-staging');
+  });
+
+  it('should_stage_under_its_own_top_level_dir_when_none_is_configured', async () => {
+    const defaults = buildWorld({ aria2: { secret: 's3cret' } });
+
+    await installer(defaults, 'aria2').install();
+
+    expect(defaults.host.dirs.get('/var/lib/kobox-aria2')).toBe('0750');
+  });
+
+  it('should_restart_aria2_on_a_changed_config_and_report_its_version', async () => {
+    const outcome = await installer(world, 'aria2').install();
+
+    expect(outcome).toEqual({ state: 'installed', version: '1.0-1' });
+    expect(world.systemd.log).toEqual([
+      'daemon-reload',
+      'enable-now kobox-aria2',
+      'reload-or-restart kobox-aria2',
+    ]);
+  });
+
+  it('should_leave_aria2_running_when_nothing_changed', async () => {
+    await installer(world, 'aria2').install();
+    world.systemd.log.length = 0;
+
+    await installer(world, 'aria2').install();
+
+    expect(world.systemd.log).toEqual(['daemon-reload', 'enable-now kobox-aria2']);
+  });
+
+  it('should_reload_systemd_after_removing_the_unit_on_uninstall', async () => {
+    await installer(world, 'aria2').install();
+    world.systemd.log.length = 0;
+
+    await installer(world, 'aria2').uninstall();
+
+    expect(world.systemd.log).toEqual(['disable-now kobox-aria2', 'daemon-reload']);
   });
 });
