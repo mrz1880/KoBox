@@ -59,6 +59,11 @@ export class FakeInstallHost implements ManagedFilesPort, InstallHostPort, Artif
     return Promise.resolve();
   }
 
+  removeDir(path: string): Promise<void> {
+    this.dirs.delete(path);
+    return Promise.resolve();
+  }
+
   ensureDir(path: string, mode: string): Promise<void> {
     this.dirs.set(path, mode);
     return Promise.resolve();

@@ -11,6 +11,10 @@ import { ComponentName } from '../../../../src/domain/installation/ComponentName
 import type { SystemFacts } from '../../../../src/domain/installation/ports.js';
 import { InMemoryComponentRegistry } from '../../../../src/infrastructure/persistence/InMemoryComponentRegistry.js';
 import { FakePackages } from '../../../../src/infrastructure/system/fakes/FakePackages.js';
+import { FakeInstallHost } from '../../../../src/infrastructure/system/fakes/FakeInstallHost.js';
+import { FakeSystemd } from '../../../../src/infrastructure/system/fakes/FakeSystemd.js';
+import { TearDownRetiredServices } from '../../../../src/application/installation/TearDownRetiredServices.js';
+import type { RetiredService } from '../../../../src/domain/installation/retired.js';
 
 const healthyFacts: SystemFacts = {
   osId: 'debian',
@@ -50,6 +54,19 @@ function spec(name: string, dependsOn: readonly string[] = []): ComponentSpec {
 }
 
 // a small catalog keeps the orchestration behavior readable
+// a service an earlier release installed and this one no longer ships
+const retired: RetiredService = {
+  unit: 'kobox-engine',
+  unitFile: '/etc/systemd/system/kobox-engine.service',
+  files: ['/etc/kobox/engine.conf'],
+  dirs: ['/var/lib/kobox-engine'],
+};
+
+// what an installation run is given to take away
+function tearDownRetired(): TearDownRetiredServices {
+  return new TearDownRetiredServices({ host: world.host, systemd: world.systemd, retired: [retired] });
+}
+
 const catalog: readonly ComponentSpec[] = [
   spec('kobox-core'),
   spec('sshd'),
@@ -60,6 +77,8 @@ const catalog: readonly ComponentSpec[] = [
 interface World {
   readonly registry: InMemoryComponentRegistry;
   readonly packages: FakePackages;
+  readonly host: FakeInstallHost;
+  readonly systemd: FakeSystemd;
   readonly installers: Map<string, StubInstaller>;
   readonly enqueued: string[];
   drained: number;
@@ -79,6 +98,7 @@ function runner(): RunInstallation {
     facts: { gather: () => Promise.resolve(world.facts) },
     registry: world.registry,
     packages: world.packages,
+    tearDownRetired: tearDownRetired(),
     installers: world.installers,
     catalog,
     enqueueConvergence: (type) => {
@@ -97,6 +117,8 @@ beforeEach(() => {
   world = {
     registry: new InMemoryComponentRegistry(),
     packages: new FakePackages(),
+    host: new FakeInstallHost(),
+    systemd: new FakeSystemd(),
     installers: new Map(),
     enqueued: [],
     drained: 0,
@@ -138,6 +160,24 @@ describe('RunInstallation', () => {
     expect(world.packages.refreshCount).toBe(0);
     expect(world.enqueued).toEqual([]);
     expect((await world.registry.states()).size).toBe(0);
+    expect(world.systemd.log).toEqual([]);
+  });
+
+  it('should_stop_a_retired_service_before_installing_anything', async () => {
+    // the upgrade path: a box re-runs `kobox install` once the new release is in
+    await world.host.apply([
+      { path: retired.unitFile, content: '[Unit]\n', mode: '0644', owner: 'root', group: 'root' },
+    ]);
+    let unitThereWhenCoreInstalled: boolean | undefined;
+    stub('kobox-core', () => {
+      unitThereWhenCoreInstalled = world.host.contentAt(retired.unitFile) !== undefined;
+      return { state: 'installed' };
+    });
+
+    await runner().execute({ allowNonExt4: false });
+
+    expect(unitThereWhenCoreInstalled).toBe(false);
+    expect(world.systemd.log).toEqual(['disable-now kobox-engine', 'daemon-reload']);
   });
 
   it('should_stop_at_the_first_failure_record_it_and_resume_from_there', async () => {
@@ -281,6 +321,7 @@ describe('RunInstallation: what it records and tells the operator', () => {
       facts: { gather: () => Promise.resolve(world.facts) },
       registry: world.registry,
       packages: world.packages,
+      tearDownRetired: tearDownRetired(),
       installers: world.installers,
       catalog,
       enqueueConvergence: () => Promise.resolve(),
@@ -289,6 +330,17 @@ describe('RunInstallation: what it records and tells the operator', () => {
       onProgress: (line) => progress.push(line),
     });
   }
+
+  it('should_tell_the_operator_which_retired_service_it_stopped', async () => {
+    await world.host.apply([
+      { path: retired.unitFile, content: '[Unit]\n', mode: '0644', owner: 'root', group: 'root' },
+    ]);
+    const progress: string[] = [];
+
+    await reportingRunner(progress).execute({ allowNonExt4: false });
+
+    expect(progress[0]).toBe('kobox-engine: retired, stopped and removed');
+  });
 
   it('should_list_every_preflight_failure_and_change_nothing', async () => {
     world.facts = { ...healthyFacts, euid: 1000 };

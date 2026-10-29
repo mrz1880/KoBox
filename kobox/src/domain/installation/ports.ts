@@ -60,6 +60,8 @@ export interface InstallHostPort {
   pathExists(path: string): Promise<boolean>;
   readFile(path: string): Promise<string | undefined>;
   removeFile(path: string): Promise<void>;
+  // a directory and everything in it; one that is not there is not an error
+  removeDir(path: string): Promise<void>;
   ensureDir(path: string, mode: string): Promise<void>;
   chown(path: string, owner: string, group: string): Promise<void>;
   // creates the file only when absent; returns true when it was created
