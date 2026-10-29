@@ -39,8 +39,6 @@ const FR: Readonly<Record<string, string>> = {
   Overview: 'Vue d’ensemble',
 
   // my media
-  'Nothing here yet. Files appear once a download finishes.':
-    'Rien pour l’instant. Les fichiers apparaissent quand un téléchargement se termine.',
   'Empty for now.': 'Vide pour le moment.',
   File: 'Fichier',
   Size: 'Taille',
@@ -448,6 +446,17 @@ const FR: Readonly<Record<string, string>> = {
     '{name} peut désormais ajouter des torrents depuis des trackers publics.',
   '{name} is back to private trackers only.':
     '{name} revient aux trackers privés uniquement.',
+  '{name} now has {gib} GiB. Nobody else is affected.':
+    '{name} a maintenant {gib} Gio. Personne d’autre n’est concerné.',
+  '{name} is now {role} on the portal.': '{name} est maintenant {role} sur le portail.',
+  "{name}'s own scripts will run again after a download.":
+    'Les scripts de {name} s’exécuteront de nouveau après un téléchargement.',
+  "{name}'s own scripts will no longer run after a download.":
+    'Les scripts de {name} ne s’exécuteront plus après un téléchargement.',
+  '{name} is going back into the filter, which is rebuilt straight away.':
+    '{name} revient dans le filtre, qui est reconstruit immédiatement.',
+  '{name} is coming out of the filter, which is rebuilt straight away.':
+    '{name} sort du filtre, qui est reconstruit immédiatement.',
 
   // trackers and blocklists
   Source: 'Source',
@@ -460,7 +469,6 @@ const FR: Readonly<Record<string, string>> = {
   'Import the catalog': 'Importer le catalogue',
   Host: 'Hôte',
   Privacy: 'Confidentialité',
-  'Certificate expiry': 'Expiration du certificat',
   'Renew certificates': 'Renouveler les certificats',
 
   // mail relay and domain
