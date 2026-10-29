@@ -15,6 +15,7 @@ export class Username {
     'root',
     'plex',
     'ftp',
+    // Stryker disable next-line StringLiteral: every reader checks USERNAME_PATTERN first, which already refuses the dash, so this entry is never reached
     'www-data',
     'admin',
     'mysb',

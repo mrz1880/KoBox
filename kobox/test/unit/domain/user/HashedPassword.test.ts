@@ -19,3 +19,38 @@ describe('HashedPassword', () => {
     }
   });
 });
+
+describe('HashedPassword boundaries', () => {
+  it('should_accept_a_hash_of_16_characters_and_refuse_one_of_15', () => {
+    expect(HashedPassword.parse('$6$abcdefghijklm').value).toBe('$6$abcdefghijklm');
+    expect(() => HashedPassword.parse('$6$abcdefghijkl')).toThrow(InvalidHashedPasswordError);
+  });
+
+  it('should_accept_every_character_a_crypt_hash_uses', () => {
+    const raw = '$y$j9T$AZaz09./=,-$tail';
+
+    expect(HashedPassword.parse(raw).value).toBe(raw);
+  });
+
+  it('should_refuse_a_weaker_scheme_with_a_plausible_body', () => {
+    expect(() => HashedPassword.parse('$5$rounds=5000$abcdefghijkl')).toThrow(
+      'invalid hashed password: expected a sha512-crypt ($6$) or yescrypt ($y$) hash',
+    );
+  });
+
+  it('should_refuse_a_hash_wrapped_in_other_text', () => {
+    // anchored at both ends: a valid hash inside a longer string is not a hash
+    for (const raw of [`x${SHA512_CRYPT}`, `${SHA512_CRYPT} x`, `${SHA512_CRYPT}\n`]) {
+      expect(() => HashedPassword.parse(raw), JSON.stringify(raw)).toThrow(
+        InvalidHashedPasswordError,
+      );
+    }
+  });
+
+  it('should_never_print_the_hash_itself', () => {
+    const hash = HashedPassword.parse(SHA512_CRYPT);
+
+    expect(String(hash)).toBe('[password-hash]');
+    expect(JSON.stringify({ hash })).toBe('{"hash":"[password-hash]"}');
+  });
+});
