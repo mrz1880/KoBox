@@ -92,6 +92,74 @@ describe('FirewallPolicy', () => {
     expect(() => policyWith([tooLong])).toThrow(InvalidFirewallPolicyError);
     expect(() => policyWith([{ ...users[0]!, username: Username.parse('a'.repeat(20)) }])).not.toThrow();
   });
+
+  it('should_accept_ports_1_and_65535_for_every_port_it_holds', () => {
+    for (const port of [1, 65535]) {
+      const policy = FirewallPolicy.create({
+        ...settings,
+        sshPort: port,
+        portalPort: port,
+        vpn: { ...settings.vpn, tunGwPort: port, tunPort: port, tapPort: port },
+        users: [{ ...users[0]!, rtorrentPort: port }],
+      });
+      expect(policy.sshPort).toBe(port);
+    }
+  });
+
+  it('should_name_each_port_out_of_range', () => {
+    const cases: readonly [string, () => FirewallPolicy][] = [
+      ['sshPort', () => FirewallPolicy.create({ ...settings, sshPort: 65536, users: [] })],
+      ['portalPort', () => FirewallPolicy.create({ ...settings, portalPort: 0, users: [] })],
+      [
+        'vpn.tunGwPort',
+        () => FirewallPolicy.create({ ...settings, vpn: { ...settings.vpn, tunGwPort: 0 }, users: [] }),
+      ],
+      [
+        'vpn.tunPort',
+        () => FirewallPolicy.create({ ...settings, vpn: { ...settings.vpn, tunPort: 0 }, users: [] }),
+      ],
+      [
+        'vpn.tapPort',
+        () => FirewallPolicy.create({ ...settings, vpn: { ...settings.vpn, tapPort: 0 }, users: [] }),
+      ],
+      ['rtorrentPort of bob', () => policyWith([{ ...users[0]!, rtorrentPort: 65536 }])],
+    ];
+    for (const [what, create] of cases) {
+      expect(create).toThrow(`invalid firewall policy: ${what} must be a port in 1-65535`);
+    }
+  });
+
+  it('should_accept_uid_1_and_refuse_a_fractional_uid', () => {
+    expect(policyWith([{ ...users[0]!, uid: 1 }]).users[0]?.uid).toBe(1);
+    expect(() => policyWith([{ ...users[0]!, uid: 1001.5 }])).toThrow(
+      'uid of bob must be a positive integer, got 1001.5',
+    );
+    expect(() => policyWith([{ ...users[0]!, uid: 0 }])).toThrow(
+      'uid of bob must be a positive integer, got 0',
+    );
+  });
+
+  it('should_name_the_duplicate_and_the_overlong_user', () => {
+    expect(() => policyWith([users[0]!, users[0]!])).toThrow('duplicate user bob');
+    expect(() =>
+      policyWith([{ ...users[0]!, username: Username.parse('a'.repeat(21)) }]),
+    ).toThrow(`username ${'a'.repeat(21)} is too long for an iptables chain name (max 20)`);
+  });
+
+  it('should_hold_users_sorted_by_name_and_keep_its_settings', () => {
+    const policy = policyWith(users, { blocklistSet: true });
+    expect(policy.users.map((user) => user.username.value)).toEqual(['alice', 'bob']);
+    expect(policy.portalPort).toBe(8189);
+    expect(policy.vpn.tunPort).toBe(8194);
+    expect(policy.blocklistSet).toBe(true);
+  });
+
+  it('should_close_ssh_to_all_as_soon_as_one_user_declares_an_address', () => {
+    const undeclared = { ...users[0]!, addresses: [] };
+    expect(policyWith([]).sshOpenToAll).toBe(true);
+    expect(policyWith([undeclared]).sshOpenToAll).toBe(true);
+    expect(policyWith([undeclared, users[1]!]).sshOpenToAll).toBe(false);
+  });
 });
 
 describe('renderFirewallRules', () => {

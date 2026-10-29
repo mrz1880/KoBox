@@ -58,4 +58,54 @@ describe('DebridDownload', () => {
     expect(restored.status).toBe('downloading');
     expect(aRequest().identifiedBy(9).id).toBe(9);
   });
+  it('should_keep_the_same_reading_when_the_percent_has_not_moved', () => {
+    const reading = aRequest().startedWith(gid).progressed(40);
+    expect(reading.progressed(40)).toBe(reading);
+  });
+
+  it('should_record_a_new_reading_and_keep_everything_else', () => {
+    const before = aRequest().identifiedBy(3).startedWith(gid).progressed(40);
+    const after = before.progressed(55);
+    expect(after.percent).toBe(55);
+    expect(before.percent).toBe(40);
+    expect(after.id).toBe(3);
+    expect(after.status).toBe('downloading');
+    expect(after.gid?.value).toBe('2089b05ecca3d829');
+    expect(after.createdAt).toBe('2026-07-26 12:00:00');
+  });
+
+  it('should_carry_its_identity_gid_and_last_reading_through_completion', () => {
+    const done = aRequest().identifiedBy(3).startedWith(gid).progressed(99).completed('a.mkv');
+    expect(done.id).toBe(3);
+    expect(done.gid?.value).toBe('2089b05ecca3d829');
+    expect(done.percent).toBe(99);
+    expect(done.username.value).toBe('alice');
+    expect(done.category.value).toBe('films');
+    expect(done.sourceLink.value).toBe('https://1fichier.example/abc');
+    expect(done.createdAt).toBe('2026-07-26 12:00:00');
+  });
+
+  it('should_keep_the_failure_reason_and_filename_when_given_an_id', () => {
+    const failed = aRequest().completed('a.mkv').failed('disk full').identifiedBy(4);
+    expect(failed.error).toBe('disk full');
+    expect(failed.filename).toBe('a.mkv');
+    expect(failed.status).toBe('failed');
+  });
+
+  it('should_restore_every_optional_field_it_was_given', () => {
+    const restored = DebridDownload.restore({
+      username: alice,
+      category: Label.parse('series'),
+      sourceLink: link,
+      status: 'failed',
+      filename: 'b.mkv',
+      percent: 12,
+      error: 'expired',
+      createdAt: '2026-07-26 12:00:00',
+    });
+    expect(restored.id).toBeUndefined();
+    expect(restored.filename).toBe('b.mkv');
+    expect(restored.percent).toBe(12);
+    expect(restored.error).toBe('expired');
+  });
 });

@@ -377,4 +377,147 @@ describe('ImportFromMysb', () => {
       expect(await world.users.findByUsername(Username.parse('bob'))).toBeUndefined();
     });
   });
+  describe('what each run writes and reports', () => {
+    it('should_never_enqueue_anything_on_a_dry_run_over_an_already_imported_user', async () => {
+      world = buildWorld(new FakeMysbSource({ users: [aliceDto] }));
+      await world.importer.execute({ apply: true });
+      const jobsAfterApply = world.queue.jobs.length;
+
+      await world.importer.execute({ apply: false });
+
+      expect(world.queue.jobs).toHaveLength(jobsAfterApply);
+    });
+
+    it('should_have_the_whitelist_and_the_firewall_rendered_after_an_apply', async () => {
+      world = buildWorld(new FakeMysbSource({}));
+
+      await world.importer.execute({ apply: true });
+
+      expect(world.queue.jobs.map((job) => job.type)).toEqual([
+        'render-whitelist',
+        'apply-firewall',
+      ]);
+    });
+
+    it('should_bring_nobody_in_with_the_public_tracker_bypass_or_suspended_when_active', async () => {
+      world = buildWorld(new FakeMysbSource({ users: [aliceDto] }));
+
+      await world.importer.execute({ apply: true });
+
+      expect((await world.instances.findByUsername(alice))?.allowPublicTracker).toBe(false);
+      expect((await world.users.findByUsername(alice))?.status.isSuspended()).toBe(false);
+    });
+
+    it('should_mail_the_member_their_username_and_temporary_password', async () => {
+      world = buildWorld(new FakeMysbSource({ users: [aliceDto] }));
+
+      await world.importer.execute({ apply: true });
+
+      const [mail] = await world.outbox.listRecent(1);
+      expect(mail?.subject).toMatch(/^Your KoBox seedbox is ready\b.*set your password$/);
+      expect(mail?.body).toBe(
+        [
+          'Hello alice,',
+          '',
+          'Your seedbox has moved to KoBox. Sign in to the portal with:',
+          '  username: alice',
+          '  temporary password: temp-secret-9x',
+          '',
+          'You will be asked to choose a new password immediately after signing in.',
+        ].join('\n'),
+      );
+    });
+
+    it('should_count_every_catalogue_row_on_a_dry_run_without_writing_any', async () => {
+      world = buildWorld(
+        new FakeMysbSource({
+          users: [aliceDto],
+          trackers: [trackerDto],
+          blocklists: [blocklistDto],
+          torrents: [torrentDto],
+          addresses: [addressDto, { username: 'alice', value: 'dyn.example.org', kind: 'hostname' }],
+        }),
+      );
+
+      const report = await world.importer.execute({ apply: false });
+
+      expect(report.trackers).toEqual({ imported: 1, conflicts: [] });
+      expect(report.blocklists).toEqual({ imported: 1, conflicts: [] });
+      expect(report.torrents).toEqual({ imported: 1, conflicts: [] });
+      expect(report.addresses).toEqual({ imported: 2, conflicts: [] });
+      expect(await world.blocklists.listAll()).toHaveLength(0);
+      expect(await world.torrents.listFor(alice)).toHaveLength(0);
+      expect(await world.addresses.listAll()).toHaveLength(0);
+      expect(await world.addresses.listHostnames()).toHaveLength(0);
+    });
+
+    it('should_store_a_static_address_and_a_dyndns_name_each_where_it_belongs', async () => {
+      world = buildWorld(
+        new FakeMysbSource({
+          users: [aliceDto],
+          addresses: [addressDto, { username: 'alice', value: 'dyn.example.org', kind: 'hostname' }],
+        }),
+      );
+
+      const report = await world.importer.execute({ apply: true });
+
+      expect(report.addresses.imported).toBe(2);
+      expect((await world.addresses.listAll()).map((entry) => entry.ip.value)).toEqual([
+        '192.0.2.50',
+      ]);
+      expect((await world.addresses.listHostnames()).map((binding) => binding.host.value)).toEqual([
+        'dyn.example.org',
+      ]);
+    });
+
+    it('should_key_each_refused_catalogue_row_and_say_why', async () => {
+      world = buildWorld(
+        new FakeMysbSource({
+          users: [aliceDto],
+          trackers: [trackerDto, { ...trackerDto, host: 'bad;host' }],
+          blocklists: [blocklistDto, { ...blocklistDto, name: 'Broken', url: 'not a url' }],
+          torrents: [torrentDto, { ...torrentDto, infoHash: 'not-a-hash' }],
+          addresses: [addressDto, { username: 'alice', value: '192.0.2.999', kind: 'ipv4' }],
+        }),
+      );
+
+      const report = await world.importer.execute({ apply: true });
+
+      expect(report.trackers.imported).toBe(1);
+      expect(report.trackers.conflicts).toEqual([
+        { key: 'bad;host', reason: expect.stringContaining('invalid tracker host') as string },
+      ]);
+      expect(report.blocklists.imported).toBe(1);
+      expect(report.blocklists.conflicts.map((c) => c.key)).toEqual(['iblocklist/level1/Broken']);
+      expect(report.blocklists.conflicts[0]?.reason).not.toBe('');
+      expect(report.torrents.imported).toBe(1);
+      expect(report.torrents.conflicts.map((c) => c.key)).toEqual(['alice/not-a-hash']);
+      expect(report.torrents.conflicts[0]?.reason).not.toBe('');
+      expect(report.addresses.imported).toBe(1);
+      expect(report.addresses.conflicts.map((c) => c.key)).toEqual(['alice/192.0.2.999']);
+      expect(report.addresses.conflicts[0]?.reason).not.toBe('');
+    });
+
+    it('should_refuse_rows_of_a_user_that_was_not_imported_as_unknown', async () => {
+      world = buildWorld(
+        new FakeMysbSource({
+          users: [aliceDto],
+          torrents: [{ ...torrentDto, username: 'ghost' }],
+          addresses: [{ ...addressDto, username: 'ghost' }],
+        }),
+      );
+
+      const report = await world.importer.execute({ apply: true });
+
+      expect(report.torrents).toEqual({
+        imported: 0,
+        conflicts: [{ key: `ghost/${'a'.repeat(40)}`, reason: 'unknown user' }],
+      });
+      expect(report.addresses).toEqual({
+        imported: 0,
+        conflicts: [{ key: 'ghost/192.0.2.50', reason: 'unknown user' }],
+      });
+      expect(await world.addresses.listAll()).toHaveLength(0);
+    });
+  });
 });

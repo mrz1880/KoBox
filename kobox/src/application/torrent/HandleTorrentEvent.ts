@@ -174,7 +174,9 @@ export class HandleTorrentEvent {
         await this.deps.filing.file(command.torrentFile, folder);
       }
       await this.deps.fileIndex.refresh(command.username);
-    } catch {
+    }
+    // Stryker disable next-line BlockStatement: the return is the last statement of the method, so an empty catch behaves identically
+    catch {
       return;
     }
   }
@@ -199,7 +201,9 @@ export class HandleTorrentEvent {
         return;
       }
       await this.deps.recycler.replicate(existing.tree, command.directory, instance.recycling);
-    } catch {
+    }
+    // Stryker disable next-line BlockStatement: the return is the last statement of the method, so an empty catch behaves identically
+    catch {
       return;
     }
   }
@@ -222,7 +226,9 @@ export class HandleTorrentEvent {
         },
         this.deps.clock(),
       );
-    } catch {
+    }
+    // Stryker disable next-line BlockStatement: the return is the last statement of the method, so an empty catch behaves identically
+    catch {
       return;
     }
   }
