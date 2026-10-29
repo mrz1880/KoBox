@@ -1,18 +1,4 @@
 import type { RutorrentProfilePort } from '../domain/torrent/ports.js';
-import { DiscardDebridDownload } from '../application/ddl/DiscardDebridDownload.js';
-import { PollDebridDownloads } from '../application/ddl/PollDebridDownloads.js';
-import { RequestDebridDownload } from '../application/ddl/RequestDebridDownload.js';
-import { StartDebridDownload } from '../application/ddl/StartDebridDownload.js';
-import { ClearDebridKey, StoreDebridKey } from '../application/ddl/StoreDebridKey.js';
-import type {
-  DebridAccountRepository,
-  DebridCredentialsPort,
-  DebridDownloadRepository,
-  DebridPort,
-  DownloaderPort,
-  DownloadPlacementPort,
-} from '../domain/ddl/ports.js';
-import type { JobQueuePort } from '../application/jobs/JobQueuePort.js';
 import { DiscoverTrackerFromTorrent } from '../application/tracker/DiscoverTrackerFromTorrent.js';
 import { FetchTrackerCert } from '../application/tracker/FetchTrackerCert.js';
 import { ImportBlocklistCatalog } from '../application/tracker/ImportBlocklistCatalog.js';
@@ -183,8 +169,6 @@ export interface UseCaseDeps {
   readonly allocator: PortAllocatorPort;
   readonly credentials: PortalCredentialsPort;
   readonly sessions: SessionStorePort;
-  // delete-user must not leave the user's sealed debrid key behind
-  readonly debridAccounts: DebridAccountRepository;
   readonly hasher: PasswordHasherPort;
   // every service keeping its own copy of a member's password
   readonly logins: readonly ServiceLoginPort[];
@@ -463,56 +447,6 @@ export function buildTorrentUseCases(deps: TorrentUseCaseDeps): TorrentUseCases 
       repo: deps.media,
       clock: deps.clock,
     }),
-  };
-}
-
-export interface DdlUseCaseDeps {
-  readonly repo: DebridDownloadRepository;
-  readonly accounts: DebridAccountRepository;
-  readonly debrid: DebridPort;
-  readonly credentials: DebridCredentialsPort;
-  readonly downloader: DownloaderPort;
-  readonly placement: DownloadPlacementPort;
-  readonly queue: JobQueuePort;
-  readonly clock: () => string;
-  readonly stagingBase: string;
-}
-
-export interface DdlUseCases {
-  readonly requestDownload: RequestDebridDownload;
-  readonly startDownload: StartDebridDownload;
-  readonly pollDownloads: PollDebridDownloads;
-  readonly discardDownload: DiscardDebridDownload;
-  readonly storeDebridKey: StoreDebridKey;
-  readonly clearDebridKey: ClearDebridKey;
-}
-
-export function buildDdlUseCases(deps: DdlUseCaseDeps): DdlUseCases {
-  return {
-    requestDownload: new RequestDebridDownload({
-      repo: deps.repo,
-      queue: deps.queue,
-      clock: deps.clock,
-    }),
-    startDownload: new StartDebridDownload({
-      repo: deps.repo,
-      debrid: deps.debrid,
-      credentials: deps.credentials,
-      downloader: deps.downloader,
-      stagingBase: deps.stagingBase,
-    }),
-    discardDownload: new DiscardDebridDownload({
-      repo: deps.repo,
-      downloader: deps.downloader,
-      placement: deps.placement,
-    }),
-    pollDownloads: new PollDebridDownloads({
-      repo: deps.repo,
-      downloader: deps.downloader,
-      placement: deps.placement,
-    }),
-    storeDebridKey: new StoreDebridKey({ accounts: deps.accounts, clock: deps.clock }),
-    clearDebridKey: new ClearDebridKey({ accounts: deps.accounts }),
   };
 }
 

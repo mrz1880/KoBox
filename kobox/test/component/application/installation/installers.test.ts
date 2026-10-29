@@ -98,8 +98,6 @@ function buildWorld(overrides?: {
     adminPassword?: string;
     sso?: { url: string; sha256: string };
   };
-  aria2Pin?: 'none';
-  aria2?: { secret: string; stagingDir?: string };
   speedtestPin?: 'none';
   letsencrypt?: { domain: string; email: string; acmeUrl?: string };
 }): World {
@@ -167,24 +165,13 @@ function buildWorld(overrides?: {
         speedtestUrl: 'https://releases.example.net/librespeed-cli',
         speedtestSha256: 'c'.repeat(64),
       }),
-      ...(overrides?.aria2Pin !== 'none' &&
-        overrides?.aria2 === undefined && {
-          aria2RpcSecret: 'test-rpc-secret',
-          ddlStagingDir: '/var/lib/kobox-aria2',
-        }),
-      ...(overrides?.aria2 !== undefined && {
-        aria2RpcSecret: overrides.aria2.secret,
-        ...(overrides.aria2.stagingDir !== undefined && {
-          ddlStagingDir: overrides.aria2.stagingDir,
-        }),
-      }),
       ...(overrides?.quotaFs !== undefined && { quotaFs: overrides.quotaFs }),
       ...(overrides?.letsencrypt !== undefined && { letsencrypt: overrides.letsencrypt }),
       dbPath: '/var/lib/kobox/kobox.db',
       workerEnv: new Map([
         ['KOBOX_DB', '/var/lib/kobox/kobox.db'],
         // a worker-only secret: the root worker gets it, the portal must not
-        ['KOBOX_ALLDEBRID_APIKEY', 'the-debrid-key'],
+        ['KOBOX_DISCORD_WEBHOOK', 'the-webhook-secret'],
       ]),
     },
   };
@@ -263,7 +250,7 @@ describe('kobox-core installer', () => {
     );
     // the root worker is the one process that DOES hold the secrets
     expect(world.host.contentAt('/etc/kobox/worker.env')).toContain(
-      'KOBOX_ALLDEBRID_APIKEY=the-debrid-key',
+      'KOBOX_DISCORD_WEBHOOK=the-webhook-secret',
     );
     expect(world.systemd.log).toContain('daemon-reload');
     expect(world.systemd.log).toContain('enable-now kobox-worker');
@@ -271,10 +258,10 @@ describe('kobox-core installer', () => {
     expect(world.systemd.log).toContain('enable kobox-firewall');
   });
 
-  it('should_provision_the_debrid_sealing_pair', async () => {
+  it('should_provision_the_host_sealing_pair', async () => {
     await installer(world, 'kobox-core').install();
 
-    // per-user debrid keys are useless without it; the adapter itself guarantees
+    // a NAS password cannot be sealed without it; the adapter itself guarantees
     // an existing private half is never regenerated
     expect(world.hostKeys.calls).toBe(1);
   });
@@ -408,7 +395,7 @@ describe('portal installer', () => {
     const env = world.host.fileAt('/etc/kobox/portal.env');
     // the config it needs, none of the secrets it never uses
     expect(env?.content).toContain('KOBOX_DB=/var/lib/kobox/kobox.db');
-    expect(env?.content).not.toContain('the-debrid-key');
+    expect(env?.content).not.toContain('the-webhook-secret');
     // readable by the portal identity only
     expect(env?.mode).toBe('0640');
     expect(env?.group).toBe('kobox-portal');
@@ -971,52 +958,6 @@ describe('nanomon installer', () => {
   });
 });
 
-describe('aria2 installer', () => {
-  it('should_skip_when_no_rpc_secret_is_configured', async () => {
-    const unpinned = buildWorld({ aria2Pin: 'none' });
-
-    const outcome = await installer(unpinned, 'aria2').install();
-
-    expect(outcome).toMatchObject({ state: 'skipped' });
-    expect(outcome.state === 'skipped' && outcome.reason).toContain('KOBOX_ARIA2_RPC_SECRET');
-  });
-
-  it('should_install_aria2_non_root_with_a_config_backed_secret', async () => {
-    const outcome = await installer(world, 'aria2').install();
-
-    expect(outcome.state).toBe('installed');
-    expect(world.packages.installed).toContain('aria2');
-    expect(world.host.serviceAccounts.has('kobox-aria2')).toBe(true);
-    // the secret lives in the config (0640), not on the command line
-    const conf = world.host.fileAt('/etc/kobox/aria2.conf');
-    expect(conf?.content).toContain('rpc-secret=test-rpc-secret');
-    expect(conf?.mode).toBe('0640');
-    expect(world.host.contentAt('/etc/systemd/system/kobox-aria2.service')).toContain(
-      'User=kobox-aria2',
-    );
-    expect(world.systemd.log).toContain('enable-now kobox-aria2');
-  });
-
-  it('should_disable_and_remove_the_unit_on_uninstall', async () => {
-    await installer(world, 'aria2').install();
-
-    await installer(world, 'aria2').uninstall();
-
-    expect(world.systemd.log).toContain('disable-now kobox-aria2');
-    expect(world.host.contentAt('/etc/systemd/system/kobox-aria2.service')).toBeUndefined();
-    expect(world.host.contentAt('/etc/kobox/aria2.conf')).toBeUndefined();
-  });
-
-  it('should_be_a_no_op_uninstall_when_never_installed', async () => {
-    const unpinned = buildWorld({ aria2Pin: 'none' });
-
-    await installer(unpinned, 'aria2').uninstall();
-
-    // no systemctl disable / daemon-reload paid for a component that was skipped
-    expect(unpinned.systemd.log).toEqual([]);
-  });
-});
-
 describe('speedtest installer', () => {
   it('should_skip_when_no_binary_is_pinned', async () => {
     const unpinned = buildWorld({ speedtestPin: 'none' });
@@ -1240,7 +1181,7 @@ describe('nextcloud installer', () => {
 describe('installer catalog', () => {
   it('should_build_one_installer_per_catalog_component_under_its_own_name', () => {
     expect([...world.installers.keys()].sort()).toEqual([
-      'apt-sources', 'aria2', 'bind', 'dnscrypt', 'fail2ban', 'ipset', 'kobox-core',
+      'apt-sources', 'bind', 'dnscrypt', 'fail2ban', 'ipset', 'kobox-core',
       'letsencrypt', 'nanomon', 'nextcloud', 'nfs', 'nginx', 'openvpn', 'portal', 'postfix',
       'quota', 'rtorrent', 'rutorrent', 'samba', 'scheduler', 'shellinabox', 'speedtest',
       'sshd', 'tweaks',
@@ -2215,64 +2156,3 @@ describe('speedtest installer: the vendored binary', () => {
   });
 });
 
-describe('aria2 installer: staging and restarts', () => {
-  it('should_skip_when_the_rpc_secret_is_empty', async () => {
-    const empty = buildWorld({ aria2: { secret: '' } });
-
-    const outcome = await installer(empty, 'aria2').install();
-
-    expect(outcome.state === 'skipped' && outcome.reason).toContain('set KOBOX_ARIA2_RPC_SECRET');
-    expect(empty.packages.installed).toEqual([]);
-  });
-
-  it('should_give_the_staging_dir_to_the_aria2_account_alone', async () => {
-    const custom = buildWorld({ aria2: { secret: 's3cret', stagingDir: '/srv/ddl-staging' } });
-
-    await installer(custom, 'aria2').install();
-
-    expect(custom.host.dirs.get('/srv/ddl-staging')).toBe('0750');
-    expect(custom.host.ownership.get('/srv/ddl-staging')).toEqual({
-      owner: 'kobox-aria2',
-      group: 'kobox-aria2',
-      mode: '0750',
-    });
-    expect(custom.host.contentAt('/etc/kobox/aria2.conf')).toContain('/srv/ddl-staging');
-  });
-
-  it('should_stage_under_its_own_top_level_dir_when_none_is_configured', async () => {
-    const defaults = buildWorld({ aria2: { secret: 's3cret' } });
-
-    await installer(defaults, 'aria2').install();
-
-    expect(defaults.host.dirs.get('/var/lib/kobox-aria2')).toBe('0750');
-  });
-
-  it('should_restart_aria2_on_a_changed_config_and_report_its_version', async () => {
-    const outcome = await installer(world, 'aria2').install();
-
-    expect(outcome).toEqual({ state: 'installed', version: '1.0-1' });
-    expect(world.systemd.log).toEqual([
-      'daemon-reload',
-      'enable-now kobox-aria2',
-      'reload-or-restart kobox-aria2',
-    ]);
-  });
-
-  it('should_leave_aria2_running_when_nothing_changed', async () => {
-    await installer(world, 'aria2').install();
-    world.systemd.log.length = 0;
-
-    await installer(world, 'aria2').install();
-
-    expect(world.systemd.log).toEqual(['daemon-reload', 'enable-now kobox-aria2']);
-  });
-
-  it('should_reload_systemd_after_removing_the_unit_on_uninstall', async () => {
-    await installer(world, 'aria2').install();
-    world.systemd.log.length = 0;
-
-    await installer(world, 'aria2').uninstall();
-
-    expect(world.systemd.log).toEqual(['disable-now kobox-aria2', 'daemon-reload']);
-  });
-});

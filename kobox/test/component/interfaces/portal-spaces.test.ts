@@ -21,7 +21,7 @@ function linksOf(body: string, label: string): string[] {
   return [...(nav?.[1] ?? '').matchAll(/href="([^"]+)"/g)].map((match) => match[1] ?? '');
 }
 
-const SEEDBOX_MENU = ['/', '/rutorrent', '/files', '/media', '/sync', '/downloads', '/access'];
+const SEEDBOX_MENU = ['/', '/rutorrent', '/files', '/media', '/sync', '/access'];
 const ADMIN_MENU = [
   '/admin',
   '/admin/users',

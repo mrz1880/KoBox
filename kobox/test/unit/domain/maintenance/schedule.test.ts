@@ -19,7 +19,6 @@ describe('SCHEDULED_JOBS', () => {
     expect(bySubcommand.get('update-blocklists')?.schedule.value).toBe('0 */6 * * *');
     expect(bySubcommand.get('renew-tracker-certs')?.schedule.value).toBe('10 0 * * *');
     expect(bySubcommand.get('run-backup')?.schedule.value).toBe('30 5 * * *');
-    expect(bySubcommand.get('poll-debrid-downloads')?.schedule.value).toBe('*/2 * * * *');
     // the update CHECK is scheduled; applying them never is
     expect(bySubcommand.get('check-package-updates')?.schedule.value).toBe('40 5 * * *');
     expect(bySubcommand.has('apply-package-updates')).toBe(false);
@@ -30,7 +29,7 @@ describe('SCHEDULED_JOBS', () => {
     expect(bySubcommand.get('sample-disk-usage')?.schedule.value).toBe('20 * * * *');
     // files also come and go over SFTP, outside any KoBox event
     expect(bySubcommand.get('index-media')?.schedule.value).toBe('*/15 * * * *');
-    expect(await scheduledJobs()).toHaveLength(11);
+    expect(await scheduledJobs()).toHaveLength(10);
   });
 
   it('should_only_reference_shell_safe_kobox_subcommands', async () => {

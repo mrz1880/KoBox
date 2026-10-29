@@ -25,7 +25,6 @@ import { Username } from '../../../../src/domain/user/Username.js';
 import { InMemoryPasswordLinkRepository } from '../../../../src/infrastructure/persistence/InMemoryPasswordLinkRepository.js';
 import { PasswordLink } from '../../../../src/domain/portal/PasswordLink.js';
 import { InMemoryPortalCredentialsRepository } from '../../../../src/infrastructure/persistence/InMemoryPortalCredentialsRepository.js';
-import { InMemoryDebridAccountRepository } from '../../../../src/infrastructure/persistence/InMemoryDebridAccountRepository.js';
 import { InMemoryPortalSessionRepository } from '../../../../src/infrastructure/persistence/InMemoryPortalSessionRepository.js';
 import { InMemoryDiskUsageRepository } from '../../../../src/infrastructure/persistence/InMemoryDiskUsageRepository.js';
 import { InMemoryUserRepository } from '../../../../src/infrastructure/persistence/InMemoryUserRepository.js';
@@ -120,7 +119,6 @@ interface World {
   notifications: FakeNotifications;
   credentials: InMemoryPortalCredentialsRepository;
   sessions: InMemoryPortalSessionRepository;
-  debridAccounts: InMemoryDebridAccountRepository;
   hasher: FakePasswordHasher;
   links: InMemoryPasswordLinkRepository;
   samba: FakeServiceLogin;
@@ -147,7 +145,6 @@ beforeEach(() => {
   const notifications = new FakeNotifications();
   const credentials = new InMemoryPortalCredentialsRepository();
   const sessions = new InMemoryPortalSessionRepository();
-  const debridAccounts = new InMemoryDebridAccountRepository();
   const diskSamples = new InMemoryDiskUsageRepository();
   const gauges = new FakeQuotaGauges();
   const hasher = new FakePasswordHasher();
@@ -158,7 +155,7 @@ beforeEach(() => {
   const clock = (): string => '2026-07-25 10:00:00';
   const deps = {
     repo, accounts, quota, sftp, services, notifications, credentials, sessions,
-    debridAccounts, clock, hasher, logins: [samba, nextcloud], links,
+    clock, hasher, logins: [samba, nextcloud], links,
   };
   world = {
     ...deps,
@@ -378,15 +375,6 @@ describe('DeleteUser', () => {
 
     expect(await world.credentials.find(alice)).toBeUndefined();
     expect(await world.sessions.find('a'.repeat(64))).toBeUndefined();
-  });
-
-  it('should_not_let_a_stored_debrid_key_outlive_the_account', async () => {
-    await world.createUser.execute(createUserCommand());
-    await world.debridAccounts.save(alice, 'sealed-blob', '2026-07-30 12:00:00');
-
-    await world.deleteUser.execute({ username: alice });
-
-    expect(await world.debridAccounts.has(alice)).toBe(false);
   });
 
   it('should_remove_the_member_from_every_service_with_its_own_login', async () => {

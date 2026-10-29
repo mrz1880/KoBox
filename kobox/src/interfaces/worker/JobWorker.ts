@@ -18,7 +18,6 @@ import { Quota } from '../../domain/user/Quota.js';
 import type { PasswordOpenerPort } from '../../domain/user/ports.js';
 import { Username } from '../../domain/user/Username.js';
 import type {
-  DdlUseCases,
   MaintenanceUseCases,
   SecurityUseCases,
   SyncUseCases,
@@ -58,7 +57,6 @@ export class JobWorker {
     private readonly trackers: TrackerUseCases,
     private readonly security: SecurityUseCases,
     private readonly maintenance: MaintenanceUseCases,
-    private readonly ddl: DdlUseCases,
     private readonly sync: SyncUseCases,
     // the private half of the host key: only the root worker can open a
     // password the portal sealed
@@ -131,7 +129,7 @@ export class JobWorker {
       await this.queue.enqueue(parseJob('render-rutorrent-users', {}));
     }
     // what landed on disk just changed: refresh the media listing
-    if (job.type === 'torrent-event' || job.type === 'poll-debrid-downloads') {
+    if (job.type === 'torrent-event') {
       await this.queue.enqueueUnique(parseJob('index-media', {}));
     }
     if (hints?.sendNowFor !== undefined) {
@@ -501,29 +499,6 @@ export class JobWorker {
         return;
       case 'render-nfs-exports':
         await this.security.renderNfsExports.execute();
-        return;
-      case 'debrid-download':
-        await this.ddl.startDownload.execute({ downloadId: job.payload.downloadId });
-        return;
-      case 'discard-debrid-download':
-        await this.ddl.discardDownload.execute({
-          username: Username.parse(job.payload.username),
-          id: job.payload.downloadId,
-        });
-        return;
-      case 'poll-debrid-downloads':
-        await this.ddl.pollDownloads.execute();
-        return;
-      case 'set-debrid-key':
-        await this.ddl.storeDebridKey.execute({
-          username: Username.parse(job.payload.username),
-          encryptedKey: job.payload.encryptedKey,
-        });
-        return;
-      case 'clear-debrid-key':
-        await this.ddl.clearDebridKey.execute({
-          username: Username.parse(job.payload.username),
-        });
         return;
       case 'add-user-address':
       case 'remove-user-address': {

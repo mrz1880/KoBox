@@ -244,18 +244,4 @@ export const buildJob = {
   renderNfsExports(): Job {
     return parseJob('render-nfs-exports', {});
   },
-
-  discardDebridDownload(input: { username: string; downloadId: number }): Job {
-    return parseJob('discard-debrid-download', input);
-  },
-
-  pollDebridDownloads(): Job {
-    return parseJob('poll-debrid-downloads', {});
-  },
-  setDebridKey(input: { username: string; encryptedKey: string }): Job {
-    return parseJob('set-debrid-key', input);
-  },
-  clearDebridKey(input: { username: string }): Job {
-    return parseJob('clear-debrid-key', input);
-  },
 };

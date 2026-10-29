@@ -333,10 +333,6 @@ export const loginAttempts = sqliteTable('login_attempts', {
   lockedUntil: text('locked_until'),
 });
 
-// Phase 9 — DDL/debrid downloads: a user submits a filehoster link, KoBox
-// unrestricts it (debrid) and downloads it with aria2 into their home. The
-// source link is content, never a secret (the debrid key lives in the worker
-// env only). Status drives the poll loop; the gid is aria2's handle.
 // What the worker last saw in each user's completed downloads. The portal reads
 // this instead of the filesystem, which is what lets it keep ProtectHome=yes.
 export const mediaFiles = sqliteTable(
@@ -377,40 +373,6 @@ export const speedtests = sqliteTable('speedtests', {
   server: text('server').notNull(),
   measuredAt: text('measured_at').notNull(),
 });
-
-// One AllDebrid key per user, stored ENCRYPTED (RSA-OAEP, base64): the portal
-// shares this database and must not be able to use what it can read. username as
-// primary key means setting a key replaces the old one — no stale secrets pile up.
-export const debridAccounts = sqliteTable('debrid_accounts', {
-  username: text('username').primaryKey(),
-  encryptedKey: text('encrypted_key').notNull(),
-  updatedAt: text('updated_at').notNull(),
-});
-
-export const debridDownloads = sqliteTable(
-  'debrid_downloads',
-  {
-    id: integer('id').primaryKey({ autoIncrement: true }),
-    username: text('username').notNull(),
-    // free text validated by Label, not a closed enum: the member's own
-    // folders are what a download is routed into, and they are not two
-    category: text('category').notNull(),
-    // last reading from aria2; null while the size was still unknown
-    percent: integer('percent'),
-    sourceLink: text('source_link').notNull(),
-    status: text('status', { enum: ['pending', 'downloading', 'done', 'failed'] })
-      .notNull()
-      .default('pending'),
-    gid: text('gid'),
-    filename: text('filename'),
-    error: text('error'),
-    createdAt: text('created_at').notNull(),
-  },
-  (table) => [
-    index('debrid_downloads_status_idx').on(table.status),
-    index('debrid_downloads_username_idx').on(table.username),
-  ],
-);
 
 // Where one member's finished downloads are copied to. One row per member —
 // the legacy kept the same thing in a single-row `ident` table per user.

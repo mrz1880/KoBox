@@ -13,8 +13,8 @@ let priv: string;
 
 beforeEach(async () => {
   const dir = mkdtempSync(join(tmpdir(), 'kobox-password-cipher-'));
-  pub = join(dir, 'debrid-pub.pem');
-  priv = join(dir, 'debrid-key.pem');
+  pub = join(dir, 'host-pub.pem');
+  priv = join(dir, 'host-key.pem');
   await new FsHostKeyPair(pub, priv).ensurePair();
 });
 

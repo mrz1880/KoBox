@@ -139,7 +139,7 @@ describe.skipIf(!onDebianAsRoot)('E2E: fresh Debian 13 -> bootstrap -> full stac
       KOBOX_RUTORRENT_URL: `https://${ARTIFACT_HOST}:${String(ARTIFACT_PORT)}/rutorrent.tar.gz`,
       KOBOX_RUTORRENT_SHA256: artifactSha,
       // a worker-only secret, to prove the non-root portal never receives it
-      KOBOX_ALLDEBRID_APIKEY: PORTAL_FORBIDDEN_SECRET,
+      KOBOX_E2E_PROBE_SECRET: PORTAL_FORBIDDEN_SECRET,
       NODE_EXTRA_CA_CERTS: tls.pemPath,
     };
 
@@ -474,7 +474,7 @@ describe.skipIf(!onDebianAsRoot)('E2E: fresh Debian 13 -> bootstrap -> full stac
   it('should_keep_the_secret_bearing_files_out_of_reach_of_that_same_portal', () => {
     // the other half of the argument: the files deliberately absent from the
     // catalog are also unreadable to the process that renders it
-    for (const secret of ['/etc/kobox/worker.env', '/etc/kobox/aria2.conf']) {
+    for (const secret of ['/etc/kobox/worker.env', '/etc/kobox/debrid-key.pem']) {
       if (!existsSync(secret)) {
         continue;
       }
@@ -541,7 +541,7 @@ describe.skipIf(!onDebianAsRoot)('E2E: fresh Debian 13 -> bootstrap -> full stac
   it('should_install_the_command_its_own_cron_entries_call', () => {
     // Every scheduled job on a real box invoked /usr/local/bin/kobox and
     // nothing created it, so all of them silently did nothing: no mail flush,
-    // no blocklist update, no backup, no certificate renewal, no debrid poll.
+    // no blocklist update, no backup, no certificate renewal.
     //
     // The assertion is about the command the cron file NAMES, not about a
     // fixed path: this suite points KOBOX_BIN at a command of its own, and an
@@ -575,17 +575,14 @@ describe.skipIf(!onDebianAsRoot)('E2E: fresh Debian 13 -> bootstrap -> full stac
     // nanomon is unpinned in this suite (no KOBOX_NANOMON_URL) so it honestly
     // skips; its real install/uninstall is component-tested and its runtime is
     // covered by nanomon.e2e.
-    // aria2 is likewise unpinned here (no KOBOX_ARIA2_RPC_SECRET) so it skips;
-    // its install is component-tested.
     const skippedOnDebian12 = [
       'dnscrypt',
       'apt-sources',
       'ipset',
       'letsencrypt',
       'nanomon',
-      'aria2',
       'speedtest',
-      // unpinned here like nanomon and aria2: no KOBOX_NEXTCLOUD_URL in this
+      // unpinned here like nanomon: no KOBOX_NEXTCLOUD_URL in this
       // suite, so it skips honestly and never reaches to_install
       'nextcloud',
     ];

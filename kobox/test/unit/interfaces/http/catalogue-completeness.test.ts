@@ -1,6 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { DebridDownload } from '../../../../src/domain/ddl/DebridDownload.js';
-import { FilehosterLink } from '../../../../src/domain/ddl/FilehosterLink.js';
 import { ComponentName } from '../../../../src/domain/installation/ComponentName.js';
 import { ConfigDocument } from '../../../../src/domain/installation/ConfigDocument.js';
 import { InstallState } from '../../../../src/domain/installation/InstallState.js';
@@ -70,7 +68,6 @@ import { syncPage } from '../../../../src/interfaces/http/views/syncPage.js';
 import {
   accessPage,
   adminHomePage,
-  downloadsPage,
   filesPage,
   mediaPage,
   mediaWatchPage,
@@ -88,19 +85,6 @@ const NOW = '2026-10-28 10:00:00';
 const ED25519 = 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIB7Kk1p2vQ0Hn3xYqZ8mLsRtWuVdEfGhIjKlMnOpQrSt';
 const alice = Username.parse('alice');
 const films = Label.parse('films');
-
-function download(status: DebridDownload['status'], extra: { filename?: string; error?: string } = {}): DebridDownload {
-  return DebridDownload.restore({
-    id: 1,
-    username: alice,
-    category: films,
-    sourceLink: FilehosterLink.parse('https://files.example.org/abc'),
-    status,
-    createdAt: NOW,
-    ...(status === 'downloading' ? { percent: 40 } : {}),
-    ...extra,
-  });
-}
 
 function media(path: string): MediaFile {
   return MediaFile.record({ username: alice, path: MediaPath.parse(path), sizeBytes: 1024 ** 3, indexedAt: NOW });
@@ -194,21 +178,6 @@ function keysSentToTheCatalogue(): ReadonlySet<string> {
     userHomePage(user, member, row);
   }
   passwordPage(member);
-  for (const engineReady of [true, false]) {
-    downloadsPage(member, [], false, [], engineReady);
-  }
-  downloadsPage(
-    member,
-    [
-      download('done', { filename: 'Some.Film.mkv' }),
-      download('failed', { error: 'debrid error LINK_DOWN: the host is down' }),
-      download('downloading'),
-      download('pending'),
-    ],
-    true,
-    [films],
-    true,
-  );
   twoStepSetupPage(member, 'alice', 'JBSWY3DPEHPK3PXP');
   for (const nextcloudInstalled of [true, false]) {
     filesPage(member, {

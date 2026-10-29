@@ -18,7 +18,6 @@ const FR: Readonly<Record<string, string>> = {
   'Nextcloud, SFTP, network share': 'Nextcloud, SFTP, partage réseau',
   'Watch in the browser': 'Regarder dans le navigateur',
   'Your categories': 'Vos catégories',
-  'Through AllDebrid': 'Via AllDebrid',
   'Password, VPN, keys': 'Mot de passe, VPN, clés',
   'What needs you': 'Ce qui demande une action',
   'Invite, quotas, roles': 'Inviter, quotas, rôles',
@@ -34,7 +33,6 @@ const FR: Readonly<Record<string, string>> = {
   Troubleshooting: 'Dépannage',
   Menu: 'Menu',
   Space: 'Espace',
-  Downloads: 'Téléchargements',
   Folders: 'Dossiers',
   Account: 'Mon compte',
   'Sign out': 'Se déconnecter',
@@ -50,16 +48,11 @@ const FR: Readonly<Record<string, string>> = {
   Download: 'Télécharger',
   'Loose files': 'Fichiers isolés',
 
-  // downloads
-  'Filehoster link': 'Lien d’hébergeur',
+  // shared table words
   Folder: 'Dossier',
-  'Start download': 'Lancer le téléchargement',
   Status: 'État',
   Detail: 'Détail',
-  Requested: 'Demandé',
   Remove: 'Retirer',
-  'Nothing here yet. Submit a link above to start.':
-    'Rien pour l’instant. Collez un lien ci-dessus pour commencer.',
 
   // account
   'My access': 'Mon accès',
@@ -137,7 +130,6 @@ const FR: Readonly<Record<string, string>> = {
     'Vous êtes connecté en IPv6. Seules les adresses IPv4 peuvent être déclarées.',
   'Updating blocklists.': 'Mise à jour des listes de blocage.',
   'That token no longer works anywhere.': 'Ce jeton ne fonctionne plus nulle part.',
-  'That one is already gone.': 'Celui-ci n’est déjà plus là.',
   'That is not an IPv4 address, like 203.0.113.20.':
     'Ce n’est pas une adresse IPv4, comme 203.0.113.20.',
   'That is not a hostname, like myhome.duckdns.org. For a fixed address, use the field above.':
@@ -154,22 +146,18 @@ const FR: Readonly<Record<string, string>> = {
     'Enregistré. Cela s’applique à ce qu’il ajoutera désormais, et ne change rien de ce qui est déjà sur le disque.',
   'Restarting your rtorrent.': 'Redémarrage de votre rtorrent.',
   'Renewing certificates.': 'Renouvellement des certificats.',
-  'Removing it now.': 'Suppression en cours.',
   'Relay saved. Applying it now.': 'Relais enregistré. Application en cours.',
   'Putting it back in the queue.': 'Remise en file d’attente.',
   'Password change under way: it takes a few seconds.':
     'Changement de mot de passe en cours : cela prend quelques secondes.',
   'Override applied.': 'Dérogation appliquée.',
   'Measuring the link.': 'Mesure du lien en cours.',
-  'Key saved.': 'Clé enregistrée.',
   'Key accepted. It is being installed.': 'Clé acceptée. Elle est en cours d’installation.',
   'Installing the updates.': 'Installation des mises à jour.',
   'Importing the catalog.': 'Import du catalogue.',
   'Hostname removed.': 'Nom d’hôte retiré.',
   'Hostname added. Its address opens within five minutes.':
     'Nom d’hôte ajouté. Son adresse s’ouvre d’ici cinq minutes.',
-  'Download started. It will appear in the list below.':
-    'Téléchargement lancé. Il apparaîtra dans la liste ci-dessous.',
   'Checking for updates.': 'Recherche de mises à jour.',
   'An update is already running.': 'Une mise à jour est déjà en cours.',
   'A test is already running.': 'Un test est déjà en cours.',
@@ -177,10 +165,6 @@ const FR: Readonly<Record<string, string>> = {
   'A check is already running.': 'Une vérification est déjà en cours.',
   'Your current password is incorrect.': 'Votre mot de passe actuel est incorrect.',
   'Please fill in both passwords.': 'Merci de remplir les deux mots de passe.',
-  "That doesn't look like an AllDebrid API key.":
-    'Cela ne ressemble pas à une clé d’API AllDebrid.',
-  'Please provide a valid http(s) link and a category.':
-    'Merci de donner un lien http(s) valide et une catégorie.',
   'A relay needs a hostname, a port between 1 and 65535, a login and a password.':
     'Un relais a besoin d’un nom d’hôte, d’un port entre 1 et 65535, d’un identifiant et d’un mot de passe.',
   'That is not a hostname. Give the name on its own, with no https:// and no trailing slash.':
@@ -189,15 +173,12 @@ const FR: Readonly<Record<string, string>> = {
   // member pages
   Torrents: 'Torrents',
   ruTorrent: 'ruTorrent',
-  'Download a link': 'Télécharger un lien',
   Open: 'Ouvrir',
   'Hello {name}': 'Bonjour {name}',
   'My account and connection details': 'Mon compte et mes informations de connexion',
   'Add a torrent and follow it. This is the main tool.':
     'Ajoutez un torrent et suivez-le. C’est l’outil principal.',
   'Watch or download what has finished.': 'Regardez ou téléchargez ce qui est terminé.',
-  'Paste a link from a file host and let the server fetch it.':
-    'Collez un lien d’hébergeur et laissez le serveur le récupérer.',
   'Your account is suspended. Contact the administrator to have it restored.':
     'Votre compte est suspendu. Contactez l’administrateur pour le faire rétablir.',
   'Your torrent client is not running. {restart}.':
@@ -215,24 +196,8 @@ const FR: Readonly<Record<string, string>> = {
   'Download this file': 'Télécharger ce fichier',
   'You have no folders yet. Create one under {folders}, and what lands in it shows up here.':
     'Vous n’avez pas encore de dossier. Créez-en un dans {folders}, et ce qui y arrive apparaîtra ici.',
-  'You have no folders yet. Create one under {folders} and it will show up here.':
-    'Vous n’avez pas encore de dossier. Créez-en un dans {folders} et il apparaîtra ici.',
-  done: 'terminé',
   failed: 'en échec',
-  downloading: 'en cours',
   pending: 'en attente',
-  'My AllDebrid account': 'Mon compte AllDebrid',
-  'Status: {state}': 'État : {state}',
-  'key configured': 'clé configurée',
-  'no key': 'pas de clé',
-  'Your key is stored encrypted and is only used for your own downloads. Without one, downloads stay unavailable for you, and nothing else changes.':
-    'Votre clé est stockée chiffrée et ne sert qu’à vos propres téléchargements. Sans clé, les téléchargements vous restent fermés, et rien d’autre ne change.',
-  'Replace my key': 'Remplacer ma clé',
-  'My AllDebrid API key': 'Ma clé d’API AllDebrid',
-  'Remove my key': 'Retirer ma clé',
-  'The download engine is {notSetUp}, so links will not go anywhere. This is not something you can fix from here: tell an admin, and they will find the reason under Health.':
-    'Le moteur de téléchargement {notSetUp}, les liens n’iront donc nulle part. Ce n’est pas réparable d’ici : prévenez un administrateur, il trouvera la raison dans État du système.',
-  'not set up on this box': 'n’est pas installé sur cette box',
   'Simplest': 'Le plus simple',
   'Three ways to reach your files. All of them take your username, {username}, and the password you use here.':
     'Trois façons d’accéder à vos fichiers. Toutes demandent votre identifiant, {username}, et le mot de passe que vous utilisez ici.',
@@ -582,8 +547,8 @@ const FR: Readonly<Record<string, string>> = {
   // configuration files: each file's title and purpose come from the catalog
   // in domain/installation/ConfigDocument.ts
   Configuration: 'Configuration',
-  'Every file KoBox writes onto this box, as it is on disk right now. Read-only, and only these files: this page cannot edit them, and it cannot open anything else. Files holding a secret (the worker environment, the aria2 password, the VPN keys) are not listed and cannot be reached from here.':
-    'Chaque fichier que KoBox écrit sur cette box, tel qu’il est sur le disque en ce moment. En lecture seule, et seulement ces fichiers : cette page ne peut ni les modifier, ni ouvrir quoi que ce soit d’autre. Les fichiers qui contiennent un secret (l’environnement du worker, le mot de passe aria2, les clés VPN) ne sont pas listés et restent inaccessibles d’ici.',
+  'Every file KoBox writes onto this box, as it is on disk right now. Read-only, and only these files: this page cannot edit them, and it cannot open anything else. Files holding a secret (the worker environment, the VPN keys) are not listed and cannot be reached from here.':
+    'Chaque fichier que KoBox écrit sur cette box, tel qu’il est sur le disque en ce moment. En lecture seule, et seulement ces fichiers : cette page ne peut ni les modifier, ni ouvrir quoi que ce soit d’autre. Les fichiers qui contiennent un secret (l’environnement du worker, les clés VPN) ne sont pas listés et restent inaccessibles d’ici.',
   'What it decides': 'Ce qu’il décide',
   Path: 'Chemin',
   'This file is not on this box.': 'Ce fichier n’est pas sur cette box.',
@@ -606,9 +571,6 @@ const FR: Readonly<Record<string, string>> = {
   'Worker service': 'Service du worker',
   'The one privileged process: it executes the typed jobs the portal enqueues.':
     'Le seul processus privilégié : il exécute les tâches typées que le portail met en file.',
-  'Direct download service': 'Service de téléchargement direct',
-  'The downloader that fetches debrid links into the staging area.':
-    'Le téléchargeur qui récupère les liens débridés dans la zone de transit.',
   'Monitoring service': 'Service de supervision',
   'The metrics collector behind /monitoring, bound to the loopback only.':
     'Le collecteur de métriques derrière /monitoring, lié à la boucle locale uniquement.',

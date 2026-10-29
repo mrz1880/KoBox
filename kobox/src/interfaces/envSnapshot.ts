@@ -3,9 +3,9 @@
 // It used to be the current shell's KOBOX_* and nothing else, which made
 // re-running `kobox install` destructive: an operator running it from a plain
 // terminal wiped every setting the box had been configured with. That is the
-// opposite of what a convergent installer promises, and it cost a live box its
-// aria2 RPC secret, leaving every debrid download failing with "Unauthorized"
-// while aria2 itself was running perfectly.
+// opposite of what a convergent installer promises, and it once cost a live box
+// a secret its running services still held, so they kept running while every
+// request between them was refused.
 //
 // So the shell wins on what it actually says, and stays silent about the rest.
 // Removing a setting becomes an explicit edit of a root-only file rather than a
@@ -31,9 +31,9 @@ export function parseEnvFile(content: string | undefined): ReadonlyMap<string, s
 }
 
 // Makes a root CLI invocation see the same configuration the worker unit does.
-// systemd hands worker.env to the worker; a person typing `kobox doctor` gets
-// only their own shell, so without this the CLI would report aria2 unreachable
-// on a perfectly healthy box purely because it never read the secret.
+// systemd hands worker.env to the worker; a person typing a `kobox` command gets
+// only their own shell, so without this the CLI would act on a configuration the
+// box does not run with, purely because it never read the file.
 //
 // Existing variables win: an operator overriding one on the command line means
 // it, and this must not undo that.

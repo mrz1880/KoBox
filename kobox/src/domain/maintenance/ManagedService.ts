@@ -16,7 +16,6 @@ export class UnknownManagedServiceError extends DomainError {
 const MANAGED_SERVICES = [
   'nginx',
   'kobox-portal',
-  'kobox-aria2',
   'kobox-nanomon',
   'fail2ban',
 ] as const;

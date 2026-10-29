@@ -1,4 +1,3 @@
-import type { DebridDownload } from '../../../domain/ddl/DebridDownload.js';
 import { Language } from '../../../domain/portal/Language.js';
 import type { MediaFile } from '../../../domain/media/MediaFile.js';
 import type { Label } from '../../../domain/torrent/Label.js';
@@ -130,7 +129,7 @@ interface HomeAction {
   readonly blurb: string;
 }
 
-// The three things people actually do here. ruTorrent comes first because that
+// The two things people actually do here. ruTorrent comes first because that
 // is where most of them spend their time — the portal is the place you visit to
 // set something up or check on it, not where you live.
 const HOME_ACTIONS: readonly HomeAction[] = [
@@ -143,11 +142,6 @@ const HOME_ACTIONS: readonly HomeAction[] = [
     href: '/media',
     title: 'My media',
     blurb: 'Watch or download what has finished.',
-  },
-  {
-    href: '/downloads',
-    title: 'Download a link',
-    blurb: 'Paste a link from a file host and let the server fetch it.',
   },
 ];
 
@@ -267,148 +261,6 @@ ${flash(viewer.t, error, 'error')}
 // profile — so the three variants are presented as a choice, each carrying the
 // sentence that tells you whether it is yours — and then knowing their own
 // connection details, which the page previously never showed at all.
-function downloadStatusChip(status: DebridDownload['status'], viewer: Viewer): RawHtml {
-  switch (status) {
-    case 'done':
-      return html`<span class="chip ok">${viewer.t('done')}</span>`;
-    case 'failed':
-      return html`<span class="chip bad">${viewer.t('failed')}</span>`;
-    case 'downloading':
-      return html`<span class="chip warn">${viewer.t('downloading')}</span>`;
-    default:
-      return html`<span class="chip">${viewer.t('pending')}</span>`;
-  }
-}
-
-// The per-user debrid account panel. It never echoes the key back — not even
-// sealed: the only states shown are "configured" and "not configured".
-function debridAccountCard(viewer: Viewer, hasKey: boolean): RawHtml {
-  return html`<div class="card">
-  <h2>${viewer.t('My AllDebrid account')}</h2>
-  <p>${sentence(viewer.t, 'Status: {state}', {
-    state: hasKey
-      ? html`<span class="chip ok">${viewer.t('key configured')}</span>`
-      : html`<span class="chip warn">${viewer.t('no key')}</span>`,
-  })}<br>
-  <span class="muted">${viewer.t('Your key is stored encrypted and is only used for your own downloads. Without one, downloads stay unavailable for you, and nothing else changes.')}</span></p>
-  <form method="post" action="/downloads/debrid-key">
-    <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
-    <label for="apiKey">${viewer.t(hasKey ? 'Replace my key' : 'My AllDebrid API key')}</label>
-    <input id="apiKey" name="apiKey" type="password" autocomplete="off" required>
-    <button type="submit">${viewer.t('Save')}</button>
-  </form>
-  ${hasKey
-    ? html`<form class="inline" method="post" action="/downloads/debrid-key/clear">
-    <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
-    <button class="ghost" type="submit">${viewer.t('Remove my key')}</button>
-  </form>`
-    : undefined}
-</div>`;
-}
-
-// A finished download shows its file, a running one its source, a failed one the
-// reason. The first two are data and read as mono; a reason is a sentence meant
-// to be read, so it is set as prose with the API code kept scannable beside it.
-// Drawn only when aria2 has actually reported a size. No bar is a truthful
-// "we cannot tell yet"; a bar sitting at zero reads as "started and going
-// nowhere", which is a different and wrong statement.
-function progressBar(download: DebridDownload): RawHtml {
-  if (download.percent === undefined || download.status !== 'downloading') {
-    return html``;
-  }
-  const percent = String(download.percent);
-  return html`<span class="bar" role="progressbar" aria-valuenow="${percent}"
-  aria-valuemin="0" aria-valuemax="100"><span style="width:${percent}%"></span></span>
-<span class="pct">${percent}%</span>`;
-}
-
-function detailCell(download: DebridDownload): RawHtml {
-  if (download.filename !== undefined) {
-    return html`<span class="path">${download.filename}</span>`;
-  }
-  if (download.error !== undefined) {
-    const match = /^debrid error ([A-Z_]+): (.*)$/s.exec(download.error);
-    return match === null
-      ? html`<span class="reason">${download.error}</span>`
-      : html`<span class="reason"><code>${match[1] ?? ''}</code>${match[2] ?? ''}</span>`;
-  }
-  return html`<span class="path">${download.sourceLink.value}</span>`;
-}
-
-// The member's own folders, the same list the Folders page shows. A closed films|series
-// enum used to live here, so a member with a Divers folder could sync it and
-// never download into it.
-function folderChoice(folders: readonly Label[], viewer: Viewer): RawHtml {
-  if (folders.length === 0) {
-    return html`<p class="muted">${sentence(viewer.t, 'You have no folders yet. Create one under {folders} and it will show up here.', {
-      folders: html`<a href="/sync">${viewer.t('Folders')}</a>`,
-    })}</p>`;
-  }
-  const options = folders.map((folder) => html`<option value="${folder.value}">${folder.value}</option>`);
-  return html`<select id="category" name="category">${options}</select>`;
-}
-
-// aria2 is what actually pulls the file down, and it skips its own install when
-// no RPC secret is configured. Without this, every submitted link fails one at a
-// time with a message about the last hop, and nothing says the engine is absent.
-function engineNotice(engineReady: boolean, viewer: Viewer): RawHtml {
-  return engineReady
-    ? html``
-    : html`<p class="card bad">${sentence(viewer.t, 'The download engine is {notSetUp}, so links will not go anywhere. This is not something you can fix from here: tell an admin, and they will find the reason under Health.', {
-      notSetUp: html`<strong>${viewer.t('not set up on this box')}</strong>`,
-    })}</p>`;
-}
-
-export function downloadsPage(
-  viewer: Viewer,
-  downloads: readonly DebridDownload[],
-  hasKey: boolean,
-  folders: readonly Label[],
-  engineReady: boolean,
-  message?: string,
-  error?: string,
-): string {
-  const rows =
-    downloads.length === 0
-      ? html`<tr><td colspan="4">${viewer.t('Nothing here yet. Submit a link above to start.')}</td></tr>`
-      : downloads.map(
-          (download) => html`<tr>
-  <td>${download.category.value}</td>
-  <td>${downloadStatusChip(download.status, viewer)}${progressBar(download)}</td>
-  <td>${detailCell(download)}</td>
-  <td class="when">${download.createdAt}</td>
-  <td>${download.id === undefined
-      ? html``
-      : html`<form class="inline" method="post" action="/downloads/${String(download.id)}/remove">
-    <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
-    <button type="submit" class="ghost">${viewer.t('Remove')}</button>
-  </form>`}</td>
-</tr>`,
-        );
-  return page(
-    'Downloads',
-    html`<h1>${viewer.t('Downloads')}</h1>
-${flash(viewer.t, message)}
-${flash(viewer.t, error, 'error')}
-${engineNotice(engineReady, viewer)}
-${debridAccountCard(viewer, hasKey)}
-<form class="card" method="post" action="/downloads">
-  <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
-  <label for="link">${viewer.t('Filehoster link')}</label>
-  <input id="link" name="link" type="url" inputmode="url" placeholder="https://…" required>
-  <label for="category">${viewer.t('Folder')}</label>
-  ${folderChoice(folders, viewer)}
-  <button type="submit">${viewer.t('Start download')}</button>
-</form>
-<table>
-  <thead><tr><th>${viewer.t('Folder')}</th><th>${viewer.t('Status')}</th><th>${viewer.t('Detail')}</th><th>${viewer.t('Requested')}</th><th></th></tr></thead>
-  <tbody>${rows}</tbody>
-</table>`,
-    viewer,
-  );
-}
-
-
 const VPN_CHOICES: readonly {
   readonly variant: string;
   readonly title: string;
@@ -742,7 +594,6 @@ ${sshKeySection(viewer, facts)}
 ${languageSection(viewer, facts)}
 
 <p class="links"><a href="/rutorrent">${viewer.t('Open ruTorrent')}</a> ·
-<a href="/downloads">${viewer.t('Downloads')}</a> ·
 <a href="/password">${viewer.t('Change password')}</a></p>`,
     viewer,
   );

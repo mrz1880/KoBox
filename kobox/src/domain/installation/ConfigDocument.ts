@@ -27,8 +27,9 @@ export class SecretBearingConfigError extends DomainError {
 // argument is "no entry carries a secret", and an argument that lives only in a
 // review comment is one nobody enforces.
 //
-// /etc/kobox holds worker.env (AllDebrid key, aria2 RPC secret), portal.env and
-// aria2.conf; /etc/openvpn holds the PKI; htpasswd files hold password hashes.
+// /etc/kobox holds worker.env (notification webhooks, blocklist credentials),
+// portal.env and the host key pair; /etc/openvpn holds the PKI; htpasswd files
+// hold password hashes.
 const SECRET_BEARING = [
   /^\/etc\/kobox\//,
   /^\/etc\/openvpn\//,
@@ -111,12 +112,6 @@ const CATALOG: readonly ConfigDocument[] = [
     'Worker service',
     '/etc/systemd/system/kobox-worker.service',
     'The one privileged process: it executes the typed jobs the portal enqueues.',
-  ),
-  ConfigDocument.of(
-    'aria2-unit',
-    'Direct download service',
-    '/etc/systemd/system/kobox-aria2.service',
-    'The downloader that fetches debrid links into the staging area.',
   ),
   ConfigDocument.of(
     'nanomon-unit',

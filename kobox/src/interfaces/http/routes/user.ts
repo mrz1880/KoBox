@@ -1,16 +1,13 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import type { RequestDebridDownload } from '../../../application/ddl/RequestDebridDownload.js';
 import type { JobQueuePort } from '../../../application/jobs/JobQueuePort.js';
 import type { VpnProfileStorePort } from '../../../application/portal/ports.js';
 
-import { FilehosterLink } from '../../../domain/ddl/FilehosterLink.js';
-import { DebridApiKey } from '../../../domain/ddl/DebridApiKey.js';
 import { MediaPath, type MediaFile } from '../../../domain/media/MediaFile.js';
 import type { MediaRepository } from '../../../domain/media/ports.js';
 import { ComponentName } from '../../../domain/installation/ComponentName.js';
 import type { ComponentRegistry } from '../../../domain/installation/ports.js';
-import { LABEL_PATTERN, Label } from '../../../domain/torrent/Label.js';
+import { Label } from '../../../domain/torrent/Label.js';
 import { SshPublicKey } from '../../../domain/user/SshPublicKey.js';
 import type { SshKeyRepository } from '../../../domain/user/ports.js';
 import { SyncMode } from '../../../domain/torrent/SyncMode.js';
@@ -26,11 +23,6 @@ import { RemotePort } from '../../../domain/sync/RemotePort.js';
 import { SendHour } from '../../../domain/sync/SendHour.js';
 import { TransferBatchSize } from '../../../domain/sync/TransferBatchSize.js';
 import type { Username } from '../../../domain/user/Username.js';
-import type {
-  DebridAccountRepository,
-  DebridDownloadRepository,
-  DebridKeyEncryptorPort,
-} from '../../../domain/ddl/ports.js';
 import type { PortalCredentials, PortalCredentialsPort } from '../../../domain/portal/ports.js';
 import type { IssueAppToken } from '../../../application/portal/IssueAppToken.js';
 import { DomainError } from '../../../domain/shared/DomainError.js';
@@ -51,7 +43,6 @@ import {
   twoStepSetupPage,
   adminHomePage,
   filesPage,
-  downloadsPage,
   mediaPage,
   mediaWatchPage,
   passwordPage,
@@ -99,13 +90,6 @@ const passwordSchema = z.object({
   next: passwordField,
 });
 
-const downloadSchema = z.object({
-  link: z.string().min(1).max(2048),
-  category: z.string().regex(LABEL_PATTERN),
-});
-
-const debridKeySchema = z.object({ apiKey: z.string().min(1).max(256) });
-
 // "Same as my browser": the member's credentials with no stored language.
 function withoutLanguageChoice({
   language: _previous,
@@ -116,37 +100,6 @@ function withoutLanguageChoice({
 
 function isVpnVariant(raw: string): raw is VpnVariant {
   return (VPN_VARIANTS as readonly string[]).includes(raw);
-}
-
-// A malformed link is a form error, not a 500: parse it here and let the caller
-// re-render the page. Only a domain rejection is swallowed — anything else throws.
-function parseLink(raw: string | undefined): FilehosterLink | undefined {
-  if (raw === undefined) {
-    return undefined;
-  }
-  try {
-    return FilehosterLink.parse(raw);
-  } catch (error) {
-    if (error instanceof DomainError) {
-      return undefined;
-    }
-    throw error;
-  }
-}
-
-// A mistyped key is a form error, not a 500 — same contract as parseLink.
-function parseDebridKey(raw: string | undefined): DebridApiKey | undefined {
-  if (raw === undefined) {
-    return undefined;
-  }
-  try {
-    return DebridApiKey.parse(raw);
-  } catch (error) {
-    if (error instanceof DomainError) {
-      return undefined;
-    }
-    throw error;
-  }
 }
 
 // A file is served only when it parses as a relative path AND appears in this
@@ -197,11 +150,6 @@ export interface UserRoutesDeps {
   readonly credentials: PortalCredentialsPort;
   readonly issueAppToken: IssueAppToken;
   readonly profiles: VpnProfileStorePort;
-  readonly downloads: DebridDownloadRepository;
-  readonly requestDownload: RequestDebridDownload;
-  readonly debridAccounts: DebridAccountRepository;
-  // the portal holds the PUBLIC half only — it can seal a key, never open one
-  readonly debridEncryptor: DebridKeyEncryptorPort;
   readonly media: MediaRepository;
   readonly instances: TorrentInstanceRepository;
   readonly destinations: SyncDestinationRepository;
@@ -378,15 +326,8 @@ export function registerUserRoutes(
     return redirectWithFlash(reply, '/password', 'Password change under way: it takes a few seconds.');
   });
 
-  // aria2 is the engine behind every debrid download. Reading its install state
-  // once per page beats letting each link discover the absence on its own.
-  const engineReady = async (): Promise<boolean> => {
-    const record = await deps.components.get(ComponentName.parse('aria2'));
-    return record?.state.value === 'installed';
-  };
-
-  // The folders a member actually has, read from their instance. Folders and
-  // "Download a link" must never disagree about what exists.
+  // The folders a member actually has, read from their instance: the media page
+  // groups by them, and must never disagree with Folders about what exists.
   const foldersOf = async (username: Username): Promise<readonly Label[]> => {
     const instance = await deps.instances.findByUsername(username);
     return (instance?.watchDirs ?? [])
@@ -620,133 +561,6 @@ export function registerUserRoutes(
     }
     await deps.queue.enqueue(buildJob.removeSshKey({ username: session.username.value }));
     return redirectWithFlash(reply, '/access', 'Key removed.');
-  });
-
-  server.get('/downloads', async (request, reply) => {
-    const session = await guards.requireSession(request, reply);
-    if (session === undefined) {
-      return;
-    }
-    const rows = await deps.downloads.listForUser(session.username);
-    const hasKey = await deps.debridAccounts.has(session.username);
-    return reply
-      .type('text/html')
-      .send(
-        downloadsPage(
-          viewerOf(session, request),
-          rows,
-          hasKey,
-          await foldersOf(session.username),
-          await engineReady(),
-          flashOf(request),
-        ),
-      );
-  });
-
-  const downloadIdSchema = z.object({ id: z.coerce.number().int().positive() });
-
-  server.post('/downloads/:id/remove', async (request, reply) => {
-    const session = await guards.requireCsrf(request, reply);
-    if (session === undefined) {
-      return;
-    }
-    const params = downloadIdSchema.safeParse(request.params);
-    if (!params.success) {
-      return reply.code(400).send();
-    }
-    // scoped by the session's own username, so somebody else's id enqueues
-    // nothing and gets the answer a line already removed gets: the page comes
-    // back before the worker drops a line, and a second click is common
-    const rows = await deps.downloads.listForUser(session.username);
-    if (!rows.some((row) => row.id === params.data.id)) {
-      return redirectWithFlash(reply, '/downloads', 'That one is already gone.');
-    }
-    // the portal can neither reach aria2 nor delete from the staging dir, so
-    // the worker does the whole thing: cancel, discard the partial file, drop
-    // the row. Removing the row here would strand the bytes it was writing.
-    await deps.queue.enqueue(
-      buildJob.discardDebridDownload({
-        username: session.username.value,
-        downloadId: params.data.id,
-      }),
-    );
-    return redirectWithFlash(reply, '/downloads', 'Removing it now.');
-  });
-
-  server.post('/downloads/debrid-key', async (request, reply) => {
-    const session = await guards.requireCsrf(request, reply);
-    if (session === undefined) {
-      return;
-    }
-    const parsed = debridKeySchema.safeParse(request.body);
-    const key = parseDebridKey(parsed.success ? parsed.data.apiKey : undefined);
-    if (key === undefined) {
-      const rows = await deps.downloads.listForUser(session.username);
-      const hasKey = await deps.debridAccounts.has(session.username);
-      return reply
-        .code(200)
-        .type('text/html')
-        .send(
-          downloadsPage(
-            viewerOf(session, request),
-            rows,
-            hasKey,
-            await foldersOf(session.username),
-            await engineReady(),
-            undefined,
-            "That doesn't look like an AllDebrid API key.",
-          ),
-        );
-    }
-    // sealed HERE with the public half: the plaintext key never reaches the job
-    // payload, the database, or a log line
-    const encryptedKey = await deps.debridEncryptor.encrypt(key);
-    await deps.queue.enqueue(
-      buildJob.setDebridKey({ username: session.username.value, encryptedKey }),
-    );
-    return redirectWithFlash(reply, '/downloads', 'Key saved.');
-  });
-
-  server.post('/downloads/debrid-key/clear', async (request, reply) => {
-    const session = await guards.requireCsrf(request, reply);
-    if (session === undefined) {
-      return;
-    }
-    await deps.queue.enqueue(buildJob.clearDebridKey({ username: session.username.value }));
-    return redirectWithFlash(reply, '/downloads', 'Key removed.');
-  });
-
-  server.post('/downloads', async (request, reply) => {
-    const session = await guards.requireCsrf(request, reply);
-    if (session === undefined) {
-      return;
-    }
-    const parsed = downloadSchema.safeParse(request.body);
-    const link = parseLink(parsed.success ? parsed.data.link : undefined);
-    if (!parsed.success || link === undefined) {
-      const rows = await deps.downloads.listForUser(session.username);
-      const hasKey = await deps.debridAccounts.has(session.username);
-      return reply
-        .code(200)
-        .type('text/html')
-        .send(
-          downloadsPage(
-            viewerOf(session, request),
-            rows,
-            hasKey,
-            await foldersOf(session.username),
-            await engineReady(),
-            undefined,
-            'Please provide a valid http(s) link and a category.',
-          ),
-        );
-    }
-    await deps.requestDownload.execute({
-      username: session.username,
-      category: Label.parse(parsed.data.category),
-      link,
-    });
-    return redirectWithFlash(reply, '/downloads', 'Download started. It will appear in the list below.');
   });
 
   server.post('/rutorrent/restart', async (request, reply) => {

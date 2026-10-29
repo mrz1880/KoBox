@@ -1,8 +1,5 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
-import { DebridApiKey } from '../../domain/ddl/DebridApiKey.js';
-
-import { FilehosterLink } from '../../domain/ddl/FilehosterLink.js';
 import { EventHook } from '../../domain/torrent/EventHook.js';
 import { InfoHash } from '../../domain/torrent/InfoHash.js';
 import { LABEL_PATTERN, Label } from '../../domain/torrent/Label.js';
@@ -675,64 +672,6 @@ program
   });
 
 program
-  .command('poll-debrid-downloads')
-  .description('advance in-flight debrid downloads (cron entry point)')
-  .action(async () => {
-    const c = container();
-    const id = await c.queue.enqueueUnique(buildJob.pollDebridDownloads());
-    await done(
-      c,
-      id === undefined
-        ? 'poll-debrid-downloads already pending'
-        : `job ${String(id)} enqueued: poll-debrid-downloads`,
-    );
-  });
-
-program
-  .command('request-download')
-  .argument('<username>')
-  .argument('<link>')
-  .option('--category <films|series>', 'target complete/ subdir', 'films')
-  .description('queue a filehoster link for debrid unlock + download (unprivileged entry point)')
-  .action(async (username: string, link: string, options: Record<string, string>) => {
-    const c = container();
-    const id = await c.ddlUseCases.requestDownload.execute({
-      username: Username.parse(username),
-      category: Label.parse(options.category ?? 'films'),
-      link: FilehosterLink.parse(link),
-    });
-    await done(c, `download ${String(id)} requested for ${username}`);
-  });
-
-program
-  .command('set-debrid-key')
-  .argument('<username>')
-  .description('set a user AllDebrid key (read from stdin; sealed before it enters the queue)')
-  .action(async (username: string) => {
-    const raw = await readStdin();
-    const c = container();
-    // sealed here, exactly like the portal does: the plaintext never enters the
-    // job payload, the database or a log line
-    const encryptedKey = await c.debridCipher.encrypt(DebridApiKey.parse(raw));
-    const id = await c.queue.enqueue(
-      buildJob.setDebridKey({ username: Username.parse(username).value, encryptedKey }),
-    );
-    await done(c, `job ${String(id)} enqueued: set-debrid-key ${username}`);
-  });
-
-program
-  .command('clear-debrid-key')
-  .argument('<username>')
-  .description('remove a user stored AllDebrid key')
-  .action(async (username: string) => {
-    const c = container();
-    const id = await c.queue.enqueue(
-      buildJob.clearDebridKey({ username: Username.parse(username).value }),
-    );
-    await done(c, `job ${String(id)} enqueued: clear-debrid-key ${username}`);
-  });
-
-program
   .command('index-media')
   .description('refresh the per-user media listing (cron entry point)')
   .action(async () => {
@@ -1103,15 +1042,6 @@ program
   .action(async () => {
     const c = container();
     const checks = await new ProbeSeedboxHealth({ repo: c.repo, health: c.healthProbe }).execute();
-    // the credential, not the port: aria2 listens happily with a secret KoBox
-    // no longer holds, and every debrid download then fails while a socket
-    // probe still reports healthy
-    const aria2 = await c.downloader.checkReachable();
-    checks.push({
-      name: 'aria2 rpc',
-      state: aria2.ok ? ('healthy' as const) : ('unhealthy' as const),
-      detail: aria2.detail,
-    });
     const healthy = checks.every((check) => check.state === 'healthy');
     process.stdout.write(`${JSON.stringify({ healthy, checks }, null, 2)}\n`);
     c.db.close();

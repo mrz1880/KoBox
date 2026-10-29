@@ -70,11 +70,6 @@ export const JOB_TYPES = [
   'set-fair-use-override',
   'render-rutorrent-users',
   'render-nfs-exports',
-  'debrid-download',
-  'poll-debrid-downloads',
-  'discard-debrid-download',
-  'set-debrid-key',
-  'clear-debrid-key',
 ] as const;
 
 export type JobType = (typeof JOB_TYPES)[number];
@@ -282,20 +277,6 @@ export const jobPayloadSchemas = {
   'restart-rtorrent': usernameOnly,
   'render-rutorrent-users': z.strictObject({}),
   'render-nfs-exports': z.strictObject({}),
-  // DDL: resolve+download a submitted link; the poll advances active downloads
-  'debrid-download': z.strictObject({ downloadId: z.number().int().positive() }),
-  'poll-debrid-downloads': z.strictObject({}),
-  'discard-debrid-download': z.strictObject({
-    username: usernameField,
-    downloadId: z.number().int().positive(),
-  }),
-  // per-user debrid account: the payload carries only the SEALED key (base64
-  // RSA-OAEP) — the plaintext never reaches a job, a log or this database
-  'set-debrid-key': z.strictObject({
-    username: usernameField,
-    encryptedKey: z.string().min(1).max(4096).regex(/^[A-Za-z0-9+/=]+$/),
-  }),
-  'clear-debrid-key': usernameOnly,
 } satisfies Record<JobType, z.ZodType>;
 
 export type JobPayload<T extends JobType> = z.infer<(typeof jobPayloadSchemas)[T]>;

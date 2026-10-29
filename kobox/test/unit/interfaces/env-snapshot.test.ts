@@ -5,13 +5,13 @@ describe('mergeKoboxEnv', () => {
   it('should_keep_a_setting_the_current_shell_never_heard_of', () => {
     // re-running `kobox install` from a plain shell used to rewrite worker.env
     // from that shell alone, silently dropping every secret the box was
-    // configured with. The aria2 RPC secret went that way on a live box.
-    const existing = new Map([['KOBOX_ARIA2_RPC_SECRET', 'kept'], ['KOBOX_DB', 'old.db']]);
+    // configured with, which happened to a live box.
+    const existing = new Map([['KOBOX_DISCORD_WEBHOOK', 'kept'], ['KOBOX_DB', 'old.db']]);
     const fromShell = new Map([['KOBOX_DB', 'new.db']]);
 
     const merged = mergeKoboxEnv(existing, fromShell);
 
-    expect(merged.get('KOBOX_ARIA2_RPC_SECRET')).toBe('kept');
+    expect(merged.get('KOBOX_DISCORD_WEBHOOK')).toBe('kept');
     expect(merged.get('KOBOX_DB')).toBe('new.db');
   });
 
@@ -51,14 +51,14 @@ describe('parseEnvFile', () => {
 
 describe('loadWorkerEnvInto', () => {
   it('should_give_a_root_cli_the_configuration_the_worker_unit_has', () => {
-    // systemd hands worker.env to the worker; a person typing `kobox doctor`
-    // gets only their own shell, and would otherwise be told aria2 is
-    // unreachable on a perfectly healthy box
+    // systemd hands worker.env to the worker; a person typing a `kobox`
+    // command gets only their own shell, and would otherwise act on a
+    // configuration the box does not run with
     const env: Record<string, string | undefined> = {};
 
-    loadWorkerEnvInto(env, 'KOBOX_ARIA2_RPC_SECRET=from-the-box\n');
+    loadWorkerEnvInto(env, 'KOBOX_DISCORD_WEBHOOK=from-the-box\n');
 
-    expect(env.KOBOX_ARIA2_RPC_SECRET).toBe('from-the-box');
+    expect(env.KOBOX_DISCORD_WEBHOOK).toBe('from-the-box');
   });
 
   it('should_let_an_explicit_override_stand', () => {

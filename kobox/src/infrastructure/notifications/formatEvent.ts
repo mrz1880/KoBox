@@ -60,7 +60,7 @@ function noticeOf(event: AnyDomainEvent): Notice {
         title: `Member deleted: ${event.username}`,
         facts: [
           `The account of ${event.username} is gone, with their home and every file in it.`,
-          'Also removed: their rTorrent instance, their VPN certificate (revoked), their Samba and Nextcloud logins, their password links and their sealed debrid key.',
+          'Also removed: their rTorrent instance, their VPN certificate (revoked), their Samba and Nextcloud logins and their password links.',
         ],
         page: '/admin/users',
         priority: 'default',
