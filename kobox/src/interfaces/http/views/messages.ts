@@ -870,6 +870,12 @@ export function hasFrench(english: string): boolean {
   return Object.hasOwn(FR, english);
 }
 
+// Every sentence the French catalogue holds, so a test can tell a line that
+// no page sends any more from one still in use.
+export function frenchSentences(): readonly string[] {
+  return Object.keys(FR);
+}
+
 export function translatorFor(language: Language): Translate {
   const catalogue = CATALOGUES[language.value];
   return (english, values) => fill(catalogue?.[english] ?? english, values);
