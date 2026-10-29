@@ -12,7 +12,13 @@ import {
   renderDnscryptConfig,
   renderDnscryptSocketDropIn,
   renderFirewallBootUnit,
+  renderNfsConf,
   renderNfsExports,
+  renderNextcloudPhp,
+  rutorrentProfilesDir,
+  rutorrentUserConfigDir,
+  rutorrentUserConfigsDir,
+  RUTORRENT_OWN_CONFIG,
   renderAria2Conf,
   renderAria2Unit,
   renderNanomonUnit,
@@ -37,6 +43,7 @@ import {
   renderWorkerEnv,
   renderWorkerUnit,
 } from '../../../../src/domain/installation/rendering.js';
+import { PHP_SETTINGS } from '../../../../src/domain/installation/platform.js';
 
 const GOLDEN_DIR = join(dirname(fileURLToPath(import.meta.url)), '../../../golden/installation');
 
@@ -694,3 +701,201 @@ describe('installation rendering', () => {
     expectGolden('dnscrypt-proxy.socket.dropin.golden', file.content);
   });
 });
+
+describe('installation rendering: who may read and run each file', () => {
+  const alice = { username: 'alice', scgiPort: 5001 };
+
+  it.each([
+    ['worker unit', () => renderWorkerUnit({ nodeBin: '/usr/bin/node', workerMain: '/opt/w.js' }), '0644', 'root', 'root'],
+    ['portal unit', () => renderPortalUnit({ nodeBin: '/usr/bin/node', portalMain: '/opt/p.js' }), '0644', 'root', 'root'],
+    ['nanomon unit', () => renderNanomonUnit(), '0644', 'root', 'root'],
+    ['aria2 config', () => renderAria2Conf('s3cret', '/var/lib/kobox-aria2'), '0640', 'root', 'kobox-aria2'],
+    ['aria2 unit', () => renderAria2Unit('/var/lib/kobox-aria2'), '0644', 'root', 'root'],
+    ['firewall unit', () => renderFirewallBootUnit(), '0644', 'root', 'root'],
+    ['worker env', () => renderWorkerEnv(new Map()), '0600', 'root', 'root'],
+    ['sshd drop-in', () => renderSshdDropin(22), '0600', 'root', 'root'],
+    ['sysctl tweaks', () => renderSysctlTweaks(), '0644', 'root', 'root'],
+    ['nginx vhost', () => renderNginxVhost({ portalPort: 8189 }), '0644', 'root', 'root'],
+    ['nfs config', () => renderNfsConf(), '0644', 'root', 'root'],
+    ['nfs exports', () => renderNfsExports([]), '0644', 'root', 'root'],
+    ['samba', () => renderSmbConf(), '0644', 'root', 'root'],
+    ['shellinabox', () => renderShellinaboxDefault(), '0644', 'root', 'root'],
+    ['rpc include', () => renderRutorrentUsersInclude([alice]), '0644', 'root', 'root'],
+    ['member rutorrent config', () => renderRutorrentUserConfig(alice), '0640', 'root', 'alice'],
+    ['member php pool', () => renderRutorrentPhpPool('alice'), '0644', 'root', 'root'],
+    ['nextcloud site', () => renderNextcloudSite(), '0644', 'root', 'root'],
+    ['certbot hook', () => renderCertbotDeployHook(), '0755', 'root', 'root'],
+    ['quota answer', () => renderRutorrentQuotaAnswer(), '0644', 'root', 'root'],
+    ['rutorrent config', () => renderRutorrentConfig(), '0644', 'root', 'root'],
+    ['ratio offer', () => renderRutorrentRatioOffer(), '0644', 'root', 'root'],
+    ['default theme', () => renderRutorrentDefaultTheme(), '0644', 'root', 'root'],
+    ['plugins', () => renderRutorrentPlugins(), '0644', 'root', 'root'],
+    ['bind local', () => renderBindLocal(), '0644', 'root', 'bind'],
+    ['bind options', () => renderBindOptions({ dnscryptForwarder: true }), '0644', 'root', 'bind'],
+    ['dnscrypt socket', () => renderDnscryptSocketDropIn(), '0644', 'root', 'root'],
+    ['dnscrypt config', () => renderDnscryptConfig(), '0644', 'root', 'root'],
+  ])('should_install_the_%s_with_the_expected_permissions', (_name, render, mode, owner, group) => {
+    const file = render();
+    expect([file.mode, file.owner, file.group]).toEqual([mode, owner, group]);
+  });
+
+  it('should_write_every_apt_source_file_root_owned_and_world_readable', () => {
+    for (const file of renderAptSources()) {
+      expect([file.mode, file.owner, file.group], file.path).toEqual(['0644', 'root', 'root']);
+    }
+  });
+
+  it('should_install_every_nextcloud_php_setting_root_owned_and_world_readable', () => {
+    for (const file of renderNextcloudPhp()) {
+      expect([file.mode, file.owner, file.group], file.path).toEqual(['0644', 'root', 'root']);
+    }
+  });
+
+  it.each([
+    ['worker unit', () => renderWorkerUnit({ nodeBin: '/usr/bin/node', workerMain: '/opt/w.js' }), '/etc/systemd/system/kobox-worker.service'],
+    ['nanomon unit', () => renderNanomonUnit(), '/etc/systemd/system/kobox-nanomon.service'],
+    ['aria2 config', () => renderAria2Conf('s3cret', '/var/lib/kobox-aria2'), '/etc/kobox/aria2.conf'],
+    ['aria2 unit', () => renderAria2Unit('/var/lib/kobox-aria2'), '/etc/systemd/system/kobox-aria2.service'],
+    ['nginx vhost', () => renderNginxVhost({ portalPort: 8189 }), '/etc/nginx/conf.d/kobox.conf'],
+    ['nfs exports', () => renderNfsExports([]), '/etc/exports.d/kobox.exports'],
+    ['samba', () => renderSmbConf(), '/etc/samba/smb.conf'],
+    ['shellinabox', () => renderShellinaboxDefault(), '/etc/default/shellinabox'],
+    ['rpc include', () => renderRutorrentUsersInclude([]), '/etc/nginx/kobox.d/rutorrent-users.conf'],
+    ['nextcloud site', () => renderNextcloudSite(), '/etc/nginx/kobox.d/nextcloud.conf'],
+    ['certbot hook', () => renderCertbotDeployHook(), '/etc/letsencrypt/renewal-hooks/deploy/kobox-nginx'],
+    ['ratio offer', () => renderRutorrentRatioOffer(), '/usr/local/share/kobox/rutorrent-ratios.php'],
+    ['default theme', () => renderRutorrentDefaultTheme(), '/var/www/rutorrent/plugins/theme/conf.local.php'],
+    ['plugins', () => renderRutorrentPlugins(), '/var/www/rutorrent/conf/plugins.ini'],
+    ['bind local', () => renderBindLocal(), '/etc/bind/named.conf.local'],
+    ['bind options', () => renderBindOptions({ dnscryptForwarder: false }), '/etc/bind/named.conf.options'],
+    ['dnscrypt socket', () => renderDnscryptSocketDropIn(), '/etc/systemd/system/dnscrypt-proxy.socket.d/90-kobox.conf'],
+    ['dnscrypt config', () => renderDnscryptConfig(), '/etc/dnscrypt-proxy/dnscrypt-proxy.toml'],
+  ])('should_write_the_%s_where_its_consumer_reads_it', (_name, render, path) => {
+    expect(render().path).toBe(path);
+  });
+});
+
+describe('installation rendering: files without a golden', () => {
+  it('should_pin_nfs_mountd_to_the_port_the_firewall_opens', () => {
+    const file = renderNfsConf();
+    expect(file.path).toBe('/etc/nfs.conf.d/kobox.conf');
+    expect(file.content.split('\n').slice(1)).toEqual(['[mountd]', 'port=32767', '']);
+  });
+
+  it('should_give_php_the_memory_and_cache_nextcloud_asks_for', () => {
+    const [fpm, cli, pool] = renderNextcloudPhp();
+    expect(fpm?.path).toBe(PHP_SETTINGS.fpm);
+    expect(fpm?.content.split('\n').slice(1)).toEqual([
+      'memory_limit = 512M',
+      'opcache.interned_strings_buffer = 16',
+      '',
+    ]);
+    expect(cli?.path).toBe(PHP_SETTINGS.cli);
+    expect(cli?.content.split('\n').slice(1)).toEqual(['memory_limit = 512M', 'apc.enable_cli = 1', '']);
+    expect(pool?.path).toBe(PHP_SETTINGS.pool);
+    expect(pool?.content.split('\n').slice(1)).toEqual(['[www]', 'clear_env = no', '']);
+  });
+
+  it('should_mark_php_ini_files_with_a_semicolon_comment_php_accepts', () => {
+    // a `#` line is a syntax error in a php ini file
+    for (const file of [...renderNextcloudPhp(), renderRutorrentPhpPool('alice')]) {
+      expect(file.content.split('\n')[0], file.path).toBe(
+        '; KoBox-managed \u2014 DO NOT EDIT (rendered declaratively).',
+      );
+    }
+  });
+
+  it('should_keep_each_members_rutorrent_config_and_profile_in_their_own_folder', () => {
+    expect(rutorrentUserConfigsDir()).toBe('/var/www/rutorrent/conf/users');
+    expect(rutorrentUserConfigDir('alice')).toBe('/var/www/rutorrent/conf/users/alice');
+    expect(rutorrentProfilesDir()).toBe('/var/lib/rutorrent/users');
+    expect(RUTORRENT_OWN_CONFIG).toBe('/var/www/rutorrent/conf/config.php');
+  });
+  it('should_let_the_web_server_reach_the_pool_and_keep_idle_members_cheap', () => {
+    // nginx connects through the socket as www-data; ondemand with a short idle
+    // timeout means a member who is not looking costs no process
+    expect(renderRutorrentPhpPool('alice').content.split('\n').slice(5)).toEqual([
+      'listen.owner = www-data',
+      'listen.group = www-data',
+      'listen.mode = 0660',
+      'pm = ondemand',
+      'pm.max_children = 4',
+      'pm.process_idle_timeout = 30s',
+      'clear_env = no',
+      '',
+    ]);
+  });
+});
+
+describe('installation rendering: environment snapshots', () => {
+  it('should_sort_entries_by_key_whatever_the_snapshot_order', () => {
+    const file = renderWorkerEnv(
+      new Map([
+        ['KOBOX_C', '3'],
+        ['KOBOX_A', '1'],
+        ['KOBOX_B', '2'],
+      ]),
+    );
+    expect(file.content.split('\n').slice(1)).toEqual(['KOBOX_A=1', 'KOBOX_B=2', 'KOBOX_C=3', '']);
+  });
+
+  it('should_accept_keys_of_capitals_digits_and_underscores_starting_with_a_capital', () => {
+    const file = renderWorkerEnv(new Map([['K9_X', 'v']]));
+    expect(file.content).toContain('\nK9_X=v\n');
+    expect(renderWorkerEnv(new Map([['K', 'v']])).content).toContain('\nK=v\n');
+  });
+
+  it('should_refuse_a_key_that_systemd_would_misread', () => {
+    for (const key of ['', '9KOBOX', '_KOBOX', 'kobox_db', 'KOBOX_db', 'KOBOX-DB', 'KOBOX DB', ' KOBOX', 'KOBOX=']) {
+      expect(() => renderWorkerEnv(new Map([[key, 'v']])), key).toThrow(
+        `invalid worker environment entry: key ${JSON.stringify(key)}`,
+      );
+      expect(() => renderPortalEnv(new Map([[key, 'v']])), key).toThrow(InvalidWorkerEnvError);
+    }
+  });
+
+  it('should_refuse_a_value_that_would_smuggle_a_second_entry', () => {
+    expect(() => renderWorkerEnv(new Map([['KOBOX_X', 'a\nKOBOX_Y=b']]))).toThrow(
+      'invalid worker environment entry: value of KOBOX_X contains a newline',
+    );
+    expect(() => renderPortalEnv(new Map([['KOBOX_X', 'a\nb']]))).toThrow(InvalidWorkerEnvError);
+  });
+
+  it('should_validate_even_the_entries_the_portal_never_receives', () => {
+    expect(() => renderPortalEnv(new Map([['KOBOX_X_SECRET', 'a\nb']]))).toThrow(InvalidWorkerEnvError);
+  });
+
+  it('should_withhold_every_secret_suffix_from_the_portal', () => {
+    for (const key of [
+      'KOBOX_X_APIKEY',
+      'KOBOX_X_API_KEY',
+      'KOBOX_X_SECRET',
+      'KOBOX_X_TOKEN',
+      'KOBOX_X_PASSWORD',
+      'KOBOX_X_WEBHOOK',
+      'KOBOX_X_PIN',
+      'KOBOX_IBLOCKLIST_USER',
+      'KOBOX_DISCORD_WEBHOOK',
+    ]) {
+      expect(isWorkerOnlyEnv(key), key).toBe(true);
+    }
+  });
+
+  it('should_hand_the_portal_a_key_that_only_contains_a_secret_word', () => {
+    // the convention matches a suffix: a key merely mentioning the word is config
+    for (const key of ['KOBOX_TOKEN_TTL', 'KOBOX_PINNED', 'KOBOX_XSECRET', 'KOBOX_SECRET_FILE_DIR']) {
+      expect(isWorkerOnlyEnv(key), key).toBe(false);
+    }
+  });
+});
+
+describe('installation rendering: sshd port', () => {
+  it.each([21, 23, 2222])('should_declare_port_%i_since_it_is_not_the_default', (port) => {
+    expect(renderSshdDropin(port).content.split('\n')[1]).toBe(`Port ${String(port)}`);
+  });
+
+  it('should_go_straight_to_the_hardening_on_the_default_port', () => {
+    expect(renderSshdDropin(22).content.split('\n')[1]).toBe('AddressFamily inet');
+  });
+});
+
