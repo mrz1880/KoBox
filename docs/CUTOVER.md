@@ -79,11 +79,6 @@ Nothing comes over from MySB, so these are set again, per member, from what they
 - **Public trackers**: a member who needs the public-tracker bypass gets
   `kobox set-allow-public-tracker <member> on`.
 - **Restricted IPs and DynDNS hostnames**, if a member had them.
-- **Debrid accounts are per member** and must be authorised **from this server**: each member
-  pastes their AllDebrid key on the Downloads page. The first unlock from a new IP fails with
-  `AUTH_BLOCKED` and AllDebrid emails the account owner to approve the new location. This is per
-  IP and does not carry over: a key validated from a laptop is still blocked here. Expect one
-  failed download per member, the row reading "AllDebrid blocked this new location".
 - **Nextcloud**: a member's account is created with their portal password, the Watch folder
   mounted in it; a member created before Nextcloud was installed gets it at their next
   password change.
@@ -113,7 +108,6 @@ With your own account, then with one member's:
 - Portal login, ruTorrent frames, a torrent added through each path (ruTorrent, watch folder,
   Nextcloud) reaches `complete/`.
 - A finished download is sent to the member's machine.
-- A debrid download completes (after the AllDebrid approval).
 - The `.ovpn` connects; SFTP lands in the member's chroot.
 - `kobox doctor` is green.
 

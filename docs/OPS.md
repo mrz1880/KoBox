@@ -197,7 +197,7 @@ and per-user scoping, which it never had.
 Three roles, deliberately separate:
 
 - the **root worker** indexes `~user/rtorrent/complete/` into the database —
-  chained after a finished torrent or a placed debrid download, plus a sweep
+  chained after a finished torrent, plus a sweep
   every 15 min because files also leave over SFTP;
 - the **portal** lists from those rows, so it keeps `ProtectHome=yes` and no
   disk access at all;
@@ -247,7 +247,7 @@ in seconds — and arrives at the one that failed.
 ## Restarting a managed service
 
 **Health → Managed services** restarts a KoBox-managed unit without a shell:
-nginx, kobox-portal, kobox-aria2, kobox-nanomon, fail2ban.
+nginx, kobox-portal, kobox-nanomon, fail2ban.
 
 The list is a **closed set** in the domain, not a free text field. An open
 "restart any unit" control would be a root shell behind a nicer form — it would
@@ -266,7 +266,7 @@ reports them at `/monitoring`.
 ## Reading a unit's journal
 
 **Logs** shows the last 200 lines each KoBox unit wrote — nginx, kobox-portal,
-kobox-aria2, kobox-nanomon, fail2ban and kobox-worker. Same closed-set
+kobox-nanomon, fail2ban and kobox-worker. Same closed-set
 discipline as the restart control: `journalctl` on an arbitrary unit from a web
 page would hand over the whole host's journal, including sshd and every
 authentication failure on the box.
@@ -331,7 +331,8 @@ The portal reads these files **directly**, as the unprivileged `kobox-portal`
 user, with no job and no root. That only holds because every catalogued file
 installs world-readable, which is a property of the installer rather than of the
 reader — so the E2E asserts it on a real box: every catalogued file that exists
-must be readable by `kobox-portal`, and `worker.env` and `aria2.conf` must not.
+must be readable by `kobox-portal`, and `worker.env` and the host private key
+must not.
 
 Two things are deliberately absent:
 
@@ -340,9 +341,8 @@ Two things are deliberately absent:
   could read it would trade real protection for convenience, and listing it
   while the read always fails would report "not on this box" for a file that is
   right there. Read that one from a shell.
-- **Anything holding a secret** — `worker.env`, `portal.env`, `aria2.conf`
-  (it carries the RPC secret), the debrid private key, the VPN PKI, the nginx
-  htpasswd.
+- **Anything holding a secret** — `worker.env`, `portal.env`, the host private
+  key, the VPN PKI, the nginx htpasswd.
 
 A file that is simply missing reads as "not on this box", which is the normal
 answer when the component it belongs to was never installed — no NFS means no
@@ -440,8 +440,8 @@ the legacy did and what members' NAS layouts already assume.
 
 - **The password is never in the clear.** MySB kept it in the member's own
   SQLite file and passed it as `sshpass -p <password>` — visible in `ps` to every
-  other member of the box. KoBox seals it with the host RSA key (the same pair
-  as per-member debrid keys) and hands it to `sshpass -e` through the
+  other member of the box. KoBox seals it with the host RSA key (see "The host
+  key pair") and hands it to `sshpass -e` through the
   environment. It never reaches an argv, and the portal cannot open one: sealing
   needs the public half, opening needs the private half, and no single process
   holds both.
@@ -578,73 +578,57 @@ alerting (its `alerts.toml` → webhook) stays standalone for now.
 > relative to the working directory, so `/monitoring` answered 404 where the UI
 > should be. v0.3.2 embeds them in the binary.
 
-## DDL & debrid downloads (aria2 + AllDebrid)
+## The host key pair
 
-KoBox can turn a filehoster link (1fichier, …) into a finished file in the
-user's library, the same folder Radarr/Sonarr already import from. KoBox is
-**source-agnostic**: it receives a link the user already has, unlocks it through
-a debrid service, downloads it, and drops it in place. It never scrapes a
-source — where the links come from is the user's business.
+`kobox install` provisions one RSA pair, idempotently. The portal seals with its
+public half (a member's NAS password, a password on its way to the worker
+through the job queue) and only the root worker opens with the private half:
 
-The flow, all job-driven so the portal stays unprivileged:
+- `/etc/kobox/debrid-pub.pem`: `0644`, the portal seals with it
+- `/etc/kobox/debrid-key.pem`: `0600 root:root`, only the worker opens with it
 
-```
-portal /downloads  (or)  kobox request-download <user> <link> --category films|series
-      → pending row + `debrid-download` job
-      → worker: AllDebrid unlock → aria2 fetches the direct URL into staging
-      → cron `poll-debrid-downloads` (every 2 min): on complete, the root
-        worker moves the file to ~<user>/rtorrent/complete/<category>/ and
-        chowns it to the user; on error, the row is marked failed
-```
-
-The `aria2` component installs the engine as a **non-root** `kobox-aria2`
-account with RPC on loopback only; the RPC secret lives in
-`/etc/kobox/aria2.conf` (mode 0640), never on the command line. Like ruTorrent
-and NanoMon it is **skip-when-unpinned** — no secret configured, no component.
-
-Only one server-wide secret is needed — the aria2 RPC secret:
-
-```
-export KOBOX_ARIA2_RPC_SECRET=$(openssl rand -hex 24)
-kobox install        # brings up kobox-aria2.service
-```
-
-Optional: `KOBOX_DDL_STAGING` (default `/var/lib/kobox-aria2`, deliberately
-outside the portal-locked `/var/lib/kobox` which `kobox-aria2` cannot traverse)
-for the aria2 scratch dir; `KOBOX_ALLDEBRID_BASE_URL` overrides the API endpoint
-(used by the E2E to point at a local stub).
-
-### Debrid accounts are per-user
-
-**Each user brings their own AllDebrid account** — there is no shared server key.
-A user pastes their key on `/downloads`; it is encrypted in the browser round
-trip's server leg with a public key and stored as ciphertext, and only the root
-worker can open it. Admins can also set one for a user without seeing it stored
-in the clear:
-
-```
-printf '%s' 'the-alldebrid-key' | kobox set-debrid-key alice
-kobox clear-debrid-key alice     # drop a stored key
-```
-
-`kobox install` provisions the sealing pair, idempotently:
-
-- `/etc/kobox/debrid-pub.pem` — `0644`, the portal seals with it
-- `/etc/kobox/debrid-key.pem` — `0600 root:root`, only the worker opens with it
-
-An existing private key is **never** regenerated (that would orphan every stored
-key), and a missing public half is re-derived from it. Back up
+The file names come from the debrid downloads the pair was first made for; they
+stay as they are, because moving them would make the installer mint a new pair.
+An existing private key is **never** regenerated (that would orphan everything
+sealed with it), and a missing public half is re-derived from it. Back up
 `debrid-key.pem` with the database: restoring one without the other leaves the
-stored keys undecryptable and users simply re-enter them.
+sealed NAS passwords unreadable, and members have to enter them again.
+`KOBOX_DEBRID_PUBLIC_KEY` and `KOBOX_DEBRID_PRIVATE_KEY` override both paths
+(the E2E uses them); a box in production has no reason to set them.
 
-Having an account is **never a prerequisite**: a user without a key just has no
-DDL. Their download rows fail with "no AllDebrid account configured — add your
-key in Downloads", and nothing else in KoBox is affected.
+## Retired: debrid downloads (AllDebrid + aria2)
 
-Users submit from the portal **Downloads** page (per-user, CSRF-guarded, lists
-their own requests + live status) or an admin can queue one with
-`kobox request-download`. Categories are the closed set `films|series`, which
-picks the `complete/<category>/` subdir.
+KoBox used to turn a filehoster link into a finished file through AllDebrid and
+an aria2 daemon. AllDebrid refuses a datacenter address both to unlock a link
+and to download it, so the feature could never work from a seedbox and was
+removed.
+
+Upgrading a box that ran it cleans up after it:
+
+- the database migration drops the `debrid_downloads` and `debrid_accounts`
+  tables (members' sealed AllDebrid keys go with them), forgets the `aria2`
+  component and deletes the debrid jobs still waiting in the queue;
+- the next `kobox install` stops and disables `kobox-aria2.service`, then
+  removes its unit file, `/etc/kobox/aria2.conf` and the staging directory
+  `/var/lib/kobox-aria2`, partial downloads included. It prints
+  `kobox-aria2: retired, stopped and removed`, and costs nothing on a box that
+  never had it.
+
+Left in place on purpose: the `aria2` Debian package (KoBox never removes a
+package) and the `kobox-aria2` nologin service account, which owns nothing once
+the staging directory is gone. Remove them by hand if you want them gone:
+`apt-get purge aria2` and `userdel kobox-aria2`. A `KOBOX_ARIA2_RPC_SECRET` or
+`KOBOX_ALLDEBRID_APIKEY` line left in `/etc/kobox/worker.env` is read by nothing
+and still withheld from the portal by its name; delete it from the install
+environment the box is configured from if you want it gone. A staging directory
+moved elsewhere with `KOBOX_DDL_STAGING` is not removed: only the default one is
+known.
+
+This release breaks the "migrations stay additive" rule above on purpose: a
+`kobox upgrade --rollback` to a release that still had debrid downloads boots
+against a database without its tables, so that release's Downloads page and
+member deletion fail until it is upgraded again. Roll forward, not back, across
+this release; the step-4 backup holds the tables if they are ever needed.
 
 ## The portal & application auth
 
@@ -689,8 +673,7 @@ mutation enqueues a typed job the root worker executes.
   file. `/etc/kobox/worker.env` (`0600 root:root`) holds the full install
   snapshot including every secret; `/etc/kobox/portal.env`
   (`0640 root:kobox-portal`) is the same snapshot **minus** the worker-only
-  secrets — the debrid key, the aria2 RPC secret, the iblocklist credentials and
-  the ntfy/Discord webhooks. The portal never calls those paths (it reads
+  secrets — the iblocklist credentials and the ntfy/Discord webhooks. The portal never calls those paths (it reads
   repositories and enqueues jobs), so it must not carry the secrets in its
   memory or in `/proc/<pid>/environ`, which its own uid can read. Both files are
   rendered by `kobox install`; a key is withheld from the portal when its name is
@@ -748,8 +731,8 @@ trusted for every port, as on MySB.
 
 ## A member's NAS through the VPN
 
-The VPN is optional: Nextcloud, the portal, ruTorrent, SFTP, the apps' RPC and
-debrid downloads all work over the internet. The tunnels carry what must not be
+The VPN is optional: Nextcloud, the portal, ruTorrent, SFTP and the apps' RPC
+all work over the internet. The tunnels carry what must not be
 exposed to it, NFS and Samba.
 
 Every member holds a host number for life, handed out when the account is
