@@ -66,6 +66,7 @@ import { JournaldLogAdapter } from '../infrastructure/system/JournaldLogAdapter.
 import { AptUpdateAdapter } from '../infrastructure/system/AptUpdateAdapter.js';
 import { LibrespeedAdapter } from '../infrastructure/system/LibrespeedAdapter.js';
 import { AllDebridAdapter } from '../infrastructure/system/AllDebridAdapter.js';
+import { LoggedDebrid } from '../infrastructure/system/LoggedDebrid.js';
 import { Aria2Adapter } from '../infrastructure/system/Aria2Adapter.js';
 import { DdlPlacementAdapter } from '../infrastructure/system/DdlPlacementAdapter.js';
 import { NtfyChannel } from '../infrastructure/notifications/NtfyChannel.js';
@@ -914,8 +915,9 @@ export function buildContainer(name: string): Container {
   const ddlUseCases = buildDdlUseCases({
     repo: debridDownloadRepo,
     accounts: debridAccountRepo,
-    debrid: new AllDebridAdapter(
-      process.env.KOBOX_ALLDEBRID_BASE_URL ?? DEFAULT_ALLDEBRID_BASE_URL,
+    debrid: new LoggedDebrid(
+      new AllDebridAdapter(process.env.KOBOX_ALLDEBRID_BASE_URL ?? DEFAULT_ALLDEBRID_BASE_URL),
+      logger,
     ),
     credentials: new StoredDebridCredentials(debridAccountRepo, debridCipher),
     downloader,
