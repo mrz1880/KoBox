@@ -20,9 +20,8 @@ the only process allowed to touch the system and the web portal holds no privile
 - **Filtering**: tracker whitelist, IP blocklists enforced by ipset, firewall, fail2ban.
 - **Privacy**: DNS resolved locally by bind and forwarded through dnscrypt-proxy; an OpenVPN
   profile per member.
-- **Getting files in and out**: direct downloads through a debrid account (AllDebrid + aria2),
-  Nextcloud (drop a `.torrent` in the Watch folder), Samba, and automatic sending of finished
-  downloads to a member's own machine.
+- **Getting files in and out**: Nextcloud (drop a `.torrent` in the Watch folder), SFTP, Samba,
+  and automatic sending of finished downloads to a member's own machine.
 - **Web portal**: a console for members and administrators, with a media browser, monitoring
   (NanoMon), a link speed test and a browser shell.
 - **Running it**: scheduled jobs, backups and restore, upgrades by version tag with rollback,
@@ -108,9 +107,9 @@ au système et où le portail web ne détient aucun privilège.
   fail2ban.
 - **Confidentialité** : DNS résolu localement par bind et relayé par dnscrypt-proxy ; un profil
   OpenVPN par membre.
-- **Faire entrer et sortir les fichiers** : téléchargement direct via un compte de débridage
-  (AllDebrid + aria2), Nextcloud (déposer un `.torrent` dans le dossier Watch), Samba, et envoi
-  automatique des téléchargements terminés vers la machine du membre.
+- **Faire entrer et sortir les fichiers** : Nextcloud (déposer un `.torrent` dans le dossier
+  Watch), SFTP, Samba, et envoi automatique des téléchargements terminés vers la machine du
+  membre.
 - **Portail web** : une console pour les membres et les administrateurs, avec un navigateur de
   médias, la supervision (NanoMon), un test de débit du lien et un shell dans le navigateur.
 - **Exploitation** : tâches planifiées, sauvegardes et restauration, mises à jour par tag de
