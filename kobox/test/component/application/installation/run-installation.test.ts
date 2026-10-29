@@ -274,3 +274,135 @@ describe('UninstallComponents', () => {
     expect((await world.registry.get(ComponentName.parse('bind')))?.state.value).toBe('skipped');
   });
 });
+
+describe('RunInstallation: what it records and tells the operator', () => {
+  function reportingRunner(progress: string[]): RunInstallation {
+    return new RunInstallation({
+      facts: { gather: () => Promise.resolve(world.facts) },
+      registry: world.registry,
+      packages: world.packages,
+      installers: world.installers,
+      catalog,
+      enqueueConvergence: () => Promise.resolve(),
+      drain: () => Promise.resolve(7),
+      now: () => '2026-07-25 08:00:00',
+      onProgress: (line) => progress.push(line),
+    });
+  }
+
+  it('should_list_every_preflight_failure_and_change_nothing', async () => {
+    world.facts = { ...healthyFacts, euid: 1000 };
+
+    const failure = runner().execute({ allowNonExt4: false });
+
+    await expect(failure).rejects.toThrow(/^preflight failed .* nothing was changed:\n {2}- kobox install must run as root/);
+    await expect(failure).rejects.toHaveProperty('name', 'PreflightFailedError');
+  });
+
+  it('should_let_a_non_ext4_root_through_when_the_operator_allows_it', async () => {
+    world.facts = { ...healthyFacts, rootFsType: 'overlay' };
+
+    const report = await runner().execute({ allowNonExt4: true });
+
+    expect(report.installed).toEqual(['kobox-core', 'sshd', 'bind', 'fail2ban']);
+  });
+
+  it('should_refresh_the_package_index_when_a_single_component_is_left_to_install', async () => {
+    await runner().execute({ allowNonExt4: false });
+    await world.registry.reset(ComponentName.parse('bind'), '2026-07-25 09:00:00');
+
+    await runner().execute({ allowNonExt4: false });
+
+    expect(world.packages.refreshCount).toBe(2);
+  });
+
+  it('should_record_the_version_and_time_an_installer_reports', async () => {
+    stub('sshd', () => ({ state: 'installed', version: '1:9.2p1-2' }));
+
+    await runner().execute({ allowNonExt4: false });
+
+    const record = await world.registry.get(ComponentName.parse('sshd'));
+    expect(record?.version?.value).toBe('1:9.2p1-2');
+    expect(record?.installedAt).toBe('2026-07-25 08:00:00');
+    expect((await world.registry.get(ComponentName.parse('bind')))?.version).toBeUndefined();
+  });
+
+  it('should_record_why_a_component_was_skipped', async () => {
+    stub('bind', () => ({ state: 'skipped', reason: 'not packaged here' }));
+
+    await runner().execute({ allowNonExt4: false });
+
+    expect((await world.registry.get(ComponentName.parse('bind')))?.reason).toBe('not packaged here');
+  });
+
+  it('should_return_how_many_convergence_jobs_were_drained', async () => {
+    const report = await reportingRunner([]).execute({ allowNonExt4: false });
+
+    expect(report.drainedJobs).toBe(7);
+  });
+
+  it('should_tell_the_operator_what_each_component_did', async () => {
+    stub('sshd', () => ({ state: 'installed', detail: 'hard quotas active on /home' }));
+    stub('bind', () => ({ state: 'skipped', reason: 'not packaged here' }));
+    const progress: string[] = [];
+
+    await reportingRunner(progress).execute({ allowNonExt4: false });
+
+    // the progress lines separate the component's note with a dash
+    expect(progress.map((line) => line.replace(/ \S /, ' - '))).toEqual([
+      'installing kobox-core…',
+      'kobox-core: installed',
+      'installing sshd…',
+      'sshd: installed - hard quotas active on /home',
+      'installing bind…',
+      'bind: skipped - not packaged here',
+      'installing fail2ban…',
+      'fail2ban: installed',
+    ]);
+  });
+
+  it('should_say_a_component_stays_installed_when_a_rerun_lacks_its_pin', async () => {
+    await runner().execute({ allowNonExt4: false });
+    stub('bind', () => ({ state: 'skipped', reason: 'nothing pinned' }));
+    const progress: string[] = [];
+
+    await reportingRunner(progress).execute({ allowNonExt4: false });
+
+    expect(progress).toContainEqual(expect.stringMatching(/^bind: left installed \S nothing pinned$/));
+  });
+
+  it('should_name_the_failed_component_and_its_cause', async () => {
+    stub('bind', () => {
+      throw new Error('named-checkconf exited 1');
+    });
+
+    const failure = runner().execute({ allowNonExt4: false });
+
+    await expect(failure).rejects.toThrow(
+      /^component bind failed: named-checkconf exited 1 .* fix the cause and re-run kobox install \(completed components are not redone\)$/,
+    );
+    await expect(failure).rejects.toMatchObject({ name: 'ComponentInstallError', component: 'bind' });
+  });
+
+  it('should_record_a_failure_that_is_not_an_error_object', async () => {
+    stub('bind', () => {
+      // eslint-disable-next-line @typescript-eslint/only-throw-error -- a third-party installer may throw anything
+      throw 'apt lock held';
+    });
+
+    await expect(runner().execute({ allowNonExt4: false })).rejects.toThrow(
+      'component bind failed: apt lock held',
+    );
+
+    expect((await world.registry.get(ComponentName.parse('bind')))?.reason).toBe('apt lock held');
+  });
+
+  it('should_refuse_a_catalog_component_without_an_installer', async () => {
+    world.installers.delete('sshd');
+
+    await expect(runner().execute({ allowNonExt4: false })).rejects.toThrow(
+      'component sshd failed: no installer registered',
+    );
+    expect(world.installers.get('bind')?.installCalls).toBe(0);
+  });
+});
