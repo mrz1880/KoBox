@@ -4,7 +4,6 @@ import fastifyCookie from '@fastify/cookie';
 import fastifyFormbody from '@fastify/formbody';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import type { RequestDebridDownload } from '../../application/ddl/RequestDebridDownload.js';
 import type { JobQueuePort } from '../../application/jobs/JobQueuePort.js';
 import type { Role } from '../../domain/portal/Role.js';
 import type { AuthenticateApp } from '../../application/portal/AuthenticateApp.js';
@@ -22,11 +21,6 @@ import type { PortalCredentialsPort } from '../../domain/portal/ports.js';
 import type { ComponentRegistry } from '../../domain/installation/ports.js';
 import type { SpeedtestRepositoryPort } from '../../application/maintenance/SpeedtestPort.js';
 import type { MediaRepository } from '../../domain/media/ports.js';
-import type {
-  DebridAccountRepository,
-  DebridDownloadRepository,
-  DebridKeyEncryptorPort,
-} from '../../domain/ddl/ports.js';
 import type { DynDnsBindingRepository, FairUseRepository } from '../../domain/security/ports.js';
 import type {
   BlocklistRepository,
@@ -110,10 +104,6 @@ export interface PortalServerDeps {
   readonly outbox: MailOutboxPort;
   readonly credentials: PortalCredentialsPort;
   readonly profiles: VpnProfileStorePort;
-  readonly downloads: DebridDownloadRepository;
-  readonly requestDownload: RequestDebridDownload;
-  readonly debridAccounts: DebridAccountRepository;
-  readonly debridEncryptor: DebridKeyEncryptorPort;
   readonly media: MediaRepository;
   readonly instances: TorrentInstanceRepository;
   readonly diskSamples: DiskUsageRepository;

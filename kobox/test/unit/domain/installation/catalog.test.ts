@@ -41,7 +41,6 @@ describe('COMPONENT_CATALOG', () => {
       'samba',
       'shellinabox',
       'nanomon',
-      'aria2',
       'speedtest',
       'nextcloud',
     ]);
@@ -76,7 +75,6 @@ describe('COMPONENT_CATALOG', () => {
     ['samba', ['kobox-core']],
     ['shellinabox', ['nginx']],
     ['nanomon', ['nginx']],
-    ['aria2', ['kobox-core']],
     ['speedtest', ['kobox-core']],
     ['nextcloud', ['nginx', 'kobox-core']],
   ])('should_install_%s_only_after_%j', async (component, dependencies) => {

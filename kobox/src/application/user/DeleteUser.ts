@@ -1,4 +1,3 @@
-import type { DebridAccountRepository } from '../../domain/ddl/ports.js';
 import type {
   PasswordLinkRepository,
   PortalCredentialsPort,
@@ -27,7 +26,6 @@ interface Deps {
   readonly notifications: NotificationPort;
   readonly credentials: PortalCredentialsPort;
   readonly sessions: SessionStorePort;
-  readonly debridAccounts: DebridAccountRepository;
   readonly logins: readonly ServiceLoginPort[];
   readonly links: PasswordLinkRepository;
 }
@@ -37,7 +35,7 @@ export class DeleteUser {
 
   async execute(command: DeleteUserCommand): Promise<void> {
     const {
-      repo, accounts, sftp, services, notifications, credentials, sessions, debridAccounts, logins,
+      repo, accounts, sftp, services, notifications, credentials, sessions, logins,
     } = this.deps;
 
     const user = await repo.findByUsername(command.username);
@@ -56,8 +54,6 @@ export class DeleteUser {
     await credentials.delete(user.username);
     // a link to choose the password of an account that is gone
     await this.deps.links.deleteForUser(user.username);
-    // their sealed debrid key must not outlive the account
-    await debridAccounts.remove(user.username);
     await repo.delete(user.username);
     await notifications.notify({ type: 'UserDeleted', username: user.username.value });
   }

@@ -1,5 +1,4 @@
 import type { FastifyInstance } from 'fastify';
-import { RequestDebridDownload } from '../../../src/application/ddl/RequestDebridDownload.js';
 import type { Job } from '../../../src/application/jobs/contract.js';
 import type { ClaimedJob, JobQueuePort } from '../../../src/application/jobs/JobQueuePort.js';
 import { Authenticate } from '../../../src/application/portal/Authenticate.js';
@@ -7,8 +6,6 @@ import { AuthenticateApp } from '../../../src/application/portal/AuthenticateApp
 import { IssueAppToken } from '../../../src/application/portal/IssueAppToken.js';
 import { Login } from '../../../src/application/portal/Login.js';
 import { Logout } from '../../../src/application/portal/Logout.js';
-import type { DebridApiKey } from '../../../src/domain/ddl/DebridApiKey.js';
-import type { DebridKeyEncryptorPort } from '../../../src/domain/ddl/ports.js';
 import { Password } from '../../../src/domain/user/Password.js';
 import { Username } from '../../../src/domain/user/Username.js';
 import { RtorrentPort, ScgiPort } from '../../../src/domain/user/Port.js';
@@ -40,8 +37,6 @@ import { InMemoryTorrentInstanceRepository } from '../../../src/infrastructure/p
 import { InMemoryDiagnosticsRepository } from '../../../src/infrastructure/persistence/InMemoryDiagnosticsRepository.js';
 import { InMemorySpeedtestRepository } from '../../../src/infrastructure/persistence/InMemorySpeedtestRepository.js';
 import { InMemoryMediaRepository } from '../../../src/infrastructure/persistence/InMemoryMediaRepository.js';
-import { InMemoryDebridAccountRepository } from '../../../src/infrastructure/persistence/InMemoryDebridAccountRepository.js';
-import { InMemoryDebridDownloadRepository } from '../../../src/infrastructure/persistence/InMemoryDebridDownloadRepository.js';
 import { InMemoryLoginAttemptsRepository } from '../../../src/infrastructure/persistence/InMemoryLoginAttemptsRepository.js';
 import { InMemoryMailOutbox } from '../../../src/infrastructure/persistence/InMemoryMailOutbox.js';
 import { InMemoryReleaseRepository } from '../../../src/infrastructure/persistence/InMemoryReleaseRepository.js';
@@ -131,16 +126,6 @@ export class RecordingQueue implements JobQueuePort {
   }
 }
 
-// Stands in for RSA sealing: reversible marker, so a test can assert the portal
-// never emits the PLAINTEXT key while still proving it sealed the right one.
-export const SEAL_PREFIX = 'sealed:';
-
-class FakeDebridEncryptor implements DebridKeyEncryptorPort {
-  encrypt(key: DebridApiKey): Promise<string> {
-    return Promise.resolve(Buffer.from(`${SEAL_PREFIX}${key.reveal()}`).toString('base64'));
-  }
-}
-
 export interface PortalWorld {
   readonly server: FastifyInstance;
   readonly users: InMemoryUserRepository;
@@ -148,8 +133,6 @@ export interface PortalWorld {
   readonly sessions: InMemoryPortalSessionRepository;
   readonly queue: RecordingQueue;
   readonly outbox: InMemoryMailOutbox;
-  readonly downloads: InMemoryDebridDownloadRepository;
-  readonly debridAccounts: InMemoryDebridAccountRepository;
   readonly media: InMemoryMediaRepository;
   readonly fairUse: InMemoryFairUseRepository;
   readonly diagnostics: InMemoryDiagnosticsRepository;
@@ -183,10 +166,6 @@ export async function buildPortalWorld(
   const passwords = new FakePasswordCipher();
   const queue = new RecordingQueue();
   const outbox = new InMemoryMailOutbox();
-  const downloads = new InMemoryDebridDownloadRepository();
-  const debridAccounts = new InMemoryDebridAccountRepository();
-  // the portal seals with the public half only; this fake makes that visible
-  const debridEncryptor = new FakeDebridEncryptor();
   const media = new InMemoryMediaRepository();
   const fairUse = new InMemoryFairUseRepository();
   const diagnostics = new InMemoryDiagnosticsRepository();
@@ -266,10 +245,6 @@ export async function buildPortalWorld(
     outbox,
     credentials,
     profiles: new NoProfiles(),
-    downloads,
-    requestDownload: new RequestDebridDownload({ repo: downloads, queue, clock: () => NOW }),
-    debridAccounts,
-    debridEncryptor,
     media,
     ...extra,
   });
@@ -304,7 +279,7 @@ export async function buildPortalWorld(
     },
     NOW,
   );
-  return { server, users, credentials, sessions, queue, outbox, downloads, debridAccounts, media, fairUse, diagnostics, instances, diskSamples, sshKeys, addresses, blocklists, totp, components, mailRelay, siteSettings, destinations, transfers, passwords };
+  return { server, users, credentials, sessions, queue, outbox, media, fairUse, diagnostics, instances, diskSamples, sshKeys, addresses, blocklists, totp, components, mailRelay, siteSettings, destinations, transfers, passwords };
 }
 
 export interface AgentSession {

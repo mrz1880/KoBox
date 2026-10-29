@@ -11,9 +11,9 @@ export interface CronRenderSettings {
 // The command every cron entry invokes. Nothing installed it: the scheduler
 // rendered entries calling /usr/local/bin/kobox and that file did not exist, so
 // on a real box every scheduled job silently did nothing. No mail flush, no
-// blocklist update, no backup, no certificate renewal, no debrid polling. The
-// E2E missed it by setting KOBOX_BIN to a command it built itself, which proved
-// the wiring while supplying the one piece production lacked.
+// blocklist update, no backup, no certificate renewal. The E2E missed it by
+// setting KOBOX_BIN to a command it built itself, which proved the wiring while
+// supplying the one piece production lacked.
 //
 // It resolves through the `current` symlink, so an upgrade carries it along and
 // no reinstall is needed.

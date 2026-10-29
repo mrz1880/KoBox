@@ -74,7 +74,6 @@ import { FakeVpnPki } from '../../../src/infrastructure/system/fakes/FakeVpnPki.
 import { buildJob } from '../../../src/interfaces/cli/buildJob.js';
 import { JobWorker } from '../../../src/interfaces/worker/JobWorker.js';
 import {
-  buildDdlUseCases,
   buildMaintenanceUseCases,
   buildSyncUseCases,
   buildSecurityUseCases,
@@ -82,8 +81,6 @@ import {
   buildTrackerUseCases,
   buildUseCases,
 } from '../../../src/interfaces/useCases.js';
-import { InMemoryDebridAccountRepository } from '../../../src/infrastructure/persistence/InMemoryDebridAccountRepository.js';
-import { InMemoryDebridDownloadRepository } from '../../../src/infrastructure/persistence/InMemoryDebridDownloadRepository.js';
 import { FakePasswordCipher } from '../../../src/infrastructure/system/fakes/FakePasswordCipher.js';
 import { FakePasswordHasher } from '../../../src/infrastructure/system/fakes/FakePasswordHasher.js';
 import { FakeServiceLogin } from '../../../src/infrastructure/system/fakes/FakeServiceLogin.js';
@@ -250,7 +247,6 @@ beforeEach(() => {
   let nextRtorrent = 45000;
   const credentials = new InMemoryPortalCredentialsRepository();
   const sessions = new InMemoryPortalSessionRepository();
-  const debridAccounts = new InMemoryDebridAccountRepository();
   const useCases = buildUseCases({
     repo,
     accounts,
@@ -277,7 +273,6 @@ beforeEach(() => {
     notifications,
     credentials,
     sessions,
-    debridAccounts,
     clock: () => '2026-07-25 10:00:00',
     allocator: {
       allocateScgiPort: () =>
@@ -432,25 +427,6 @@ beforeEach(() => {
     installHost: new FakeInstallHost(),
     clock: () => '2026-07-25 10:00:00',
   });
-  const ddlUseCases = buildDdlUseCases({
-    repo: new InMemoryDebridDownloadRepository(),
-    accounts: debridAccounts,
-    debrid: { unlock: () => Promise.reject(new Error('no debrid in this suite')) },
-    credentials: { forUser: () => Promise.resolve(undefined) },
-    downloader: {
-      addUri: () => Promise.reject(new Error('no aria2 in this suite')),
-      checkReachable: () => Promise.resolve({ ok: true, detail: 'fake' }),
-      cancel: () => Promise.resolve({}),
-      status: () => Promise.reject(new Error('no aria2 in this suite')),
-    },
-    placement: {
-      place: () => Promise.reject(new Error('no placement in this suite')),
-      discardStaged: () => Promise.resolve(),
-    },
-    queue,
-    clock: () => '2026-07-25 10:00:00',
-    stagingBase: '/tmp/kobox-ddl-staging',
-  });
   world = {
     nextcloud,
     components,
@@ -489,7 +465,6 @@ beforeEach(() => {
       trackerUseCases,
       securityUseCases,
       maintenanceUseCases,
-      ddlUseCases,
       syncUseCases,
       passwords,
     ),

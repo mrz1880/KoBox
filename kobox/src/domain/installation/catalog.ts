@@ -42,8 +42,6 @@ export const COMPONENT_CATALOG: readonly ComponentSpec[] = [
   spec('shellinabox', ['nginx']),
   // Phase 8 — NanoMon monitoring, proxied by nginx behind the admin session
   spec('nanomon', ['nginx']),
-  // Phase 9 — aria2 download engine for debrid downloads (localhost RPC)
-  spec('aria2', ['kobox-core']),
   spec('speedtest', ['kobox-core']),
   // Nextcloud is a PHP app behind the same nginx and the same portal session
   spec('nextcloud', ['nginx', 'kobox-core']),

@@ -7,8 +7,8 @@ export class InvalidRemotePasswordError extends DomainError {
 }
 
 // The password of an account on somebody else's machine. Opaque, like Password
-// and DebridApiKey: reveal() is the only way out, and only the adapter that
-// hands it to ssh may call it. toString/toJSON stay redacted so it cannot leak
+// and AppToken: reveal() is the only way out, and only the adapter that hands
+// it to ssh may call it. toString/toJSON stay redacted so it cannot leak
 // through a log line, a rendered template or a serialized error.
 //
 // No charset rule beyond "not empty, not absurd": it is their NAS's policy that

@@ -114,18 +114,19 @@ describe.skipIf(!onDebianAsRoot)('E2E: torrent lifecycle with a real rtorrent', 
     const dir = mkdtempSync(join(tmpdir(), 'kobox-torrent-e2e-'));
     chmodSync(dir, 0o711); // the seedbox user must traverse into the spool
     dbPath = join(dir, 'kobox.db');
-    // a key pair of its own, handed over the way ddl-debrid does it: the host
-    // pair that e2e-setup lays down is never rewritten from here
-    hostKey = join(dir, 'debrid-key.pem');
+    // a key pair of its own, handed over through the KOBOX_DEBRID_*_KEY
+    // overrides: the host pair that e2e-setup lays down is never rewritten from
+    // here
+    hostKey = join(dir, 'host-key.pem');
     execFileSync('openssl', ['genrsa', '-out', hostKey, '4096'], { stdio: 'pipe' });
-    execFileSync('openssl', ['rsa', '-in', hostKey, '-pubout', '-out', join(dir, 'debrid-pub.pem')], {
+    execFileSync('openssl', ['rsa', '-in', hostKey, '-pubout', '-out', join(dir, 'host-pub.pem')], {
       stdio: 'pipe',
     });
     env = {
       ...process.env,
       KOBOX_DB: dbPath,
       KOBOX_DEBRID_PRIVATE_KEY: hostKey,
-      KOBOX_DEBRID_PUBLIC_KEY: join(dir, 'debrid-pub.pem'),
+      KOBOX_DEBRID_PUBLIC_KEY: join(dir, 'host-pub.pem'),
       KOBOX_SPOOL: join(dir, 'events'),
       KOBOX_BIN: `/usr/bin/env node ${process.cwd()}/${CLI}`,
     };

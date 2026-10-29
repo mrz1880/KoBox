@@ -2,7 +2,6 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { Username } from '../../../src/domain/user/Username.js';
 import { IpAddress } from '../../../src/domain/shared/IpAddress.js';
 import { DynDnsHost } from '../../../src/domain/security/DynDnsHost.js';
-import { ComponentName } from '../../../src/domain/installation/ComponentName.js';
 import { Label } from '../../../src/domain/torrent/Label.js';
 import { SyncMode } from '../../../src/domain/torrent/SyncMode.js';
 import { LocalPath } from '../../../src/domain/sync/LocalPath.js';
@@ -10,13 +9,11 @@ import { SyncTransfer } from '../../../src/domain/sync/SyncTransfer.js';
 import { MediaPath } from '../../../src/domain/media/MediaFile.js';
 import type { VpnVariant } from '../../../src/domain/security/vpn.js';
 import type { VpnProfileStorePort } from '../../../src/application/portal/ports.js';
-import { DownloadGid } from '../../../src/domain/ddl/DownloadGid.js';
 import {
   buildPortalWorld,
   form,
   loginAs,
   NOW,
-  SEAL_PREFIX,
   REMOTE_SEAL_PREFIX,
   type AgentSession,
   type PortalWorld,
@@ -58,10 +55,11 @@ describe('role-routed home', () => {
     expect(response.statusCode).toBe(200);
     expect(response.body).toContain('alice');
     // the home answers "what do I want to do", not "here is your telemetry":
-    // the three real actions, and no bandwidth figure or port number
+    // the real actions, and no bandwidth figure or port number
     expect(response.body).toContain('/rutorrent');
     expect(response.body).toContain('/media');
-    expect(response.body).toContain('/downloads');
+    // debrid downloads were retired: nothing may still lead to them
+    expect(response.body).not.toContain('/downloads');
     expect(response.body).toContain('Everything is running');
     expect(response.body).not.toContain('412');
   });
@@ -270,244 +268,6 @@ describe('my access', () => {
 
     expect(response.statusCode).toBe(404);
     expect(response.body).not.toContain('the admin profile');
-  });
-});
-
-describe('debrid downloads', () => {
-  it('should_show_the_submit_form_and_an_empty_list', async () => {
-    const response = await world.server.inject({
-      method: 'GET',
-      url: '/downloads',
-      headers: { cookie: user.cookie },
-    });
-
-    expect(response.statusCode).toBe(200);
-    expect(response.body).toContain('action="/downloads"');
-    expect(response.body).toContain('Nothing here yet');
-  });
-
-  it('should_persist_a_pending_row_and_enqueue_the_typed_job', async () => {
-    const response = await world.server.inject({
-      method: 'POST',
-      url: '/downloads',
-      headers: { cookie: user.cookie, 'content-type': 'application/x-www-form-urlencoded' },
-      payload: form({
-        _csrf: user.csrf,
-        link: 'https://1fichier.example/abc',
-        category: 'films',
-      }),
-    });
-
-    expect(response.statusCode).toBe(303);
-    const stored = await world.downloads.listForUser(Username.parse('alice'));
-    expect(stored).toHaveLength(1);
-    expect(stored[0]?.status).toBe('pending');
-    expect(stored[0]?.category.value).toBe('films');
-    const job = world.queue.jobs[0];
-    expect(job?.type).toBe('debrid-download');
-    // the portal enqueues an id, never the link — resolution is the worker's job
-    if (job?.type === 'debrid-download') {
-      expect(job.payload.downloadId).toBe(stored[0]?.id);
-      expect(JSON.stringify(job.payload)).not.toContain('1fichier');
-    }
-  });
-
-  it('should_say_when_the_download_engine_is_not_there_rather_than_failing_link_by_link', async () => {
-    // aria2 skips its own install without an RPC secret, and every submitted
-    // link then fails one at a time with a message about the last hop
-    await world.components.markSkipped(
-      ComponentName.parse('aria2'),
-      'no aria2 RPC secret',
-      '2026-08-17 12:00:00',
-    );
-
-    const response = await world.server.inject({
-      method: 'GET',
-      url: '/downloads',
-      headers: { cookie: user.cookie },
-    });
-
-    expect(response.body).toContain('not set up on this box');
-  });
-
-  it('should_offer_the_member_own_folders_rather_than_two_hard_coded_ones', async () => {
-    const alice = Username.parse('alice');
-    const instance = await world.instances.findByUsername(alice);
-    if (instance === undefined) {
-      throw new Error('the world should have provisioned alice');
-    }
-    await world.instances.save(instance.addWatchDir(Label.parse('Divers')).instance);
-
-    const response = await world.server.inject({
-      method: 'GET',
-      url: '/downloads',
-      headers: { cookie: user.cookie },
-    });
-
-    expect(response.body).toContain('<option value="Divers">');
-  });
-
-  it('should_route_a_download_to_any_folder_the_member_actually_has', async () => {
-    // the Folders page lists the member's real folders while this form accepted a
-    // closed films|series enum: a member with a Divers folder could sync it and
-    // never download into it
-    const response = await world.server.inject({
-      method: 'POST',
-      url: '/downloads',
-      headers: { cookie: user.cookie, 'content-type': 'application/x-www-form-urlencoded' },
-      payload: form({
-        _csrf: user.csrf,
-        link: 'https://1fichier.example/abc',
-        category: 'Divers',
-      }),
-    });
-
-    expect(response.statusCode).toBe(303);
-    const stored = await world.downloads.listForUser(Username.parse('alice'));
-    expect(stored[0]?.category.value).toBe('Divers');
-  });
-
-  it('should_reject_a_non_http_link_without_enqueueing', async () => {
-    const response = await world.server.inject({
-      method: 'POST',
-      url: '/downloads',
-      headers: { cookie: user.cookie, 'content-type': 'application/x-www-form-urlencoded' },
-      payload: form({ _csrf: user.csrf, link: 'ftp://nope/x', category: 'films' }),
-    });
-
-    expect(response.statusCode).toBe(200);
-    expect(response.body).toContain('valid http(s) link');
-    expect(world.queue.jobs).toHaveLength(0);
-    expect(await world.downloads.listForUser(Username.parse('alice'))).toHaveLength(0);
-  });
-
-  it('should_require_csrf', async () => {
-    const response = await world.server.inject({
-      method: 'POST',
-      url: '/downloads',
-      headers: { cookie: user.cookie, 'content-type': 'application/x-www-form-urlencoded' },
-      payload: form({ link: 'https://1fichier.example/abc', category: 'films' }),
-    });
-
-    expect(response.statusCode).toBe(403);
-    expect(world.queue.jobs).toHaveLength(0);
-  });
-
-  it('should_never_list_another_users_downloads', async () => {
-    await world.server.inject({
-      method: 'POST',
-      url: '/downloads',
-      headers: { cookie: user.cookie, 'content-type': 'application/x-www-form-urlencoded' },
-      payload: form({
-        _csrf: user.csrf,
-        link: 'https://1fichier.example/alice-only',
-        category: 'series',
-      }),
-    });
-
-    const bossView = await world.server.inject({
-      method: 'GET',
-      url: '/downloads',
-      headers: { cookie: admin.cookie },
-    });
-
-    expect(bossView.statusCode).toBe(200);
-    expect(bossView.body).toContain('Nothing here yet');
-  });
-});
-
-describe('per-user debrid account', () => {
-  const KEY = 'abcdef0123456789ABCDEF';
-
-  it('should_show_the_no_key_state_and_a_form', async () => {
-    const response = await world.server.inject({
-      method: 'GET',
-      url: '/downloads',
-      headers: { cookie: user.cookie },
-    });
-
-    expect(response.body).toContain('My AllDebrid account');
-    expect(response.body).toContain('no key');
-    expect(response.body).toContain('action="/downloads/debrid-key"');
-  });
-
-  it('should_seal_the_key_before_it_ever_leaves_the_portal', async () => {
-    const response = await world.server.inject({
-      method: 'POST',
-      url: '/downloads/debrid-key',
-      headers: { cookie: user.cookie, 'content-type': 'application/x-www-form-urlencoded' },
-      payload: form({ _csrf: user.csrf, apiKey: KEY }),
-    });
-
-    expect(response.statusCode).toBe(303);
-    const job = world.queue.jobs[0];
-    expect(job?.type).toBe('set-debrid-key');
-    if (job?.type === 'set-debrid-key') {
-      expect(job.payload.username).toBe('alice');
-      // the plaintext key must not appear anywhere in the job payload
-      expect(JSON.stringify(job.payload)).not.toContain(KEY);
-      // …but the sealed blob is the right one
-      expect(Buffer.from(job.payload.encryptedKey, 'base64').toString()).toBe(
-        `${SEAL_PREFIX}${KEY}`,
-      );
-    }
-  });
-
-  it('should_report_a_configured_key_without_ever_echoing_it', async () => {
-    await world.debridAccounts.save(Username.parse('alice'), 'sealed-blob', NOW);
-
-    const response = await world.server.inject({
-      method: 'GET',
-      url: '/downloads',
-      headers: { cookie: user.cookie },
-    });
-
-    expect(response.body).toContain('key configured');
-    // neither the key nor its ciphertext is ever rendered back
-    expect(response.body).not.toContain('sealed-blob');
-    expect(response.body).toContain('Remove my key');
-  });
-
-  it('should_reject_a_malformed_key_without_enqueueing', async () => {
-    const response = await world.server.inject({
-      method: 'POST',
-      url: '/downloads/debrid-key',
-      headers: { cookie: user.cookie, 'content-type': 'application/x-www-form-urlencoded' },
-      payload: form({ _csrf: user.csrf, apiKey: 'https://alldebrid.com/apikeys' }),
-    });
-
-    expect(response.statusCode).toBe(200);
-    // the apostrophe is html-escaped in the rendered page
-    expect(response.body).toContain('look like an AllDebrid API key');
-    expect(world.queue.jobs).toHaveLength(0);
-  });
-
-  it('should_enqueue_a_clear_for_the_session_user_only', async () => {
-    const response = await world.server.inject({
-      method: 'POST',
-      url: '/downloads/debrid-key/clear',
-      headers: { cookie: user.cookie, 'content-type': 'application/x-www-form-urlencoded' },
-      payload: form({ _csrf: user.csrf }),
-    });
-
-    expect(response.statusCode).toBe(303);
-    // the username comes from the session, never from the request body
-    expect(world.queue.jobs[0]).toEqual({
-      type: 'clear-debrid-key',
-      payload: { username: 'alice' },
-    });
-  });
-
-  it('should_require_csrf_to_set_a_key', async () => {
-    const response = await world.server.inject({
-      method: 'POST',
-      url: '/downloads/debrid-key',
-      headers: { cookie: user.cookie, 'content-type': 'application/x-www-form-urlencoded' },
-      payload: form({ apiKey: KEY }),
-    });
-
-    expect(response.statusCode).toBe(403);
-    expect(world.queue.jobs).toHaveLength(0);
   });
 });
 
@@ -1283,11 +1043,11 @@ describe('the language a member reads the portal in', () => {
   it('should_default_to_english_for_somebody_who_never_chose', async () => {
     const response = await world.server.inject({
       method: 'GET',
-      url: '/downloads',
+      url: '/password',
       headers: { cookie: user.cookie },
     });
 
-    expect(response.body).toContain('Start download');
+    expect(response.body).toContain('Change password');
   });
 
   it('should_show_french_to_a_member_who_asked_for_it', async () => {
@@ -1301,11 +1061,11 @@ describe('the language a member reads the portal in', () => {
 
     const response = await world.server.inject({
       method: 'GET',
-      url: '/downloads',
+      url: '/password',
       headers: { cookie: french.cookie },
     });
 
-    expect(response.body).toContain('Lancer le téléchargement');
+    expect(response.body).toContain('Changer de mot de passe');
     expect(response.body).toContain('<html lang="fr">');
   });
 
@@ -1505,113 +1265,6 @@ describe("a member's own SSH key", () => {
 
     const job = world.queue.jobs.find((j) => j.type === 'set-ssh-key');
     expect(job?.payload).toMatchObject({ username: 'alice' });
-  });
-});
-
-describe("clearing a line from a member's own download list", () => {
-  it('should_let_them_remove_one_that_never_went_anywhere', async () => {
-    // a job that failed before touching the row leaves it pending forever, and
-    // the list is the member's own: they must be able to tidy it
-    await world.server.inject({
-      method: 'POST',
-      url: '/downloads',
-      headers: { cookie: user.cookie, 'content-type': 'application/x-www-form-urlencoded' },
-      payload: form({ _csrf: user.csrf, link: 'https://1fichier.example/abc', category: 'films' }),
-    });
-    const [row] = await world.downloads.listForUser(Username.parse('alice'));
-
-    const response = await world.server.inject({
-      method: 'POST',
-      url: `/downloads/${String(row?.id ?? 0)}/remove`,
-      headers: { cookie: user.cookie, 'content-type': 'application/x-www-form-urlencoded' },
-      payload: form({ _csrf: user.csrf }),
-    });
-
-    expect(response.statusCode).toBe(303);
-    // the portal cannot reach aria2 nor the staging directory, so it asks the
-    // worker: removing the row here would strand the bytes aria2 was writing
-    const job = world.queue.jobs.find((j) => j.type === 'discard-debrid-download');
-    expect(job?.payload).toMatchObject({ username: 'alice', downloadId: row?.id });
-  });
-
-  it('should_refuse_to_touch_a_line_belonging_to_someone_else', async () => {
-    // ownership is the whole guard here: an id is guessable
-    await world.server.inject({
-      method: 'POST',
-      url: '/downloads',
-      headers: { cookie: user.cookie, 'content-type': 'application/x-www-form-urlencoded' },
-      payload: form({ _csrf: user.csrf, link: 'https://1fichier.example/abc', category: 'films' }),
-    });
-    const [row] = await world.downloads.listForUser(Username.parse('alice'));
-
-    const response = await world.server.inject({
-      method: 'POST',
-      url: `/downloads/${String(row?.id ?? 0)}/remove`,
-      headers: { cookie: admin.cookie, 'content-type': 'application/x-www-form-urlencoded' },
-      payload: form({ _csrf: admin.csrf }),
-    });
-
-    // the same answer as for a line that does not exist: nothing to learn
-    expect(response.statusCode).toBe(303);
-    expect(world.queue.jobs.filter((j) => j.type === 'discard-debrid-download')).toHaveLength(0);
-    expect(await world.downloads.listForUser(Username.parse('alice'))).toHaveLength(1);
-  });
-
-  // the page comes back before the worker has dropped the line, so a member
-  // clicked Remove again and got a blank 404
-  it('should_say_a_line_is_already_gone_rather_than_show_a_bare_error', async () => {
-    const response = await world.server.inject({
-      method: 'POST',
-      url: '/downloads/999/remove',
-      headers: { cookie: user.cookie, 'content-type': 'application/x-www-form-urlencoded' },
-      payload: form({ _csrf: user.csrf }),
-    });
-
-    expect(response.statusCode).toBe(303);
-    expect(response.headers.location).toContain('/downloads?flash=');
-  });
-});
-
-describe('how far along a running download is', () => {
-  it('should_show_the_reading_the_poll_took', async () => {
-    await world.server.inject({
-      method: 'POST',
-      url: '/downloads',
-      headers: { cookie: user.cookie, 'content-type': 'application/x-www-form-urlencoded' },
-      payload: form({ _csrf: user.csrf, link: 'https://1fichier.example/abc', category: 'films' }),
-    });
-    const [row] = await world.downloads.listForUser(Username.parse('alice'));
-    if (row === undefined) {
-      throw new Error('the submission should have made a row');
-    }
-    await world.downloads.save(row.startedWith(DownloadGid.parse('2089b05ecca3d829')).progressed(42));
-
-    const response = await world.server.inject({
-      method: 'GET',
-      url: '/downloads',
-      headers: { cookie: user.cookie },
-    });
-
-    expect(response.body).toContain('42%');
-  });
-
-  it('should_show_no_bar_at_all_while_the_size_is_unknown', async () => {
-    // a bar stuck at 0 reads as "started and going nowhere"; the truth is that
-    // aria2 has not seen the headers yet
-    await world.server.inject({
-      method: 'POST',
-      url: '/downloads',
-      headers: { cookie: user.cookie, 'content-type': 'application/x-www-form-urlencoded' },
-      payload: form({ _csrf: user.csrf, link: 'https://1fichier.example/abc', category: 'films' }),
-    });
-
-    const response = await world.server.inject({
-      method: 'GET',
-      url: '/downloads',
-      headers: { cookie: user.cookie },
-    });
-
-    expect(response.body).not.toContain('class="bar"');
   });
 });
 

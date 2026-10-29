@@ -15,7 +15,7 @@ const TOKEN_PATTERN = /^[a-f0-9]{64}$/;
 // so a leaked download-client config costs the member their token and not their
 // account.
 //
-// Opaque like Password and DebridApiKey: reveal() is the only way out, and
+// Opaque like Password and RemotePassword: reveal() is the only way out, and
 // toString/toJSON stay redacted so it cannot leak through a log line or a
 // rendered page.
 export class AppToken {

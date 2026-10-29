@@ -50,7 +50,7 @@ export function adminConfigPage(
   return page(
     'Config',
     html`<h1>${viewer.t('Configuration')}</h1>
-<p class="muted">${viewer.t('Every file KoBox writes onto this box, as it is on disk right now. Read-only, and only these files: this page cannot edit them, and it cannot open anything else. Files holding a secret (the worker environment, the aria2 password, the VPN keys) are not listed and cannot be reached from here.')}</p>
+<p class="muted">${viewer.t('Every file KoBox writes onto this box, as it is on disk right now. Read-only, and only these files: this page cannot edit them, and it cannot open anything else. Files holding a secret (the worker environment, the VPN keys) are not listed and cannot be reached from here.')}</p>
 ${selected === undefined ? html`` : viewer_(selected, found, viewer)}
 ${index(selected, viewer)}`,
     viewer,

@@ -39,7 +39,6 @@ describe('ConfigDocument', () => {
     for (const secret of [
       '/etc/kobox/worker.env',
       '/etc/kobox/portal.env',
-      '/etc/kobox/aria2.conf',
       '/etc/kobox/debrid-key.pem',
       '/etc/nginx/kobox.htpasswd',
       '/etc/openvpn/kobox-pki/private/ca.key',
@@ -150,7 +149,6 @@ describe('ConfigDocument', () => {
       ['rutorrent-users', '/etc/nginx/kobox.d/rutorrent-users.conf'],
       ['portal-unit', '/etc/systemd/system/kobox-portal.service'],
       ['worker-unit', '/etc/systemd/system/kobox-worker.service'],
-      ['aria2-unit', '/etc/systemd/system/kobox-aria2.service'],
       ['nanomon-unit', '/etc/systemd/system/kobox-nanomon.service'],
       ['firewall-unit', '/etc/systemd/system/kobox-firewall.service'],
       ['fail2ban-jails', '/etc/fail2ban/jail.d/kobox.local'],

@@ -45,30 +45,20 @@ import { DeliverNowOrQueue } from '../application/maintenance/DeliverNowOrQueue.
 import type { MailOutboxPort } from '../application/maintenance/MailOutboxPort.js';
 import { SqliteMailOutbox } from '../infrastructure/persistence/SqliteMailOutbox.js';
 import { SqliteMysbDumpSource } from '../infrastructure/persistence/SqliteMysbDumpSource.js';
-import { SqliteDebridAccountRepository } from '../infrastructure/persistence/SqliteDebridAccountRepository.js';
 import { SqliteMediaRepository } from '../infrastructure/persistence/SqliteMediaRepository.js';
 import { SqliteDiagnosticsRepository } from '../infrastructure/persistence/SqliteDiagnosticsRepository.js';
 import { SqliteSpeedtestRepository } from '../infrastructure/persistence/SqliteSpeedtestRepository.js';
-import { SqliteDebridDownloadRepository } from '../infrastructure/persistence/SqliteDebridDownloadRepository.js';
-import { RsaDebridKeyCipher } from '../infrastructure/system/RsaDebridKeyCipher.js';
 import {
   DEFAULT_HOST_PRIVATE_KEY,
   DEFAULT_HOST_PUBLIC_KEY,
   FsHostKeyPair,
 } from '../infrastructure/system/HostKeyPair.js';
-import { RequestDebridDownload } from '../application/ddl/RequestDebridDownload.js';
-import type { DebridKeyEncryptorPort } from '../domain/ddl/ports.js';
 import type { JobQueuePort } from '../application/jobs/JobQueuePort.js';
-import { StoredDebridCredentials } from '../infrastructure/system/StoredDebridCredentials.js';
 import { FsMediaScanner } from '../infrastructure/system/FsMediaScanner.js';
 import { FsConfigFileReader } from '../infrastructure/system/FsConfigFileReader.js';
 import { JournaldLogAdapter } from '../infrastructure/system/JournaldLogAdapter.js';
 import { AptUpdateAdapter } from '../infrastructure/system/AptUpdateAdapter.js';
 import { LibrespeedAdapter } from '../infrastructure/system/LibrespeedAdapter.js';
-import { AllDebridAdapter } from '../infrastructure/system/AllDebridAdapter.js';
-import { LoggedDebrid } from '../infrastructure/system/LoggedDebrid.js';
-import { Aria2Adapter } from '../infrastructure/system/Aria2Adapter.js';
-import { DdlPlacementAdapter } from '../infrastructure/system/DdlPlacementAdapter.js';
 import { NtfyChannel } from '../infrastructure/notifications/NtfyChannel.js';
 import type {
   NotificationChannel,
@@ -167,14 +157,12 @@ import { WatchDirAdapter } from '../infrastructure/system/WatchDirAdapter.js';
 import { loadRtorrentTemplates } from '../infrastructure/templates/TemplateProvider.js';
 import { JobWorker } from './worker/JobWorker.js';
 import {
-  buildDdlUseCases,
   buildMaintenanceUseCases,
   buildSyncUseCases,
   buildSecurityUseCases,
   buildTorrentUseCases,
   buildTrackerUseCases,
   buildUseCases,
-  type DdlUseCases,
   type MaintenanceUseCases,
   type SecurityUseCases,
   type SyncUseCases,
@@ -199,7 +187,10 @@ function envInt(name: string, fallback: number): number {
 }
 
 // The host key pair, wherever this box keeps it: one place reads the override
-// so every cipher built here seals and opens with the same pair.
+// so every cipher built here seals and opens with the same pair. The override
+// names keep the "DEBRID" the pair was first made for: a box that set one would
+// otherwise fall back to the default path, where the installer mints a new pair
+// and orphans every value sealed with the old one.
 function hostKeyPair(): { readonly publicKey: string; readonly privateKey: string } {
   return {
     publicKey: process.env.KOBOX_DEBRID_PUBLIC_KEY ?? DEFAULT_HOST_PUBLIC_KEY,
@@ -220,11 +211,6 @@ function passwordCipher(): RsaPasswordCipher {
 function remotePasswordCipher(): RsaRemotePasswordCipher {
   const keys = hostKeyPair();
   return new RsaRemotePasswordCipher(keys.publicKey, keys.privateKey);
-}
-
-function debridKeyCipher(): RsaDebridKeyCipher {
-  const keys = hostKeyPair();
-  return new RsaDebridKeyCipher(keys.publicKey, keys.privateKey);
 }
 
 // What an admin set in the interface wins over the environment: the screen is
@@ -340,10 +326,6 @@ export function securitySettings(): SecuritySettings {
 }
 
 export const DEFAULT_DB_PATH = '/var/lib/kobox/kobox.db';
-const DEFAULT_ARIA2_RPC_URL = 'http://127.0.0.1:6800/jsonrpc';
-// outside /var/lib/kobox (2770 root:kobox-portal, untraversable by kobox-aria2)
-const DEFAULT_DDL_STAGING = '/var/lib/kobox-aria2';
-const DEFAULT_ALLDEBRID_BASE_URL = 'https://api.alldebrid.com';
 export const DEFAULT_KOBOX_BIN = '/usr/local/bin/kobox';
 export const DEFAULT_CURRENT_LINK = '/opt/kobox/current';
 export const DEFAULT_RELEASES_DIR = '/opt/kobox/releases';
@@ -392,8 +374,6 @@ export async function buildInstallation(
 ): Promise<InstallationWiring> {
   const runner = new ExecFileRunner();
   const facts = await new SystemFactsAdapter(runner).gather();
-  const aria2RpcSecret = process.env.KOBOX_ARIA2_RPC_SECRET;
-  const ddlStagingDir = process.env.KOBOX_DDL_STAGING;
   const quotaFs = process.env.KOBOX_QUOTA_FS;
   const site = await siteSettings(c.db).get();
   const leDomain = site?.domain;
@@ -425,8 +405,6 @@ export async function buildInstallation(
       manageAptSources: flags.manageAptSources,
       // every vendored release's pin, from one tested place
       ...artifactPinsFrom(process.env),
-      ...(aria2RpcSecret !== undefined && aria2RpcSecret !== '' && { aria2RpcSecret }),
-      ...(ddlStagingDir !== undefined && ddlStagingDir !== '' && { ddlStagingDir }),
       ...(quotaFs !== undefined && quotaFs !== '' && { quotaFs }),
       ...(leDomain !== undefined &&
         leDomain !== '' &&
@@ -537,16 +515,11 @@ export interface Container {
   readonly saveMailRelay: SaveMailRelay;
   readonly inviteMember: InviteMember;
   readonly outbox: MailOutboxPort;
-  readonly ddlUseCases: DdlUseCases;
-  readonly downloader: Aria2Adapter;
   readonly syncUseCases: SyncUseCases;
   readonly setDestination: SetSyncDestination;
   readonly speedtestRepo: SqliteSpeedtestRepository;
   readonly diagnosticsRepo: SqliteDiagnosticsRepository;
   readonly mediaRepo: SqliteMediaRepository;
-  readonly debridDownloadRepo: SqliteDebridDownloadRepository;
-  readonly debridAccountRepo: SqliteDebridAccountRepository;
-  readonly debridCipher: RsaDebridKeyCipher;
   readonly queue: SqliteJobQueue;
   readonly worker: JobWorker;
   // seals a password typed at the CLI for the worker, like the portal does
@@ -575,8 +548,8 @@ export interface Container {
 // becomes a fact about what it can even construct.
 //
 // Two deliberate details:
-//   - `debridEncryptor` is typed as the ENCRYPTOR port only, so this container
-//     cannot open a stored key even though one class implements both halves;
+//   - `passwords` is typed as the SEALER port only, so this container cannot
+//     open a sealed password even though one class implements both halves;
 //   - a CommandRunner is still created, but only for openssl (password verify)
 //     and the health probe — neither is privileged, and the process runs as
 //     kobox-portal regardless.
@@ -614,14 +587,10 @@ export interface PortalContainer {
   readonly transfers: SqliteSyncTransferRepository;
   readonly setDestination: SetSyncDestination;
   readonly outbox: MailOutboxPort;
-  readonly debridDownloadRepo: SqliteDebridDownloadRepository;
-  readonly debridAccountRepo: SqliteDebridAccountRepository;
-  readonly debridEncryptor: DebridKeyEncryptorPort;
-  // the SEALER port only, for the same reason: a member's new password goes to
-  // the worker sealed, and the portal can never open one back
+  // a member's new password goes to the worker sealed, and the portal can never
+  // open one back
   readonly passwords: PasswordSealerPort;
   readonly media: SqliteMediaRepository;
-  readonly requestDownload: RequestDebridDownload;
   readonly inviteMember: InviteMember;
   readonly sendPasswordLink: SendPasswordLink;
   readonly requestPasswordReset: RequestPasswordReset;
@@ -653,7 +622,6 @@ export function buildPortalContainer(name: string): PortalContainer {
   // openssl + health probe only; nothing here mutates the host
   const runner = new ExecFileRunner();
   const queue = new SqliteJobQueue(db);
-  const debridDownloadRepo = new SqliteDebridDownloadRepository(db);
   const portalCredentialsRepo = new SqlitePortalCredentialsRepository(db);
   const portalAttempts = new SqliteLoginAttemptsRepository(db);
   const users = new SqliteUserRepository(db);
@@ -729,15 +697,7 @@ export function buildPortalContainer(name: string): PortalContainer {
       sealer: remotePasswordCipher(),
     }),
     outbox,
-    debridDownloadRepo,
-    debridAccountRepo: new SqliteDebridAccountRepository(db),
     media: new SqliteMediaRepository(db),
-    debridEncryptor: debridKeyCipher(),
-    requestDownload: new RequestDebridDownload({
-      repo: debridDownloadRepo,
-      queue,
-      clock: nowStamp,
-    }),
   };
 }
 
@@ -759,7 +719,6 @@ export function buildContainer(name: string): Container {
   const credentials = new SqlitePortalCredentialsRepository(db);
   const sessions = new SqlitePortalSessionRepository(db);
   const loginAttempts = new SqliteLoginAttemptsRepository(db);
-  const debridAccountRepo = new SqliteDebridAccountRepository(db);
   const nextcloud = new OccNextcloudAdapter(runner);
   const components = new SqliteComponentRegistry(db);
   const passwords = passwordCipher();
@@ -792,7 +751,6 @@ export function buildContainer(name: string): Container {
     allocator: new SqlitePortAllocator(db),
     credentials,
     sessions,
-    debridAccounts: debridAccountRepo,
     clock: nowStamp,
   });
   const queue = new SqliteJobQueue(db);
@@ -903,29 +861,6 @@ export function buildContainer(name: string): Container {
     installHost: new InstallHostAdapter(runner),
     clock: nowStamp,
   });
-  // DDL/debrid: debrid accounts are PER-USER — each key is stored sealed and is
-  // only opened here, worker-side, by the root-only private PEM. No user key,
-  // no download for that user; everything else is unaffected.
-  const debridDownloadRepo = new SqliteDebridDownloadRepository(db);
-  const debridCipher = debridKeyCipher();
-  const downloader = new Aria2Adapter(
-    process.env.KOBOX_ARIA2_RPC_URL ?? DEFAULT_ARIA2_RPC_URL,
-    process.env.KOBOX_ARIA2_RPC_SECRET ?? '',
-  );
-  const ddlUseCases = buildDdlUseCases({
-    repo: debridDownloadRepo,
-    accounts: debridAccountRepo,
-    debrid: new LoggedDebrid(
-      new AllDebridAdapter(process.env.KOBOX_ALLDEBRID_BASE_URL ?? DEFAULT_ALLDEBRID_BASE_URL),
-      logger,
-    ),
-    credentials: new StoredDebridCredentials(debridAccountRepo, debridCipher),
-    downloader,
-    placement: new DdlPlacementAdapter(runner),
-    queue,
-    clock: nowStamp,
-    stagingBase: process.env.KOBOX_DDL_STAGING ?? DEFAULT_DDL_STAGING,
-  });
   const syncDestinationRepo = new SqliteSyncDestinationRepository(db);
   const syncTransferRepo = new SqliteSyncTransferRepository(db);
   const syncUseCases = buildSyncUseCases({
@@ -970,18 +905,12 @@ export function buildContainer(name: string): Container {
       trackerUseCases,
       securityUseCases,
       maintenanceUseCases,
-      ddlUseCases,
       syncUseCases,
       passwords,
     ),
-    ddlUseCases,
-    downloader,
     speedtestRepo,
     diagnosticsRepo,
     mediaRepo,
-    debridDownloadRepo,
-    debridAccountRepo,
-    debridCipher,
     passwords,
     repo,
     trackerRepo,

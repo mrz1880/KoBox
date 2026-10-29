@@ -29,8 +29,6 @@ export const COMPONENT_NAMES = [
   'shellinabox',
   // lightweight host monitoring (vendored NanoMon binary)
   'nanomon',
-  // DDL/debrid download engine (aria2 daemon, localhost RPC)
-  'aria2',
   'speedtest',
 ] as const;
 

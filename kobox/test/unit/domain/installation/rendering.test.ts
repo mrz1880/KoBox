@@ -19,8 +19,6 @@ import {
   rutorrentUserConfigDir,
   rutorrentUserConfigsDir,
   RUTORRENT_OWN_CONFIG,
-  renderAria2Conf,
-  renderAria2Unit,
   renderNanomonUnit,
   renderNextcloudSite,
   renderNginxVhost,
@@ -303,14 +301,16 @@ describe('installation rendering', () => {
       ['KOBOX_DB', '/var/lib/kobox/kobox.db'],
       ['KOBOX_PORTAL_HTTP_PORT', '8190'],
       // every secret the root worker alone acts on
-      ['KOBOX_ALLDEBRID_APIKEY', 'the-debrid-key'],
-      ['KOBOX_ARIA2_RPC_SECRET', 'the-rpc-secret'],
       ['KOBOX_IBLOCKLIST_USER', 'the-list-user'],
       ['KOBOX_IBLOCKLIST_PIN', 'the-list-pin'],
       ['KOBOX_NTFY_URL', 'https://ntfy.example.net/secret-topic'],
       ['KOBOX_DISCORD_WEBHOOK', 'https://discord.example/api/webhooks/xyz'],
       // convention-matched: a secret added later is withheld by default
       ['KOBOX_FUTURE_TOKEN', 'not-yet-invented'],
+      // and so is one a retired feature left behind in an upgraded box's
+      // worker.env: nothing reads it any more, and it still never reaches the
+      // portal
+      ['KOBOX_ARIA2_RPC_SECRET', 'the-rpc-secret'],
     ]);
 
     const file = renderPortalEnv(snapshot);
@@ -325,7 +325,6 @@ describe('installation rendering', () => {
     expect(file.content).toContain('KOBOX_PORTAL_HTTP_PORT=8190');
     // not one secret VALUE reaches the file
     for (const secret of [
-      'the-debrid-key',
       'the-rpc-secret',
       'the-list-user',
       'the-list-pin',
@@ -338,13 +337,11 @@ describe('installation rendering', () => {
     expectGolden('portal.env.golden', file.content);
 
     // the worker still gets everything — the split withholds, it never drops
-    expect(renderWorkerEnv(snapshot).content).toContain('KOBOX_ALLDEBRID_APIKEY=the-debrid-key');
+    expect(renderWorkerEnv(snapshot).content).toContain('KOBOX_IBLOCKLIST_PIN=the-list-pin');
   });
 
   it('should_classify_worker_only_env_keys_by_name_and_convention', () => {
     for (const key of [
-      'KOBOX_ALLDEBRID_APIKEY',
-      'KOBOX_ARIA2_RPC_SECRET',
       'KOBOX_IBLOCKLIST_PIN',
       'KOBOX_NTFY_URL',
       'KOBOX_SOMETHING_TOKEN',
@@ -356,7 +353,7 @@ describe('installation rendering', () => {
     for (const key of [
       'KOBOX_DB',
       'KOBOX_PORTAL_HTTP_PORT',
-      'KOBOX_ARIA2_RPC_URL',
+      'KOBOX_LE_DOMAIN',
       'KOBOX_VPN_PROFILES_DIR',
       'KOBOX_NANOMON_SHA256',
     ]) {
@@ -639,21 +636,6 @@ describe('installation rendering', () => {
     expectGolden('shellinabox.default.golden', file.content);
   });
 
-  it('should_render_the_aria2_config_and_unit_golden', () => {
-    const conf = renderAria2Conf('test-rpc-secret', '/var/lib/kobox-aria2');
-    expect(conf.path).toBe('/etc/kobox/aria2.conf');
-    // secret-bearing config is not world-readable and RPC stays on loopback
-    expect(conf.mode).toBe('0640');
-    expect(conf.content).toContain('rpc-secret=test-rpc-secret');
-    expect(conf.content).toContain('rpc-listen-all=false');
-    expectGolden('aria2.conf.golden', conf.content);
-
-    const unit = renderAria2Unit('/var/lib/kobox-aria2');
-    expect(unit.content).toContain('User=kobox-aria2');
-    expect(unit.content).toContain('ReadWritePaths=/var/lib/kobox-aria2');
-    expectGolden('kobox-aria2.service.golden', unit.content);
-  });
-
   it('should_render_the_nanomon_unit_non_root_on_loopback_golden', () => {
     const file = renderNanomonUnit();
     expect(file.path).toBe('/etc/systemd/system/kobox-nanomon.service');
@@ -709,8 +691,6 @@ describe('installation rendering: who may read and run each file', () => {
     ['worker unit', () => renderWorkerUnit({ nodeBin: '/usr/bin/node', workerMain: '/opt/w.js' }), '0644', 'root', 'root'],
     ['portal unit', () => renderPortalUnit({ nodeBin: '/usr/bin/node', portalMain: '/opt/p.js' }), '0644', 'root', 'root'],
     ['nanomon unit', () => renderNanomonUnit(), '0644', 'root', 'root'],
-    ['aria2 config', () => renderAria2Conf('s3cret', '/var/lib/kobox-aria2'), '0640', 'root', 'kobox-aria2'],
-    ['aria2 unit', () => renderAria2Unit('/var/lib/kobox-aria2'), '0644', 'root', 'root'],
     ['firewall unit', () => renderFirewallBootUnit(), '0644', 'root', 'root'],
     ['worker env', () => renderWorkerEnv(new Map()), '0600', 'root', 'root'],
     ['sshd drop-in', () => renderSshdDropin(22), '0600', 'root', 'root'],
@@ -754,8 +734,6 @@ describe('installation rendering: who may read and run each file', () => {
   it.each([
     ['worker unit', () => renderWorkerUnit({ nodeBin: '/usr/bin/node', workerMain: '/opt/w.js' }), '/etc/systemd/system/kobox-worker.service'],
     ['nanomon unit', () => renderNanomonUnit(), '/etc/systemd/system/kobox-nanomon.service'],
-    ['aria2 config', () => renderAria2Conf('s3cret', '/var/lib/kobox-aria2'), '/etc/kobox/aria2.conf'],
-    ['aria2 unit', () => renderAria2Unit('/var/lib/kobox-aria2'), '/etc/systemd/system/kobox-aria2.service'],
     ['nginx vhost', () => renderNginxVhost({ portalPort: 8189 }), '/etc/nginx/conf.d/kobox.conf'],
     ['nfs exports', () => renderNfsExports([]), '/etc/exports.d/kobox.exports'],
     ['samba', () => renderSmbConf(), '/etc/samba/smb.conf'],

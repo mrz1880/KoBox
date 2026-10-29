@@ -259,7 +259,6 @@ describe.skipIf(!onDebianAsRoot)('E2E: maintenance keeps the installed box alive
       for (const type of [
         'resolve-dyndns', 'send-mails', 'evaluate-fair-use',
         'update-blocklists', 'renew-tracker-certs', 'run-backup',
-        'poll-debrid-downloads',
         'index-media',
         'check-package-updates',
         'send-pending-transfers',

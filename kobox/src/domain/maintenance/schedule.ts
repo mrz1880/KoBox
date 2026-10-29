@@ -30,8 +30,6 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
   entry('0 */6 * * *', 'update-blocklists'),
   entry('10 0 * * *', 'renew-tracker-certs'),
   entry('30 5 * * *', 'run-backup'),
-  // advance in-flight debrid downloads (aria2 status -> place / fail)
-  entry('*/2 * * * *', 'poll-debrid-downloads'),
   // files also appear and vanish over SFTP, outside any KoBox event
   entry('*/15 * * * *', 'index-media'),
   // the portal runs non-root and cannot read another account's quota, so the

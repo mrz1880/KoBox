@@ -4,11 +4,11 @@ import { translatorFor } from '../../../../src/interfaces/http/views/messages.js
 
 describe('translatorFor', () => {
   it('should_give_a_french_member_french', () => {
-    expect(translatorFor(Language.fr)('Downloads')).toBe('Téléchargements');
+    expect(translatorFor(Language.fr)('Folders')).toBe('Dossiers');
   });
 
   it('should_give_english_back_unchanged', () => {
-    expect(translatorFor(Language.en)('Downloads')).toBe('Downloads');
+    expect(translatorFor(Language.en)('Folders')).toBe('Folders');
   });
 
   it('should_fall_back_to_the_english_rather_than_showing_a_key', () => {

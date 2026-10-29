@@ -73,11 +73,6 @@ async function main(): Promise<void> {
     outbox: container.outbox,
     credentials: container.credentials,
     profiles: new FsVpnProfileStore(process.env.KOBOX_VPN_PROFILES_DIR),
-    downloads: container.debridDownloadRepo,
-    requestDownload: container.requestDownload,
-    debridAccounts: container.debridAccountRepo,
-    // public half only: this process can seal a key, never open one
-    debridEncryptor: container.debridEncryptor,
     media: container.media,
   });
 
