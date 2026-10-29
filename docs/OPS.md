@@ -341,7 +341,7 @@ Two things are deliberately absent:
   could read it would trade real protection for convenience, and listing it
   while the read always fails would report "not on this box" for a file that is
   right there. Read that one from a shell.
-- **Anything holding a secret** — `worker.env`, `portal.env`, the host private
+- **Anything holding a secret**: `worker.env`, `portal.env`, the host private
   key, the VPN PKI, the nginx htpasswd.
 
 A file that is simply missing reads as "not on this box", which is the normal
@@ -673,9 +673,10 @@ mutation enqueues a typed job the root worker executes.
   file. `/etc/kobox/worker.env` (`0600 root:root`) holds the full install
   snapshot including every secret; `/etc/kobox/portal.env`
   (`0640 root:kobox-portal`) is the same snapshot **minus** the worker-only
-  secrets — the iblocklist credentials and the ntfy/Discord webhooks. The portal never calls those paths (it reads
-  repositories and enqueues jobs), so it must not carry the secrets in its
-  memory or in `/proc/<pid>/environ`, which its own uid can read. Both files are
+  secrets (the iblocklist credentials and the ntfy/Discord webhooks). The
+  portal never calls those paths (it reads repositories and enqueues jobs), so
+  it must not carry the secrets in its memory or in `/proc/<pid>/environ`, which
+  its own uid can read. Both files are
   rendered by `kobox install`; a key is withheld from the portal when its name is
   on the explicit list **or** ends in `_SECRET`/`_TOKEN`/`_APIKEY`/`_PASSWORD`/
   `_WEBHOOK`/`_PIN` — so a secret added later is withheld by default. Adding a
