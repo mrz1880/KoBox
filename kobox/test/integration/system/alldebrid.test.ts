@@ -122,6 +122,20 @@ describe('AllDebridAdapter', () => {
     await expect(adapter.unlock(link, KEY)).rejects.toThrow(/AUTH_BLOCKED/);
   });
 
+  it('should_say_plainly_that_alldebrid_refuses_servers', async () => {
+    // proven against the live API on 2026-10-29: the box's datacenter address is
+    // refused for the unlock AND for the download, so no retry can help
+    unlockBody = {
+      status: 'error',
+      error: { code: 'NO_SERVER', message: 'Server are not allowed to use this feature.' },
+    };
+    const adapter = new AllDebridAdapter(baseUrl);
+
+    await expect(adapter.unlock(link, KEY)).rejects.toThrow(
+      /NO_SERVER: AllDebrid refuses downloads from servers, this box included/,
+    );
+  });
+
   it('should_pass_an_unknown_error_code_through_unchanged', async () => {
     unlockBody = {
       status: 'error',

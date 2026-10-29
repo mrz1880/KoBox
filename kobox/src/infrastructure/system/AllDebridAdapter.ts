@@ -18,6 +18,8 @@ const ACTIONABLE_MESSAGES: Readonly<Record<string, string>> = {
   LINK_HOST_UNAVAILABLE: 'this filehoster is unavailable at AllDebrid right now, try again later',
   LINK_DOWN: 'this file is no longer available at the filehoster',
   MUST_BE_PREMIUM: 'this filehoster requires an active AllDebrid premium subscription',
+  NO_SERVER:
+    'AllDebrid refuses downloads from servers, this box included: the file has to be fetched from home',
 };
 
 export class DebridError extends Error {
