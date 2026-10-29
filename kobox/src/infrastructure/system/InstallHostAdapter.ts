@@ -32,6 +32,10 @@ export class InstallHostAdapter implements InstallHostPort {
     await rm(path, { force: true });
   }
 
+  async removeDir(path: string): Promise<void> {
+    await rm(path, { recursive: true, force: true });
+  }
+
   async ensureDir(path: string, mode: string): Promise<void> {
     await mkdir(path, { recursive: true });
     await chmod(path, parseInt(mode, 8));

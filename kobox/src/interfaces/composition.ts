@@ -10,6 +10,8 @@ import {
   type InstallerContext,
 } from '../application/installation/installers.js';
 import { RunInstallation } from '../application/installation/RunInstallation.js';
+import { TearDownRetiredServices } from '../application/installation/TearDownRetiredServices.js';
+import { RETIRED_SERVICES } from '../domain/installation/retired.js';
 import { UninstallComponents } from '../application/installation/UninstallComponents.js';
 import { COMPONENT_CATALOG } from '../domain/installation/catalog.js';
 import { stampOf } from '../domain/shared/stamp.js';
@@ -434,6 +436,11 @@ export async function buildInstallation(
       facts: { gather: () => Promise.resolve(facts) },
       registry,
       packages: ctx.packages,
+      tearDownRetired: new TearDownRetiredServices({
+        host: ctx.host,
+        systemd: ctx.systemd,
+        retired: RETIRED_SERVICES,
+      }),
       installers,
       catalog: COMPONENT_CATALOG,
       enqueueConvergence: async (type) => {

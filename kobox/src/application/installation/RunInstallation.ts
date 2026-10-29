@@ -8,6 +8,7 @@ import type {
 import { evaluatePreflight, type PreflightFailure } from '../../domain/installation/preflight.js';
 import { Version } from '../../domain/installation/Version.js';
 import type { ComponentInstaller } from './installers.js';
+import type { TearDownRetiredServices } from './TearDownRetiredServices.js';
 
 // The Phase 1-3 renders that make an installed box converge to desired state.
 export const CONVERGENCE_JOBS = [
@@ -55,6 +56,8 @@ interface Deps {
   readonly facts: SystemFactsPort;
   readonly registry: ComponentRegistry;
   readonly packages: PackagePort;
+  // what earlier releases installed and this one no longer ships
+  readonly tearDownRetired: TearDownRetiredServices;
   readonly installers: ReadonlyMap<string, ComponentInstaller>;
   readonly catalog: readonly ComponentSpec[];
   readonly enqueueConvergence: (type: ConvergenceJobType) => Promise<void>;
@@ -77,6 +80,12 @@ export class RunInstallation {
     });
     if (failures.length > 0) {
       throw new PreflightFailedError(failures);
+    }
+
+    // before the plan, so no component is converged next to a daemon nothing
+    // manages any more
+    for (const unit of await deps.tearDownRetired.execute()) {
+      this.deps.onProgress?.(`${unit}: retired, stopped and removed`);
     }
 
     const states = await deps.registry.states();

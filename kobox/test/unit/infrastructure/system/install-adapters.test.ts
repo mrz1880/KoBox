@@ -144,6 +144,20 @@ describe('InstallHostAdapter (fs side)', () => {
     await expect(host.removeFile(file)).resolves.toBeUndefined();
   });
 
+  it('should_remove_a_directory_with_everything_in_it_and_converge_when_it_is_gone', async () => {
+    dir = mkdtempSync(join(tmpdir(), 'kobox-host-'));
+    const host = new InstallHostAdapter(new RecordingRunner());
+    const staging = join(dir, 'staging');
+    mkdirSync(join(staging, 'half-done'), { recursive: true });
+    writeFileSync(join(staging, 'half-done', 'part.bin'), 'bytes');
+
+    await host.removeDir(staging);
+
+    expect(existsSync(staging)).toBe(false);
+    // a box that never had it, or a second run, pays nothing and fails nothing
+    await expect(host.removeDir(staging)).resolves.toBeUndefined();
+  });
+
   it('should_extract_tarballs_with_one_stripped_component_and_parse_mount_options', async () => {
     dir = mkdtempSync(join(tmpdir(), 'kobox-host-'));
     mkdirSync(join(dir, 'dest'));
