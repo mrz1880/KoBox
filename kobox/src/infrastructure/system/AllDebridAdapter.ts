@@ -10,12 +10,12 @@ import type { DebridPort, DebridResult } from '../../domain/ddl/ports.js';
 // account meets a brand-new IP the first time its key is used on a new seedbox.
 const ACTIONABLE_MESSAGES: Readonly<Record<string, string>> = {
   AUTH_BLOCKED:
-    'AllDebrid blocked this new location — open the email it sent you to authorise this server, then request the download again',
-  AUTH_BAD_APIKEY: 'AllDebrid rejected your key — check it in Downloads',
-  AUTH_MISSING_APIKEY: 'no AllDebrid key was sent — set yours in Downloads',
+    'AllDebrid blocked this new location: open the email it sent you to authorise this server, then request the download again',
+  AUTH_BAD_APIKEY: 'AllDebrid rejected your key: check it in Downloads',
+  AUTH_MISSING_APIKEY: 'no AllDebrid key was sent: set yours in Downloads',
   AUTH_USER_BANNED: 'this AllDebrid account is banned',
   LINK_HOST_NOT_SUPPORTED: 'AllDebrid does not support this filehoster',
-  LINK_HOST_UNAVAILABLE: 'this filehoster is unavailable at AllDebrid right now — try again later',
+  LINK_HOST_UNAVAILABLE: 'this filehoster is unavailable at AllDebrid right now, try again later',
   LINK_DOWN: 'this file is no longer available at the filehoster',
   MUST_BE_PREMIUM: 'this filehoster requires an active AllDebrid premium subscription',
 };
