@@ -6,7 +6,7 @@ import { setTimeout as sleep } from 'node:timers/promises';
 import Database from 'better-sqlite3';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { renderAria2Conf, renderAria2Unit } from '../../src/domain/installation/rendering.js';
-import { FsDebridKeyPair } from '../../src/infrastructure/system/FsDebridKeyPair.js';
+import { FsHostKeyPair } from '../../src/infrastructure/system/HostKeyPair.js';
 
 // Full DDL/debrid E2E on a fresh Debian 13 with a REAL aria2c daemon started
 // from the REAL rendered unit + config (the kobox-aria2 non-root account, RPC
@@ -162,7 +162,7 @@ describe.skipIf(!onDebianAsRoot)('E2E: debrid link -> aria2 -> user home', () =>
 
     // the sealing pair `kobox install` would provision, then the user's OWN key
     // through the real CLI path (seal -> job -> worker -> stored ciphertext)
-    await new FsDebridKeyPair(
+    await new FsHostKeyPair(
       env.KOBOX_DEBRID_PUBLIC_KEY ?? '',
       env.KOBOX_DEBRID_PRIVATE_KEY ?? '',
     ).ensurePair();

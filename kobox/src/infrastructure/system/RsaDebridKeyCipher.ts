@@ -1,13 +1,12 @@
 import { constants, privateDecrypt, publicEncrypt } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { DebridApiKey } from '../../domain/ddl/DebridApiKey.js';
+import { DEFAULT_HOST_PRIVATE_KEY, DEFAULT_HOST_PUBLIC_KEY } from './HostKeyPair.js';
 import type {
   DebridKeyDecryptorPort,
   DebridKeyEncryptorPort,
 } from '../../domain/ddl/ports.js';
 
-export const DEFAULT_DEBRID_PUBLIC_KEY = '/etc/kobox/debrid-pub.pem';
-export const DEFAULT_DEBRID_PRIVATE_KEY = '/etc/kobox/debrid-key.pem';
 
 export class DebridKeyCipherError extends Error {
   constructor(detail: string) {
@@ -23,8 +22,8 @@ export class DebridKeyCipherError extends Error {
 // encrypt(), so it never opens (nor needs read access to) the private half.
 export class RsaDebridKeyCipher implements DebridKeyEncryptorPort, DebridKeyDecryptorPort {
   constructor(
-    private readonly publicKeyPath: string = DEFAULT_DEBRID_PUBLIC_KEY,
-    private readonly privateKeyPath: string = DEFAULT_DEBRID_PRIVATE_KEY,
+    private readonly publicKeyPath: string = DEFAULT_HOST_PUBLIC_KEY,
+    private readonly privateKeyPath: string = DEFAULT_HOST_PRIVATE_KEY,
   ) {}
 
   async encrypt(key: DebridApiKey): Promise<string> {

@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Password } from '../../../src/domain/user/Password.js';
-import { FsDebridKeyPair } from '../../../src/infrastructure/system/FsDebridKeyPair.js';
+import { FsHostKeyPair } from '../../../src/infrastructure/system/HostKeyPair.js';
 import { RsaPasswordCipher } from '../../../src/infrastructure/system/RsaPasswordCipher.js';
 
 const RAW = 'correct horse battery staple';
@@ -15,7 +15,7 @@ beforeEach(async () => {
   const dir = mkdtempSync(join(tmpdir(), 'kobox-password-cipher-'));
   pub = join(dir, 'debrid-pub.pem');
   priv = join(dir, 'debrid-key.pem');
-  await new FsDebridKeyPair(pub, priv).ensurePair();
+  await new FsHostKeyPair(pub, priv).ensurePair();
 });
 
 describe('RsaPasswordCipher', () => {

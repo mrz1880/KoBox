@@ -3,22 +3,20 @@ import type {
   RemotePasswordOpenerPort,
   RemotePasswordSealerPort,
 } from '../../domain/sync/ports.js';
-import {
-  DEFAULT_DEBRID_PRIVATE_KEY,
-  DEFAULT_DEBRID_PUBLIC_KEY,
-} from './RsaDebridKeyCipher.js';
+import { DEFAULT_HOST_PRIVATE_KEY, DEFAULT_HOST_PUBLIC_KEY } from './HostKeyPair.js';
 import { openString, readPem, sealString } from './rsaSealing.js';
 
-// The same host key pair that seals per-member debrid keys. One pair, generated
-// once at install, never regenerated — a second pair would mean a second thing
-// to back up and a second way to lose everything sealed with it.
+// The host key pair, the same one that seals a password on its way through the
+// job queue. One pair, generated once at install, never regenerated: a second
+// pair would mean a second thing to back up and a second way to lose everything
+// sealed with it.
 //
 // Each PEM is read LAZILY, per call: the non-root portal only ever seals, so it
 // never opens (nor needs read access to) the private half.
 export class RsaRemotePasswordCipher implements RemotePasswordSealerPort, RemotePasswordOpenerPort {
   constructor(
-    private readonly publicKeyPath: string = DEFAULT_DEBRID_PUBLIC_KEY,
-    private readonly privateKeyPath: string = DEFAULT_DEBRID_PRIVATE_KEY,
+    private readonly publicKeyPath: string = DEFAULT_HOST_PUBLIC_KEY,
+    private readonly privateKeyPath: string = DEFAULT_HOST_PRIVATE_KEY,
   ) {}
 
   async seal(password: RemotePassword): Promise<string> {
