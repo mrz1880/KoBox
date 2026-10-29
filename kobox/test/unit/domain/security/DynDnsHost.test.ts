@@ -82,4 +82,41 @@ describe('DynDnsHost', () => {
       false,
     );
   });
+  it('should_accept_a_host_of_exactly_253_chars_and_reject_254', () => {
+    const label = 'a'.repeat(63);
+    const at253 = `${label}.${label}.${label}.${'b'.repeat(61)}`;
+    expect(at253).toHaveLength(253);
+    expect(DynDnsHost.parse(at253).value).toBe(at253);
+    expect(() => DynDnsHost.parse(`${at253}b`)).toThrow(/longer than 253 characters/);
+  });
+
+  it('should_accept_a_label_of_exactly_63_chars_and_reject_64', () => {
+    const host = `${'a'.repeat(63)}.org`;
+    expect(DynDnsHost.parse(host).value).toBe(host);
+    expect(() => DynDnsHost.parse(`${'a'.repeat(64)}.org`)).toThrow(/label "a{64}" is invalid/);
+  });
+
+  it('should_accept_single_character_labels', () => {
+    expect(DynDnsHost.parse('a.b').value).toBe('a.b');
+  });
+
+  it('should_accept_names_that_only_contain_a_dotted_quad', () => {
+    // only a whole IPv4 literal is refused: these are names
+    expect(DynDnsHost.parse('dyn.192.0.2.10').value).toBe('dyn.192.0.2.10');
+    expect(DynDnsHost.parse('192.0.2.10.example.org').value).toBe('192.0.2.10.example.org');
+  });
+
+  it('should_name_the_reason_a_host_is_refused', () => {
+    expect(() => DynDnsHost.parse('')).toThrow(/: empty$/);
+    expect(() => DynDnsHost.parse('dyn.example.org;id')).toThrow(
+      /contains characters unsafe for a shell/,
+    );
+    expect(() => DynDnsHost.parse(';dyn.example.org')).toThrow(
+      /contains characters unsafe for a shell/,
+    );
+    expect(() => DynDnsHost.parse('192.0.2.10')).toThrow(/IPv4 literal/);
+    expect(() => DynDnsHost.parse('localhost')).toThrow(/must be a fully qualified name/);
+    expect(() => DynDnsHost.parse('-dyn.example.org')).toThrow(/label "-dyn" is invalid/);
+    expect(() => DynDnsHost.parse('dyn-.example.org')).toThrow(/label "dyn-" is invalid/);
+  });
 });

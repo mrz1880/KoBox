@@ -32,6 +32,7 @@ describe('TrackerHost', () => {
     expect(TrackerHost.parse('announce.tracker.example.org').registrableDomain).toBe('example.org');
     expect(TrackerHost.parse('example.org').registrableDomain).toBe('example.org');
     expect(TrackerHost.parse('192.0.2.10').registrableDomain).toBe('192.0.2.10');
+    expect(TrackerHost.parse('198.51.100.7').registrableDomain).toBe('198.51.100.7');
   });
 
   it('should_reject_single_label_hosts', () => {
@@ -105,5 +106,40 @@ describe('TrackerHost', () => {
     expect(TrackerHost.parse('a.example.org').equals(TrackerHost.parse('b.example.org'))).toBe(
       false,
     );
+  });
+  it('should_accept_a_host_of_exactly_253_chars_and_reject_254', () => {
+    const label = 'a'.repeat(63);
+    const at253 = `${label}.${label}.${label}.${'b'.repeat(61)}`;
+    expect(at253).toHaveLength(253);
+    expect(TrackerHost.parse(at253).value).toBe(at253);
+    expect(() => TrackerHost.parse(`${at253}b`)).toThrow(/longer than 253 characters/);
+  });
+
+  it('should_accept_a_label_of_exactly_63_chars', () => {
+    const host = `${'a'.repeat(63)}.org`;
+    expect(TrackerHost.parse(host).value).toBe(host);
+  });
+
+  it('should_accept_single_character_labels', () => {
+    expect(TrackerHost.parse('a.b').value).toBe('a.b');
+  });
+
+  it('should_name_the_reason_a_host_is_refused', () => {
+    expect(() => TrackerHost.parse('')).toThrow(/: empty$/);
+    expect(() => TrackerHost.parse('tracker.example.org;id')).toThrow(
+      /contains characters unsafe for a shell/,
+    );
+    expect(() => TrackerHost.parse(';tracker.example.org')).toThrow(
+      /contains characters unsafe for a shell/,
+    );
+    expect(() => TrackerHost.parse('localhost')).toThrow(/must be a fully qualified name/);
+    expect(() => TrackerHost.parse('-bad.example.org')).toThrow(/label "-bad" is invalid/);
+    expect(() => TrackerHost.parse('bad-.example.org')).toThrow(/label "bad-" is invalid/);
+  });
+
+  it('should_take_the_last_two_labels_of_a_name_ending_in_digits_as_registrable_domain', () => {
+    // only a whole dotted quad is an address: a name that merely contains one is not
+    expect(TrackerHost.parse('cdn.192.0.2.10').registrableDomain).toBe('2.10');
+    expect(TrackerHost.parse('192.0.2.10.example.org').registrableDomain).toBe('example.org');
   });
 });

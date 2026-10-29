@@ -3,6 +3,7 @@ import { EvaluateFairUse } from '../../../../src/application/security/EvaluateFa
 import { Bandwidth } from '../../../../src/domain/security/Bandwidth.js';
 import { FairUsePolicy } from '../../../../src/domain/security/FairUsePolicy.js';
 import type { SecurityEvent } from '../../../../src/domain/security/events.js';
+import type { FairUseState } from '../../../../src/domain/security/ports.js';
 import { Username } from '../../../../src/domain/user/Username.js';
 import { InMemoryFairUseRepository } from '../../../../src/infrastructure/persistence/InMemoryFairUseRepository.js';
 import { InMemoryUserRepository } from '../../../../src/infrastructure/persistence/InMemoryUserRepository.js';
@@ -216,5 +217,132 @@ describe('EvaluateFairUse — the user-h scenario end-to-end', () => {
 
     expect((await fairUse.getState(alice)).level).toBe('none');
     expect(notifications.published).toEqual([]);
+  });
+});
+
+class StateWriteRecordingRepository extends InMemoryFairUseRepository {
+  readonly stateWrites: string[] = [];
+
+  override saveState(username: Username, state: FairUseState, now: string): Promise<void> {
+    this.stateWrites.push(`${username.value}:${state.level}@${now}`);
+    return super.saveState(username, state, now);
+  }
+}
+
+describe('EvaluateFairUse report and audit trail', () => {
+  it('should_count_a_breach_on_the_first_strike_and_a_throttle_on_the_second', async () => {
+    authLog.setCount('alice', 82);
+
+    const first = await useCase.execute({ now: '2026-07-24 10:00:00' });
+    const second = await useCase.execute({ now: '2026-07-24 10:05:00' });
+
+    expect(first).toEqual({ evaluated: 1, breaches: 1, throttled: 0 });
+    // the throttle run notifies UserThrottled, which is a consequence, not a new breach
+    expect(second).toEqual({ evaluated: 1, breaches: 0, throttled: 1 });
+  });
+
+  it('should_report_a_quiet_user_as_evaluated_without_breach_or_throttle', async () => {
+    const report = await useCase.execute({ now: '2026-07-24 10:00:00' });
+
+    expect(report).toEqual({ evaluated: 1, breaches: 0, throttled: 0 });
+  });
+
+  it('should_count_a_breach_once_when_it_comes_with_an_unrelated_event', async () => {
+    authLog.setCount('alice', 82);
+    health.markSocketDown('127.0.0.1', aUser().build().scgiPort.value);
+
+    const report = await useCase.execute({ now: '2026-07-24 10:00:00' });
+
+    expect(notifications.published.map((event) => event.type).sort()).toEqual([
+      'AbnormalAuthRate',
+      'ServiceUnhealthy',
+    ]);
+    expect(report.breaches).toBe(1);
+  });
+
+  it('should_count_sustained_egress_as_a_breach', async () => {
+    meter.setCounter('alice', 1_000_000_000, 0);
+    await useCase.execute({ now: '2026-07-24 10:00:00' });
+    meter.setCounter('alice', 1_600_000_000, 0);
+
+    const report = await useCase.execute({ now: '2026-07-24 10:01:00' });
+
+    expect(report.breaches).toBe(1);
+  });
+
+  it('should_not_count_an_unhealthy_service_as_a_breach', async () => {
+    health.markSocketDown('127.0.0.1', aUser().build().scgiPort.value);
+
+    const report = await useCase.execute({ now: '2026-07-24 10:00:00' });
+
+    expect(notifications.published.map((event) => event.type)).toEqual(['ServiceUnhealthy']);
+    expect(report.breaches).toBe(0);
+  });
+
+  it('should_take_no_rate_from_two_samples_taken_at_the_same_instant', async () => {
+    // a zero-length window has no rate: it must not turn into an evaluation error
+    meter.setCounter('alice', 1_000_000_000, 0);
+    await useCase.execute({ now: '2026-07-24 10:00:00' });
+    meter.setCounter('alice', 1_600_000_000, 0);
+
+    await useCase.execute({ now: '2026-07-24 10:00:00' });
+
+    expect((await fairUse.listEvents(alice)).map((entry) => entry.eventType)).toEqual([]);
+  });
+
+  it('should_take_no_rate_when_the_clock_went_backwards', async () => {
+    meter.setCounter('alice', 1_000_000_000, 0);
+    await useCase.execute({ now: '2026-07-24 10:00:00' });
+    meter.setCounter('alice', 1_600_000_000, 0);
+
+    await useCase.execute({ now: '2026-07-24 09:59:00' });
+
+    expect((await fairUse.listEvents(alice)).map((entry) => entry.eventType)).toEqual([]);
+  });
+
+  it('should_record_why_the_evaluation_of_a_user_failed', async () => {
+    const brokenAuthLog = {
+      countAcceptedPublickey: (): Promise<number> =>
+        Promise.reject(new Error('journal unreadable')),
+    };
+    const broken = new EvaluateFairUse({
+      users, fairUse, meter, authLog: brokenAuthLog, identity, shaping, health,
+      notifications, policy,
+    });
+
+    await broken.execute({ now: '2026-07-24 10:00:00' });
+
+    expect(await fairUse.listEvents(alice)).toMatchObject([
+      {
+        eventType: 'FairUseEvaluationError',
+        detailJson: JSON.stringify({ message: 'journal unreadable' }),
+        createdAt: '2026-07-24 10:00:00',
+      },
+    ]);
+  });
+
+  it('should_name_the_suspended_user_whose_throttle_it_released', async () => {
+    await users.save(aUser().withUsername('bob').withScgiPort(51102).withRtorrentPort(45001).suspended());
+    identity.setUid('bob', 1002);
+    const bob = Username.parse('bob');
+    await fairUse.saveState(bob, { level: 'throttled', healthState: 'healthy' }, '2026-07-24 09:00:00');
+
+    await useCase.execute({ now: '2026-07-24 10:00:00' });
+
+    const [released] = await fairUse.listEvents(bob);
+    expect(released?.detailJson).toBe(JSON.stringify({ username: 'bob' }));
+  });
+
+  it('should_leave_the_stored_state_alone_while_nothing_changes', async () => {
+    // the state row carries the time of the last transition: rewriting it on
+    // every quiet run would make that time a lie
+    const recording = new StateWriteRecordingRepository();
+    const quiet = new EvaluateFairUse({
+      users, fairUse: recording, meter, authLog, identity, shaping, health, notifications, policy,
+    });
+
+    await quiet.execute({ now: '2026-07-24 10:00:00' });
+
+    expect(recording.stateWrites).toEqual([]);
   });
 });

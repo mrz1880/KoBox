@@ -115,5 +115,45 @@ describe('Cidr', () => {
   it('should_refuse_a_host_the_network_cannot_hold', () => {
     expect(() => Cidr.parse('10.0.1.0/28').addressOf(VpnHost.parse(20))).toThrow(InvalidCidrError);
   });
+  it('should_place_the_last_usable_host_and_refuse_the_broadcast', () => {
+    // a /28 holds 16 addresses: .0 is the network, .15 the broadcast
+    const cidr = Cidr.parse('10.0.1.0/28');
+    expect(cidr.addressOf(VpnHost.parse(14))).toBe('10.0.1.14');
+    expect(() => cidr.addressOf(VpnHost.parse(15))).toThrow(/has no room for host 15/);
+  });
+
+  it('should_place_a_member_host_in_a_tunnel_starting_high_in_the_address_space', () => {
+    expect(Cidr.parse('203.0.113.0/24').addressOf(VpnHost.parse(254))).toBe('203.0.113.254');
+    expect(Cidr.parse('255.255.255.0/24').firstAddress()).toBe('255.255.255.1');
+    expect(Cidr.parse('255.255.255.0/24').gatewayAddress).toBe('255.255.255.1');
+  });
+
+  it('should_accept_every_prefix_from_0_to_32_and_refuse_33', () => {
+    expect(Cidr.parse('128.0.0.0/1').netmask).toBe('128.0.0.0');
+    expect(Cidr.parse('192.0.2.0/32').netmask).toBe('255.255.255.255');
+    expect(Cidr.parse('0.0.0.0/0').netmask).toBe('0.0.0.0');
+    expect(Cidr.parse('192.0.2.0/30').value).toBe('192.0.2.0/30');
+    expect(() => Cidr.parse('192.0.2.0/33')).toThrow(/prefix must be 0-32/);
+  });
+
+  it('should_name_the_reason_a_cidr_is_refused', () => {
+    expect(() => Cidr.parse('192.0.2.0')).toThrow(/expected a\.b\.c\.d\/prefix/);
+    expect(() => Cidr.parse('x192.0.2.0/24')).toThrow(/expected a\.b\.c\.d\/prefix/);
+    expect(() => Cidr.parse('192.0.2.0/24x')).toThrow(/expected a\.b\.c\.d\/prefix/);
+    expect(() => Cidr.parse('299.0.2.0/24')).toThrow(/invalid IPv4 network address/);
+    expect(() => Cidr.parse('192.0.2.1/24')).toThrow(/host bits set/);
+  });
+
+  it('should_expose_a_host_cidr_as_a_single_address_network', () => {
+    const host = Cidr.host(IpAddress.parse('203.0.113.9'));
+    expect(host.networkAddress).toBe('203.0.113.9');
+    expect(host.netmask).toBe('255.255.255.255');
+    expect(host.contains(IpAddress.parse('203.0.113.9'))).toBe(true);
+    expect(host.contains(IpAddress.parse('203.0.113.8'))).toBe(false);
+  });
+
+  it('should_print_as_its_canonical_value', () => {
+    expect(Cidr.parse('192.0.2.0/24').toString()).toBe('192.0.2.0/24');
+  });
 });
 
