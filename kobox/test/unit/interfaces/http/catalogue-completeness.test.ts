@@ -1,3 +1,5 @@
+import { readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { ComponentName } from '../../../../src/domain/installation/ComponentName.js';
 import { ConfigDocument } from '../../../../src/domain/installation/ConfigDocument.js';
@@ -55,7 +57,7 @@ import {
 } from '../../../../src/interfaces/http/views/adminUsersPage.js';
 import type { Reader, Viewer } from '../../../../src/interfaces/http/views/layout.js';
 import { loginPage, twoStepCodePage } from '../../../../src/interfaces/http/views/loginPage.js';
-import { hasFrench, type Translate } from '../../../../src/interfaces/http/views/messages.js';
+import { frenchSentences, hasFrench, type Translate } from '../../../../src/interfaces/http/views/messages.js';
 import {
   choosePasswordPage,
   forgotPasswordPage,
@@ -338,4 +340,39 @@ describe('the French catalogue', () => {
 
     expect(missing).toEqual([]);
   });
+
+  // The other way round: a line whose English no source file spells any more
+  // is dead weight, and it once hid a route that built its flash with the
+  // member's name inside, so the catalogue never matched. A sentence reaches
+  // t() as a literal, quoted whole, so the source has to hold it whole too.
+  it('should_hold_no_french_line_that_the_code_no_longer_sends', () => {
+    const source = sourceFiles(SOURCE_ROOT)
+      .filter((file) => file !== CATALOGUE_FILE)
+      .map((file) => readFileSync(file, 'utf8'))
+      .join('\n');
+    const quoted = (english: string): readonly string[] => [
+      `'${english.replaceAll("'", "\\'")}'`,
+      `"${english}"`,
+      `\`${english}\``,
+    ];
+
+    const orphans = frenchSentences().filter(
+      (english) => !quoted(english).some((literal) => source.includes(literal)),
+    );
+
+    expect(orphans).toEqual([]);
+  });
 });
+
+const SOURCE_ROOT = 'src';
+const CATALOGUE_FILE = join(SOURCE_ROOT, 'interfaces', 'http', 'views', 'messages.ts');
+
+function sourceFiles(dir: string): string[] {
+  return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(dir, entry.name);
+    if (entry.isDirectory()) {
+      return sourceFiles(path);
+    }
+    return path.endsWith('.ts') ? [path] : [];
+  });
+}
