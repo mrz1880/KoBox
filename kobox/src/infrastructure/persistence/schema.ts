@@ -225,6 +225,15 @@ export const diskSamples = sqliteTable('disk_samples', {
   sampledAt: text('sampled_at').notNull(),
 });
 
+// The last reading of the volume holding the members' homes: one row, replaced
+// on every pass, since only the latest one is ever shown.
+export const volumeSamples = sqliteTable('volume_samples', {
+  id: integer('id').primaryKey(),
+  freeBytes: integer('free_bytes').notNull(),
+  sizeBytes: integer('size_bytes').notNull(),
+  measuredAt: text('measured_at').notNull(),
+});
+
 export const usageSamples = sqliteTable('usage_samples', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   username: text('username').notNull().unique(),
