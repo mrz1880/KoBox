@@ -150,6 +150,8 @@ import type {
   SftpPort,
   SystemAccountPort,
   UserRepository,
+  VolumePort,
+  VolumeSampleRepository,
 } from '../domain/user/ports.js';
 
 export interface UseCaseDeps {
@@ -157,6 +159,9 @@ export interface UseCaseDeps {
   readonly accounts: SystemAccountPort;
   readonly quota: QuotaPort;
   readonly diskSamples: DiskUsageRepository;
+  // the filesystem holding the members' homes, and its latest reading
+  readonly volume: VolumePort;
+  readonly volumeSamples: VolumeSampleRepository;
   readonly quotaGauges: QuotaGaugePort;
   readonly nextcloud: NextcloudPort;
   readonly components: ComponentRegistry;

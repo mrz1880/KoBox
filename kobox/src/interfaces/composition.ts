@@ -95,6 +95,9 @@ import { SqliteMailRelayRepository } from '../infrastructure/persistence/SqliteM
 import { SqliteSshKeyRepository } from '../infrastructure/persistence/SqliteSshKeyRepository.js';
 import { AuthorizedKeysAdapter } from '../infrastructure/system/AuthorizedKeysAdapter.js';
 import { SqliteDiskUsageRepository } from '../infrastructure/persistence/SqliteDiskUsageRepository.js';
+import { SqliteVolumeSampleRepository } from '../infrastructure/persistence/SqliteVolumeSampleRepository.js';
+import { StatfsVolumeAdapter } from '../infrastructure/system/StatfsVolumeAdapter.js';
+import { HOME_BASE } from '../domain/user/homeDirectory.js';
 import { SqlitePortalCredentialsRepository } from '../infrastructure/persistence/SqlitePortalCredentialsRepository.js';
 import { SqlitePortalSessionRepository } from '../infrastructure/persistence/SqlitePortalSessionRepository.js';
 import { SqlitePortAllocator } from '../infrastructure/persistence/SqlitePortAllocator.js';
@@ -734,6 +737,8 @@ export function buildContainer(name: string): Container {
     accounts: new SystemAccountAdapter(runner),
     quota,
     diskSamples: new SqliteDiskUsageRepository(db),
+    volume: new StatfsVolumeAdapter(HOME_BASE),
+    volumeSamples: new SqliteVolumeSampleRepository(db),
     // ruTorrent's disk meter shows each member their quota from these
     quotaGauges: new RutorrentQuotaGauges(new RtorrentConfigAdapter(runner)),
     nextcloud,
