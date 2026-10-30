@@ -125,4 +125,60 @@ describe("an admin's view of a member's space", () => {
       '50 Gio encore disponibles : le disque de la box arrive à saturation, l’allocation ne peut plus être atteinte.',
     );
   });
+
+  it('should_list_what_each_member_uses_and_can_still_fill_next_to_the_allowance', async () => {
+    await measured(188, 1000);
+
+    const body = await pageOf('/admin/users');
+
+    expect(body).toContain('<th>Used</th><th>Free</th>');
+    expect(body).toContain('<td class="num">188 GiB</td>');
+    expect(body).toContain('<td class="num">224 GiB</td>');
+  });
+
+  it('should_mark_a_member_the_disk_limits_in_the_free_column', async () => {
+    await measured(188, 50);
+
+    expect(await pageOf('/admin/users')).toContain(
+      '<td class="num">50 GiB <span class="chip warn">limited by the disk</span></td>',
+    );
+  });
+
+  // boss has never been measured: the list says so rather than show nothing
+  it('should_say_a_member_has_not_been_measured_yet_in_the_list', async () => {
+    await measured(188, 1000);
+
+    expect(await pageOf('/admin/users')).toContain('<span class="muted">not measured</span>');
+  });
+
+  // alice and boss hold 412 GiB each: set beside the disk, the total shows
+  // whether the box promised more than it has
+  it('should_set_the_free_disk_beside_the_total_of_the_allowances', async () => {
+    await measured(188, 1000);
+
+    expect(await pageOf('/admin/users')).toContain(
+      'Disk: 1000 GiB free of 3.13 TiB. Allowances add up to 824 GiB.',
+    );
+  });
+
+  it('should_say_the_disk_is_not_measured_before_the_first_pass', async () => {
+    expect(await pageOf('/admin/users')).toContain(
+      'Disk not measured yet. Allowances add up to 824 GiB.',
+    );
+  });
+
+  it('should_show_the_space_columns_and_the_box_line_in_french', async () => {
+    await measured(188, 50);
+
+    const body = await pageOf('/admin/users', 'fr-FR');
+
+    expect(body).toContain('<th>Utilisé</th><th>Libre</th>');
+    expect(body).toContain('<span class="chip warn">limité par le disque</span>');
+    expect(body).toContain('<span class="muted">non mesuré</span>');
+    expect(body).toContain('Disque : 50 Gio libres sur 3.13 Tio. Les allocations totalisent 824 Gio.');
+  });
+
+  it('should_say_the_disk_is_not_measured_yet_in_french', async () => {
+    expect(await pageOf('/admin/users', 'fr-FR')).toContain('Disque pas encore mesuré.');
+  });
 });

@@ -5,7 +5,10 @@ import type { DiskUsageSample, VolumeSample } from '../../../domain/user/ports.j
 import { html, type RawHtml } from '../html.js';
 import { flash, page, sentence, type Viewer } from './layout.js';
 import { HOME_BASE } from '../../../domain/user/homeDirectory.js';
-import { leftToFill, measuredSpace } from './space.js';
+import { Quota } from '../../../domain/user/Quota.js';
+import type { SpaceLimit } from '../../../domain/user/UsableSpace.js';
+import { formatBytes } from './bytes.js';
+import { leftToFill, measuredSpace, type MeasuredSpace } from './space.js';
 
 function roleOptions(selected: Role): RawHtml[] {
   return ROLES.map(
@@ -38,18 +41,68 @@ export interface MemberLogin {
 
 const ROLE_LABELS: Record<Role, string> = { admin: 'Administrator', user: 'Member' };
 
+// What the hourly pass last measured: each member's usage, by username, and
+// the volume they all share.
+export interface DiskReadings {
+  readonly usages: ReadonlyMap<string, DiskUsageSample>;
+  readonly volume: VolumeSample | undefined;
+}
+
+function usedCell(usage: DiskUsageSample | undefined, viewer: Viewer): RawHtml {
+  return usage === undefined
+    ? html`<td class="num"><span class="muted">${viewer.t('not measured')}</span></td>`
+    : html`<td class="num">${formatBytes(usage.used.toBytes(), viewer.t)}</td>`;
+}
+
+function freeCell(space: MeasuredSpace | undefined, viewer: Viewer): RawHtml {
+  return space === undefined
+    ? html`<td class="num"><span class="muted">${viewer.t('not measured')}</span></td>`
+    : html`<td class="num">${formatBytes(space.usable.free.toBytes(), viewer.t)}${diskMark(space.usable.limit, viewer)}</td>`;
+}
+
+// The box as a whole: the disk beside what every member was promised, so an
+// overcommitted box shows at a glance.
+function boxDisk(
+  users: readonly SeedboxUser[],
+  volume: VolumeSample | undefined,
+  viewer: Viewer,
+): RawHtml {
+  const allowances = viewer.t('Allowances add up to {allowances}.', {
+    allowances: formatBytes(Quota.total(users.map((user) => user.quota)).toBytes(), viewer.t),
+  });
+  return html`<p>${volume === undefined
+    ? viewer.t('Disk not measured yet.')
+    : viewer.t('Disk: {free} free of {size}.', {
+        free: formatBytes(volume.space.free.toBytes(), viewer.t),
+        size: formatBytes(volume.space.size.toBytes(), viewer.t),
+      })} ${allowances}</p>`;
+}
+
+// the disk, not the allowance, is what stops this member
+function diskMark(limit: SpaceLimit, viewer: Viewer): RawHtml {
+  switch (limit) {
+    case 'allowance':
+      return html``;
+    case 'disk':
+      return html` <span class="chip warn">${viewer.t('limited by the disk')}</span>`;
+  }
+}
+
 export function adminUsersPage(
   users: readonly SeedboxUser[],
   logins: ReadonlyMap<string, MemberLogin>,
+  disk: DiskReadings,
   viewer: Viewer,
   message?: string,
 ): string {
   const rows = users.map((user) => {
     const login = logins.get(user.username.value);
+    const usage = disk.usages.get(user.username.value);
     return html`<tr>
   <td><a href="/admin/users/${user.username.value}">${user.username.value}</a></td>
   <td>${user.email.value}</td>
   <td class="num">${user.quota.toGib()} GiB</td>
+  ${usedCell(usage, viewer)}${freeCell(measuredSpace(user, usage, disk.volume), viewer)}
   <td>${login === undefined
     ? html`<span class="muted">${viewer.t('No portal login')}</span>`
     : viewer.t(ROLE_LABELS[login.role])}</td>
@@ -65,9 +118,10 @@ export function adminUsersPage(
 <p class="muted">${viewer.t('members.intro')}</p>
 <p class="muted">${viewer.t('members.suspend')}</p>
 ${flash(viewer.t, message)}
+${boxDisk(users, disk.volume, viewer)}
 <table>
   <thead>
-    <tr><th>${viewer.t('User')}</th><th>${viewer.t('Email')}</th><th>${viewer.t('Quota')}</th><th>${viewer.t('Role')}</th><th>${viewer.t('SCGI')}</th><th>${viewer.t('Status')}</th></tr>
+    <tr><th>${viewer.t('User')}</th><th>${viewer.t('Email')}</th><th>${viewer.t('Quota')}</th><th>${viewer.t('Used')}</th><th>${viewer.t('Free')}</th><th>${viewer.t('Role')}</th><th>${viewer.t('SCGI')}</th><th>${viewer.t('Status')}</th></tr>
   </thead>
   <tbody>${rows}</tbody>
 </table>

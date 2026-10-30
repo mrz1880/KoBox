@@ -337,6 +337,19 @@ function keysSentToTheCatalogue(): ReadonlySet<string> {
       ['alice', { role: 'user' as const, invited: false }],
       ['bob', { role: 'admin' as const, invited: true }],
     ]),
+    { usages: new Map(), volume: undefined },
+    admin,
+  );
+  adminUsersPage(
+    [aUser().build(), aUser().withUsername('bob').withQuota(Quota.gib(10)).build()],
+    new Map(),
+    {
+      usages: new Map([
+        ['alice', { username: alice, used: Quota.gib(100), sampledAt: NOW }],
+        ['bob', { username: Username.parse('bob'), used: Quota.gib(1), sampledAt: NOW }],
+      ]),
+      volume: { space: volume(50), measuredAt: NOW },
+    },
     admin,
   );
   adminUserDetailPage(user, admin, undefined, 'active');

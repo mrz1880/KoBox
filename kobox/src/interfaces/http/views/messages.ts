@@ -409,6 +409,13 @@ const FR: Readonly<Record<string, string>> = {
   // members
   Email: 'Adresse mail',
   Quota: 'Quota',
+  Used: 'Utilisé',
+  Free: 'Libre',
+  'not measured': 'non mesuré',
+  'limited by the disk': 'limité par le disque',
+  'Disk: {free} free of {size}.': 'Disque : {free} libres sur {size}.',
+  'Disk not measured yet.': 'Disque pas encore mesuré.',
+  'Allowances add up to {allowances}.': 'Les allocations totalisent {allowances}.',
   Role: 'Rôle',
   Administrator: 'Administrateur',
   Member: 'Membre',
