@@ -9,6 +9,7 @@ import { Username } from '../../../domain/user/Username.js';
 import type { TorrentInstanceRepository } from '../../../domain/torrent/ports.js';
 import type {
   DiskUsageRepository,
+  DiskUsageSample,
   UserRepository,
   VolumeSampleRepository,
 } from '../../../domain/user/ports.js';
@@ -24,7 +25,12 @@ import { Quota } from '../../../domain/user/Quota.js';
 import { buildJob } from '../../cli/buildJob.js';
 import { invitationLinkPage } from '../views/passwordLinkPages.js';
 import { flashOf, redirectWithFlash, viewerOf, type Guards } from '../guards.js';
-import { adminUserDetailPage, adminUsersPage, type MemberLogin } from '../views/adminUsersPage.js';
+import {
+  adminUserDetailPage,
+  adminUsersPage,
+  type DiskReadings,
+  type MemberLogin,
+} from '../views/adminUsersPage.js';
 
 const createUserSchema = z.object({
   username: z.string().regex(USERNAME_PATTERN),
@@ -81,6 +87,17 @@ export function registerAdminUserRoutes(
     return logins;
   };
 
+  const diskOf = async (users: readonly SeedboxUser[]): Promise<DiskReadings> => {
+    const usages = new Map<string, DiskUsageSample>();
+    for (const user of users) {
+      const usage = await deps.diskSamples.find(user.username);
+      if (usage !== undefined) {
+        usages.set(user.username.value, usage);
+      }
+    }
+    return { usages, volume: await deps.volumeSamples.find() };
+  };
+
   server.get('/admin/users', async (request, reply) => {
     const session = await guards.requireAdmin(request, reply);
     if (session === undefined) {
@@ -90,7 +107,13 @@ export function registerAdminUserRoutes(
     return reply
       .type('text/html')
       .send(
-        adminUsersPage(users, await loginsOf(users), viewerOf(session, request), flashOf(request)),
+        adminUsersPage(
+          users,
+          await loginsOf(users),
+          await diskOf(users),
+          viewerOf(session, request),
+          flashOf(request),
+        ),
       );
   });
 
@@ -105,7 +128,15 @@ export function registerAdminUserRoutes(
       return reply
         .code(400)
         .type('text/html')
-        .send(adminUsersPage(users, await loginsOf(users), viewerOf(session, request), undefined));
+        .send(
+          adminUsersPage(
+            users,
+            await loginsOf(users),
+            await diskOf(users),
+            viewerOf(session, request),
+            undefined,
+          ),
+        );
     }
     // nobody types the member's password: they choose it through the link
     let invitation: { readonly url: string };
