@@ -586,6 +586,7 @@ export interface PortalContainer {
   readonly issueAppToken: IssueAppToken;
   readonly instances: SqliteTorrentInstanceRepository;
   readonly diskSamples: SqliteDiskUsageRepository;
+  readonly volumeSamples: SqliteVolumeSampleRepository;
   readonly mailRelay: SqliteMailRelayRepository;
   readonly siteSettings: SiteSettingsWithInstallDefault;
   readonly boxInVpn: string;
@@ -687,6 +688,8 @@ export function buildPortalContainer(name: string): PortalContainer {
     // what creates directories and changes a mode
     instances: new SqliteTorrentInstanceRepository(db),
     diskSamples: new SqliteDiskUsageRepository(db),
+    // read-only from here: the worker measures the homes volume
+    volumeSamples: new SqliteVolumeSampleRepository(db),
     mailRelay,
     siteSettings: siteSettings(db),
     // members reach Samba and NFS at the box's address in the usual tunnel

@@ -43,7 +43,11 @@ import type {
   SaveMailRelay,
 } from '../../application/maintenance/ConfigureMailRelay.js';
 import type { SiteSettingsRepository } from '../../domain/installation/ports.js';
-import type { DiskUsageRepository, SshKeyRepository } from '../../domain/user/ports.js';
+import type {
+  DiskUsageRepository,
+  SshKeyRepository,
+  VolumeSampleRepository,
+} from '../../domain/user/ports.js';
 import type { SyncDestinationRepository, SyncTransferRepository } from '../../domain/sync/ports.js';
 import type { SetSyncDestination } from '../../application/sync/SetSyncDestination.js';
 import { registerAdminNetworkRoutes } from './routes/adminNetwork.js';
@@ -107,6 +111,8 @@ export interface PortalServerDeps {
   readonly media: MediaRepository;
   readonly instances: TorrentInstanceRepository;
   readonly diskSamples: DiskUsageRepository;
+  // read-only from here: the worker measures the homes volume
+  readonly volumeSamples: VolumeSampleRepository;
   readonly mailRelay: MailRelayRepository;
   readonly boxInVpn: string;
   readonly sshPort: number;

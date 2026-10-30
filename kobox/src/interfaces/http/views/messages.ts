@@ -187,6 +187,11 @@ const FR: Readonly<Record<string, string>> = {
   'You are using a lot of bandwidth right now. Nothing is limited yet.':
     'Vous utilisez beaucoup de bande passante en ce moment. Rien n’est encore limité.',
   'Everything is running.': 'Tout fonctionne.',
+  '{free} free of your {allowance} ({used} used), measured {at}.':
+    '{free} libres sur vos {allowance} ({used} utilisés), mesuré le {at}.',
+  'The box is running out of disk, so your allowance can no longer be reached.':
+    'Le disque de la box arrive à saturation : votre allocation ne peut plus être atteinte.',
+  'Space not measured yet.': 'Espace pas encore mesuré.',
   'Current password': 'Mot de passe actuel',
   'Restart my rtorrent': 'Redémarrer mon rtorrent',
   'Use this if the interface stops responding.': 'À utiliser si l’interface ne répond plus.',

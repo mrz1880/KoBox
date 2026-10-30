@@ -33,6 +33,7 @@ import { SaveMailRelay } from '../../../src/application/maintenance/ConfigureMai
 import { InMemoryMailRelayRepository } from '../../../src/infrastructure/persistence/InMemoryMailRelayRepository.js';
 import { InMemorySshKeyRepository } from '../../../src/infrastructure/persistence/InMemorySshKeyRepository.js';
 import { InMemoryDiskUsageRepository } from '../../../src/infrastructure/persistence/InMemoryDiskUsageRepository.js';
+import { InMemoryVolumeSampleRepository } from '../../../src/infrastructure/persistence/InMemoryVolumeSampleRepository.js';
 import { InMemoryTorrentInstanceRepository } from '../../../src/infrastructure/persistence/InMemoryTorrentInstanceRepository.js';
 import { InMemoryDiagnosticsRepository } from '../../../src/infrastructure/persistence/InMemoryDiagnosticsRepository.js';
 import { InMemorySpeedtestRepository } from '../../../src/infrastructure/persistence/InMemorySpeedtestRepository.js';
@@ -138,6 +139,7 @@ export interface PortalWorld {
   readonly diagnostics: InMemoryDiagnosticsRepository;
   readonly instances: InMemoryTorrentInstanceRepository;
   readonly diskSamples: InMemoryDiskUsageRepository;
+  readonly volumeSamples: InMemoryVolumeSampleRepository;
   readonly sshKeys: InMemorySshKeyRepository;
   readonly addresses: InMemoryUserAddressRepository;
   readonly blocklists: InMemoryBlocklistRepository;
@@ -171,6 +173,7 @@ export async function buildPortalWorld(
   const diagnostics = new InMemoryDiagnosticsRepository();
   const instances = new InMemoryTorrentInstanceRepository();
   const diskSamples = new InMemoryDiskUsageRepository();
+  const volumeSamples = new InMemoryVolumeSampleRepository();
   const sshKeys = new InMemorySshKeyRepository();
   const addresses = new InMemoryUserAddressRepository();
   const blocklists = new InMemoryBlocklistRepository();
@@ -231,6 +234,7 @@ export async function buildPortalWorld(
     configFiles: new OneFileOnDisk(),
     instances,
     diskSamples,
+    volumeSamples,
     mailRelay,
     boxInVpn: '10.0.0.1',
     sshPort: 22,
@@ -279,7 +283,7 @@ export async function buildPortalWorld(
     },
     NOW,
   );
-  return { server, users, credentials, sessions, queue, outbox, media, fairUse, diagnostics, instances, diskSamples, sshKeys, addresses, blocklists, totp, components, mailRelay, siteSettings, destinations, transfers, passwords };
+  return { server, users, credentials, sessions, queue, outbox, media, fairUse, diagnostics, instances, diskSamples, volumeSamples, sshKeys, addresses, blocklists, totp, components, mailRelay, siteSettings, destinations, transfers, passwords };
 }
 
 export interface AgentSession {

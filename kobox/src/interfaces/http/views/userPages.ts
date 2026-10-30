@@ -5,6 +5,7 @@ import type { SshPublicKey } from '../../../domain/user/SshPublicKey.js';
 import type { SeedboxUser } from '../../../domain/user/SeedboxUser.js';
 import { BROWSER_CHOICE } from '../browserLanguage.js';
 import { formatBytes } from './bytes.js';
+import { memberSpace, type MeasuredSpace } from './space.js';
 import { html, type RawHtml } from '../html.js';
 import { flash, page, sentence, type Viewer } from './layout.js';
 import type { Translate } from './messages.js';
@@ -19,9 +20,9 @@ function fairUseChip(level: string, t: Translate): RawHtml {
     : html`<span class="chip ok">${t('within fair use')}</span>`;
 }
 
-// What the portal can honestly know about a user from the database alone.
-// Disk usage is deliberately absent: it needs root-only quota tooling, so it is
-// not shown rather than guessed at.
+// One member's channel on the console: what the portal can honestly know about
+// them from the database alone. Their disk space travels apart, as the
+// MeasuredSpace the hourly pass leaves behind.
 export interface SignalRow {
   readonly username: string;
   readonly suspended: boolean;
@@ -142,6 +143,7 @@ export function userHomePage(
   user: SeedboxUser,
   viewer: Viewer,
   row: SignalRow,
+  space: MeasuredSpace | undefined,
   message?: string,
 ): string {
   const actions = HOME_ACTIONS.map(
@@ -156,6 +158,7 @@ export function userHomePage(
     html`<h1>${viewer.t('Hello {name}', { name: user.username.value })}</h1>
 ${flash(viewer.t, message)}
 ${plainStatus(row, viewer)}
+${memberSpace(space, viewer)}
 <div class="choices">${actions}</div>
 <p class="links"><a href="/access">${viewer.t('My account and connection details')}</a></p>`,
     viewer,
