@@ -59,6 +59,7 @@ async function main(): Promise<void> {
     configFiles: container.configFiles,
     instances: container.instances,
     diskSamples: container.diskSamples,
+    volumeSamples: container.volumeSamples,
     mailRelay: container.mailRelay,
     boxInVpn: container.boxInVpn,
     sshPort: container.sshPort,

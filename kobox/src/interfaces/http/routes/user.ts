@@ -9,7 +9,11 @@ import { ComponentName } from '../../../domain/installation/ComponentName.js';
 import type { ComponentRegistry } from '../../../domain/installation/ports.js';
 import { Label } from '../../../domain/torrent/Label.js';
 import { SshPublicKey } from '../../../domain/user/SshPublicKey.js';
-import type { SshKeyRepository } from '../../../domain/user/ports.js';
+import type {
+  DiskUsageRepository,
+  SshKeyRepository,
+  VolumeSampleRepository,
+} from '../../../domain/user/ports.js';
 import { SyncMode } from '../../../domain/torrent/SyncMode.js';
 import type { TorrentInstanceRepository } from '../../../domain/torrent/ports.js';
 import type { SyncDestinationRepository, SyncTransferRepository } from '../../../domain/sync/ports.js';
@@ -52,6 +56,7 @@ import {
   type MemberHostname,
   type SignalRow,
 } from '../views/userPages.js';
+import { measuredSpace } from '../views/space.js';
 import { syncPage } from '../views/syncPage.js';
 import { LANGUAGES, Language } from '../../../domain/portal/Language.js';
 import { BROWSER_CHOICE } from '../browserLanguage.js';
@@ -156,6 +161,9 @@ export interface UserRoutesDeps {
   // seals with the PUBLIC half of the host key; it can never open one back
   readonly setDestination: SetSyncDestination;
   readonly transfers: SyncTransferRepository;
+  // what the hourly pass measured of the member's space and of the disk
+  readonly diskSamples: DiskUsageRepository;
+  readonly volumeSamples: VolumeSampleRepository;
 }
 
 // One channel of the console, assembled from what the portal can read in the
@@ -225,6 +233,11 @@ export function registerUserRoutes(
           user,
           viewerOf(session, request),
           await signalRowFor(deps, user),
+          measuredSpace(
+            user,
+            await deps.diskSamples.find(user.username),
+            await deps.volumeSamples.find(),
+          ),
           flashOf(request),
         ),
       );

@@ -33,6 +33,7 @@ import { RtorrentPort, ScgiPort } from '../../../../src/domain/user/Port.js';
 import { Quota } from '../../../../src/domain/user/Quota.js';
 import { SshPublicKey } from '../../../../src/domain/user/SshPublicKey.js';
 import { Username } from '../../../../src/domain/user/Username.js';
+import { VolumeSpace } from '../../../../src/domain/user/VolumeSpace.js';
 import { adminConfigPage } from '../../../../src/interfaces/http/views/adminConfigPage.js';
 import {
   adminLogsPage,
@@ -66,6 +67,7 @@ import {
   passwordChosenPage,
   passwordLinkClosedPage,
 } from '../../../../src/interfaces/http/views/passwordLinkPages.js';
+import { measuredSpace } from '../../../../src/interfaces/http/views/space.js';
 import { syncPage } from '../../../../src/interfaces/http/views/syncPage.js';
 import {
   accessPage,
@@ -177,7 +179,22 @@ function keysSentToTheCatalogue(): ReadonlySet<string> {
     signalRow({ level: 'throttled' }),
     signalRow({ level: 'alerted' }),
   ]) {
-    userHomePage(user, member, row);
+    userHomePage(user, member, row, undefined);
+  }
+  for (const diskFreeGib of [1000, 10]) {
+    userHomePage(
+      user,
+      member,
+      signalRow(),
+      measuredSpace(
+        user,
+        { username: alice, used: Quota.gib(100), sampledAt: NOW },
+        {
+          space: VolumeSpace.of({ free: Quota.gib(diskFreeGib), size: Quota.gib(3200) }),
+          measuredAt: NOW,
+        },
+      ),
+    );
   }
   passwordPage(member);
   twoStepSetupPage(member, 'alice', 'JBSWY3DPEHPK3PXP');
