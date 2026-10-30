@@ -28,6 +28,7 @@ import { InMemoryPortalCredentialsRepository } from '../../../src/infrastructure
 import { InMemoryPortalSessionRepository } from '../../../src/infrastructure/persistence/InMemoryPortalSessionRepository.js';
 import { InMemorySshKeyRepository } from '../../../src/infrastructure/persistence/InMemorySshKeyRepository.js';
 import { InMemoryDiskUsageRepository } from '../../../src/infrastructure/persistence/InMemoryDiskUsageRepository.js';
+import { InMemoryVolumeSampleRepository } from '../../../src/infrastructure/persistence/InMemoryVolumeSampleRepository.js';
 import { InMemoryMailOutbox } from '../../../src/infrastructure/persistence/InMemoryMailOutbox.js';
 import { InMemoryUserRepository } from '../../../src/infrastructure/persistence/InMemoryUserRepository.js';
 import { FakeBlocklistCache } from '../../../src/infrastructure/system/fakes/FakeBlocklistCache.js';
@@ -41,6 +42,7 @@ import { FakeTrackerCert } from '../../../src/infrastructure/system/fakes/FakeTr
 import { FakeAnnouncerSink } from '../../../src/infrastructure/system/fakes/FakeAnnouncerSink.js';
 import { FakeNotifications } from '../../../src/infrastructure/system/fakes/FakeNotifications.js';
 import { FakeQuota } from '../../../src/infrastructure/system/fakes/FakeQuota.js';
+import { FakeVolume } from '../../../src/infrastructure/system/fakes/FakeVolume.js';
 import { FakeInstallHost } from '../../../src/infrastructure/system/fakes/FakeInstallHost.js';
 import { FakeQuotaGauges } from '../../../src/infrastructure/system/fakes/FakeQuotaGauges.js';
 import { InMemoryMailRelayRepository } from '../../../src/infrastructure/persistence/InMemoryMailRelayRepository.js';
@@ -252,6 +254,8 @@ beforeEach(() => {
     accounts,
     quota,
     diskSamples: new InMemoryDiskUsageRepository(),
+    volume: new FakeVolume(),
+    volumeSamples: new InMemoryVolumeSampleRepository(),
     quotaGauges: new FakeQuotaGauges(),
     nextcloud,
     components,

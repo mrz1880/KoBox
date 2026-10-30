@@ -28,6 +28,7 @@ import { InMemoryPortalCredentialsRepository } from '../../../../src/infrastruct
 import { InMemoryPortalSessionRepository } from '../../../../src/infrastructure/persistence/InMemoryPortalSessionRepository.js';
 import { InMemoryDiskUsageRepository } from '../../../../src/infrastructure/persistence/InMemoryDiskUsageRepository.js';
 import { InMemoryUserRepository } from '../../../../src/infrastructure/persistence/InMemoryUserRepository.js';
+import { InMemoryVolumeSampleRepository } from '../../../../src/infrastructure/persistence/InMemoryVolumeSampleRepository.js';
 import { FakePasswordHasher } from '../../../../src/infrastructure/system/fakes/FakePasswordHasher.js';
 import { FakeServiceLogin } from '../../../../src/infrastructure/system/fakes/FakeServiceLogin.js';
 import { FakeNotifications } from '../../../../src/infrastructure/system/fakes/FakeNotifications.js';
@@ -36,6 +37,8 @@ import { FakeQuotaGauges } from '../../../../src/infrastructure/system/fakes/Fak
 import { FakeServiceControl } from '../../../../src/infrastructure/system/fakes/FakeServiceControl.js';
 import { FakeSftp } from '../../../../src/infrastructure/system/fakes/FakeSftp.js';
 import { FakeSystemAccounts } from '../../../../src/infrastructure/system/fakes/FakeSystemAccounts.js';
+import { FakeVolume } from '../../../../src/infrastructure/system/fakes/FakeVolume.js';
+import { VolumeSpace } from '../../../../src/domain/user/VolumeSpace.js';
 import { TotpSecret } from '../../../../src/domain/portal/TotpSecret.js';
 
 class SequentialPortAllocator implements PortAllocatorPort {
@@ -131,6 +134,8 @@ interface World {
   setUserQuota: SetUserQuota;
   sampleDiskUsage: SampleDiskUsage;
   diskSamples: InMemoryDiskUsageRepository;
+  volume: FakeVolume;
+  volumeSamples: InMemoryVolumeSampleRepository;
   gauges: FakeQuotaGauges;
 }
 
@@ -147,6 +152,8 @@ beforeEach(() => {
   const sessions = new InMemoryPortalSessionRepository();
   const diskSamples = new InMemoryDiskUsageRepository();
   const gauges = new FakeQuotaGauges();
+  const volume = new FakeVolume();
+  const volumeSamples = new InMemoryVolumeSampleRepository();
   const hasher = new FakePasswordHasher();
   const links = new InMemoryPasswordLinkRepository();
   const samba = new FakeServiceLogin();
@@ -167,8 +174,16 @@ beforeEach(() => {
     suspendUser: new SuspendUser(deps),
     resumeUser: new ResumeUser(deps),
     setUserQuota: new SetUserQuota(deps),
-    sampleDiskUsage: new SampleDiskUsage({ ...deps, samples: diskSamples, gauges }),
+    sampleDiskUsage: new SampleDiskUsage({
+      ...deps,
+      samples: diskSamples,
+      gauges,
+      volume,
+      volumeSamples,
+    }),
     diskSamples,
+    volume,
+    volumeSamples,
     gauges,
   };
 });
@@ -639,6 +654,36 @@ describe('SampleDiskUsage', () => {
     const sample = await world.diskSamples.find(alice);
     expect(sample?.used.toGib()).toBe(37);
     expect(sample?.sampledAt).toBe('2026-07-25 10:00:00');
+  });
+
+  // every member draws on the same disk, so the pass reads it once
+  it('should_record_the_free_and_total_space_of_the_homes_volume_once_per_pass', async () => {
+    await world.createUser.execute(createUserCommand());
+    await world.createUser.execute({
+      ...createUserCommand(),
+      username: Username.parse('bob'),
+      email: EmailAddress.parse('bob@example.org'),
+    });
+    world.volume.setSpaceForTest(VolumeSpace.of({ free: Quota.gib(900), size: Quota.gib(3200) }));
+
+    await world.sampleDiskUsage.execute();
+
+    const sample = await world.volumeSamples.find();
+    expect(sample?.space.free.toGib()).toBe(900);
+    expect(sample?.space.size.toGib()).toBe(3200);
+    expect(sample?.measuredAt).toBe('2026-07-25 10:00:00');
+    expect(world.volume.readCount).toBe(1);
+  });
+
+  it('should_still_record_each_member_when_the_volume_cannot_be_read', async () => {
+    await world.createUser.execute(createUserCommand());
+    world.quota.setUsageForTest(alice, Quota.gib(37));
+    world.volume.failWith('statfs: no such file or directory');
+
+    await world.sampleDiskUsage.execute();
+
+    expect((await world.diskSamples.find(alice))?.used.toGib()).toBe(37);
+    expect(await world.volumeSamples.find()).toBeUndefined();
   });
 
   // ruTorrent's own meter showed the whole disk's free space: each member's
