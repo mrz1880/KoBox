@@ -33,4 +33,16 @@ describe('the administration console in French', () => {
     expect(response.body).toContain('<html lang="fr">');
     expect(response.body).toContain('Cet espace est réservé aux administrateurs.');
   });
+
+  // the catalogue says Gio everywhere it names the unit itself; the figures
+  // the console formats said GiB in the middle of a French sentence
+  it('should_count_bytes_in_french_units_to_a_french_browser', async () => {
+    const response = await world.server.inject({
+      method: 'GET',
+      url: '/admin',
+      headers: { cookie: admin.cookie, 'accept-language': 'fr' },
+    });
+
+    expect(response.body).toContain('<b>0 Gio</b> envoyés');
+  });
 });
