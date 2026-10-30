@@ -4,6 +4,7 @@ import type { Label } from '../../../domain/torrent/Label.js';
 import type { SshPublicKey } from '../../../domain/user/SshPublicKey.js';
 import type { SeedboxUser } from '../../../domain/user/SeedboxUser.js';
 import { BROWSER_CHOICE } from '../browserLanguage.js';
+import { formatBytes } from './bytes.js';
 import { html, type RawHtml } from '../html.js';
 import { flash, page, sentence, type Viewer } from './layout.js';
 import type { Translate } from './messages.js';
@@ -44,14 +45,6 @@ const VU_SEGMENTS = 24;
 // the shoulder and peak zones of the meter, in segments
 const VU_WARN_AT = 15;
 const VU_PEAK_AT = 19;
-
-function formatBytes(bytes: number): string {
-  const gib = bytes / 1024 ** 3;
-  if (gib >= 1024) {
-    return `${(gib / 1024).toFixed(2)} TiB`;
-  }
-  return gib >= 10 || gib === 0 ? `${gib.toFixed(0)} GiB` : `${gib.toFixed(1)} GiB`;
-}
 
 // Segments, not a smooth bar: the eye reads a channel running into the red long
 // before it reads a percentage.
