@@ -90,6 +90,10 @@ const ED25519 = 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIB7Kk1p2vQ0Hn3xYqZ8mLsRtWuV
 const alice = Username.parse('alice');
 const films = Label.parse('films');
 
+function volume(freeGib: number): VolumeSpace {
+  return VolumeSpace.of({ free: Quota.gib(freeGib), size: Quota.gib(3200) });
+}
+
 function media(path: string): MediaFile {
   return MediaFile.record({ username: alice, path: MediaPath.parse(path), sizeBytes: 1024 ** 3, indexedAt: NOW });
 }
@@ -189,10 +193,7 @@ function keysSentToTheCatalogue(): ReadonlySet<string> {
       measuredSpace(
         user,
         { username: alice, used: Quota.gib(100), sampledAt: NOW },
-        {
-          space: VolumeSpace.of({ free: Quota.gib(diskFreeGib), size: Quota.gib(3200) }),
-          measuredAt: NOW,
-        },
+        { space: volume(diskFreeGib), measuredAt: NOW },
       ),
     );
   }
@@ -339,11 +340,17 @@ function keysSentToTheCatalogue(): ReadonlySet<string> {
     admin,
   );
   adminUserDetailPage(user, admin, undefined, 'active');
-  adminUserDetailPage(aUser().suspended(), admin, 'user', 'invited', instance(true, true), {
-    username: alice,
-    used: Quota.gib(10),
-    sampledAt: NOW,
-  });
+  for (const diskFreeGib of [1000, 10]) {
+    adminUserDetailPage(
+      aUser().suspended(),
+      admin,
+      'user',
+      'invited',
+      instance(true, true),
+      { username: alice, used: Quota.gib(100), sampledAt: NOW },
+      { space: volume(diskFreeGib), measuredAt: NOW },
+    );
+  }
   adminUserDetailPage(user, admin, 'admin', 'active', instance(false, false));
   return keys;
 }

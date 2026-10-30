@@ -84,3 +84,45 @@ describe("a member's usable space on their home page", () => {
     expect(await homeOf(member, 'fr-FR')).toContain('Espace pas encore mesuré.');
   });
 });
+
+describe("an admin's view of a member's space", () => {
+  let admin: AgentSession;
+
+  beforeEach(async () => {
+    admin = await loginAs(world, 'boss');
+  });
+
+  async function pageOf(url: string, language = 'en'): Promise<string> {
+    const response = await world.server.inject({
+      method: 'GET',
+      url,
+      headers: { cookie: admin.cookie, 'accept-language': language },
+    });
+    return response.body;
+  }
+
+  it('should_add_what_the_member_can_still_fill_to_the_storage_sentence', async () => {
+    await measured(188, 1000);
+
+    const body = await pageOf('/admin/users/alice');
+
+    expect(body).toContain('Using 188 GiB of 412 GiB');
+    expect(body).toContain('224 GiB left to fill.');
+  });
+
+  it('should_tell_the_admin_when_the_disk_is_what_limits_the_member', async () => {
+    await measured(188, 50);
+
+    expect(await pageOf('/admin/users/alice')).toContain(
+      '50 GiB left to fill: the box is running out of disk, so the allowance can no longer be reached.',
+    );
+  });
+
+  it('should_say_what_the_member_can_still_fill_in_french', async () => {
+    await measured(188, 50);
+
+    expect(await pageOf('/admin/users/alice', 'fr-FR')).toContain(
+      '50 Gio encore disponibles : le disque de la box arrive à saturation, l’allocation ne peut plus être atteinte.',
+    );
+  });
+});

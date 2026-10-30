@@ -440,6 +440,9 @@ const FR: Readonly<Record<string, string>> = {
   suspended: 'suspendu',
   'Nothing measured yet. The hourly pass writes this down.':
     'Rien de mesuré pour l’instant. La passe horaire l’inscrira.',
+  '{free} left to fill.': '{free} encore disponibles.',
+  '{free} left to fill: the box is running out of disk, so the allowance can no longer be reached.':
+    '{free} encore disponibles : le disque de la box arrive à saturation, l’allocation ne peut plus être atteinte.',
   'No rTorrent instance yet, so there is nothing to allow.':
     'Pas encore d’instance rTorrent, il n’y a donc rien à autoriser.',
   'No rTorrent instance yet, so nothing runs.':
