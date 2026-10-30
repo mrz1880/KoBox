@@ -181,4 +181,8 @@ describe("an admin's view of a member's space", () => {
   it('should_say_the_disk_is_not_measured_yet_in_french', async () => {
     expect(await pageOf('/admin/users', 'fr-FR')).toContain('Disque pas encore mesuré.');
   });
+
+  it('should_name_the_allowance_unit_in_french_in_the_list', async () => {
+    expect(await pageOf('/admin/users', 'fr-FR')).toContain('<td class="num">412 Gio</td>');
+  });
 });

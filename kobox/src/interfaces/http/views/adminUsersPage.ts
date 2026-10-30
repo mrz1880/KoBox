@@ -101,7 +101,7 @@ export function adminUsersPage(
     return html`<tr>
   <td><a href="/admin/users/${user.username.value}">${user.username.value}</a></td>
   <td>${user.email.value}</td>
-  <td class="num">${user.quota.toGib()} GiB</td>
+  <td class="num">${formatBytes(user.quota.toBytes(), viewer.t)}</td>
   ${usedCell(usage, viewer)}${freeCell(measuredSpace(user, usage, disk.volume), viewer)}
   <td>${login === undefined
     ? html`<span class="muted">${viewer.t('No portal login')}</span>`
