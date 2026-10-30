@@ -7,7 +7,11 @@ import { ROLES } from '../../../domain/portal/Role.js';
 import { USERNAME_PATTERN } from '../../../domain/user/Username.js';
 import { Username } from '../../../domain/user/Username.js';
 import type { TorrentInstanceRepository } from '../../../domain/torrent/ports.js';
-import type { DiskUsageRepository, UserRepository } from '../../../domain/user/ports.js';
+import type {
+  DiskUsageRepository,
+  UserRepository,
+  VolumeSampleRepository,
+} from '../../../domain/user/ports.js';
 import {
   MemberSuspendedError,
   TooManyPasswordLinksError,
@@ -38,6 +42,7 @@ export interface AdminUsersDeps {
   readonly sendPasswordLink: SendPasswordLink;
   readonly instances: TorrentInstanceRepository;
   readonly diskSamples: DiskUsageRepository;
+  readonly volumeSamples: VolumeSampleRepository;
   readonly credentials: PortalCredentialsPort;
 }
 
@@ -152,6 +157,7 @@ export function registerAdminUserRoutes(
           access,
           instance,
           usage,
+          await deps.volumeSamples.find(),
           flashOf(request),
         ),
       );

@@ -1,10 +1,11 @@
 import { ROLES, type Role } from '../../../domain/portal/Role.js';
 import type { TorrentInstance } from '../../../domain/torrent/TorrentInstance.js';
 import type { SeedboxUser } from '../../../domain/user/SeedboxUser.js';
-import type { DiskUsageSample } from '../../../domain/user/ports.js';
+import type { DiskUsageSample, VolumeSample } from '../../../domain/user/ports.js';
 import { html, type RawHtml } from '../html.js';
 import { flash, page, sentence, type Viewer } from './layout.js';
 import { HOME_BASE } from '../../../domain/user/homeDirectory.js';
+import { leftToFill, measuredSpace } from './space.js';
 
 function roleOptions(selected: Role): RawHtml[] {
   return ROLES.map(
@@ -137,14 +138,20 @@ function finishScripts(name: string, instance: TorrentInstance | undefined, view
 // The allowance and what the disk actually holds. The reading is a sample the
 // privileged worker wrote down, so it carries its own timestamp: a stale number
 // presented as live is worse than no number.
-function storage(user: SeedboxUser, usage: DiskUsageSample | undefined, viewer: Viewer): RawHtml {
+function storage(
+  user: SeedboxUser,
+  usage: DiskUsageSample | undefined,
+  volume: VolumeSample | undefined,
+  viewer: Viewer,
+): RawHtml {
   const name = user.username.value;
   const allowance = user.quota.toGib();
   const used =
     usage === undefined
       ? html`<p class="muted">${viewer.t('Nothing measured yet. The hourly pass writes this down.')}</p>`
       : html`<p>${viewer.t('storage.using', { used: String(usage.used.toGib()), allowance: String(allowance) })}
-(<span class="muted">${viewer.t('storage.measured', { at: usage.sampledAt })}</span>).</p>`;
+(<span class="muted">${viewer.t('storage.measured', { at: usage.sampledAt })}</span>).
+${leftToFill(measuredSpace(user, usage, volume), viewer)}</p>`;
   return html`${used}
 <form method="post" action="/admin/users/${name}/quota">
   <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
@@ -201,6 +208,7 @@ export function adminUserDetailPage(
   access: 'invited' | 'active',
   instance?: TorrentInstance,
   usage?: DiskUsageSample,
+  volume?: VolumeSample,
   message?: string,
 ): string {
   const name = user.username.value;
@@ -233,7 +241,7 @@ ${flash(viewer.t, message)}
 <div class="card">${portalRole(name, role, viewer)}</div>
 
 <h2>${viewer.t('Storage')}</h2>
-<div class="card">${storage(user, usage, viewer)}</div>
+<div class="card">${storage(user, usage, volume, viewer)}</div>
 
 <h2>${viewer.t('Nextcloud')}</h2>
 <div class="card">

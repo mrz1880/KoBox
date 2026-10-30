@@ -46,6 +46,21 @@ export function memberSpace(space: MeasuredSpace | undefined, viewer: Viewer): R
   })}</p>${diskWarning(space.usable.limit, viewer)}`;
 }
 
+// The admin's side of the same rule, after the "using X of Y" sentence. Says
+// nothing until the volume has been read too.
+export function leftToFill(space: MeasuredSpace | undefined, viewer: Viewer): RawHtml {
+  if (space === undefined) {
+    return html``;
+  }
+  const free = formatBytes(space.usable.free.toBytes(), viewer.t);
+  switch (space.usable.limit) {
+    case 'allowance':
+      return html`${viewer.t('{free} left to fill.', { free })}`;
+    case 'disk':
+      return html`${viewer.t('{free} left to fill: the box is running out of disk, so the allowance can no longer be reached.', { free })}`;
+  }
+}
+
 // Said only when the disk, not the allowance, is what stops the member.
 function diskWarning(limit: SpaceLimit, viewer: Viewer): RawHtml {
   switch (limit) {
