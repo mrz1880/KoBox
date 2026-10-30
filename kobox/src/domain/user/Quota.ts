@@ -22,12 +22,6 @@ export class Quota {
     return Quota.bytes(raw * BYTES_PER_GIB);
   }
 
-  // Legacy bug #72: the ceiling must count the space the user already occupies,
-  // otherwise a quota can never be raised above the remaining free space.
-  static maxSettable(usedByUser: Quota, freeOnDisk: Quota): Quota {
-    return Quota.bytes(usedByUser.valueBytes + freeOnDisk.valueBytes);
-  }
-
   toBytes(): number {
     return this.valueBytes;
   }
