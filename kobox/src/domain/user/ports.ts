@@ -5,6 +5,7 @@ import type { SeedboxUser } from './SeedboxUser.js';
 import type { UserEvent } from './events.js';
 import type { SshPublicKey } from './SshPublicKey.js';
 import type { Username } from './Username.js';
+import type { VolumeSpace } from './VolumeSpace.js';
 
 export interface UserRepository {
   findByUsername(username: Username): Promise<SeedboxUser | undefined>;
@@ -39,6 +40,24 @@ export interface DiskUsageSample {
   readonly username: Username;
   readonly used: Quota;
   readonly sampledAt: string;
+}
+
+// The free and total space of the filesystem that holds the members' homes.
+// One reading for the whole box: every member draws on the same disk.
+export interface VolumePort {
+  measure(): Promise<VolumeSpace>;
+}
+
+// The last volume reading, written by the privileged pass for the portal.
+export interface VolumeSample {
+  readonly space: VolumeSpace;
+  readonly measuredAt: string;
+}
+
+export interface VolumeSampleRepository {
+  // replaces the previous reading: only the latest one is ever shown
+  save(sample: VolumeSample): Promise<void>;
+  find(): Promise<VolumeSample | undefined>;
 }
 
 // What a member's own tools show of the space they hold: ruTorrent's meter
