@@ -22,12 +22,21 @@ export class Quota {
     return Quota.bytes(raw * BYTES_PER_GIB);
   }
 
+  static total(amounts: readonly Quota[]): Quota {
+    return Quota.bytes(amounts.reduce((sum, amount) => sum + amount.valueBytes, 0));
+  }
+
   toBytes(): number {
     return this.valueBytes;
   }
 
   toGib(): number {
     return this.valueBytes / BYTES_PER_GIB;
+  }
+
+  // What is left of this amount once `used` is taken out, never below nothing.
+  remainingAfter(used: Quota): Quota {
+    return Quota.bytes(Math.max(0, this.valueBytes - used.valueBytes));
   }
 
   fitsWithin(ceiling: Quota): boolean {

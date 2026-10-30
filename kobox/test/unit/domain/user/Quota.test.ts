@@ -25,4 +25,10 @@ describe('Quota', () => {
     expect(requested.fitsWithin(Quota.gib(500))).toBe(true);
     expect(requested.fitsWithin(Quota.gib(600))).toBe(true);
   });
+
+  // what every member was promised together, to set against the disk
+  it('should_add_up_to_the_total_of_several_amounts_and_to_nothing_for_none', () => {
+    expect(Quota.total([Quota.gib(400), Quota.gib(400), Quota.gib(200)]).toGib()).toBe(1000);
+    expect(Quota.total([]).toBytes()).toBe(0);
+  });
 });
