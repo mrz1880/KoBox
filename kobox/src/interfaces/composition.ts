@@ -55,7 +55,6 @@ import {
   DEFAULT_HOST_PUBLIC_KEY,
   FsHostKeyPair,
 } from '../infrastructure/system/HostKeyPair.js';
-import type { JobQueuePort } from '../application/jobs/JobQueuePort.js';
 import { FsMediaScanner } from '../infrastructure/system/FsMediaScanner.js';
 import { FsConfigFileReader } from '../infrastructure/system/FsConfigFileReader.js';
 import { JournaldLogAdapter } from '../infrastructure/system/JournaldLogAdapter.js';
@@ -567,7 +566,7 @@ export interface Container {
 export interface PortalContainer {
   readonly db: KoboxDatabase;
   readonly logger: Logger;
-  readonly queue: JobQueuePort;
+  readonly queue: SqliteJobQueue;
   readonly repo: SqliteUserRepository;
   readonly credentials: SqlitePortalCredentialsRepository;
   readonly sessions: SqlitePortalSessionRepository;

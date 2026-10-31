@@ -9,8 +9,14 @@ import { buildPortalServer } from './server.js';
 import { CryptoTotp } from '../../infrastructure/system/CryptoTotp.js';
 import { EnterTwoStepCode } from '../../application/portal/EnterTwoStepCode.js';
 import { TwoStepSetup } from '../../application/portal/TwoStepSetup.js';
+import { AwaitJob } from '../../application/jobs/AwaitJob.js';
+import { setTimeout as sleep } from 'node:timers/promises';
 
 export const DEFAULT_PORTAL_HTTP_PORT = 8190;
+// The worker looks for work once a second: three seconds lets most changes
+// land before the page is drawn, without holding anyone up for a long job.
+const SAVE_PATIENCE_MS = 3000;
+const JOB_LOOK_EVERY_MS = 250;
 
 
 // The portal process: non-root, no privileged adapters in reach — it reads
@@ -41,6 +47,13 @@ async function main(): Promise<void> {
     logger: container.logger,
     users: container.repo,
     queue: container.queue,
+    jobProgress: container.queue,
+    awaitJob: new AwaitJob({
+      progress: container.queue,
+      pause: (ms) => sleep(ms),
+      patienceMs: SAVE_PATIENCE_MS,
+      everyMs: JOB_LOOK_EVERY_MS,
+    }),
     hasher: container.hasher,
     passwords: container.passwords,
     inviteMember: container.inviteMember,

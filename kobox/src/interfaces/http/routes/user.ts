@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
+import type { AwaitJob } from '../../../application/jobs/AwaitJob.js';
 import type { JobQueuePort } from '../../../application/jobs/JobQueuePort.js';
 import type { VpnProfileStorePort } from '../../../application/portal/ports.js';
 
@@ -40,7 +41,7 @@ import type {
 import type { SeedboxUser } from '../../../domain/user/SeedboxUser.js';
 import { buildJob } from '../../cli/buildJob.js';
 import { passwordField } from '../passwordField.js';
-import { flashOf, redirectWithFlash, viewerOf, type Guards } from '../guards.js';
+import { flashOf, redirectWithFlash, viewerOf, type Guards, redirectOnceApplied } from '../guards.js';
 import type { Viewer } from '../views/layout.js';
 import {
   accessPage,
@@ -150,6 +151,7 @@ export interface UserRoutesDeps {
   readonly nowMs: () => number;
   readonly fairUse: FairUseRepository;
   readonly queue: JobQueuePort;
+  readonly awaitJob: AwaitJob;
   readonly hasher: PasswordHasherPort;
   readonly passwords: PasswordSealerPort;
   readonly credentials: PortalCredentialsPort;
@@ -330,13 +332,13 @@ export function registerUserRoutes(
         .type('text/html')
         .send(passwordPage(viewerOf(session, request), 'Your current password is incorrect.'));
     }
-    const job = await buildJob.changePassword(
+    const change = await buildJob.changePassword(
       { username: session.username.value },
       parsed.data.next,
       deps.passwords,
     );
-    await deps.queue.enqueue(job);
-    return redirectWithFlash(reply, '/password', 'Password change under way: it takes a few seconds.');
+    const job = await deps.queue.enqueue(change);
+    return redirectOnceApplied(reply, deps.awaitJob, job, '/password', 'Password change under way: it takes a few seconds.');
   });
 
   // The folders a member actually has, read from their instance: the media page
@@ -401,10 +403,10 @@ export function registerUserRoutes(
         error instanceof Error ? error.message : 'That does not look like a public key.',
       );
     }
-    await deps.queue.enqueue(
+    const job = await deps.queue.enqueue(
       buildJob.setSshKey({ username: session.username.value, key: parsed.data.key }),
     );
-    return redirectWithFlash(reply, '/access', 'Key accepted. It is being installed.');
+    return redirectOnceApplied(reply, deps.awaitJob, job, '/access', 'Key accepted. It is being installed.');
   });
 
   // The address is the one the request came from, never one typed in: a member
@@ -422,10 +424,10 @@ export function registerUserRoutes(
         'You are connecting over IPv6. Only IPv4 addresses can be declared.',
       );
     }
-    await deps.queue.enqueue(
+    const job = await deps.queue.enqueue(
       buildJob.addUserAddress({ username: session.username.value, ipv4: ip.value }),
     );
-    return redirectWithFlash(reply, '/access', 'Address added.');
+    return redirectOnceApplied(reply, deps.awaitJob, job, '/access', 'Address added.');
   });
 
   // An address typed in, for a place the member is not at right now (the NAS
@@ -447,10 +449,10 @@ export function registerUserRoutes(
         'That address only exists inside a home or office network. Declare the one that place shows to the internet.',
       );
     }
-    await deps.queue.enqueue(
+    const job = await deps.queue.enqueue(
       buildJob.addUserAddress({ username: session.username.value, ipv4: ip.value }),
     );
-    return redirectWithFlash(reply, '/access', 'Address added.');
+    return redirectOnceApplied(reply, deps.awaitJob, job, '/access', 'Address added.');
   });
 
   const hostnameSchema = z.object({ hostname: z.string().max(253) });
@@ -476,10 +478,10 @@ export function registerUserRoutes(
         'That is not a hostname, like myhome.duckdns.org. For a fixed address, use the field above.',
       );
     }
-    await deps.queue.enqueue(
+    const job = await deps.queue.enqueue(
       buildJob.addUserHostname({ username: session.username.value, hostname: host.value }),
     );
-    return redirectWithFlash(reply, '/access', 'Hostname added. Its address opens within five minutes.');
+    return redirectOnceApplied(reply, deps.awaitJob, job, '/access', 'Hostname added. Its address opens within five minutes.');
   });
 
   server.post('/access/hostnames/remove', async (request, reply) => {
@@ -496,13 +498,13 @@ export function registerUserRoutes(
     if (!hostnames.some((hostname) => hostname.host === parsed.data.hostname)) {
       return reply.code(404).send();
     }
-    await deps.queue.enqueue(
+    const job = await deps.queue.enqueue(
       buildJob.removeUserHostname({
         username: session.username.value,
         hostname: parsed.data.hostname,
       }),
     );
-    return redirectWithFlash(reply, '/access', 'Hostname removed.');
+    return redirectOnceApplied(reply, deps.awaitJob, job, '/access', 'Hostname removed.');
   });
 
   const twoStepCodeSchema = z.object({ code: z.string().regex(/^[0-9]{6}$/) });
@@ -561,10 +563,10 @@ export function registerUserRoutes(
     if (!addresses.includes(parsed.data.ipv4)) {
       return reply.code(404).send();
     }
-    await deps.queue.enqueue(
+    const job = await deps.queue.enqueue(
       buildJob.removeUserAddress({ username: session.username.value, ipv4: parsed.data.ipv4 }),
     );
-    return redirectWithFlash(reply, '/access', 'Address removed.');
+    return redirectOnceApplied(reply, deps.awaitJob, job, '/access', 'Address removed.');
   });
 
   server.post('/access/ssh-key/remove', async (request, reply) => {
@@ -572,8 +574,8 @@ export function registerUserRoutes(
     if (session === undefined) {
       return;
     }
-    await deps.queue.enqueue(buildJob.removeSshKey({ username: session.username.value }));
-    return redirectWithFlash(reply, '/access', 'Key removed.');
+    const job = await deps.queue.enqueue(buildJob.removeSshKey({ username: session.username.value }));
+    return redirectOnceApplied(reply, deps.awaitJob, job, '/access', 'Key removed.');
   });
 
   server.post('/rutorrent/restart', async (request, reply) => {
@@ -583,8 +585,8 @@ export function registerUserRoutes(
     }
     // the username comes from the session, never the body: a user can only
     // restart their own instance
-    await deps.queue.enqueue(buildJob.restartRtorrent({ username: session.username.value }));
-    return redirectWithFlash(reply, '/rutorrent', 'Restarting your rtorrent.');
+    const job = await deps.queue.enqueue(buildJob.restartRtorrent({ username: session.username.value }));
+    return redirectOnceApplied(reply, deps.awaitJob, job, '/rutorrent', 'Restarting your rtorrent.');
   });
 
   // The member's folders that hold a download, as the index last saw them. The
@@ -644,11 +646,10 @@ export function registerUserRoutes(
     }
     // the username comes from the session, never from the form: a member can
     // only ever create a folder for themselves
-    await deps.queue.enqueue(
+    const job = await deps.queue.enqueue(
       buildJob.addWatchDir({ username: session.username.value, label: label.value }),
     );
-    return redirectWithFlash(
-      reply,
+    return redirectOnceApplied(reply, deps.awaitJob, job,
       '/sync',
       viewerOf(session, request).t('Creating the {folder} folder.', { folder: label.value }),
     );
@@ -674,15 +675,14 @@ export function registerUserRoutes(
       }
       throw error;
     }
-    await deps.queue.enqueue(
+    const job = await deps.queue.enqueue(
       buildJob.setCategorySyncMode({
         username: session.username.value,
         label: label.value,
         mode: mode.value,
       }),
     );
-    return redirectWithFlash(
-      reply,
+    return redirectOnceApplied(reply, deps.awaitJob, job,
       '/sync',
       viewerOf(session, request).t('Saved what happens to {folder}.', { folder: label.value }),
     );
@@ -713,11 +713,10 @@ export function registerUserRoutes(
         }),
       );
     }
-    await deps.queue.enqueue(
+    const job = await deps.queue.enqueue(
       buildJob.queueFolderBacklog({ username: session.username.value, label: label.value }),
     );
-    return redirectWithFlash(
-      reply,
+    return redirectOnceApplied(reply, deps.awaitJob, job,
       '/sync',
       viewerOf(session, request).t(
         'Queuing what {folder} already holds. Anything already sent stays as it is.',
@@ -743,11 +742,10 @@ export function registerUserRoutes(
     if ((await foldersHoldingDownloads(session.username)).has(label.value)) {
       return redirectWithFlash(reply, '/sync', holdsDownloadsFlash(label, viewerOf(session, request)));
     }
-    await deps.queue.enqueue(
+    const job = await deps.queue.enqueue(
       buildJob.removeWatchDir({ username: session.username.value, label: label.value }),
     );
-    return redirectWithFlash(
-      reply,
+    return redirectOnceApplied(reply, deps.awaitJob, job,
       '/sync',
       viewerOf(session, request).t('Removing the {folder} folder.', { folder: label.value }),
     );
@@ -779,15 +777,14 @@ export function registerUserRoutes(
     if ((await foldersHoldingDownloads(session.username)).has(label.value)) {
       return redirectWithFlash(reply, '/sync', holdsDownloadsFlash(label, viewer));
     }
-    await deps.queue.enqueue(
+    const job = await deps.queue.enqueue(
       buildJob.renameWatchDir({
         username: session.username.value,
         label: label.value,
         to: to.value,
       }),
     );
-    return redirectWithFlash(
-      reply,
+    return redirectOnceApplied(reply, deps.awaitJob, job,
       '/sync',
       viewer.t('Renaming {from} to {to}.', { from: label.value, to: to.value }),
     );
@@ -856,10 +853,10 @@ export function registerUserRoutes(
     }
     // the worker owns the queue; ownership of the row is checked there too,
     // against the username from THIS session rather than from the form
-    await deps.queue.enqueue(
+    const job = await deps.queue.enqueue(
       buildJob.requeueTransfer({ username: session.username.value, id: parsed.data.id }),
     );
-    return redirectWithFlash(reply, '/sync', 'Putting it back in the queue.');
+    return redirectOnceApplied(reply, deps.awaitJob, job, '/sync', 'Putting it back in the queue.');
   });
 
   server.get('/media', async (request, reply) => {

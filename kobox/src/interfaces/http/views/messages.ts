@@ -192,6 +192,10 @@ const FR: Readonly<Record<string, string>> = {
   'The box is running out of disk, so your allowance can no longer be reached.':
     'Le disque de la box arrive à saturation : votre allocation ne peut plus être atteinte.',
   'Space not measured yet.': 'Espace pas encore mesuré.',
+  'Saving your change. This page refreshes by itself until it is done.':
+    'Enregistrement en cours. Cette page se recharge toute seule jusqu’à ce que ce soit fait.',
+  'This change could not be applied. An administrator can find why under Troubleshooting.':
+    'Ce changement n’a pas pu être appliqué. Un administrateur en trouvera la raison dans Dépannage.',
   'Current password': 'Mot de passe actuel',
   'Restart my rtorrent': 'Redémarrer mon rtorrent',
   'Use this if the interface stops responding.': 'À utiliser si l’interface ne répond plus.',

@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
+import type { AwaitJob } from '../../../application/jobs/AwaitJob.js';
 import type { JobQueuePort } from '../../../application/jobs/JobQueuePort.js';
 import type {
   MailRelayRepository,
@@ -9,7 +10,7 @@ import type { MailOutboxPort } from '../../../application/maintenance/MailOutbox
 import { RemotePassword } from '../../../domain/sync/RemotePassword.js';
 import type { UserRepository } from '../../../domain/user/ports.js';
 import { buildJob } from '../../cli/buildJob.js';
-import { flashOf, redirectWithFlash, viewerOf, type Guards } from '../guards.js';
+import { flashOf, redirectWithFlash, viewerOf, type Guards, redirectOnceApplied } from '../guards.js';
 import { adminMailPage } from '../views/adminMailPage.js';
 
 // The relay host is a name, not a URL: no scheme, no path, no port suffix.
@@ -22,6 +23,7 @@ const relaySchema = z.object({
 
 export interface AdminMailDeps {
   readonly queue: JobQueuePort;
+  readonly awaitJob: AwaitJob;
   readonly mailRelay: MailRelayRepository;
   readonly saveMailRelay: SaveMailRelay;
   readonly outbox: MailOutboxPort;
@@ -73,8 +75,8 @@ export function registerAdminMailRoutes(
       password: RemotePassword.parse(parsed.data.password),
     });
     // the job carries no secret at all, only "apply what is stored"
-    await deps.queue.enqueue(buildJob.applyMailRelay());
-    return redirectWithFlash(reply, '/admin/mail-relay', 'Relay saved. Applying it now.');
+    const job = await deps.queue.enqueue(buildJob.applyMailRelay());
+    return redirectOnceApplied(reply, deps.awaitJob, job, '/admin/mail-relay', 'Relay saved. Applying it now.');
   });
 
   server.post('/admin/mail-relay/test', async (request, reply) => {

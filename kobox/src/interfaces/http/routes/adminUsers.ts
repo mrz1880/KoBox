@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
+import type { AwaitJob } from '../../../application/jobs/AwaitJob.js';
 import type { JobQueuePort } from '../../../application/jobs/JobQueuePort.js';
 import type { PortalCredentials, PortalCredentialsPort } from '../../../domain/portal/ports.js';
 import type { SeedboxUser } from '../../../domain/user/SeedboxUser.js';
@@ -24,7 +25,7 @@ import { EmailAddress } from '../../../domain/user/EmailAddress.js';
 import { Quota } from '../../../domain/user/Quota.js';
 import { buildJob } from '../../cli/buildJob.js';
 import { invitationLinkPage } from '../views/passwordLinkPages.js';
-import { flashOf, redirectWithFlash, viewerOf, type Guards } from '../guards.js';
+import { flashOf, redirectWithFlash, viewerOf, type Guards, redirectOnceApplied } from '../guards.js';
 import {
   adminUserDetailPage,
   adminUsersPage,
@@ -44,6 +45,7 @@ const usernameParamSchema = z.object({ name: z.string().regex(USERNAME_PATTERN) 
 export interface AdminUsersDeps {
   readonly users: UserRepository;
   readonly queue: JobQueuePort;
+  readonly awaitJob: AwaitJob;
   readonly inviteMember: InviteMember;
   readonly sendPasswordLink: SendPasswordLink;
   readonly instances: TorrentInstanceRepository;
@@ -210,10 +212,9 @@ export function registerAdminUserRoutes(
       if (!params.success) {
         return reply.code(400).send();
       }
-      await deps.queue.enqueue(build(params.data.name));
+      const job = await deps.queue.enqueue(build(params.data.name));
       const target = action === 'delete' ? '/admin/users' : `/admin/users/${params.data.name}`;
-      return redirectWithFlash(
-        reply,
+      return redirectOnceApplied(reply, deps.awaitJob, job,
         target,
         viewerOf(session, request).t(ACTION_WORDS[action], { name: params.data.name }),
       );
@@ -232,11 +233,10 @@ export function registerAdminUserRoutes(
     if (!params.success || !parsed.success) {
       return reply.code(400).send();
     }
-    await deps.queue.enqueue(
+    const job = await deps.queue.enqueue(
       buildJob.setUserQuota({ username: params.data.name, quotaGib: parsed.data.quotaGib }),
     );
-    return redirectWithFlash(
-      reply,
+    return redirectOnceApplied(reply, deps.awaitJob, job,
       `/admin/users/${params.data.name}`,
       viewerOf(session, request).t('{name} now has {gib} GiB. Nobody else is affected.', {
         name: params.data.name,
@@ -257,11 +257,10 @@ export function registerAdminUserRoutes(
     if (!params.success || !parsed.success) {
       return reply.code(400).send();
     }
-    await deps.queue.enqueue(
+    const job = await deps.queue.enqueue(
       buildJob.setUserRole({ username: params.data.name, role: parsed.data.role }),
     );
-    return redirectWithFlash(
-      reply,
+    return redirectOnceApplied(reply, deps.awaitJob, job,
       `/admin/users/${params.data.name}`,
       viewerOf(session, request).t('{name} is now {role} on the portal.', {
         name: params.data.name,
@@ -284,11 +283,10 @@ export function registerAdminUserRoutes(
       return reply.code(400).send();
     }
     const allowed = parsed.data.allowed === 'on';
-    await deps.queue.enqueue(
+    const job = await deps.queue.enqueue(
       buildJob.setAllowPublicTracker({ username: params.data.name, allowed }),
     );
-    return redirectWithFlash(
-      reply,
+    return redirectOnceApplied(reply, deps.awaitJob, job,
       `/admin/users/${params.data.name}`,
       viewerOf(session, request).t(
         allowed
@@ -311,11 +309,10 @@ export function registerAdminUserRoutes(
     if (!params.success || !parsed.success) {
       return reply.code(400).send();
     }
-    await deps.queue.enqueue(
+    const job = await deps.queue.enqueue(
       buildJob.setRecycling({ username: params.data.name, mode: parsed.data.mode }),
     );
-    return redirectWithFlash(
-      reply,
+    return redirectOnceApplied(reply, deps.awaitJob, job,
       `/admin/users/${params.data.name}`,
       'Saved. It applies to what they add from now on, and changes nothing already on disk.',
     );
@@ -336,11 +333,10 @@ export function registerAdminUserRoutes(
       return reply.code(400).send();
     }
     const run = parsed.data.run === 'on';
-    await deps.queue.enqueue(
+    const job = await deps.queue.enqueue(
       buildJob.setSyncDisabled({ username: params.data.name, disabled: !run }),
     );
-    return redirectWithFlash(
-      reply,
+    return redirectOnceApplied(reply, deps.awaitJob, job,
       `/admin/users/${params.data.name}`,
       viewerOf(session, request).t(
         run
