@@ -191,6 +191,18 @@ describe('admin fair-use screen', () => {
     expect(response.body).toContain('<p class="muted">No event recorded yet.</p>');
   });
 
+  it('should_open_on_one_sentence_and_fold_how_the_steps_work', async () => {
+    const response = await world.server.inject({
+      method: 'GET',
+      url: '/admin/fair-use',
+      headers: { cookie: admin.cookie },
+    });
+
+    expect(response.body).toContain(
+      '<p class="lead">One member saturating the link makes the box unusable for everyone else.</p>\n<details class="explain"><summary>How it works</summary>',
+    );
+  });
+
   it('should_enqueue_an_override_job_translating_clear_to_null', async () => {
     const response = await world.server.inject({
       method: 'POST',

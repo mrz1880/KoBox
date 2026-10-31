@@ -8,7 +8,7 @@ import type {
 import type { UserAddress } from '../../../domain/tracker/ports.js';
 import { html, type RawHtml } from '../html.js';
 import { formatBytes } from './bytes.js';
-import { flash, page, sentence, type Viewer } from './layout.js';
+import { explained, flash, page, sentence, type Viewer } from './layout.js';
 import { formatMoment } from './moment.js';
 import type { Translate } from './messages.js';
 
@@ -157,14 +157,18 @@ export function adminFairUsePage(
   return page(
     'Fair use',
     html`<h1>${viewer.t('Fair use')}</h1>
-<p class="muted">${sentence(viewer.t, 'One member saturating the link makes the box unusable for everyone else. KoBox samples what each one actually moves and answers in steps rather than cutting them off: {none} is the normal state, {alerted} means they have been told, {throttled} means their bandwidth is capped until they come back under. Nothing here deletes anything or suspends an account.', {
+${explained(
+  'One member saturating the link makes the box unusable for everyone else.',
+  html`<p>${sentence(viewer.t, 'KoBox samples what each one actually moves and answers in steps rather than cutting them off: {none} is the normal state, {alerted} means they have been told, {throttled} means their bandwidth is capped until they come back under. Nothing here deletes anything or suspends an account.', {
   none: html`<strong>${viewer.t('none')}</strong>`,
   alerted: html`<strong>${viewer.t('alerted')}</strong>`,
   throttled: html`<strong>${viewer.t('throttled')}</strong>`,
 })}</p>
-<p class="muted">${sentence(viewer.t, 'Every decision is recorded below, and every one is reversible: a {override} raises the limit for a member who has a reason, without changing it for anyone else.', {
+<p>${sentence(viewer.t, 'Every decision is recorded below, and every one is reversible: a {override} raises the limit for a member who has a reason, without changing it for anyone else.', {
   override: html`<strong>${viewer.t('budget override')}</strong>`,
-})}</p>
+})}</p>`,
+  viewer.t,
+)}
 ${flash(viewer.t, message)}
 <table>
   <thead>

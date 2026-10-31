@@ -3,7 +3,7 @@ import type { TorrentInstance } from '../../../domain/torrent/TorrentInstance.js
 import type { SeedboxUser } from '../../../domain/user/SeedboxUser.js';
 import type { DiskUsageSample, VolumeSample } from '../../../domain/user/ports.js';
 import { html, type RawHtml } from '../html.js';
-import { flash, page, sentence, type Viewer } from './layout.js';
+import { explained, flash, page, sentence, type Viewer } from './layout.js';
 import { HOME_BASE } from '../../../domain/user/homeDirectory.js';
 import { Quota } from '../../../domain/user/Quota.js';
 import type { SpaceLimit } from '../../../domain/user/UsableSpace.js';
@@ -117,8 +117,11 @@ export function adminUsersPage(
   return page(
     'Members',
     html`<h1>${viewer.t('Members')}</h1>
-<p class="muted">${viewer.t('members.intro')}</p>
-<p class="muted">${viewer.t('members.suspend')}</p>
+${explained(
+  'Everyone with an account on the box.',
+  html`<p>${viewer.t('members.intro')}</p><p>${viewer.t('members.suspend')}</p>`,
+  viewer.t,
+)}
 ${flash(viewer.t, message)}
 ${boxDisk(users, disk.volume, viewer)}
 <table>

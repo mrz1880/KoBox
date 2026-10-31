@@ -62,6 +62,8 @@ nav.menu a[aria-current="page"] {
 main { flex: 999 1 35rem; min-width: 0; }
 h1 { font-size: 1.75rem; margin: 0 0 1rem; } h2 { font-size: 1.1rem; margin-top: 2rem; }
 .lead { color: var(--muted); }
+details.explain { margin: -0.5rem 0 1rem; color: var(--muted); max-width: 70ch; }
+details.explain summary { cursor: pointer; color: var(--teal); font-size: 0.85rem; }
 table { border-collapse: collapse; width: 100%; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
 th, td {
   text-align: left; padding: 0.55rem 0.7rem; border-bottom: 1px solid var(--line);
@@ -361,6 +363,13 @@ ${body}
 // A flash is one of the server's own sentences, so it is looked up like any
 // other; one arriving from elsewhere (it rides in the query string) matches no
 // key, shows as it came, and is escaped like any other text.
+// A page opens on the one sentence that says what it is for; the longer
+// explanation stays one click away, folded natively, without script.
+export function explained(lead: string, details: RawHtml, t: Translate): RawHtml {
+  return html`<p class="lead">${t(lead)}</p>
+<details class="explain"><summary>${t('How it works')}</summary>${details}</details>`;
+}
+
 // A table with nothing in it says so in one full-width row, rather than
 // showing its headers alone like a page that broke.
 export function rowsOrEmpty(

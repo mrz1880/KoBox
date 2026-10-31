@@ -693,8 +693,8 @@ const FR: Readonly<Record<string, string>> = {
   unresolved: 'non résolu',
   When: 'Quand',
   Event: 'Événement',
-  'One member saturating the link makes the box unusable for everyone else. KoBox samples what each one actually moves and answers in steps rather than cutting them off: {none} is the normal state, {alerted} means they have been told, {throttled} means their bandwidth is capped until they come back under. Nothing here deletes anything or suspends an account.':
-    'Un membre qui sature le lien rend la box inutilisable pour tous les autres. KoBox mesure ce que chacun fait réellement passer et répond par paliers plutôt que de couper : {none} est l’état normal, {alerted} veut dire qu’il a été prévenu, {throttled} que sa bande passante est plafonnée jusqu’à ce qu’il repasse en dessous. Rien ici ne supprime quoi que ce soit ni ne suspend un compte.',
+  'KoBox samples what each one actually moves and answers in steps rather than cutting them off: {none} is the normal state, {alerted} means they have been told, {throttled} means their bandwidth is capped until they come back under. Nothing here deletes anything or suspends an account.':
+    'KoBox mesure ce que chacun fait réellement passer et répond par paliers plutôt que de couper : {none} est l’état normal, {alerted} veut dire qu’il a été prévenu, {throttled} que sa bande passante est plafonnée jusqu’à ce qu’il repasse en dessous. Rien ici ne supprime quoi que ce soit ni ne suspend un compte.',
   'Every decision is recorded below, and every one is reversible: a {override} raises the limit for a member who has a reason, without changing it for anyone else.':
     'Chaque décision est consignée ci-dessous, et chacune est réversible : une {override} relève la limite pour un membre qui a une raison, sans la changer pour les autres.',
   'budget override': 'dérogation de budget',
@@ -793,7 +793,11 @@ const FR: Readonly<Record<string, string>> = {
   // admin prose, keyed rather than quoted: a six-line paragraph makes a poor
   // lookup key, and reflowing the English would silently orphan its translation
   'members.intro':
-    'Toutes les personnes ayant un compte sur la machine. En créer un provisionne un vrai compte système, sa propre instance rTorrent sur son propre port, un répertoire personnel avec un quota et un profil VPN, puis lui envoie par mail un lien pour choisir son mot de passe ; personne d’autre ne le connaît. Le port SCGI est celui auquel parle son ruTorrent ; il est affiché parce que c’est ce dont vous avez besoin quand quelque chose cloche, et il est conservé en cas de migration.',
+    'En créer un provisionne un vrai compte système, sa propre instance rTorrent sur son propre port, un répertoire personnel avec un quota et un profil VPN, puis lui envoie par mail un lien pour choisir son mot de passe ; personne d’autre ne le connaît. Le port SCGI est celui auquel parle son ruTorrent ; il est affiché parce que c’est ce dont vous avez besoin quand quelque chose cloche, et il est conservé en cas de migration.',
+  'Everyone with an account on the box.': 'Toutes les personnes ayant un compte sur la machine.',
+  'One member saturating the link makes the box unusable for everyone else.':
+    'Un membre qui sature le lien rend la box inutilisable pour tous les autres.',
+  'How it works': 'Comment ça marche',
   'admin.band':
     'Administration : les réglages de toute la box et de tous les membres. Ce que vous changez ici concerne tout le monde.',
   'media.playback':
@@ -838,7 +842,7 @@ const FR: Readonly<Record<string, string>> = {
 // design exists to avoid.
 const EN: Readonly<Record<string, string>> = {
   'members.intro':
-    'Everyone with an account on the box. Creating one provisions a real system account, its own rTorrent instance on its own port, a home directory with a quota, and a VPN profile, then mails them a link to choose their password; nobody else ever knows it. SCGI is the port their ruTorrent talks to; it is shown because it is what you need when something is wrong, and it is preserved if they are ever migrated.',
+    'Creating one provisions a real system account, its own rTorrent instance on its own port, a home directory with a quota, and a VPN profile, then mails them a link to choose their password; nobody else ever knows it. SCGI is the port their ruTorrent talks to; it is shown because it is what you need when something is wrong, and it is preserved if they are ever migrated.',
   'admin.band':
     'Administration: the settings of the whole box and of every member. What you change here affects everyone.',
   'media.playback':
