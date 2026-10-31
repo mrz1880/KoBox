@@ -4,8 +4,8 @@ import { Language } from '../../../../src/domain/portal/Language.js';
 import { translatorFor } from '../../../../src/interfaces/http/views/messages.js';
 
 const GIB = 1024 ** 3;
-const english = { language: Language.en, t: translatorFor(Language.en) };
-const french = { language: Language.fr, t: translatorFor(Language.fr) };
+const english = { language: Language.en, t: translatorFor(Language.en), zone: 'Europe/Paris' };
+const french = { language: Language.fr, t: translatorFor(Language.fr), zone: 'Europe/Paris' };
 
 describe('formatBytes', () => {
   it.each([

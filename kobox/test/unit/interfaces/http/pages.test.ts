@@ -14,7 +14,7 @@ import { adminUserDetailPage } from '../../../../src/interfaces/http/views/admin
 import { aUser } from '../../../builders/UserBuilder.js';
 import { accessFacts, G, signalRow as row } from './viewFixtures.js';
 
-const ENGLISH = { language: Language.en, t: translatorFor(Language.en) };
+const ENGLISH = { language: Language.en, t: translatorFor(Language.en), zone: 'Europe/Paris' };
 const VIEWER = { username: 'alice', role: 'user' as const, csrfToken: 'csrf', ...ENGLISH };
 const ADMIN = { username: 'boss', role: 'admin' as const, csrfToken: 'csrf', ...ENGLISH };
 
