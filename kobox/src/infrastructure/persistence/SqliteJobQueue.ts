@@ -1,6 +1,7 @@
 import { asc, eq, sql } from 'drizzle-orm';
 import { parseJob, payloadAfterClaim, type Job } from '../../application/jobs/contract.js';
 import type { ClaimedJob, JobQueuePort } from '../../application/jobs/JobQueuePort.js';
+import type { JobProgressPort, JobState } from '../../application/jobs/JobProgressPort.js';
 import type { KoboxDatabase } from './db.js';
 import { jobs } from './schema.js';
 
@@ -14,7 +15,7 @@ function storedAfterClaim(payloadJson: string): string {
   }
 }
 
-export class SqliteJobQueue implements JobQueuePort {
+export class SqliteJobQueue implements JobQueuePort, JobProgressPort {
   constructor(private readonly db: KoboxDatabase) {}
 
   enqueue(job: Job): Promise<number> {
@@ -106,6 +107,11 @@ export class SqliteJobQueue implements JobQueuePort {
         );
       }
     }
+  }
+
+  stateOf(id: number): Promise<JobState | undefined> {
+    const row = this.db.orm.select({ status: jobs.status }).from(jobs).where(eq(jobs.id, id)).get();
+    return Promise.resolve(row?.status);
   }
 
   recoverStale(): Promise<number> {

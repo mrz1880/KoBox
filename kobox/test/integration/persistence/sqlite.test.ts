@@ -301,6 +301,20 @@ describe('SqliteJobQueue', () => {
     expect(row.error).toMatch(/interrupted/);
     expect(await queue.claimNextPending()).toBeUndefined();
   });
+
+  // the portal reads this to hold a save until the worker has applied it
+  it('should_tell_where_a_job_stands_as_the_worker_moves_it_along', async () => {
+    const queue = new SqliteJobQueue(db);
+    const id = await queue.enqueue(parseJob('suspend-user', { username: 'alice' }));
+    const states = [await queue.stateOf(id)];
+    await queue.claimNextPending();
+    states.push(await queue.stateOf(id));
+    await queue.markDone(id);
+    states.push(await queue.stateOf(id));
+
+    expect(states).toEqual(['pending', 'running', 'done']);
+    expect(await queue.stateOf(id + 1)).toBeUndefined();
+  });
 });
 
 describe('SqliteTorrentInstanceRepository', () => {
