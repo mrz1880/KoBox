@@ -72,7 +72,7 @@ td.num, td.mono { font-family: ui-monospace, monospace; font-variant-numeric: ta
 .mono { font-family: ui-monospace, monospace; }
 tr.current td { background: var(--panel); font-weight: 600; }
 /* Diagnostics: a captured excerpt and the panel that frames it. The excerpt
-   scrolls inside its own box — a 200-line journal must not stretch the page. */
+   scrolls inside its own box: a 200-line journal must not stretch the page. */
 .panel {
   border: 1px solid var(--line); border-radius: 12px; background: var(--panel);
   padding: 1rem 1.25rem; margin: 0.75rem 0;
@@ -89,7 +89,7 @@ td.when {
   white-space: nowrap; width: 1%; font-family: ui-monospace, monospace;
   font-variant-numeric: tabular-nums; font-size: 0.8rem; color: var(--muted);
 }
-/* file names and links are data — read as mono; a failure is prose — read as text */
+/* file names and links are data, read as mono; a failure is prose, read as text */
 .path { font-family: ui-monospace, monospace; font-size: 0.85rem; overflow-wrap: anywhere; }
 .reason { color: var(--muted); }
 .reason code {
@@ -152,7 +152,7 @@ form.inline { display: inline; } form.inline button { margin: 0; min-height: 2.2
 /* --- Signal strip: the console signature ---------------------------------
    Each user reads as a mixing-desk channel: a state LED, a segmented VU of
    egress against their fair-use budget, then the numbers. Segments (not a
-   smooth bar) are the deliberate cue — a bar that runs into the peak zone is
+   smooth bar) are the deliberate cue: a bar that runs into the peak zone is
    how an abuser becomes obvious at a glance instead of days later. */
 .eyebrow {
   font-size: 0.68rem; letter-spacing: 0.14em; text-transform: uppercase;
