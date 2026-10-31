@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
+import type { AwaitJob } from '../../../application/jobs/AwaitJob.js';
 import type { JobQueuePort } from '../../../application/jobs/JobQueuePort.js';
 import { DynDnsHost } from '../../../domain/security/DynDnsHost.js';
 import type { DynDnsBindingRepository, FairUseRepository } from '../../../domain/security/ports.js';
@@ -8,7 +9,7 @@ import type { UserAddressRepository } from '../../../domain/tracker/ports.js';
 import { USERNAME_PATTERN } from '../../../domain/user/Username.js';
 import type { UserRepository } from '../../../domain/user/ports.js';
 import { buildJob } from '../../cli/buildJob.js';
-import { flashOf, redirectWithFlash, viewerOf, type Guards } from '../guards.js';
+import { flashOf, redirectWithFlash, viewerOf, type Guards, redirectOnceApplied } from '../guards.js';
 import {
   adminAddressesPage,
   adminFairUsePage,
@@ -70,6 +71,7 @@ export interface AdminNetworkDeps {
   readonly bindings: DynDnsBindingRepository;
   readonly fairUse: FairUseRepository;
   readonly queue: JobQueuePort;
+  readonly awaitJob: AwaitJob;
 }
 
 export function registerAdminNetworkRoutes(
@@ -117,9 +119,8 @@ export function registerAdminNetworkRoutes(
           ),
         );
       }
-      await deps.queue.enqueue(build(parsed.data));
-      return redirectWithFlash(
-        reply,
+      const job = await deps.queue.enqueue(build(parsed.data));
+      return redirectOnceApplied(reply, deps.awaitJob, job,
         '/admin/addresses',
         action === 'add' ? 'Adding the address.' : 'Removing the address.',
       );
@@ -144,9 +145,8 @@ export function registerAdminNetworkRoutes(
       if (!parsed.success) {
         return reply.code(400).send();
       }
-      await deps.queue.enqueue(build(parsed.data));
-      return redirectWithFlash(
-        reply,
+      const job = await deps.queue.enqueue(build(parsed.data));
+      return redirectOnceApplied(reply, deps.awaitJob, job,
         '/admin/addresses',
         action === 'add-hostname' ? 'Adding the hostname.' : 'Removing the hostname.',
       );
@@ -188,7 +188,7 @@ export function registerAdminNetworkRoutes(
     const egressLimitBps = toBpsOverride(parsed.data.egressLimitMbit);
     const authRatePerHour = toCountOverride(parsed.data.authRatePerHour);
     const throttleToBps = toBpsOverride(parsed.data.throttleToMbit);
-    await deps.queue.enqueue(
+    const job = await deps.queue.enqueue(
       buildJob.setFairUseOverride({
         username: parsed.data.username,
         ...(egressLimitBps !== undefined && { egressLimitBps }),
@@ -196,6 +196,6 @@ export function registerAdminNetworkRoutes(
         ...(throttleToBps !== undefined && { throttleToBps }),
       }),
     );
-    return redirectWithFlash(reply, '/admin/fair-use', 'Override applied.');
+    return redirectOnceApplied(reply, deps.awaitJob, job, '/admin/fair-use', 'Override applied.');
   });
 }

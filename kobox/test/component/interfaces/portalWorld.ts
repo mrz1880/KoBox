@@ -1,5 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import type { Job } from '../../../src/application/jobs/contract.js';
+import { AwaitJob } from '../../../src/application/jobs/AwaitJob.js';
+import type { JobProgressPort, JobState } from '../../../src/application/jobs/JobProgressPort.js';
 import type { ClaimedJob, JobQueuePort } from '../../../src/application/jobs/JobQueuePort.js';
 import { Authenticate } from '../../../src/application/portal/Authenticate.js';
 import { AuthenticateApp } from '../../../src/application/portal/AuthenticateApp.js';
@@ -98,8 +100,19 @@ class NoProfiles implements VpnProfileStorePort {
 export const TEST_PASSWORD = '8chars!!';
 
 // Records enqueued jobs; the portal never consumes them, so claiming is out.
-export class RecordingQueue implements JobQueuePort {
+// The worker's side is played by one state every job is left in: done unless
+// a test says otherwise, as if the worker were instant.
+export class RecordingQueue implements JobQueuePort, JobProgressPort {
   readonly jobs: Job[] = [];
+  private workerState: JobState = 'done';
+
+  workerLeavesJobs(state: JobState): void {
+    this.workerState = state;
+  }
+
+  stateOf(id: number): Promise<JobState | undefined> {
+    return Promise.resolve(id >= 1 && id <= this.jobs.length ? this.workerState : undefined);
+  }
 
   enqueue(job: Job): Promise<number> {
     this.jobs.push(job);
@@ -212,6 +225,9 @@ export async function buildPortalWorld(
     now: () => NOW,
     users,
     queue,
+    jobProgress: queue,
+    // the recording worker answers at once: there is nothing to wait for
+    awaitJob: new AwaitJob({ progress: queue, pause: () => Promise.resolve(), patienceMs: 0, everyMs: 1 }),
     hasher,
     passwords,
     inviteMember: new InviteMember(linkDeps),

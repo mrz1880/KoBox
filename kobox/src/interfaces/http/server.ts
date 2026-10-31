@@ -5,6 +5,8 @@ import fastifyFormbody from '@fastify/formbody';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import type { JobQueuePort } from '../../application/jobs/JobQueuePort.js';
+import type { JobProgressPort } from '../../application/jobs/JobProgressPort.js';
+import type { AwaitJob } from '../../application/jobs/AwaitJob.js';
 import type { Role } from '../../domain/portal/Role.js';
 import type { AuthenticateApp } from '../../application/portal/AuthenticateApp.js';
 import type { IssueAppToken } from '../../application/portal/IssueAppToken.js';
@@ -34,7 +36,7 @@ import type {
   UserRepository,
 } from '../../domain/user/ports.js';
 import type { Logger } from '../../infrastructure/logging/logger.js';
-import { buildGuards, readerOf, SESSION_COOKIE } from './guards.js';
+import { buildGuards, readerOf, SESSION_COOKIE, watchJob } from './guards.js';
 import type { DiagnosticsRepositoryPort } from '../../application/maintenance/DiagnosticsPort.js';
 import type { ConfigFileReaderPort } from '../../application/installation/ConfigFileReaderPort.js';
 import type { TorrentInstanceRepository } from '../../domain/torrent/ports.js';
@@ -85,6 +87,9 @@ export interface PortalServerDeps {
   readonly now: () => string;
   readonly users: UserRepository;
   readonly queue: JobQueuePort;
+  // where a change handed to the worker stands, and the wait for it
+  readonly jobProgress: JobProgressPort;
+  readonly awaitJob: AwaitJob;
   readonly hasher: PasswordHasherPort;
   // the public half of the host key: the portal seals a new password for the
   // worker and can never open one back
@@ -150,6 +155,13 @@ export function buildPortalServer(deps: PortalServerDeps): FastifyInstance {
       reply.header('vary', LANGUAGE_HEADER);
     }
     return payload;
+  });
+
+  // a page reached right after a save keeps an eye on the change it carries
+  server.addHook('preHandler', async (request, reply) => {
+    if (request.method === 'GET') {
+      await watchJob(request, reply, deps.jobProgress);
+    }
   });
 
   const guards = buildGuards(deps.authenticate, deps.now);

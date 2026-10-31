@@ -6,6 +6,8 @@ import { html } from './html.js';
 import { page, type Reader, type Viewer } from './views/layout.js';
 import { translatorFor } from './views/messages.js';
 import { secondStepRequired } from '../../domain/portal/policy.js';
+import type { AwaitJob } from '../../application/jobs/AwaitJob.js';
+import type { JobProgressPort, JobState } from '../../application/jobs/JobProgressPort.js';
 
 export const SESSION_COOKIE = 'kobox_session';
 
@@ -208,7 +210,67 @@ export async function redirectWithFlash(
     .send();
 }
 
+// A change still on its way to the worker, or one it gave up on, outranks the
+// message written for when it is done: that one would be a promise.
+const IN_PROGRESS = 'Saving your change. This page refreshes by itself until it is done.';
+const GAVE_UP = 'This change could not be applied. An administrator can find why under Troubleshooting.';
+// a page waiting on the worker asks the browser to come back this often
+const REFRESH_SECONDS = 2;
+
+const jobStates = new WeakMap<FastifyRequest, JobState>();
+
+function isUnderWay(state: JobState | undefined): boolean {
+  return state === 'pending' || state === 'running';
+}
+
+// Hands the change to the worker and holds the answer a moment, so the next
+// page shows it applied. A job still under way, or failed, travels in the
+// address: the page it lands on keeps an eye on it.
+export async function redirectOnceApplied(
+  reply: FastifyReply,
+  awaitJob: AwaitJob,
+  job: number,
+  to: string,
+  message: string,
+): Promise<void> {
+  const state = await awaitJob.execute(job);
+  const watched = isUnderWay(state) || state === 'failed' ? `&job=${String(job)}` : '';
+  await reply
+    .code(303)
+    .header('location', `${to}?flash=${encodeURIComponent(message)}${watched}`)
+    .send();
+}
+
+const watchedJobSchema = z.object({ job: z.coerce.number().int().positive() });
+
+// Looks up the job a page was sent to watch, before the page is drawn.
+export async function watchJob(
+  request: FastifyRequest,
+  reply: FastifyReply,
+  progress: JobProgressPort,
+): Promise<void> {
+  const watched = watchedJobSchema.safeParse(request.query);
+  if (!watched.success) {
+    return;
+  }
+  const state = await progress.stateOf(watched.data.job);
+  if (state === undefined) {
+    return;
+  }
+  jobStates.set(request, state);
+  if (isUnderWay(state)) {
+    reply.header('refresh', String(REFRESH_SECONDS));
+  }
+}
+
 export function flashOf(request: FastifyRequest): string | undefined {
+  const state = jobStates.get(request);
+  if (isUnderWay(state)) {
+    return IN_PROGRESS;
+  }
+  if (state === 'failed') {
+    return GAVE_UP;
+  }
   const query = request.query as Record<string, unknown>;
   const value = query.flash;
   return typeof value === 'string' && value.length <= 200 ? value : undefined;

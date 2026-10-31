@@ -1,10 +1,11 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
+import type { AwaitJob } from '../../../application/jobs/AwaitJob.js';
 import type { JobQueuePort } from '../../../application/jobs/JobQueuePort.js';
 import type { BlocklistRepository, TrackerRepository } from '../../../domain/tracker/ports.js';
 import { TrackerHost } from '../../../domain/tracker/TrackerHost.js';
 import { buildJob } from '../../cli/buildJob.js';
-import { flashOf, redirectWithFlash, viewerOf, type Guards } from '../guards.js';
+import { flashOf, viewerOf, type Guards, redirectOnceApplied } from '../guards.js';
 import { adminBlocklistsPage, adminTrackersPage } from '../views/adminTrackersPage.js';
 
 // The VO is the validator: a host the domain refuses never becomes a payload.
@@ -26,6 +27,7 @@ export interface AdminTrackersDeps {
   readonly trackers: TrackerRepository;
   readonly blocklists: BlocklistRepository;
   readonly queue: JobQueuePort;
+  readonly awaitJob: AwaitJob;
   readonly now: () => string;
 }
 
@@ -60,9 +62,8 @@ export function registerAdminTrackerRoutes(
       if (!parsed.success) {
         return reply.code(400).send();
       }
-      await deps.queue.enqueue(build(parsed.data.host));
-      return redirectWithFlash(
-        reply,
+      const job = await deps.queue.enqueue(build(parsed.data.host));
+      return redirectOnceApplied(reply, deps.awaitJob, job,
         '/admin/trackers',
         viewerOf(session, request).t('Updating {host}.', { host: parsed.data.host }),
       );
@@ -75,8 +76,8 @@ export function registerAdminTrackerRoutes(
       return;
     }
     const today = deps.now().slice(0, 10);
-    await deps.queue.enqueue(buildJob.renewTrackerCerts({ today }));
-    return redirectWithFlash(reply, '/admin/trackers', 'Renewing certificates.');
+    const job = await deps.queue.enqueue(buildJob.renewTrackerCerts({ today }));
+    return redirectOnceApplied(reply, deps.awaitJob, job, '/admin/trackers', 'Renewing certificates.');
   });
 
   server.get('/admin/blocklists', async (request, reply) => {
@@ -95,8 +96,8 @@ export function registerAdminTrackerRoutes(
     if (session === undefined) {
       return;
     }
-    await deps.queue.enqueue(buildJob.updateBlocklists());
-    return redirectWithFlash(reply, '/admin/blocklists', 'Updating blocklists.');
+    const job = await deps.queue.enqueue(buildJob.updateBlocklists());
+    return redirectOnceApplied(reply, deps.awaitJob, job, '/admin/blocklists', 'Updating blocklists.');
   });
 
   // one form per row, so a tick and a Save move exactly the list you are
@@ -118,7 +119,7 @@ export function registerAdminTrackerRoutes(
       return reply.code(400).send();
     }
     const enabled = parsed.data.enabled === 'on';
-    await deps.queue.enqueue(
+    const job = await deps.queue.enqueue(
       buildJob.setBlocklistEnabled({
         source: parsed.data.source,
         author: parsed.data.author,
@@ -126,8 +127,7 @@ export function registerAdminTrackerRoutes(
         enabled,
       }),
     );
-    return redirectWithFlash(
-      reply,
+    return redirectOnceApplied(reply, deps.awaitJob, job,
       '/admin/blocklists',
       viewerOf(session, request).t(
         enabled
@@ -143,7 +143,7 @@ export function registerAdminTrackerRoutes(
     if (session === undefined) {
       return;
     }
-    await deps.queue.enqueue(buildJob.importBlocklistCatalog());
-    return redirectWithFlash(reply, '/admin/blocklists', 'Importing the catalog.');
+    const job = await deps.queue.enqueue(buildJob.importBlocklistCatalog());
+    return redirectOnceApplied(reply, deps.awaitJob, job, '/admin/blocklists', 'Importing the catalog.');
   });
 }

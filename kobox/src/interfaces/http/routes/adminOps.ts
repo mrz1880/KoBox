@@ -8,6 +8,7 @@ import type {
   DiagnosticsRepositoryPort,
   ServiceLogSnapshot,
 } from '../../../application/maintenance/DiagnosticsPort.js';
+import type { AwaitJob } from '../../../application/jobs/AwaitJob.js';
 import type { JobQueuePort } from '../../../application/jobs/JobQueuePort.js';
 import type { HealthProbePort, UserRepository } from '../../../domain/user/ports.js';
 import { ProbeSeedboxHealth } from '../../../application/user/ProbeSeedboxHealth.js';
@@ -16,7 +17,7 @@ import { LoggableService, ManagedService } from '../../../domain/maintenance/Man
 import { ConfigDocument } from '../../../domain/installation/ConfigDocument.js';
 import { DomainError } from '../../../domain/shared/DomainError.js';
 import { buildJob } from '../../cli/buildJob.js';
-import { flashOf, redirectWithFlash, viewerOf, type Guards } from '../guards.js';
+import { flashOf, redirectWithFlash, viewerOf, type Guards, redirectOnceApplied } from '../guards.js';
 import { adminHealthPage, adminMailsPage } from '../views/adminOpsPage.js';
 import { adminLogsPage, adminPackagesPage } from '../views/adminDiagnosticsPage.js';
 import { adminConfigPage } from '../views/adminConfigPage.js';
@@ -28,6 +29,7 @@ export interface AdminOpsDeps {
   readonly components: ComponentRegistry;
   readonly speedtests: SpeedtestRepositoryPort;
   readonly queue: JobQueuePort;
+  readonly awaitJob: AwaitJob;
   readonly releases: ReleaseRepositoryPort;
   readonly outbox: MailOutboxPort;
   readonly diagnostics: DiagnosticsRepositoryPort;
@@ -111,9 +113,8 @@ export function registerAdminOpsRoutes(
       }
       throw error;
     }
-    await deps.queue.enqueue(buildJob.restartService({ service: service.value }));
-    return redirectWithFlash(
-      reply,
+    const job = await deps.queue.enqueue(buildJob.restartService({ service: service.value }));
+    return redirectOnceApplied(reply, deps.awaitJob, job,
       '/admin/health',
       viewerOf(session, request).t('Restarting {service}.', { service: service.value }),
     );
@@ -169,9 +170,8 @@ export function registerAdminOpsRoutes(
       }
       throw error;
     }
-    await deps.queue.enqueue(buildJob.captureServiceLog({ service: service.value }));
-    return redirectWithFlash(
-      reply,
+    const job = await deps.queue.enqueue(buildJob.captureServiceLog({ service: service.value }));
+    return redirectOnceApplied(reply, deps.awaitJob, job,
       '/admin/logs',
       viewerOf(session, request).t('Capturing the {service} journal.', { service: service.value }),
     );
