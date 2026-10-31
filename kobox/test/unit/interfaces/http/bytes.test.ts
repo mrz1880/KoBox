@@ -21,6 +21,10 @@ describe('formatBytes', () => {
     const fr = french;
 
     expect(formatBytes(212 * GIB, fr)).toBe('212 Gio');
-    expect(formatBytes(2048 * GIB, fr)).toBe('2.00 Tio');
+    expect(formatBytes(2048 * GIB, fr)).toBe('2,00 Tio');
+  });
+
+  it('should_write_the_decimal_mark_the_way_a_french_reader_does', () => {
+    expect(formatBytes(1.5 * GIB, french)).toBe('1,5 Gio');
   });
 });
