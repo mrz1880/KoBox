@@ -134,6 +134,7 @@ button.danger { background: var(--danger); border-color: var(--danger); }
 form.inline { display: inline; } form.inline button { margin: 0; min-height: 2.25rem; padding: 0.2rem 0.8rem; font-size: 0.85rem; }
 .flash { border-left: 3px solid var(--green); background: var(--panel); border-radius: 8px; padding: 0.7rem 1rem; margin: 1rem 0; }
 .error { border-left-color: var(--danger); }
+.flash.warn { border-left-color: var(--amber); }
 .muted { color: var(--muted); font-size: 0.85rem; }
 .links { margin-top: 1.5rem; }
 
@@ -162,6 +163,21 @@ form.inline { display: inline; } form.inline button { margin: 0; min-height: 2.2
 .facts dd {
   margin: 0; font-family: ui-monospace, monospace; font-variant-numeric: tabular-nums;
   font-size: 0.85rem; overflow-wrap: anywhere;
+}
+
+/* A member's space: the free figure to read at a glance, then the quota as a
+   track, used from the left; what the disk can no longer hold is hatched. */
+.space { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 1.1rem 1.25rem; margin: 1rem 0; max-width: 36rem; }
+.space p { margin: 0.35rem 0 0; }
+.space > :first-child { margin-top: 0; }
+.space-free { color: var(--muted); }
+.space-free b { font-size: 2rem; color: var(--ink); font-variant-numeric: tabular-nums; margin-right: 0.15rem; }
+.gauge { display: flex; height: 0.75rem; margin: 0.6rem 0 0.4rem; background: var(--bg); border: 1px solid var(--line); border-radius: 999px; overflow: hidden; }
+.gauge .used { background: var(--teal); }
+.gauge .beyond {
+  margin-left: auto;
+  background: repeating-linear-gradient(135deg, var(--amber) 0 4px, transparent 4px 8px);
+  opacity: 0.6;
 }
 
 /* --- Signal strip: the console signature ---------------------------------
