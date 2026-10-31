@@ -166,9 +166,9 @@ form.inline { display: inline; } form.inline button { margin: 0; min-height: 2.2
 
 /* --- Signal strip: the console signature ---------------------------------
    Each user reads as a mixing-desk channel: a state LED, a segmented VU of
-   egress against their fair-use budget, then the numbers. Segments (not a
-   smooth bar) are the deliberate cue: a bar that runs into the peak zone is
-   how an abuser becomes obvious at a glance instead of days later. */
+   egress against the busiest channel, then the numbers. The length compares
+   members at a glance; the colour is their fair-use level, never their place
+   on a relative scale. */
 .eyebrow {
   font-size: 0.68rem; letter-spacing: 0.14em; text-transform: uppercase;
   color: var(--muted); font-weight: 600;
@@ -200,8 +200,6 @@ form.inline { display: inline; } form.inline button { margin: 0; min-height: 2.2
 .vu i.on { background: var(--teal); }
 .vu i.on.warn { background: var(--amber); }
 .vu i.on.peak { background: var(--danger); }
-/* the peak zone stays tinted even unlit, so the scale is readable at rest */
-.vu i.zone { background: color-mix(in srgb, var(--danger) 18%, var(--line)); }
 .ribbon {
   display: flex; flex-wrap: wrap; gap: 0.6rem 2rem; align-items: baseline;
   padding: 1rem 1.25rem; border: 1px solid var(--line); border-radius: 12px;
