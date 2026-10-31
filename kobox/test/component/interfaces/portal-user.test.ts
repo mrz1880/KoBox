@@ -384,6 +384,48 @@ describe('my media', () => {
     expect(body).toContain('2,5 Gio');
   });
 
+  async function sized(...files: [string, number][]): Promise<void> {
+    await world.media.replaceFor(
+      alice,
+      files.map(([path, mib]) => ({ path: MediaPath.parse(path), sizeBytes: mib * 1024 ** 2 })),
+      NOW,
+    );
+  }
+
+  async function namesOn(url: string): Promise<string[]> {
+    const body = (await world.server.inject({ method: 'GET', url, headers: { cookie: user.cookie } }))
+      .body;
+    return [...body.matchAll(/<td class="path">([^<]+)<\/td>/g)].map((match) => match[1] ?? '');
+  }
+
+  it('should_list_the_biggest_files_first_when_asked_to_sort_by_size', async () => {
+    await sized(['films/Small.mkv', 10], ['films/Big.mkv', 3000], ['films/Middle.mkv', 500]);
+
+    expect(await namesOn('/media?sort=size&order=desc')).toEqual([
+      'Big.mkv',
+      'Middle.mkv',
+      'Small.mkv',
+    ]);
+  });
+
+  it('should_let_a_column_header_sort_the_list_and_say_which_one_does', async () => {
+    await sized(['films/Some.Film.mkv', 10]);
+
+    const body = (
+      await world.server.inject({
+        method: 'GET',
+        url: '/media?sort=size&order=desc',
+        headers: { cookie: user.cookie },
+      })
+    ).body;
+    const header = (label: string) => new RegExp(`<th[^>]*>(?:(?!</th>)[^])*${label}[^]*?</th>`).exec(body)?.[0] ?? '';
+
+    expect(header('Size')).toContain('aria-sort="descending"');
+    expect(header('Size')).toMatch(/href="\/media\?sort=size&(amp;)?order=asc"/);
+    expect(header('File')).not.toContain('aria-sort');
+    expect(header('File')).toMatch(/href="\/media\?sort=name&(amp;)?order=asc"/);
+  });
+
   it('should_hand_the_bytes_to_nginx_instead_of_reading_them', async () => {
     await give(alice, 'films/Some.Film.mkv');
 

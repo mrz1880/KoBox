@@ -5,6 +5,7 @@ import type { SshPublicKey } from '../../../domain/user/SshPublicKey.js';
 import type { SeedboxUser } from '../../../domain/user/SeedboxUser.js';
 import { BROWSER_CHOICE } from '../browserLanguage.js';
 import { formatBytes } from './bytes.js';
+import type { MediaColumn, MediaOrder } from './mediaOrder.js';
 import { memberSpace, type MeasuredSpace } from './space.js';
 import { html, type RawHtml } from '../html.js';
 import { flash, page, sentence, type Reader, type Viewer } from './layout.js';
@@ -631,10 +632,21 @@ function playbackNote(file: MediaFile, viewer: Viewer): RawHtml | undefined {
   }
 }
 
+const READ_AS: Record<MediaOrder['direction'], string> = { asc: 'ascending', desc: 'descending' };
+const ARROW: Record<MediaOrder['direction'], string> = { asc: '▲', desc: '▼' };
+
+// A header that sorts the list: a plain link, so it works without a script,
+// and aria-sort tells a screen reader which column the list follows.
+function sortHeader(label: string, column: MediaColumn, order: MediaOrder, viewer: Viewer): RawHtml {
+  const active = order.column === column;
+  return html`<th${active ? html` aria-sort="${READ_AS[order.direction]}"` : ''}><a class="sort" href="/media?${order.linkFor(column)}">${viewer.t(label)}${active ? html` <span aria-hidden="true">${ARROW[order.direction]}</span>` : ''}</a></th>`;
+}
+
 export function mediaPage(
   viewer: Viewer,
   files: readonly MediaFile[],
   folders: readonly Label[],
+  order: MediaOrder,
   message?: string,
 ): string {
   // A folder exists before its contents do. Seeding the groups from the
@@ -657,8 +669,8 @@ export function mediaPage(
 <p class="muted">${viewer.t('Empty for now.')}</p>`
           : html`<h2>${category}</h2>
 <table>
-  <thead><tr><th>${viewer.t('File')}</th><th>${viewer.t('Size')}</th><th>${viewer.t('In the browser')}</th><th></th></tr></thead>
-  <tbody>${items.map(
+  <thead><tr>${sortHeader('File', 'name', order, viewer)}${sortHeader('Size', 'size', order, viewer)}<th>${viewer.t('In the browser')}</th><th></th></tr></thead>
+  <tbody>${order.sorted(items).map(
     (file) => html`<tr>
   <td class="path">${file.path.name}</td>
   <td class="num">${formatBytes(file.sizeBytes, viewer)}</td>

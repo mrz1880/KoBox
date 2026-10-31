@@ -71,6 +71,8 @@ th, td {
   vertical-align: top;
 }
 th { color: var(--muted); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.06em; }
+th a.sort { color: inherit; text-decoration: none; }
+th a.sort:hover, th a.sort:focus, th[aria-sort] a.sort { color: var(--ink); }
 td.num, td.mono { font-family: ui-monospace, monospace; font-variant-numeric: tabular-nums; }
 td.num { white-space: nowrap; }
 /* a word in a figures column ("not measured") stays a word */
