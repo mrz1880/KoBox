@@ -293,32 +293,42 @@ ${flash(viewer.t, message)}
   </form>
 </div>
 
+<div class="tiles">
+<section class="tile">
 <h2>${viewer.t('Portal role')}</h2>
 <div class="card">${portalRole(name, role, viewer)}</div>
-
+</section>
+<section class="tile">
 <h2>${viewer.t('Storage')}</h2>
 <div class="card">${storage(user, usage, volume, viewer)}</div>
-
+</section>
+<section class="tile">
 <h2>${viewer.t('Nextcloud')}</h2>
 <div class="card">
   <p class="muted">${viewer.t('nextcloud.what', { name })}</p>
 </div>
-
+</section>
+<section class="tile">
 <h2>${viewer.t('Reusing what is already here')}</h2>
 <div class="card">${recycling(name, instance, viewer)}</div>
-
+</section>
+<section class="tile">
 <h2>${viewer.t('Public trackers')}</h2>
 <div class="card">${publicTrackers(name, instance, viewer)}</div>
-
+</section>
+<section class="tile">
 <h2>${viewer.t('Their own scripts')}</h2>
 <div class="card">${finishScripts(name, instance, viewer)}</div>
-
+</section>
+<section class="tile">
 <h2>${viewer.t('Password')}</h2>
 <form class="card" method="post" action="/admin/users/${name}/password-link">
   <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
   <p class="muted">${viewer.t(access === 'invited' ? 'password.invited' : 'password.active', { name })}</p>
   <button type="submit">${viewer.t(access === 'invited' ? 'Resend the invitation' : 'Send a reset link')}</button>
-</form>`,
+</form>
+</section>
+</div>`,
     viewer,
     'admin',
     { entry: 'Members', titleValues: { name } },
