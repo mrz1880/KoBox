@@ -37,4 +37,12 @@ describe('SCHEDULED_JOBS', () => {
       expect(entry.command).toMatch(/^[a-z0-9-]+$/);
     }
   });
+
+  // a page that says when something runs next reads it from this table
+  it('should_find_the_schedule_of_a_subcommand_or_nothing', async () => {
+    const { scheduleOf } = await import('../../../../src/domain/maintenance/schedule.js');
+
+    expect(scheduleOf('sample-disk-usage')?.value).toBe('20 * * * *');
+    expect(scheduleOf('no-such-job')).toBeUndefined();
+  });
 });

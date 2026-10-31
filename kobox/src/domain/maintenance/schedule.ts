@@ -44,3 +44,8 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
   // choice; the choice survives, the crontab writing does not.
   entry('5 * * * *', 'send-pending-transfers'),
 ];
+
+// When a subcommand runs, as the table above has it.
+export function scheduleOf(command: string): CronSchedule | undefined {
+  return SCHEDULED_JOBS.find((job) => job.command === command)?.schedule;
+}
