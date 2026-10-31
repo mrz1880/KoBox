@@ -96,7 +96,7 @@ export function syncPage(
   );
   return page(
     'Folders',
-    html`<h1>${viewer.t('Your folders')}</h1>
+    html`<h1>${viewer.t('Folders')}</h1>
 <p class="muted">${viewer.t("A folder is what you sort your downloads into. Drop a torrent in a folder's watch directory and what comes out lands in that folder, and, if you ask for it here, gets copied on to your own machine.")}</p>
 ${flash(viewer.t, message)}
 ${categories.length === 0
