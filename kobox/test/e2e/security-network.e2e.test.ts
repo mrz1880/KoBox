@@ -247,6 +247,7 @@ describe.skipIf(!onDebianAsRoot)('E2E: security & network — the user-h slice',
     const alert = ntfyReceived.at(-1);
     expect(alert?.title).toContain('Abnormal SSH sign-in rate');
     expect(alert?.body).toContain(USER);
+    const alertsSoFar = ntfyReceived.length;
 
     // still flooding -> the throttle engages for real
     kobox(['evaluate-fair-use']);
@@ -254,7 +255,6 @@ describe.skipIf(!onDebianAsRoot)('E2E: security & network — the user-h slice',
     expect(dbRow('SELECT * FROM fair_use_state WHERE username = ?', USER)?.level).toBe('throttled');
     const uidHex = uidOf(USER).toString(16);
     expect(sh('tc', ['class', 'show', 'dev', 'eth0'])).toContain(`1:${uidHex}`);
-    expect(ntfyReceived.at(-1)?.title).toContain('auto-throttled');
 
     // calm again -> recovery lifts the throttle
     wipeJournalWindow();
@@ -262,7 +262,9 @@ describe.skipIf(!onDebianAsRoot)('E2E: security & network — the user-h slice',
     await drainQueue();
     expect(dbRow('SELECT * FROM fair_use_state WHERE username = ?', USER)?.level).toBe('none');
     expect(sh('tc', ['class', 'show', 'dev', 'eth0'])).not.toContain(`1:${uidHex}`);
-    expect(ntfyReceived.at(-1)?.title).toContain('back within fair use');
+    // the throttle and its lifting mend things by themselves: they are on the
+    // audit trail below, not in the admin's notifications
+    expect(ntfyReceived).toHaveLength(alertsSoFar);
 
     // every rung is on the audit trail
     const audit = dbAll(
