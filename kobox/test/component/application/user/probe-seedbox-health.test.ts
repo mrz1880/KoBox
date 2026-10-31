@@ -26,6 +26,15 @@ describe('probing the seedbox health', () => {
     ]);
   });
 
+  // a socket on a port number said nothing about whose rTorrent was down
+  it('should_name_the_member_whose_socket_each_probe_reaches', async () => {
+    await repo.save(aUser().withUsername('alice').withScgiPort(51101).build());
+
+    const checks = await probe.execute();
+
+    expect(checks.map((check) => check.member?.value)).toEqual([undefined, 'alice']);
+  });
+
   // rtorrent runs one instance per member: with nobody to serve, its absence is
   // the expected state, not a failure
   it.each([

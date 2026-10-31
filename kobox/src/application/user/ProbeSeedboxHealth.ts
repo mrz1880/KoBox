@@ -1,4 +1,9 @@
 import type { HealthCheckResult, HealthProbePort, UserRepository } from '../../domain/user/ports.js';
+import type { Username } from '../../domain/user/Username.js';
+
+// A probe and, for a member's own socket, whose it is: a port number alone
+// does not say whose rTorrent stopped answering.
+export type SeedboxCheck = HealthCheckResult & { readonly member?: Username };
 
 interface Deps {
   readonly repo: UserRepository;
@@ -16,14 +21,17 @@ const SCGI_HOST = '127.0.0.1';
 export class ProbeSeedboxHealth {
   constructor(private readonly deps: Deps) {}
 
-  async execute(): Promise<HealthCheckResult[]> {
+  async execute(): Promise<SeedboxCheck[]> {
     const active = (await this.deps.repo.listAll()).filter((user) => !user.status.isSuspended());
     if (active.length === 0) {
       return [];
     }
-    const checks: HealthCheckResult[] = [await this.deps.health.checkProcess('rtorrent')];
+    const checks: SeedboxCheck[] = [await this.deps.health.checkProcess('rtorrent')];
     for (const user of active) {
-      checks.push(await this.deps.health.checkSocket(SCGI_HOST, user.scgiPort.value));
+      checks.push({
+        ...(await this.deps.health.checkSocket(SCGI_HOST, user.scgiPort.value)),
+        member: user.username,
+      });
     }
     return checks;
   }

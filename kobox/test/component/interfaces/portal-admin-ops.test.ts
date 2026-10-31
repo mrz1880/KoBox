@@ -89,6 +89,16 @@ describe('admin health screen', () => {
     expect(response.body).toContain('current');
   });
 
+  it('should_name_the_member_beside_the_probe_of_their_socket', async () => {
+    const response = await world.server.inject({
+      method: 'GET',
+      url: '/admin/health',
+      headers: { cookie: admin.cookie },
+    });
+
+    expect(response.body).toContain('<td class="mono">socket:127.0.0.1:51101</td>\n  <td>alice</td>');
+  });
+
   // the ledger printed its stored words and UTC stamps, and an em dash for a
   // release never switched to
   it('should_say_the_releases_ledger_in_the_admins_words_and_clock', async () => {
