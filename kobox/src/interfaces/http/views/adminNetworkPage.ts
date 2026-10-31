@@ -188,7 +188,7 @@ ${flash(viewer.t, message)}
 </form>
 
 <h2>${viewer.t('Recent events')}</h2>
-${eventBlocks}`,
+${eventBlocks.length > 0 ? eventBlocks : html`<p class="muted">${viewer.t('No event recorded yet.')}</p>`}`,
     viewer,
     'admin',
   );

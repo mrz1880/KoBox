@@ -5,7 +5,7 @@ import type { Speedtest } from '../../../domain/maintenance/speedtest.js';
 import { ManagedService } from '../../../domain/maintenance/ManagedService.js';
 import type { HealthCheckResult } from '../../../domain/user/ports.js';
 import { html, type RawHtml } from '../html.js';
-import { flash, page, sentence, type Viewer } from './layout.js';
+import { flash, page, rowsOrEmpty, sentence, type Viewer } from './layout.js';
 import type { Translate } from './messages.js';
 
 function healthChip(state: string, t: Translate): RawHtml {
@@ -141,13 +141,13 @@ ${linkSpeedSection(viewer, measurements, speedtestAvailable)}
 <h2>${viewer.t('Components')}</h2>
 <table>
   <thead><tr><th>${viewer.t('Component')}</th><th>${viewer.t('State')}</th><th>${viewer.t('Version')}</th><th>${viewer.t('Reason')}</th></tr></thead>
-  <tbody>${componentRows}</tbody>
+  <tbody>${rowsOrEmpty(componentRows, { columns: 4, message: 'No component installed yet.' }, viewer.t)}</tbody>
 </table>
 
 <h2>${viewer.t('Releases')}</h2>
 <table>
   <thead><tr><th>${viewer.t('Ref')}</th><th>${viewer.t('State')}</th><th>${viewer.t('Created')}</th><th>${viewer.t('Switched')}</th></tr></thead>
-  <tbody>${releaseRows}</tbody>
+  <tbody>${rowsOrEmpty(releaseRows, { columns: 4, message: 'No release deployed yet.' }, viewer.t)}</tbody>
 </table>`,
     viewer,
     'admin',
