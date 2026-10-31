@@ -5,6 +5,7 @@ import type { SshPublicKey } from '../../../domain/user/SshPublicKey.js';
 import type { SeedboxUser } from '../../../domain/user/SeedboxUser.js';
 import { BROWSER_CHOICE } from '../browserLanguage.js';
 import { formatBytes } from './bytes.js';
+import { icon } from './icons.js';
 import type { MediaColumn, MediaOrder } from './mediaOrder.js';
 import { memberSpace, type MeasuredSpace } from './space.js';
 import { html, type RawHtml } from '../html.js';
@@ -615,21 +616,29 @@ ${languageSection(viewer, facts)}
   );
 }
 
-// The end of the journey: what actually landed, ready to watch or take away.
-// Grouped by the folder the file came down into, because that is how people
-// think about it — not by the flat table the database happens to hold.
-// Said beside each video, so nobody wonders why one has no player: nothing is
-// re-encoded, and most releases come in a container browsers do not open.
-function playbackNote(file: MediaFile, viewer: Viewer): RawHtml | undefined {
+// Beside each video, so nobody wonders why one has no player: nothing is
+// re-encoded, and most releases come in a container browsers do not open. The
+// slot stays even when empty, so the download icons line up.
+function playSlot(file: MediaFile, viewer: Viewer): RawHtml {
   switch (file.playback) {
-    case 'in-browser':
-      return html`<span class="chip ok">${viewer.t('Plays here')}</span>`;
-    case 'download-only':
-      return html`<span class="chip warn">${viewer.t('Download to watch')}</span>
-<span class="muted">${viewer.t('{container}: browsers do not play it', { container: file.extension.toUpperCase() })}</span>`;
+    case 'in-browser': {
+      const label = viewer.t('Watch in the browser');
+      return html`<a class="icon-action" href="/media/watch?path=${file.path.value}" aria-label="${label}" title="${label}">${icon('play')}</a>`;
+    }
+    case 'download-only': {
+      const why = viewer.t('{container}: browsers do not play it. Download it to watch it.', {
+        container: file.extension.toUpperCase(),
+      });
+      return html`<span class="icon-action muted" role="img" aria-label="${why}" title="${why}">${icon('tv-off')}</span>`;
+    }
     case 'not-a-video':
-      return undefined;
+      return html`<span class="icon-action"></span>`;
   }
+}
+
+function downloadLink(file: MediaFile, viewer: Viewer): RawHtml {
+  const label = viewer.t('Download');
+  return html`<a class="icon-action" href="/media/file?path=${file.path.value}" download aria-label="${label}" title="${label}">${icon('download')}</a>`;
 }
 
 const READ_AS: Record<MediaOrder['direction'], string> = { asc: 'ascending', desc: 'descending' };
@@ -642,6 +651,9 @@ function sortHeader(label: string, column: MediaColumn, order: MediaOrder, viewe
   return html`<th${active ? html` aria-sort="${READ_AS[order.direction]}"` : ''}><a class="sort" href="/media?${order.linkFor(column)}">${viewer.t(label)}${active ? html` <span aria-hidden="true">${ARROW[order.direction]}</span>` : ''}</a></th>`;
 }
 
+// The end of the journey: what actually landed, ready to watch or take away.
+// Grouped by the folder the file came down into, because that is how people
+// think about it, not by the flat table the database happens to hold.
 export function mediaPage(
   viewer: Viewer,
   files: readonly MediaFile[],
@@ -669,16 +681,12 @@ export function mediaPage(
 <p class="muted">${viewer.t('Empty for now.')}</p>`
           : html`<h2>${category}</h2>
 <table>
-  <thead><tr>${sortHeader('File', 'name', order, viewer)}${sortHeader('Size', 'size', order, viewer)}<th>${viewer.t('In the browser')}</th><th></th></tr></thead>
+  <thead><tr>${sortHeader('File', 'name', order, viewer)}${sortHeader('Size', 'size', order, viewer)}<th class="act"></th></tr></thead>
   <tbody>${order.sorted(items).map(
     (file) => html`<tr>
   <td class="path">${file.path.name}</td>
   <td class="num">${formatBytes(file.sizeBytes, viewer)}</td>
-  <td>${playbackNote(file, viewer)}</td>
-  <td>${file.playback === 'in-browser'
-      ? html`<a href="/media/watch?path=${file.path.value}">${viewer.t('Watch')}</a> ·
-        <a href="/media/file?path=${file.path.value}" download>${viewer.t('Download')}</a>`
-      : html`<a href="/media/file?path=${file.path.value}" download>${viewer.t('Download')}</a>`}</td>
+  <td class="act">${playSlot(file, viewer)}${downloadLink(file, viewer)}</td>
 </tr>`,
   )}</tbody>
 </table>`,

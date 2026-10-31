@@ -237,6 +237,9 @@ form.inline { display: inline; } form.inline button { margin: 0; min-height: 2.2
   .strip .figures { grid-column: 1 / -1; text-align: left; }
   .strip .vu { grid-column: 1 / -1; }
 }
+.icon { width: 1.15rem; height: 1.15rem; vertical-align: middle; }
+.icon-action { display: inline-flex; justify-content: center; width: 2rem; padding: 0.25rem 0; border-radius: 6px; }
+a.icon-action:hover, a.icon-action:focus { background: var(--raised); }
 .chip { display: inline-block; padding: 0.05rem 0.5rem; border-radius: 999px; font-size: 0.78rem; border: 1px solid var(--line); }
 .chip.ok { color: var(--green); border-color: var(--green); }
 .chip.warn { color: var(--amber); border-color: var(--amber); }

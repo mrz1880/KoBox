@@ -357,10 +357,9 @@ describe('my media', () => {
     const row = (name: string) =>
       new RegExp(`<tr>(?:(?!<tr>)[^])*?${name}[^]*?</tr>`).exec(body)?.[0] ?? '';
 
-    expect(row('Playable.mp4')).toContain('Plays here');
-    expect(row('Container.mkv')).toContain('Download to watch');
-    expect(row('Container.mkv')).toContain('MKV');
-    expect(row('Container.nfo')).not.toMatch(/Plays here|Download to watch/);
+    expect(row('Playable.mp4')).toContain('aria-label="Watch in the browser"');
+    expect(row('Container.mkv')).toContain('MKV: browsers do not play it. Download it to watch it.');
+    expect(row('Container.nfo')).not.toMatch(/Watch in the browser|browsers do not play it/);
     // and the page says once which files play in the browser
     expect(body).toContain('MP4 and WebM videos play in the browser');
   });
@@ -424,6 +423,23 @@ describe('my media', () => {
     expect(header('Size')).toMatch(/href="\/media\?sort=size&(amp;)?order=asc"/);
     expect(header('File')).not.toContain('aria-sort');
     expect(header('File')).toMatch(/href="\/media\?sort=name&(amp;)?order=asc"/);
+  });
+
+  // the words "Download" and "MKV: browsers do not play it" on every row
+  // crowded the file names out: each action is an icon, named for whoever
+  // cannot see it and on hover for whoever wonders
+  it('should_show_each_action_as_an_icon_that_still_says_what_it_does', async () => {
+    await sized(['films/Some.Film.mkv', 10]);
+
+    const body = (
+      await world.server.inject({ method: 'GET', url: '/media', headers: { cookie: user.cookie } })
+    ).body;
+    const download = /<a [^>]*href="\/media\/file\?path=films\/Some.Film.mkv"[^>]*>[^]*?<\/a>/.exec(body)?.[0] ?? '';
+
+    expect(download).toContain('aria-label="Download"');
+    expect(download).toContain('title="Download"');
+    expect(download).toContain('<svg');
+    expect(download).not.toMatch(/>\s*Download\s*</);
   });
 
   it('should_hand_the_bytes_to_nginx_instead_of_reading_them', async () => {

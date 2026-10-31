@@ -9,11 +9,9 @@ const FR: Readonly<Record<string, string>> = {
   Home: 'Accueil',
   'My media': 'Mes médias',
   'My files': 'Mes fichiers',
-  'In the browser': 'Dans le navigateur',
-  'Plays here': 'Se lit ici',
-  'Download to watch': 'À télécharger',
   'Full screen': 'Plein écran',
-  '{container}: browsers do not play it': '{container} : les navigateurs ne le lisent pas',
+  '{container}: browsers do not play it. Download it to watch it.':
+    '{container} : les navigateurs ne le lisent pas. Téléchargez-le pour le regarder.',
   'Your seedbox at a glance': 'Votre seedbox en un coup d’œil',
   'Nextcloud, SFTP, network share': 'Nextcloud, SFTP, partage réseau',
   'Watch in the browser': 'Regarder dans le navigateur',
