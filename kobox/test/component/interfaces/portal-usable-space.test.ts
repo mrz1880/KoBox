@@ -110,6 +110,17 @@ describe("an admin's view of a member's space", () => {
     expect(body).toContain('224 GiB left to fill.');
   });
 
+  // the sample is in bytes: a raw division showed every decimal place
+  it('should_round_what_the_member_uses_like_every_other_size', async () => {
+    await world.diskSamples.save({
+      username: Username.parse('alice'),
+      used: Quota.bytes(1.5 * 1024 ** 3 + 123),
+      sampledAt: MEASURED_AT,
+    });
+
+    expect(await pageOf('/admin/users/alice')).toContain('Using 1.5 GiB of 412 GiB');
+  });
+
   it('should_tell_the_admin_when_the_disk_is_what_limits_the_member', async () => {
     await measured(188, 50);
 

@@ -814,7 +814,7 @@ const FR: Readonly<Record<string, string>> = {
     "Personne ne connaît le mot de passe de {name}, pas même vous : un lien par mail lui permet d'en choisir un nouveau.",
   'nextcloud.what':
     '{name} se connecte à Nextcloud et au partage réseau avec le mot de passe du portail : son compte Nextcloud est créé avec, ses trois dossiers rTorrent à la racine, et suit chacun de ses changements. Les membres sont des utilisateurs ordinaires ; seuls les administrateurs du portail administrent Nextcloud.',
-  'storage.using': 'Utilise {used} Gio sur {allowance} Gio',
+  'storage.using': 'Utilise {used} sur {allowance}',
   'storage.measured': 'mesuré le {at}',
   'role.what':
     'Un administrateur voit tous les membres et pilote la machine d’ici ; un membre ne voit que son propre compte. Le changement s’applique dès sa page suivante, et décide aussi s’il administre Nextcloud.',
@@ -857,7 +857,7 @@ const EN: Readonly<Record<string, string>> = {
     "Nobody knows {name}'s password, you included: a link by mail lets them choose a new one.",
   'nextcloud.what':
     '{name} signs in to Nextcloud and to the network share with their portal password: their Nextcloud account is created with it, their three rTorrent folders at its root, and follows every change of it. Members are ordinary Nextcloud users; only portal admins administer it.',
-  'storage.using': 'Using {used} GiB of {allowance} GiB',
+  'storage.using': 'Using {used} of {allowance}',
   'storage.measured': 'measured {at}',
   'role.what':
     'An admin sees every member and runs the box from here; a member sees only their own account. It applies from their next page, and it also decides whether they administer Nextcloud.',
