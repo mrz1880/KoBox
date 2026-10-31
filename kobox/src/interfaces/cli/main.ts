@@ -1041,7 +1041,10 @@ program
   .description('run health probes and print JSON results')
   .action(async () => {
     const c = container();
-    const checks = await new ProbeSeedboxHealth({ repo: c.repo, health: c.healthProbe }).execute();
+    // the printed shape stays the probes alone: scripts read this JSON
+    const checks = (await new ProbeSeedboxHealth({ repo: c.repo, health: c.healthProbe }).execute()).map(
+      ({ member: _member, ...check }) => check,
+    );
     const healthy = checks.every((check) => check.state === 'healthy');
     process.stdout.write(`${JSON.stringify({ healthy, checks }, null, 2)}\n`);
     c.db.close();

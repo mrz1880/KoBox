@@ -3,7 +3,7 @@ import type { OutboxMail } from '../../../application/maintenance/MailOutboxPort
 import type { ComponentRecord } from '../../../domain/installation/ports.js';
 import type { Speedtest } from '../../../domain/maintenance/speedtest.js';
 import { ManagedService } from '../../../domain/maintenance/ManagedService.js';
-import type { HealthCheckResult } from '../../../domain/user/ports.js';
+import type { SeedboxCheck } from '../../../application/user/ProbeSeedboxHealth.js';
 import { html, type RawHtml } from '../html.js';
 import { flash, page, rowsOrEmpty, sentence, type Viewer } from './layout.js';
 import { formatMoment } from './moment.js';
@@ -100,7 +100,7 @@ const RELEASE_STATES: Record<ReleaseState, string> = {
 };
 
 export function adminHealthPage(
-  probes: readonly HealthCheckResult[],
+  probes: readonly SeedboxCheck[],
   components: readonly ComponentRecord[],
   releases: readonly ReleaseRecord[],
   viewer: Viewer,
@@ -111,6 +111,7 @@ export function adminHealthPage(
   const probeRows = probes.map(
     (probe) => html`<tr>
   <td class="mono">${probe.name}</td>
+  <td>${probe.member?.value ?? ''}</td>
   <td>${healthChip(probe.state, viewer.t)}</td>
   <td>${probe.detail ?? ''}</td>
 </tr>`,
@@ -140,7 +141,7 @@ ${flash(viewer.t, message)}
 <p class="links"><a href="/monitoring">${viewer.t('Monitoring of the machine: CPU, memory, network, disks')}</a></p>
 <h2>${viewer.t('Service probes')}</h2>
 <table>
-  <thead><tr><th>${viewer.t('Probe')}</th><th>${viewer.t('State')}</th><th>${viewer.t('Detail')}</th></tr></thead>
+  <thead><tr><th>${viewer.t('Probe')}</th><th>${viewer.t('Member')}</th><th>${viewer.t('State')}</th><th>${viewer.t('Detail')}</th></tr></thead>
   <tbody>${probeRows}</tbody>
 </table>
 
