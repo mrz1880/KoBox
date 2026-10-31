@@ -33,7 +33,7 @@ export interface SignalRow {
   // Full-scale reference for the meter, in bytes. On the fleet console this is
   // the loudest channel, so the desk reads comparatively and an outlier pins the
   // meter. Omitted where there is nothing honest to compare against (a user
-  // looking at their own channel), and then no meter is drawn — the fair-use
+  // looking at their own channel), and then no meter is drawn: the fair-use
   // verdict is carried by the LED and the level, which are authoritative.
   readonly scaleBytes?: number;
   readonly linked?: boolean;
@@ -43,23 +43,26 @@ export interface SignalRow {
 }
 
 const VU_SEGMENTS = 24;
-// the shoulder and peak zones of the meter, in segments
-const VU_WARN_AT = 15;
-const VU_PEAK_AT = 19;
 
-// Segments, not a smooth bar: the eye reads a channel running into the red long
-// before it reads a percentage.
-function vuMeter(egressBytes: number, scaleBytes: number, reader: Reader): RawHtml {
+// The tone of the lit segments: the scale is the busiest channel, so position
+// on it says nothing about fair use; the member's level does.
+function vuTone(level: string): string {
+  if (level === 'throttled') {
+    return ' peak';
+  }
+  return level === 'alerted' ? ' warn' : '';
+}
+
+// Segments, not a smooth bar: the eye compares lengths across the desk long
+// before it reads a figure.
+function vuMeter(egressBytes: number, scaleBytes: number, level: string, reader: Reader): RawHtml {
   const { t } = reader;
   const ratio = scaleBytes > 0 ? egressBytes / scaleBytes : 0;
   const lit = Math.min(VU_SEGMENTS, Math.round(ratio * VU_SEGMENTS));
-  const segments = Array.from({ length: VU_SEGMENTS }, (_unused, index) => {
-    if (index >= lit) {
-      return html`<i class="${index >= VU_PEAK_AT ? 'zone' : ''}"></i>`;
-    }
-    const tone = index >= VU_PEAK_AT ? ' peak' : index >= VU_WARN_AT ? ' warn' : '';
-    return html`<i class="on${tone}"></i>`;
-  });
+  const tone = vuTone(level);
+  const segments = Array.from({ length: VU_SEGMENTS }, (_unused, index) =>
+    index >= lit ? html`<i></i>` : html`<i class="on${tone}"></i>`,
+  );
   return html`<div class="vu" role="img"
     aria-label="${t('Egress {egress}, busiest channel {busiest}', { egress: formatBytes(egressBytes, reader), busiest: formatBytes(scaleBytes, reader) })}">${segments}</div>`;
 }
@@ -89,7 +92,7 @@ export function signalStrip(row: SignalRow, reader: Reader): RawHtml {
   <span class="led ${ledClass(row)}"></span>
   <span class="who">${name}<span class="eyebrow">${stateWords(row, t)}</span></span>
   ${row.scaleBytes !== undefined && row.scaleBytes > 0
-    ? vuMeter(row.egressBytes, row.scaleBytes, reader)
+    ? vuMeter(row.egressBytes, row.scaleBytes, row.level, reader)
     : html`<span>${fairUseChip(row.level, t)}</span>`}
   <span class="figures">${sentence(t, '{sent} sent · {quota} GiB quota', {
     sent: html`<b>${formatBytes(row.egressBytes, reader)}</b>`,

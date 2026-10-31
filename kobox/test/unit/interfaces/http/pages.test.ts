@@ -57,10 +57,19 @@ describe('portal pages', () => {
     expect(litSegments(full.value)).toBe(24);
     expect(litSegments(half.value)).toBe(12);
     expect(litSegments(quiet.value)).toBe(0);
-    // a channel at full scale reaches the peak zone — that is what makes an
-    // outlier visible without reading a number
-    expect(full.value).toContain('on peak');
-    expect(half.value).not.toContain('on peak');
+  });
+
+  // The scale is the busiest channel, so the busiest one always fills it: red
+  // at the top end alarmed about a member well within fair use. The length
+  // compares; the colour says where the member stands.
+  it.each([
+    ['none', 'on"'],
+    ['alerted', 'on warn"'],
+    ['throttled', 'on peak"'],
+  ])('should_colour_a_%s_channel_by_its_fair_use_level', (level, segment) => {
+    const strip = signalStrip(row({ level, egressBytes: 200 * G, scaleBytes: 200 * G }), ENGLISH);
+
+    expect(strip.value.match(/<i class="on[^"]*"/g)).toEqual(Array(24).fill(`<i class="${segment}`));
   });
 
   it('should_drop_the_meter_when_there_is_nothing_honest_to_compare_against', () => {
