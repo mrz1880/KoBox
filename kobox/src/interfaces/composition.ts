@@ -96,6 +96,7 @@ import { SqliteSshKeyRepository } from '../infrastructure/persistence/SqliteSshK
 import { AuthorizedKeysAdapter } from '../infrastructure/system/AuthorizedKeysAdapter.js';
 import { SqliteDiskUsageRepository } from '../infrastructure/persistence/SqliteDiskUsageRepository.js';
 import { SqliteVolumeSampleRepository } from '../infrastructure/persistence/SqliteVolumeSampleRepository.js';
+import { LoggedVolume } from '../infrastructure/system/LoggedVolume.js';
 import { StatfsVolumeAdapter } from '../infrastructure/system/StatfsVolumeAdapter.js';
 import { HOME_BASE } from '../domain/user/homeDirectory.js';
 import { SqlitePortalCredentialsRepository } from '../infrastructure/persistence/SqlitePortalCredentialsRepository.js';
@@ -740,7 +741,7 @@ export function buildContainer(name: string): Container {
     accounts: new SystemAccountAdapter(runner),
     quota,
     diskSamples: new SqliteDiskUsageRepository(db),
-    volume: new StatfsVolumeAdapter(HOME_BASE),
+    volume: new LoggedVolume(new StatfsVolumeAdapter(HOME_BASE), logger),
     volumeSamples: new SqliteVolumeSampleRepository(db),
     // ruTorrent's disk meter shows each member their quota from these
     quotaGauges: new RutorrentQuotaGauges(new RtorrentConfigAdapter(runner)),
