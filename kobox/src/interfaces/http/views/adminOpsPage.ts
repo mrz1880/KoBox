@@ -77,7 +77,7 @@ function managedServicesSection(viewer: Viewer): RawHtml {
   const rows = ManagedService.all().map(
     (name) => html`<tr>
   <td class="mono">${name}</td>
-  <td><form class="inline" method="post" action="/admin/services/restart">
+  <td class="act"><form class="inline" method="post" action="/admin/services/restart">
     <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
     <input type="hidden" name="service" value="${name}">
     <button class="ghost" type="submit">${viewer.t('Restart')}</button>
@@ -87,7 +87,7 @@ function managedServicesSection(viewer: Viewer): RawHtml {
   return html`<h2>${viewer.t('Managed services')}</h2>
 <p class="muted">${viewer.t('The worker itself is not here on purpose: it is what carries out the restart, so restarting it from this page would kill the job mid-flight.')}</p>
 <table>
-  <thead><tr><th>${viewer.t('Unit')}</th><th></th></tr></thead>
+  <thead><tr><th>${viewer.t('Unit')}</th><th class="act">${viewer.t('Action')}</th></tr></thead>
   <tbody>${rows}</tbody>
 </table>`;
 }

@@ -175,6 +175,18 @@ describe('managed services', () => {
     });
   });
 
+  // the button column had no heading and sat out of line with its unit
+  it('should_set_each_restart_button_in_an_action_column_beside_its_unit', async () => {
+    const response = await world.server.inject({
+      method: 'GET',
+      url: '/admin/health',
+      headers: { cookie: admin.cookie },
+    });
+
+    expect(response.body).toContain('<th>Unit</th><th class="act">Action</th>');
+    expect(response.body).toContain('<td class="mono">nginx</td>\n  <td class="act">');
+  });
+
   it('should_refuse_a_unit_outside_the_closed_set', async () => {
     const response = await world.server.inject({
       method: 'POST',

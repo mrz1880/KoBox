@@ -70,6 +70,11 @@ th, td {
 }
 th { color: var(--muted); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.06em; }
 td.num, td.mono { font-family: ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+/* a word in a figures column ("not measured") stays a word */
+td.num .muted { font-family: system-ui, sans-serif; }
+/* a row's own button sits at the end, level with what it acts on */
+th.act, td.act { text-align: right; width: 1%; white-space: nowrap; }
+tr:has(td.act) td { vertical-align: middle; }
 .mono { font-family: ui-monospace, monospace; }
 tr.current td { background: var(--panel); font-weight: 600; }
 /* Diagnostics: a captured excerpt and the panel that frames it. The excerpt
