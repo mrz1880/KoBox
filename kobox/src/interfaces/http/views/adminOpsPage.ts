@@ -1,4 +1,4 @@
-import type { ReleaseRecord } from '../../../application/maintenance/ReleaseRepositoryPort.js';
+import type { ReleaseRecord, ReleaseState } from '../../../application/maintenance/ReleaseRepositoryPort.js';
 import type { OutboxMail } from '../../../application/maintenance/MailOutboxPort.js';
 import type { ComponentRecord } from '../../../domain/installation/ports.js';
 import type { Speedtest } from '../../../domain/maintenance/speedtest.js';
@@ -6,6 +6,7 @@ import { ManagedService } from '../../../domain/maintenance/ManagedService.js';
 import type { HealthCheckResult } from '../../../domain/user/ports.js';
 import { html, type RawHtml } from '../html.js';
 import { flash, page, rowsOrEmpty, sentence, type Viewer } from './layout.js';
+import { formatMoment } from './moment.js';
 import type { Translate } from './messages.js';
 
 function healthChip(state: string, t: Translate): RawHtml {
@@ -91,6 +92,13 @@ function managedServicesSection(viewer: Viewer): RawHtml {
 </table>`;
 }
 
+const RELEASE_STATES: Record<ReleaseState, string> = {
+  staged: 'staged',
+  current: 'in service',
+  previous: 'previous',
+  failed: 'failed',
+};
+
 export function adminHealthPage(
   probes: readonly HealthCheckResult[],
   components: readonly ComponentRecord[],
@@ -111,16 +119,18 @@ export function adminHealthPage(
     (component) => html`<tr>
   <td>${component.name.value}</td>
   <td>${componentChip(component.state.value, viewer.t)}</td>
-  <td class="mono">${component.version?.value ?? '—'}</td>
+  <td class="mono">${component.version?.value ?? ''}</td>
   <td>${component.reason ?? ''}</td>
 </tr>`,
   );
   const releaseRows = releases.map(
     (release) => html`<tr>
   <td class="mono">${release.ref}</td>
-  <td>${release.state}</td>
-  <td class="mono">${release.createdAt}</td>
-  <td class="mono">${release.switchedAt ?? '—'}</td>
+  <td>${viewer.t(RELEASE_STATES[release.state])}</td>
+  <td>${formatMoment(release.createdAt, viewer)}</td>
+  <td>${release.switchedAt === undefined
+    ? html`<span class="muted">${viewer.t('not yet')}</span>`
+    : formatMoment(release.switchedAt, viewer)}</td>
 </tr>`,
   );
   return page(
