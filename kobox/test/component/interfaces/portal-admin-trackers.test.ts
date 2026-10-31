@@ -47,6 +47,17 @@ describe('admin trackers screen', () => {
     expect(response.body).toContain('dead.example.net');
   });
 
+  it('should_say_a_tracker_has_no_certificate_rather_than_show_a_dash', async () => {
+    const response = await world.server.inject({
+      method: 'GET',
+      url: '/admin/trackers',
+      headers: { cookie: admin.cookie },
+    });
+
+    expect(response.body).toContain('<span class="muted">no certificate</span>');
+    expect(response.body).not.toContain('—');
+  });
+
   it('should_refuse_non_admins', async () => {
     const user = await loginAs(world, 'alice');
     const response = await world.server.inject({
@@ -122,6 +133,18 @@ describe('admin blocklists screen', () => {
     expect(response.statusCode).toBe(200);
     expect(response.body).toContain('bluetack');
     expect(response.body).toContain('level1');
+  });
+
+  // an em dash stood for a list never fetched
+  it('should_say_a_list_was_never_updated_rather_than_show_a_dash', async () => {
+    const response = await world.server.inject({
+      method: 'GET',
+      url: '/admin/blocklists',
+      headers: { cookie: admin.cookie },
+    });
+
+    expect(response.body).toContain('<span class="muted">never updated</span>');
+    expect(response.body).not.toContain('—');
   });
 
   it('should_enqueue_update_and_catalog_import', async () => {

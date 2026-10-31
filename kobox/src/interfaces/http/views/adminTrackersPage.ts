@@ -23,7 +23,7 @@ export function adminTrackersPage(
   <td class="mono">${tracker.host.value}</td>
   <td>${tracker.proto.value}:${tracker.port.value}</td>
   <td>${tracker.privacy.value}</td>
-  <td class="mono">${tracker.certExpiry?.value ?? '—'}</td>
+  <td class="mono">${tracker.certExpiry?.value ?? html`<span class="muted">${viewer.t('no certificate')}</span>`}</td>
   <td>${trackerChip(tracker, viewer.t)}</td>
   <td>
     <form class="inline" method="post" action="/admin/trackers/fetch-cert">
@@ -94,7 +94,7 @@ export function adminBlocklistsPage(
   <td>${list.name}</td>
   <td>${toggle(list, viewer)}</td>
   <td>${list.lastUpdate === undefined
-    ? '—'
+    ? html`<span class="muted">${viewer.t('never updated')}</span>`
     : list.lastUpdate.status === 'ok'
       ? html`<span class="chip ok">ok · ${list.lastUpdate.at}</span>`
       : html`<span class="chip bad">${viewer.t('failed')}</span>`}</td>
