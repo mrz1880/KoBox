@@ -531,6 +531,7 @@ const FR: Readonly<Record<string, string>> = {
   Channels: 'Canaux',
   'Meters run full scale at the busiest channel ({scale}). Loudest first.':
     'Les vumètres sont à pleine échelle sur le canal le plus chargé ({scale}). Le plus chargé en premier.',
+  '{amount} MiB': '{amount} Mio',
   '{amount} GiB': '{amount} Gio',
   '{amount} TiB': '{amount} Tio',
   'Egress {egress}, busiest channel {busiest}':

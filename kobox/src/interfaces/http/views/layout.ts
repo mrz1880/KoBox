@@ -72,6 +72,7 @@ th, td {
 }
 th { color: var(--muted); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.06em; }
 td.num, td.mono { font-family: ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+td.num { white-space: nowrap; }
 /* a word in a figures column ("not measured") stays a word */
 td.num .muted { font-family: system-ui, sans-serif; }
 /* a row's own button sits at the end, level with what it acts on */

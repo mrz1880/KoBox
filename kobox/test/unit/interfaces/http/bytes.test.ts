@@ -24,6 +24,16 @@ describe('formatBytes', () => {
     expect(formatBytes(2048 * GIB, fr)).toBe('2,00 Tio');
   });
 
+  // a file under a gibibyte reads better in MiB than as 0.9 GiB, and a tiny one
+  // as 1 MiB rather than as nothing at all
+  it.each([
+    [963 * 1024 ** 2, '963 MiB', '963 Mio'],
+    [1024, '1 MiB', '1 Mio'],
+  ])('should_say_%d_bytes_under_a_gib_in_mib', (bytes, english_, french_) => {
+    expect(formatBytes(bytes, english)).toBe(english_);
+    expect(formatBytes(bytes, french)).toBe(french_);
+  });
+
   it('should_write_the_decimal_mark_the_way_a_french_reader_does', () => {
     expect(formatBytes(1.5 * GIB, french)).toBe('1,5 Gio');
   });

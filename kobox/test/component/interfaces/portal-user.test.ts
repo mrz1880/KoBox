@@ -365,6 +365,25 @@ describe('my media', () => {
     expect(body).toContain('MP4 and WebM videos play in the browser');
   });
 
+  // a French page said "963 MiB" with a decimal point, in its own formatter
+  it('should_say_each_size_in_the_readers_units', async () => {
+    await world.media.replaceFor(
+      alice,
+      [{ path: MediaPath.parse('films/Some.Film.mkv'), sizeBytes: 2.5 * 1024 ** 3 }],
+      NOW,
+    );
+
+    const body = (
+      await world.server.inject({
+        method: 'GET',
+        url: '/media',
+        headers: { cookie: user.cookie, 'accept-language': 'fr' },
+      })
+    ).body;
+
+    expect(body).toContain('2,5 Gio');
+  });
+
   it('should_hand_the_bytes_to_nginx_instead_of_reading_them', async () => {
     await give(alice, 'films/Some.Film.mkv');
 
