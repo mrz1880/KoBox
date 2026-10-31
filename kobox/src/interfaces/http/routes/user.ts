@@ -586,7 +586,7 @@ export function registerUserRoutes(
     // the username comes from the session, never the body: a user can only
     // restart their own instance
     const job = await deps.queue.enqueue(buildJob.restartRtorrent({ username: session.username.value }));
-    return redirectOnceApplied(reply, deps.awaitJob, job, '/rutorrent', 'Restarting your rtorrent.');
+    return redirectOnceApplied(reply, deps.awaitJob, job, '/rutorrent', 'Restarting your rTorrent.');
   });
 
   // The member's folders that hold a download, as the index last saw them. The

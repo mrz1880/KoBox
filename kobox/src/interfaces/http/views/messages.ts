@@ -141,7 +141,7 @@ const FR: Readonly<Record<string, string>> = {
     'Enregistré. Lancez kobox install sur la box pour demander le certificat.',
   'Saved. It applies to what they add from now on, and changes nothing already on disk.':
     'Enregistré. Cela s’applique à ce qu’il ajoutera désormais, et ne change rien de ce qui est déjà sur le disque.',
-  'Restarting your rtorrent.': 'Redémarrage de votre rtorrent.',
+  'Restarting your rTorrent.': 'Redémarrage de votre rTorrent.',
   'Renewing certificates.': 'Renouvellement des certificats.',
   'Relay saved. Applying it now.': 'Relais enregistré. Application en cours.',
   'Putting it back in the queue.': 'Remise en file d’attente.',
@@ -203,7 +203,7 @@ const FR: Readonly<Record<string, string>> = {
   previous: 'précédente',
   'not yet': 'pas encore',
   'Current password': 'Mot de passe actuel',
-  'Restart my rtorrent': 'Redémarrer mon rtorrent',
+  'Restart my rTorrent': 'Redémarrer mon rTorrent',
   'Use this if the interface stops responding.': 'À utiliser si l’interface ne répond plus.',
   'Back to my media': 'Retour à mes médias',
   'Download this file': 'Télécharger ce fichier',
@@ -241,7 +241,7 @@ const FR: Readonly<Record<string, string>> = {
   'Puts your machine on the same network as the server. Rarely needed.':
     'Place votre machine sur le même réseau que le serveur. Rarement utile.',
   'SFTP host': 'Hôte SFTP',
-  'rtorrent port': 'Port rtorrent',
+  'rTorrent port': 'Port rTorrent',
   'Your SFTP password is the one you use here.':
     'Votre mot de passe SFTP est celui que vous utilisez ici.',
   'Open ruTorrent': 'Ouvrir ruTorrent',

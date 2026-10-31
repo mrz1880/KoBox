@@ -19,7 +19,7 @@ describe("a member's pages in French", () => {
       headers: { cookie: member.cookie, 'accept-language': 'fr' },
     });
 
-    expect(response.body).toContain('Redémarrer mon rtorrent');
+    expect(response.body).toContain('Redémarrer mon rTorrent');
   });
 
   // the reason is the domain's own words; the sentence around it is the page's
