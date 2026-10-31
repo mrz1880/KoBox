@@ -126,7 +126,7 @@ export function registerAdminNetworkRoutes(
       const job = await deps.queue.enqueue(build(parsed.data));
       return redirectOnceApplied(reply, deps.awaitJob, job,
         '/admin/addresses',
-        action === 'add' ? 'Adding the address.' : 'Removing the address.',
+        action === 'add' ? 'Address added.' : 'Address removed.',
       );
     });
   }
@@ -152,7 +152,7 @@ export function registerAdminNetworkRoutes(
       const job = await deps.queue.enqueue(build(parsed.data));
       return redirectOnceApplied(reply, deps.awaitJob, job,
         '/admin/addresses',
-        action === 'add-hostname' ? 'Adding the hostname.' : 'Removing the hostname.',
+        action === 'add-hostname' ? 'Hostname added. Its address opens within five minutes.' : 'Hostname removed.',
       );
     });
   }

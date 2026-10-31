@@ -930,6 +930,9 @@ describe('the queue a member can see', () => {
     });
 
     expect(response.statusCode).toBe(303);
+    expect(new URL(String(response.headers.location), 'https://box.example.org').searchParams.get('flash')).toBe(
+      'Back in the queue.',
+    );
     expect(world.queue.jobs[0]).toEqual({
       type: 'requeue-transfer',
       payload: { username: 'alice', id },

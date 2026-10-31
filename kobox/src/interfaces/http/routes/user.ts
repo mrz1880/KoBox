@@ -338,7 +338,7 @@ export function registerUserRoutes(
       deps.passwords,
     );
     const job = await deps.queue.enqueue(change);
-    return redirectOnceApplied(reply, deps.awaitJob, job, '/password', 'Password change under way: it takes a few seconds.');
+    return redirectOnceApplied(reply, deps.awaitJob, job, '/password', 'Password changed.');
   });
 
   // The folders a member actually has, read from their instance: the media page
@@ -406,7 +406,7 @@ export function registerUserRoutes(
     const job = await deps.queue.enqueue(
       buildJob.setSshKey({ username: session.username.value, key: parsed.data.key }),
     );
-    return redirectOnceApplied(reply, deps.awaitJob, job, '/access', 'Key accepted. It is being installed.');
+    return redirectOnceApplied(reply, deps.awaitJob, job, '/access', 'Key installed.');
   });
 
   // The address is the one the request came from, never one typed in: a member
@@ -586,7 +586,7 @@ export function registerUserRoutes(
     // the username comes from the session, never the body: a user can only
     // restart their own instance
     const job = await deps.queue.enqueue(buildJob.restartRtorrent({ username: session.username.value }));
-    return redirectOnceApplied(reply, deps.awaitJob, job, '/rutorrent', 'Restarting your rTorrent.');
+    return redirectOnceApplied(reply, deps.awaitJob, job, '/rutorrent', 'Your rTorrent restarted.');
   });
 
   // The member's folders that hold a download, as the index last saw them. The
@@ -651,7 +651,7 @@ export function registerUserRoutes(
     );
     return redirectOnceApplied(reply, deps.awaitJob, job,
       '/sync',
-      viewerOf(session, request).t('Creating the {folder} folder.', { folder: label.value }),
+      viewerOf(session, request).t('{folder} folder created.', { folder: label.value }),
     );
   });
 
@@ -719,7 +719,7 @@ export function registerUserRoutes(
     return redirectOnceApplied(reply, deps.awaitJob, job,
       '/sync',
       viewerOf(session, request).t(
-        'Queuing what {folder} already holds. Anything already sent stays as it is.',
+        'What {folder} already held is queued. Anything already sent stays as it is.',
         { folder: label.value },
       ),
     );
@@ -747,7 +747,7 @@ export function registerUserRoutes(
     );
     return redirectOnceApplied(reply, deps.awaitJob, job,
       '/sync',
-      viewerOf(session, request).t('Removing the {folder} folder.', { folder: label.value }),
+      viewerOf(session, request).t('{folder} folder removed.', { folder: label.value }),
     );
   });
 
@@ -786,7 +786,7 @@ export function registerUserRoutes(
     );
     return redirectOnceApplied(reply, deps.awaitJob, job,
       '/sync',
-      viewer.t('Renaming {from} to {to}.', { from: label.value, to: to.value }),
+      viewer.t('{from} renamed to {to}.', { from: label.value, to: to.value }),
     );
   });
 
@@ -856,7 +856,7 @@ export function registerUserRoutes(
     const job = await deps.queue.enqueue(
       buildJob.requeueTransfer({ username: session.username.value, id: parsed.data.id }),
     );
-    return redirectOnceApplied(reply, deps.awaitJob, job, '/sync', 'Putting it back in the queue.');
+    return redirectOnceApplied(reply, deps.awaitJob, job, '/sync', 'Back in the queue.');
   });
 
   server.get('/media', async (request, reply) => {

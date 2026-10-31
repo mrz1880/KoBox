@@ -59,9 +59,9 @@ export interface AdminUsersDeps {
 // What each action is called from the operator's side, rather than the job type
 // name that happens to implement it.
 const ACTION_WORDS: Readonly<Record<'delete' | 'suspend' | 'resume', string>> = {
-  delete: 'Deleting {name}.',
-  suspend: 'Suspending {name}.',
-  resume: 'Restoring {name}.',
+  delete: '{name} deleted.',
+  suspend: '{name} suspended.',
+  resume: '{name} restored.',
 };
 
 // A login with no password yet: they have not followed their invitation.

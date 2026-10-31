@@ -76,7 +76,7 @@ export function registerAdminMailRoutes(
     });
     // the job carries no secret at all, only "apply what is stored"
     const job = await deps.queue.enqueue(buildJob.applyMailRelay());
-    return redirectOnceApplied(reply, deps.awaitJob, job, '/admin/mail-relay', 'Relay saved. Applying it now.');
+    return redirectOnceApplied(reply, deps.awaitJob, job, '/admin/mail-relay', 'Relay saved and applied.');
   });
 
   server.post('/admin/mail-relay/test', async (request, reply) => {

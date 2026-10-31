@@ -37,6 +37,6 @@ describe('the Folders page in French', () => {
       headers: french,
     });
 
-    expect(response.body).toContain('<div class="flash">Renommage de films en Movies.</div>');
+    expect(response.body).toContain('<div class="flash">films renommé en Movies.</div>');
   });
 });
