@@ -60,6 +60,26 @@ describe('the My files page', () => {
     expect(body).toContain('Nextcloud is not installed on this box');
   });
 
+  // the missing way was still highlighted as the one to take
+  it('should_not_recommend_nextcloud_while_it_is_missing', async () => {
+    const body = (await filesPage()).body;
+
+    expect(body).not.toContain('Simplest');
+    expect(body).not.toContain('choice pick');
+  });
+
+  it('should_recommend_nextcloud_once_it_is_installed', async () => {
+    await world.components.markInstalled(
+      ComponentName.parse('nextcloud'),
+      undefined,
+      '2026-10-25 12:00:00',
+    );
+
+    const body = (await filesPage()).body;
+
+    expect(body).toContain('<div class="choice pick">\n  <span class="tag">Simplest</span>\n  <h3>Nextcloud</h3>');
+  });
+
   // the share is the member's home, at the box's address in the usual tunnel
   it('should_give_the_network_share_at_the_box_address_in_the_vpn', async () => {
     const body = (await filesPage()).body;
