@@ -191,6 +191,20 @@ describe('self password change', () => {
 });
 
 describe('my access', () => {
+  // three of these forms sat bare at full width, the others in a card
+  it.each(['/access/addresses/add', '/access/hostnames/add', '/access/ssh-key', '/access/language'])(
+    'should_frame_the_form_posting_to_%s_like_every_form_with_fields',
+    async (action) => {
+      const response = await world.server.inject({
+        method: 'GET',
+        url: '/access',
+        headers: { cookie: user.cookie },
+      });
+
+      expect(response.body).toContain(`<form class="card" method="post" action="${action}">`);
+    },
+  );
+
   it('should_show_what_just_happened_on_the_account_page', async () => {
     const saved = await world.server.inject({
       method: 'POST',
