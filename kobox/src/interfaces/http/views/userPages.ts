@@ -91,9 +91,9 @@ export function signalStrip(row: SignalRow, reader: Reader): RawHtml {
   ${row.scaleBytes !== undefined && row.scaleBytes > 0
     ? vuMeter(row.egressBytes, row.scaleBytes, reader)
     : html`<span>${fairUseChip(row.level, t)}</span>`}
-  <span class="figures">${sentence(t, '{sent} sent · {allowance} GiB allowance', {
+  <span class="figures">${sentence(t, '{sent} sent · {quota} GiB quota', {
     sent: html`<b>${formatBytes(row.egressBytes, reader)}</b>`,
-    allowance: html`${row.quotaGib}`,
+    quota: html`${row.quotaGib}`,
   })}</span>
 </div>`;
 }

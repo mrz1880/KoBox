@@ -59,7 +59,7 @@ describe("a member's usable space on their home page", () => {
 
     expect(body).toContain('50 GiB free of your 412 GiB (188 GiB used)');
     expect(body).toContain(
-      'The box is running out of disk, so your allowance can no longer be reached.',
+      'The box is running out of disk, so your quota can no longer be reached.',
     );
   });
 
@@ -76,7 +76,7 @@ describe("a member's usable space on their home page", () => {
 
     expect(body).toContain('50 Gio libres sur vos 412 Gio (188 Gio utilisés), mesuré le 30 octobre 2026 à 20:00.');
     expect(body).toContain(
-      'Le disque de la box arrive à saturation : votre allocation ne peut plus être atteinte.',
+      'Le disque de la box arrive à saturation : votre quota ne peut plus être atteint.',
     );
   });
 
@@ -126,7 +126,7 @@ describe("an admin's view of a member's space", () => {
     await measured(188, 50);
 
     expect(await pageOf('/admin/users/alice')).toContain(
-      '50 GiB left to fill: the box is running out of disk, so the allowance can no longer be reached.',
+      '50 GiB left to fill: the box is running out of disk, so the quota can no longer be reached.',
     );
   });
 
@@ -134,7 +134,7 @@ describe("an admin's view of a member's space", () => {
     await measured(188, 50);
 
     expect(await pageOf('/admin/users/alice', 'fr-FR')).toContain(
-      '50 Gio encore disponibles : le disque de la box arrive à saturation, l’allocation ne peut plus être atteinte.',
+      '50 Gio encore disponibles : le disque de la box arrive à saturation, le quota ne peut plus être atteint.',
     );
   });
 
@@ -169,13 +169,13 @@ describe("an admin's view of a member's space", () => {
     await measured(188, 1000);
 
     expect(await pageOf('/admin/users')).toContain(
-      'Disk: 1000 GiB free of 3.13 TiB. Allowances add up to 824 GiB.',
+      'Disk: 1000 GiB free of 3.13 TiB. Quotas add up to 824 GiB.',
     );
   });
 
   it('should_say_the_disk_is_not_measured_before_the_first_pass', async () => {
     expect(await pageOf('/admin/users')).toContain(
-      'Disk not measured yet. Allowances add up to 824 GiB.',
+      'Disk not measured yet. Quotas add up to 824 GiB.',
     );
   });
 
@@ -187,7 +187,7 @@ describe("an admin's view of a member's space", () => {
     expect(body).toContain('<th>Utilisé</th><th>Libre</th>');
     expect(body).toContain('<span class="chip warn">limité par le disque</span>');
     expect(body).toContain('<span class="muted">non mesuré</span>');
-    expect(body).toContain('Disque : 50 Gio libres sur 3,13 Tio. Les allocations totalisent 824 Gio.');
+    expect(body).toContain('Disque : 50 Gio libres sur 3,13 Tio. Les quotas totalisent 824 Gio.');
   });
 
   it('should_say_the_disk_is_not_measured_yet_in_french', async () => {

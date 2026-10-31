@@ -69,8 +69,8 @@ function boxDisk(
   volume: VolumeSample | undefined,
   viewer: Viewer,
 ): RawHtml {
-  const allowances = viewer.t('Allowances add up to {allowances}.', {
-    allowances: formatBytes(Quota.total(users.map((user) => user.quota)).toBytes(), viewer),
+  const allowances = viewer.t('Quotas add up to {quotas}.', {
+    quotas: formatBytes(Quota.total(users.map((user) => user.quota)).toBytes(), viewer),
   });
   return html`<p>${volume === undefined
     ? viewer.t('Disk not measured yet.')
@@ -211,7 +211,7 @@ ${leftToFill(measuredSpace(user, usage, volume), viewer)}</p>`;
   return html`${used}
 <form method="post" action="/admin/users/${name}/quota">
   <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
-  <label for="quotaGib">${viewer.t('Allowance (GiB)')}</label>
+  <label for="quotaGib">${viewer.t('Quota (GiB)')}</label>
   <input id="quotaGib" name="quotaGib" type="number" min="1" value="${allowance}" required>
   <button type="submit">${viewer.t('Save')}</button>
 </form>
