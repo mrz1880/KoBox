@@ -703,12 +703,6 @@ const FR: Readonly<Record<string, string>> = {
   Egress: 'Sortant',
   Ingress: 'Entrant',
   Sampled: 'Mesuré',
-  'Sustained egress (Mbit/s, empty = keep, "clear" = default)':
-    'Débit sortant soutenu (Mbit/s, vide = garder, « clear » = par défaut)',
-  'SSH auths per hour (empty = keep, "clear" = default)':
-    'Authentifications SSH par heure (vide = garder, « clear » = par défaut)',
-  'Throttle target (Mbit/s, empty = keep, "clear" = default)':
-    'Débit une fois bridé (Mbit/s, vide = garder, « clear » = par défaut)',
   'Apply override': 'Appliquer la dérogation',
   'Recent events': 'Événements récents',
 
@@ -798,6 +792,11 @@ const FR: Readonly<Record<string, string>> = {
   'One member saturating the link makes the box unusable for everyone else.':
     'Un membre qui sature le lien rend la box inutilisable pour tous les autres.',
   'How it works': 'Comment ça marche',
+  'Leave a field empty to keep its current limit.': 'Laissez un champ vide pour garder sa limite actuelle.',
+  'Sustained egress (Mbit/s)': 'Débit sortant soutenu (Mbit/s)',
+  'SSH sign-ins per hour': 'Connexions SSH par heure',
+  'Speed once throttled (Mbit/s)': 'Débit une fois bridé (Mbit/s)',
+  'Back to the default': 'Revenir à la valeur par défaut',
   'admin.band':
     'Administration : les réglages de toute la box et de tous les membres. Ce que vous changez ici concerne tout le monde.',
   'media.playback':

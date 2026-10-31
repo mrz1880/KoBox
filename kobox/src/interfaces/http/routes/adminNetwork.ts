@@ -42,27 +42,31 @@ const hostnameSchema = z.object({
 const overrideField = z
   .string()
   .transform((raw) => raw.trim())
-  .refine((raw) => raw === '' || raw === 'clear' || /^[1-9]\d{0,5}$/.test(raw));
+  .refine((raw) => raw === '' || /^[1-9]\d{0,5}$/.test(raw));
+// a ticked "back to the default" box
+const defaultBox = z.literal('on').optional();
 
 const overrideSchema = z.object({
   username: usernameField,
   egressLimitMbit: overrideField,
+  egressLimitMbitDefault: defaultBox,
   authRatePerHour: overrideField,
+  authRatePerHourDefault: defaultBox,
   throttleToMbit: overrideField,
+  throttleToMbitDefault: defaultBox,
 });
 
-function toBpsOverride(raw: string): number | null | undefined {
-  if (raw === '') {
-    return undefined;
+// One limit as the form gives it: back to the default when its box is ticked
+// (null), left alone when empty (undefined), else the number typed.
+function toOverride(raw: string, backToDefault: 'on' | undefined): number | null | undefined {
+  if (backToDefault === 'on') {
+    return null;
   }
-  return raw === 'clear' ? null : Number(raw) * 1_000_000;
+  return raw === '' ? undefined : Number(raw);
 }
 
-function toCountOverride(raw: string): number | null | undefined {
-  if (raw === '') {
-    return undefined;
-  }
-  return raw === 'clear' ? null : Number(raw);
+function mbitToBps(override: number | null | undefined): number | null | undefined {
+  return typeof override === 'number' ? override * 1_000_000 : override;
 }
 
 export interface AdminNetworkDeps {
@@ -185,9 +189,13 @@ export function registerAdminNetworkRoutes(
     if (!parsed.success) {
       return reply.code(400).send();
     }
-    const egressLimitBps = toBpsOverride(parsed.data.egressLimitMbit);
-    const authRatePerHour = toCountOverride(parsed.data.authRatePerHour);
-    const throttleToBps = toBpsOverride(parsed.data.throttleToMbit);
+    const egressLimitBps = mbitToBps(
+      toOverride(parsed.data.egressLimitMbit, parsed.data.egressLimitMbitDefault),
+    );
+    const authRatePerHour = toOverride(parsed.data.authRatePerHour, parsed.data.authRatePerHourDefault);
+    const throttleToBps = mbitToBps(
+      toOverride(parsed.data.throttleToMbit, parsed.data.throttleToMbitDefault),
+    );
     const job = await deps.queue.enqueue(
       buildJob.setFairUseOverride({
         username: parsed.data.username,
