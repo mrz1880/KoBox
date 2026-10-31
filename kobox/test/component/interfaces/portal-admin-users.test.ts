@@ -252,6 +252,19 @@ describe('admin user lifecycle actions', () => {
     expect(response.body.match(/<section class="tile">\s*<h2>/g)).toHaveLength(7);
   });
 
+  // a paragraph of eight lines stood between the title and the members
+  it('should_open_the_members_list_on_one_sentence_and_fold_the_rest', async () => {
+    const response = await world.server.inject({
+      method: 'GET',
+      url: '/admin/users',
+      headers: { cookie: admin.cookie },
+    });
+
+    expect(response.body).toContain(
+      '<p class="lead">Everyone with an account on the box.</p>\n<details class="explain"><summary>How it works</summary>',
+    );
+  });
+
   it('should_404_on_unknown_users_without_leaking', async () => {
     const response = await world.server.inject({
       method: 'GET',
