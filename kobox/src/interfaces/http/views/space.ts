@@ -58,7 +58,7 @@ export function leftToFill(space: MeasuredSpace | undefined, viewer: Viewer): Ra
     case 'allowance':
       return html`${viewer.t('{free} left to fill.', { free })}`;
     case 'disk':
-      return html`${viewer.t('{free} left to fill: the box is running out of disk, so the allowance can no longer be reached.', { free })}`;
+      return html`${viewer.t('{free} left to fill: the box is running out of disk, so the quota can no longer be reached.', { free })}`;
   }
 }
 
@@ -69,6 +69,6 @@ function diskWarning(limit: SpaceLimit, viewer: Viewer): RawHtml {
       return html``;
     case 'disk':
       return html`
-<p class="flash">${viewer.t('The box is running out of disk, so your allowance can no longer be reached.')}</p>`;
+<p class="flash">${viewer.t('The box is running out of disk, so your quota can no longer be reached.')}</p>`;
   }
 }

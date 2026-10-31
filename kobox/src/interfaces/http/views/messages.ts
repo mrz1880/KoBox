@@ -188,8 +188,8 @@ const FR: Readonly<Record<string, string>> = {
   'Everything is running.': 'Tout fonctionne.',
   '{free} free of your {allowance} ({used} used), measured {at}.':
     '{free} libres sur vos {allowance} ({used} utilisés), mesuré le {at}.',
-  'The box is running out of disk, so your allowance can no longer be reached.':
-    'Le disque de la box arrive à saturation : votre allocation ne peut plus être atteinte.',
+  'The box is running out of disk, so your quota can no longer be reached.':
+    'Le disque de la box arrive à saturation : votre quota ne peut plus être atteint.',
   'Space not measured yet.': 'Espace pas encore mesuré.',
   'Saving your change. This page refreshes by itself until it is done.':
     'Enregistrement en cours. Cette page se recharge toute seule jusqu’à ce que ce soit fait.',
@@ -424,7 +424,7 @@ const FR: Readonly<Record<string, string>> = {
   'limited by the disk': 'limité par le disque',
   'Disk: {free} free of {size}.': 'Disque : {free} libres sur {size}.',
   'Disk not measured yet.': 'Disque pas encore mesuré.',
-  'Allowances add up to {allowances}.': 'Les allocations totalisent {allowances}.',
+  'Quotas add up to {quotas}.': 'Les quotas totalisent {quotas}.',
   Role: 'Rôle',
   Administrator: 'Administrateur',
   Member: 'Membre',
@@ -440,7 +440,6 @@ const FR: Readonly<Record<string, string>> = {
   Resume: 'Réactiver',
   'Delete (irreversible)': 'Supprimer (irréversible)',
   Storage: 'Stockage',
-  'Allowance (GiB)': 'Allocation (Gio)',
   Save: 'Enregistrer',
   'Public trackers': 'Trackers publics',
   'Their own scripts': 'Leurs propres scripts',
@@ -457,8 +456,8 @@ const FR: Readonly<Record<string, string>> = {
   'Nothing measured yet. The hourly pass writes this down.':
     'Rien de mesuré pour l’instant. La passe horaire l’inscrira.',
   '{free} left to fill.': '{free} encore disponibles.',
-  '{free} left to fill: the box is running out of disk, so the allowance can no longer be reached.':
-    '{free} encore disponibles : le disque de la box arrive à saturation, l’allocation ne peut plus être atteinte.',
+  '{free} left to fill: the box is running out of disk, so the quota can no longer be reached.':
+    '{free} encore disponibles : le disque de la box arrive à saturation, le quota ne peut plus être atteint.',
   'No rTorrent instance yet, so there is nothing to allow.':
     'Pas encore d’instance rTorrent, il n’y a donc rien à autoriser.',
   'No rTorrent instance yet, so nothing runs.':
@@ -521,7 +520,7 @@ const FR: Readonly<Record<string, string>> = {
   '{amount} TiB': '{amount} Tio',
   'Egress {egress}, busiest channel {busiest}':
     'Sortant {egress}, canal le plus chargé {busiest}',
-  '{sent} sent · {allowance} GiB allowance': '{sent} envoyés · allocation de {allowance} Gio',
+  '{sent} sent · {quota} GiB quota': '{sent} envoyés · quota de {quota} Gio',
   'Manage users': 'Gérer les membres',
   'within fair use': 'usage raisonnable respecté',
   throttled: 'bridé',
