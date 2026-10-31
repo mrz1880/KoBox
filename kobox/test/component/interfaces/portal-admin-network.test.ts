@@ -167,6 +167,20 @@ describe('admin fair-use screen', () => {
     expect(response.body).toContain('<td class="num"><span class="muted">not measured</span></td>');
   });
 
+  // the screen printed the stored state, healthy or unhealthy, untranslated
+  it('should_say_whether_each_members_service_runs_in_the_admins_words', async () => {
+    await fairUse.saveState(alice, { level: 'none', healthState: 'unhealthy' }, '2026-07-25 09:00:00');
+
+    const response = await world.server.inject({
+      method: 'GET',
+      url: '/admin/fair-use',
+      headers: { cookie: admin.cookie, 'accept-language': 'fr-FR' },
+    });
+
+    expect(response.body).toContain('<td><span class="chip bad">service arrêté</span></td>');
+    expect(response.body).not.toContain('unhealthy');
+  });
+
   it('should_enqueue_an_override_job_translating_clear_to_null', async () => {
     const response = await world.server.inject({
       method: 'POST',

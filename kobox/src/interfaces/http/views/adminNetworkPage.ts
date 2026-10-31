@@ -1,5 +1,10 @@
 import type { DynDnsBinding } from '../../../domain/security/ports.js';
-import type { FairUseLevel, FairUseAuditEntry, UsageSample } from '../../../domain/security/ports.js';
+import type {
+  FairUseLevel,
+  FairUseAuditEntry,
+  UsageSample,
+  UserHealthState,
+} from '../../../domain/security/ports.js';
 import type { UserAddress } from '../../../domain/tracker/ports.js';
 import { html, type RawHtml } from '../html.js';
 import { formatBytes } from './bytes.js';
@@ -87,9 +92,18 @@ ${flash(viewer.t, message)}
 export interface FairUseRow {
   readonly username: string;
   readonly level: FairUseLevel;
-  readonly health: string;
+  readonly health: UserHealthState;
   readonly sample?: UsageSample;
   readonly events: readonly FairUseAuditEntry[];
+}
+
+function healthChip(health: UserHealthState, t: Translate): RawHtml {
+  switch (health) {
+    case 'healthy':
+      return html`<span class="chip ok">${t('active')}</span>`;
+    case 'unhealthy':
+      return html`<span class="chip bad">${t('service down')}</span>`;
+  }
 }
 
 function levelChip(level: FairUseLevel, t: Translate): RawHtml {
@@ -116,7 +130,7 @@ export function adminFairUsePage(
     (row) => html`<tr>
   <td>${row.username}</td>
   <td>${levelChip(row.level, viewer.t)}</td>
-  <td>${row.health}</td>
+  <td>${healthChip(row.health, viewer.t)}</td>
   <td class="num">${row.sample === undefined ? notMeasured(viewer) : formatBytes(row.sample.egressBytes, viewer)}</td>
   <td class="num">${row.sample === undefined ? notMeasured(viewer) : formatBytes(row.sample.ingressBytes, viewer)}</td>
   <td>${row.sample === undefined ? notMeasured(viewer) : formatMoment(row.sample.sampledAt, viewer)}</td>
