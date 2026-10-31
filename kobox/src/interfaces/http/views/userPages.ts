@@ -316,9 +316,10 @@ function twoStepSection(viewer: Viewer, facts: AccessFacts): RawHtml {
 <p class="muted">${viewer.t('After your password, a 6-digit code from an app on your phone (Aegis, Google Authenticator, 1Password...). Someone who learns your password still cannot sign in. Administrators need it to open Administration.')}</p>
 ${facts.hasTwoStep
     ? html`<p><span class="chip ok">${viewer.t('On')}</span></p>
-<form class="inline" method="post" action="/access/two-step/stop">
+<form class="card" method="post" action="/access/two-step/stop">
   <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
-  <input name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" placeholder="${viewer.t('current code')}" required>
+  <label for="stop-code">${viewer.t('Current code from your app')}</label>
+  <input id="stop-code" name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required>
   <button type="submit" class="ghost">${viewer.t('Turn it off')}</button>
 </form>`
     : html`<form class="inline" method="post" action="/access/two-step/start">
@@ -383,13 +384,13 @@ ${facts.currentAddress === undefined
   })}</span>
   <button type="submit">${viewer.t('Add this address')}</button>
 </form>`}
-<form class="inline" method="post" action="/access/addresses/add">
+<form class="card" method="post" action="/access/addresses/add">
   <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
   <label for="ipv4">${viewer.t('Another place')}</label>
   <input id="ipv4" name="ipv4" required inputmode="decimal" placeholder="203.0.113.20">
+  <p class="muted">${viewer.t('For a place you are not at right now, your NAS at home or the office: type the public address it shows to the internet (a site like whatismyip.com, opened from there, tells you).')}</p>
   <button type="submit">${viewer.t('Add')}</button>
 </form>
-<p class="muted">${viewer.t('For a place you are not at right now, your NAS at home or the office: type the public address it shows to the internet (a site like whatismyip.com, opened from there, tells you).')}</p>
 ${hostnamesPart(viewer, facts)}`;
 }
 
@@ -413,7 +414,7 @@ ${facts.hostnames.length === 0
   <button type="submit" class="ghost">${viewer.t('Remove')}</button>
 </form></li>`,
     )}</ul>`}
-<form class="inline" method="post" action="/access/hostnames/add">
+<form class="card" method="post" action="/access/hostnames/add">
   <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
   <label for="hostname">${viewer.t('Hostname')}</label>
   <input id="hostname" name="hostname" required placeholder="myhome.duckdns.org">

@@ -260,7 +260,7 @@ const FR: Readonly<Record<string, string>> = {
   'After your password, a 6-digit code from an app on your phone (Aegis, Google Authenticator, 1Password...). Someone who learns your password still cannot sign in. Administrators need it to open Administration.':
     'Après votre mot de passe, un code à 6 chiffres donné par une application sur votre téléphone (Aegis, Google Authenticator, 1Password...). Quelqu’un qui apprendrait votre mot de passe ne pourrait toujours pas se connecter. Les administrateurs en ont besoin pour ouvrir l’Administration.',
   On: 'Activée',
-  'current code': 'code actuel',
+  'Current code from your app': 'Code actuel donné par votre application',
   'Turn it off': 'La désactiver',
   'Set it up': 'La configurer',
   'Add this key to your authenticator app.':

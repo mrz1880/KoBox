@@ -119,3 +119,20 @@ describe('setting two-step sign-in up', () => {
     expect((await world.credentials.find(Username.parse('boss')))?.twoStep).toBeUndefined();
   });
 });
+
+describe('turning two-step sign-in off', () => {
+  // the field was named by a placeholder only, gone as soon as one types
+  it('should_label_the_code_field_rather_than_rely_on_a_placeholder', async () => {
+    const admin = await loginAs(world, 'boss');
+
+    const response = await world.server.inject({
+      method: 'GET',
+      url: '/access',
+      headers: { cookie: admin.cookie },
+    });
+
+    expect(response.body).toContain('<form class="card" method="post" action="/access/two-step/stop">');
+    expect(response.body).toContain('<label for="stop-code">Current code from your app</label>');
+    expect(response.body).not.toContain('placeholder="current code"');
+  });
+});
