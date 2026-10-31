@@ -58,7 +58,12 @@ import {
 } from '../../../../src/interfaces/http/views/adminUsersPage.js';
 import type { Reader, Viewer } from '../../../../src/interfaces/http/views/layout.js';
 import { loginPage, twoStepCodePage } from '../../../../src/interfaces/http/views/loginPage.js';
-import { frenchSentences, hasFrench, type Translate } from '../../../../src/interfaces/http/views/messages.js';
+import {
+  frenchSentences,
+  hasFrench,
+  translatorFor,
+  type Translate,
+} from '../../../../src/interfaces/http/views/messages.js';
 import {
   choosePasswordPage,
   forgotPasswordPage,
@@ -398,6 +403,15 @@ describe('the French catalogue', () => {
     );
 
     expect(orphans).toEqual([]);
+  });
+
+  // "Port rtorrent" sat a few lines from "rTorrent": a name a reader sees is
+  // spelled the one way, wherever it appears in a sentence
+  it('should_spell_rtorrent_with_its_capital_in_every_sentence', () => {
+    const fr = translatorFor(Language.fr);
+    const sentences = frenchSentences().flatMap((english) => [english, fr(english)]);
+
+    expect(sentences.filter((sentence) => /(^|[^/~\w-])rtorrent\b/.test(sentence))).toEqual([]);
   });
 });
 

@@ -589,7 +589,7 @@ ${flash(viewer.t, message)}
     ? html`<dt>${viewer.t('SFTP host')}</dt><dd>${facts.sftpHost}</dd>`
     : undefined}
   <dt>${viewer.t('Files')}</dt><dd>~/rtorrent/complete</dd>
-  <dt>${viewer.t('rtorrent port')}</dt><dd>${facts.rtorrentPort}</dd>
+  <dt>${viewer.t('rTorrent port')}</dt><dd>${facts.rtorrentPort}</dd>
 </dl>
 <p class="muted">${viewer.t('Your SFTP password is the one you use here.')}</p>
 
@@ -708,7 +708,7 @@ export function rutorrentPage(viewer: Viewer, message?: string): string {
 ${flash(viewer.t, message)}
 <form class="inline" method="post" action="/rutorrent/restart">
   <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
-  <button class="ghost" type="submit">${viewer.t('Restart my rtorrent')}</button>
+  <button class="ghost" type="submit">${viewer.t('Restart my rTorrent')}</button>
   <span class="muted">${viewer.t('Use this if the interface stops responding.')}</span>
 </form>
 <p class="links"><a href="/ru/" target="_blank" rel="noopener">${viewer.t('Full screen')}</a></p>
