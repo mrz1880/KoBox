@@ -4,8 +4,12 @@ import { UsableSpace, type SpaceLimit } from '../../../domain/user/UsableSpace.j
 import type { DiskUsageSample, VolumeSample } from '../../../domain/user/ports.js';
 import { html, type RawHtml } from '../html.js';
 import { formatBytes } from './bytes.js';
-import { formatMoment } from './moment.js';
-import type { Viewer } from './layout.js';
+import { formatAgo, formatClock, nextRunAfter } from './moment.js';
+import { scheduleOf } from '../../../domain/maintenance/schedule.js';
+import { sentence, type Viewer } from './layout.js';
+
+// the scheduled pass that measures every member's space
+const SAMPLE_COMMAND = 'sample-disk-usage';
 
 // A member's space as the last hourly pass left it: what they hold, what their
 // allowance promises, and what they can still fill.
@@ -34,17 +38,58 @@ export function measuredSpace(
   };
 }
 
-// The one sentence a member reads about their space, on their home page.
-export function memberSpace(space: MeasuredSpace | undefined, viewer: Viewer): RawHtml {
+// the share of the quota a figure stands for, as a CSS width
+function shareOfQuota(bytes: number, space: MeasuredSpace): string {
+  const quota = space.allowance.toBytes();
+  const percent = quota === 0 ? 0 : Math.min(100, (bytes / quota) * 100);
+  return `${percent.toFixed(1)}%`;
+}
+
+// The gauge of the quota: what is used, then what is free, and hatched what
+// the disk can no longer hold once it runs short of the promise.
+function gauge(space: MeasuredSpace, viewer: Viewer): RawHtml {
+  const quota = space.allowance.toBytes();
+  const used = space.used.toBytes();
+  const beyond = Math.max(0, quota - used - space.usable.free.toBytes());
+  return html`<div class="gauge" role="img" aria-label="${viewer.t('{used} used of your {quota} quota', {
+    used: formatBytes(used, viewer),
+    quota: formatBytes(quota, viewer),
+  })}"><span class="used" style="width: ${shareOfQuota(used, space)}"></span>${space.usable.limit === 'disk' && beyond > 0
+    ? html`<span class="beyond" style="width: ${shareOfQuota(beyond, space)}"></span>`
+    : html``}</div>`;
+}
+
+// How fresh the reading is, and when the hourly pass reads it again.
+function freshness(space: MeasuredSpace, viewer: Viewer, now: string): RawHtml {
+  const schedule = scheduleOf(SAMPLE_COMMAND);
+  const next = schedule === undefined ? undefined : nextRunAfter(schedule, now, viewer);
+  const ago = viewer.t('Measured {ago}.', { ago: formatAgo(space.measuredAt, now, viewer) });
+  return html`<p class="muted">${ago}${next === undefined
+    ? html``
+    : html` ${viewer.t('Next measure at {time}.', { time: formatClock(next, viewer) })}`}</p>`;
+}
+
+// What a member reads about their space on their home page: the free space
+// first, the gauge of their quota, and how fresh the reading is.
+export function memberSpace(
+  space: MeasuredSpace | undefined,
+  viewer: Viewer,
+  now: string,
+): RawHtml {
   if (space === undefined) {
     return html`<p class="muted">${viewer.t('Space not measured yet.')}</p>`;
   }
-  return html`<p>${viewer.t('{free} free of your {allowance} ({used} used), measured {at}.', {
-    free: formatBytes(space.usable.free.toBytes(), viewer),
-    allowance: formatBytes(space.allowance.toBytes(), viewer),
+  return html`<section class="space">
+<p class="space-free">${sentence(viewer.t, '{free} free', {
+    free: html`<b>${formatBytes(space.usable.free.toBytes(), viewer)}</b>`,
+  })}</p>
+${gauge(space, viewer)}
+<p>${viewer.t('{used} used of your {quota} quota', {
     used: formatBytes(space.used.toBytes(), viewer),
-    at: formatMoment(space.measuredAt, viewer),
-  })}</p>${diskWarning(space.usable.limit, viewer)}`;
+    quota: formatBytes(space.allowance.toBytes(), viewer),
+  })}</p>
+${freshness(space, viewer, now)}
+</section>${diskWarning(space.usable.limit, viewer)}`;
 }
 
 // The admin's side of the same rule, after the "using X of Y" sentence. Says
@@ -69,6 +114,6 @@ function diskWarning(limit: SpaceLimit, viewer: Viewer): RawHtml {
       return html``;
     case 'disk':
       return html`
-<p class="flash">${viewer.t('The box is running out of disk, so your quota can no longer be reached.')}</p>`;
+<p class="flash warn">${viewer.t('The box is running out of disk, so your quota can no longer be reached.')}</p>`;
   }
 }

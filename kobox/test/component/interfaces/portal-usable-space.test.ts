@@ -4,7 +4,8 @@ import { Username } from '../../../src/domain/user/Username.js';
 import { VolumeSpace } from '../../../src/domain/user/VolumeSpace.js';
 import { buildPortalWorld, loginAs, type AgentSession, type PortalWorld } from './portalWorld.js';
 
-const MEASURED_AT = '2026-10-30 19:00:00';
+// forty minutes before the world's clock (NOW, 10:00 UTC, noon in Paris)
+const MEASURED_AT = '2026-07-25 09:20:00';
 
 let world: PortalWorld;
 let member: AgentSession;
@@ -37,36 +38,52 @@ beforeEach(async () => {
 });
 
 describe("a member's usable space on their home page", () => {
-  it('should_say_how_much_the_member_can_still_fill_and_when_it_was_measured', async () => {
+  // a figure to read at a glance, and a gauge of the quota rather than a sentence
+  it('should_put_the_free_space_first_with_a_gauge_of_the_quota', async () => {
     await measured(188, 1000);
 
-    expect(await homeOf(member)).toContain(
-      '224 GiB free of your 412 GiB (188 GiB used), measured October 30, 2026 at 8:00 PM.',
-    );
+    const body = await homeOf(member);
+
+    expect(body).toContain('<p class="space-free"><b>224 GiB</b> free</p>');
+    expect(body).toContain('<span class="used" style="width: 45.6%"></span>');
+    expect(body).toContain('188 GiB used of your 412 GiB quota');
   });
 
-  // a stale or invented figure is worse than none
+  // the reading is hourly: how fresh it is matters more than its date
+  it('should_say_how_long_ago_it_was_measured_and_when_it_is_measured_next', async () => {
+    await measured(188, 1000);
+
+    expect(await homeOf(member)).toContain('Measured 40 minutes ago. Next measure at 12:20 PM.');
+  });
+
   it('should_say_the_space_is_not_measured_before_the_first_pass', async () => {
     expect(await homeOf(member)).toContain('Space not measured yet.');
   });
 
   // the allowances add up to more than the disk: once it runs short, the
   // allowance is a promise the box can no longer keep
-  it('should_say_the_disk_is_the_limit_once_it_holds_less_than_the_allowance', async () => {
+  // the allowances add up to more than the disk: once it runs short, the
+  // allowance is a promise the box can no longer keep
+  it('should_hatch_the_part_of_the_quota_the_disk_can_no_longer_hold', async () => {
     await measured(188, 50);
 
     const body = await homeOf(member);
 
-    expect(body).toContain('50 GiB free of your 412 GiB (188 GiB used)');
+    expect(body).toContain('<p class="space-free"><b>50 GiB</b> free</p>');
+    expect(body).toContain('<span class="beyond" style="width: 42.2%"></span>');
+    // a warning, not a success: it reads in the warning colour
     expect(body).toContain(
-      'The box is running out of disk, so your quota can no longer be reached.',
+      '<p class="flash warn">The box is running out of disk, so your quota can no longer be reached.</p>',
     );
   });
 
   it('should_not_mention_the_disk_while_the_allowance_is_the_limit', async () => {
     await measured(188, 1000);
 
-    expect(await homeOf(member)).not.toContain('running out of disk');
+    const body = await homeOf(member);
+
+    expect(body).not.toContain('running out of disk');
+    expect(body).not.toContain('class="beyond"');
   });
 
   it('should_say_the_usable_space_in_french_to_a_french_browser', async () => {
@@ -74,7 +91,9 @@ describe("a member's usable space on their home page", () => {
 
     const body = await homeOf(member, 'fr-FR');
 
-    expect(body).toContain('50 Gio libres sur vos 412 Gio (188 Gio utilisés), mesuré le 30 octobre 2026 à 20:00.');
+    expect(body).toContain('<p class="space-free"><b>50 Gio</b> libres</p>');
+    expect(body).toContain('188 Gio utilisés sur votre quota de 412 Gio');
+    expect(body).toContain('Mesuré il y a 40 minutes. Prochaine mesure à 12:20.');
     expect(body).toContain(
       'Le disque de la box arrive à saturation : votre quota ne peut plus être atteint.',
     );
@@ -107,7 +126,7 @@ describe("an admin's view of a member's space", () => {
     const body = await pageOf('/admin/users/alice');
 
     expect(body).toContain('Using 188 GiB of 412 GiB');
-    expect(body).toContain('measured October 30, 2026 at 8:00 PM');
+    expect(body).toContain('measured July 25, 2026 at 11:20 AM');
     expect(body).toContain('224 GiB left to fill.');
   });
 

@@ -193,8 +193,10 @@ const FR: Readonly<Record<string, string>> = {
   'You are using a lot of bandwidth right now. Nothing is limited yet.':
     'Vous utilisez beaucoup de bande passante en ce moment. Rien n’est encore limité.',
   'Everything is running.': 'Tout fonctionne.',
-  '{free} free of your {allowance} ({used} used), measured {at}.':
-    '{free} libres sur vos {allowance} ({used} utilisés), mesuré le {at}.',
+  '{free} free': '{free} libres',
+  '{used} used of your {quota} quota': '{used} utilisés sur votre quota de {quota}',
+  'Measured {ago}.': 'Mesuré {ago}.',
+  'Next measure at {time}.': 'Prochaine mesure à {time}.',
   'The box is running out of disk, so your quota can no longer be reached.':
     'Le disque de la box arrive à saturation : votre quota ne peut plus être atteint.',
   'Space not measured yet.': 'Espace pas encore mesuré.',

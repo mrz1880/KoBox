@@ -149,6 +149,7 @@ export function userHomePage(
   viewer: Viewer,
   row: SignalRow,
   space: MeasuredSpace | undefined,
+  now: string,
   message?: string,
 ): string {
   const actions = HOME_ACTIONS.map(
@@ -163,7 +164,7 @@ export function userHomePage(
     html`<h1>${viewer.t('Hello {name}', { name: user.username.value })}</h1>
 ${flash(viewer.t, message)}
 ${plainStatus(row, viewer)}
-${memberSpace(space, viewer)}
+${memberSpace(space, viewer, now)}
 <div class="choices">${actions}</div>
 <p class="links"><a href="/access">${viewer.t('My account and connection details')}</a></p>`,
     viewer,

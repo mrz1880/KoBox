@@ -240,6 +240,7 @@ export function registerUserRoutes(
             await deps.diskSamples.find(user.username),
             await deps.volumeSamples.find(),
           ),
+          deps.now(),
           flashOf(request),
         ),
       );

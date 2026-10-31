@@ -188,7 +188,7 @@ function keysSentToTheCatalogue(): ReadonlySet<string> {
     signalRow({ level: 'throttled' }),
     signalRow({ level: 'alerted' }),
   ]) {
-    userHomePage(user, member, row, undefined);
+    userHomePage(user, member, row, undefined, NOW);
   }
   for (const diskFreeGib of [1000, 10]) {
     userHomePage(
@@ -200,6 +200,7 @@ function keysSentToTheCatalogue(): ReadonlySet<string> {
         { username: alice, used: Quota.gib(100), sampledAt: NOW },
         { space: volume(diskFreeGib), measuredAt: NOW },
       ),
+      NOW,
     );
   }
   passwordPage(member);
