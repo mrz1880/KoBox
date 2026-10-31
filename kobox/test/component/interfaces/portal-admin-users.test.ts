@@ -394,6 +394,18 @@ describe("a member's portal role", () => {
     expect(response.body).toContain('<option value="admin" selected>');
   });
 
+  // the select showed the stored value, user or admin, instead of the role
+  it('should_name_each_role_in_the_admins_words_in_the_role_choice', async () => {
+    const response = await world.server.inject({
+      method: 'GET',
+      url: '/admin/users/boss',
+      headers: { cookie: admin.cookie, 'accept-language': 'fr-FR' },
+    });
+
+    expect(response.body).toContain('<option value="admin" selected>Administrateur</option>');
+    expect(response.body).toContain('<option value="user">Membre</option>');
+  });
+
   it('should_refuse_a_role_the_portal_does_not_know', async () => {
     const response = await world.server.inject({
       method: 'POST',

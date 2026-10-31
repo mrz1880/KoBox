@@ -11,9 +11,12 @@ import { formatBytes } from './bytes.js';
 import { formatMoment } from './moment.js';
 import { leftToFill, measuredSpace, type MeasuredSpace } from './space.js';
 
-function roleOptions(selected: Role): RawHtml[] {
+const ROLE_LABELS: Record<Role, string> = { admin: 'Administrator', user: 'Member' };
+
+function roleOptions(selected: Role, viewer: Viewer): RawHtml[] {
   return ROLES.map(
-    (role) => html`<option value="${role}"${role === selected ? html` selected` : html``}>${role}</option>`,
+    (role) =>
+      html`<option value="${role}"${role === selected ? html` selected` : html``}>${viewer.t(ROLE_LABELS[role])}</option>`,
   );
 }
 
@@ -39,8 +42,6 @@ export interface MemberLogin {
   // has not followed their invitation yet
   readonly invited: boolean;
 }
-
-const ROLE_LABELS: Record<Role, string> = { admin: 'Administrator', user: 'Member' };
 
 // What the hourly pass last measured: each member's usage, by username, and
 // the volume they all share.
@@ -138,7 +139,7 @@ ${boxDisk(users, disk.volume, viewer)}
   <label for="quotaGib">${viewer.t('Quota (GiB)')}</label>
   <input id="quotaGib" name="quotaGib" type="number" min="1" value="412">
   <label for="role">${viewer.t('Portal role')}</label>
-  <select id="role" name="role">${roleOptions('user')}</select>
+  <select id="role" name="role">${roleOptions('user', viewer)}</select>
   <button type="submit">${viewer.t('Send the invitation')}</button>
 </form>`,
     viewer,
@@ -251,7 +252,7 @@ function portalRole(name: string, role: Role | undefined, viewer: Viewer): RawHt
 <form method="post" action="/admin/users/${name}/role">
   <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
   <label for="role">${viewer.t('Portal role')}</label>
-  <select id="role" name="role">${roleOptions(role)}</select>
+  <select id="role" name="role">${roleOptions(role, viewer)}</select>
   <button type="submit">${viewer.t('Save')}</button>
 </form>`;
 }
