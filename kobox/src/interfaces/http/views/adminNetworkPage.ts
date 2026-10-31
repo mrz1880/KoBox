@@ -116,6 +116,16 @@ function levelChip(level: FairUseLevel, t: Translate): RawHtml {
   return html`<span class="chip ok">${t('none')}</span>`;
 }
 
+// One limit of an override: a number, or a box to go back to the default.
+function overrideLimit(
+  field: { readonly id: string; readonly name: string; readonly label: string },
+  viewer: Viewer,
+): RawHtml {
+  return html`<label for="${field.id}">${viewer.t(field.label)}</label>
+  <input id="${field.id}" name="${field.name}" type="number" min="1" max="999999">
+  <label class="check"><input type="checkbox" name="${field.name}Default"> ${viewer.t('Back to the default')}</label>`;
+}
+
 // a member the hourly pass has not sampled yet
 function notMeasured(viewer: Viewer): RawHtml {
   return html`<span class="muted">${viewer.t('not measured')}</span>`;
@@ -180,14 +190,14 @@ ${flash(viewer.t, message)}
 <h2>${viewer.t('Budget override')}</h2>
 <form class="card" method="post" action="/admin/fair-use/override">
   <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
-  <label for="ov-username">${viewer.t('Username')}</label>
-  <input id="ov-username" name="username" required pattern="[a-z][a-z0-9]{0,31}">
-  <label for="ov-egress">${viewer.t('Sustained egress (Mbit/s, empty = keep, "clear" = default)')}</label>
-  <input id="ov-egress" name="egressLimitMbit">
-  <label for="ov-auth">${viewer.t('SSH auths per hour (empty = keep, "clear" = default)')}</label>
-  <input id="ov-auth" name="authRatePerHour">
-  <label for="ov-throttle">${viewer.t('Throttle target (Mbit/s, empty = keep, "clear" = default)')}</label>
-  <input id="ov-throttle" name="throttleToMbit">
+  <label for="ov-username">${viewer.t('Member')}</label>
+  <select id="ov-username" name="username">${rows.map(
+    (row) => html`<option value="${row.username}">${row.username}</option>`,
+  )}</select>
+  <p class="muted">${viewer.t('Leave a field empty to keep its current limit.')}</p>
+  ${overrideLimit({ id: 'ov-egress', name: 'egressLimitMbit', label: 'Sustained egress (Mbit/s)' }, viewer)}
+  ${overrideLimit({ id: 'ov-auth', name: 'authRatePerHour', label: 'SSH sign-ins per hour' }, viewer)}
+  ${overrideLimit({ id: 'ov-throttle', name: 'throttleToMbit', label: 'Speed once throttled (Mbit/s)' }, viewer)}
   <button type="submit">${viewer.t('Apply override')}</button>
 </form>
 

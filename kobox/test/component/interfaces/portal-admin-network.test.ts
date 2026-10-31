@@ -203,7 +203,22 @@ describe('admin fair-use screen', () => {
     );
   });
 
-  it('should_enqueue_an_override_job_translating_clear_to_null', async () => {
+  // a member to pick rather than a name to type, and a box to tick to go
+  // back to the default rather than the word "clear" typed into a number
+  it('should_offer_each_member_and_a_way_back_to_each_default', async () => {
+    const response = await world.server.inject({
+      method: 'GET',
+      url: '/admin/fair-use',
+      headers: { cookie: admin.cookie },
+    });
+
+    expect(response.body).toContain('<select id="ov-username" name="username">');
+    expect(response.body).toContain('<option value="alice">alice</option>');
+    expect(response.body).toContain('name="authRatePerHourDefault"');
+    expect(response.body).not.toContain('clear');
+  });
+
+  it('should_enqueue_an_override_job_with_a_ticked_default_as_null', async () => {
     const response = await world.server.inject({
       method: 'POST',
       url: '/admin/fair-use/override',
@@ -212,7 +227,8 @@ describe('admin fair-use screen', () => {
         _csrf: admin.csrf,
         username: 'alice',
         egressLimitMbit: '100',
-        authRatePerHour: 'clear',
+        authRatePerHour: '',
+        authRatePerHourDefault: 'on',
         throttleToMbit: '',
       }),
     });
