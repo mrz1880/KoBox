@@ -240,6 +240,18 @@ describe('admin user lifecycle actions', () => {
     expect(response.body).toContain('/admin/users/alice/suspend');
   });
 
+  // seven settings ran down one narrow column, twice the height of the screen
+  it('should_lay_the_member_settings_out_as_tiles_that_share_the_width', async () => {
+    const response = await world.server.inject({
+      method: 'GET',
+      url: '/admin/users/alice',
+      headers: { cookie: admin.cookie },
+    });
+
+    expect(response.body).toContain('<div class="tiles">');
+    expect(response.body.match(/<section class="tile">\s*<h2>/g)).toHaveLength(7);
+  });
+
   it('should_404_on_unknown_users_without_leaking', async () => {
     const response = await world.server.inject({
       method: 'GET',

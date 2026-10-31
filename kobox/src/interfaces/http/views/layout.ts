@@ -106,6 +106,14 @@ form.card, div.card {
   background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
   padding: 1.1rem 1.25rem; margin: 1rem 0; max-width: 36rem;
 }
+/* a card's first line sits on its padding, not on a paragraph's margin too */
+.card > :first-child, .card > input[type="hidden"]:first-child + * { margin-top: 0; }
+/* independent settings share the width on a wide screen, one per row on a phone */
+.tiles {
+  display: grid; gap: 0 1.5rem; align-items: start;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 24rem), 1fr));
+}
+.tiles .card { max-width: none; }
 label { display: block; margin: 0.6rem 0 0.15rem; color: var(--muted); font-size: 0.85rem; }
 /* a checkbox reads as a sentence, not as a field: the box sits with its words
    and must escape the full-width rule below */
