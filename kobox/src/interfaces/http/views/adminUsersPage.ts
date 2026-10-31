@@ -203,7 +203,7 @@ function storage(
   const used =
     usage === undefined
       ? html`<p class="muted">${viewer.t('Nothing measured yet. The hourly pass writes this down.')}</p>`
-      : html`<p>${viewer.t('storage.using', { used: String(usage.used.toGib()), allowance: String(allowance) })}
+      : html`<p>${viewer.t('storage.using', { used: formatBytes(usage.used.toBytes(), viewer), allowance: formatBytes(user.quota.toBytes(), viewer) })}
 (<span class="muted">${viewer.t('storage.measured', { at: usage.sampledAt })}</span>).
 ${leftToFill(measuredSpace(user, usage, volume), viewer)}</p>`;
   return html`${used}
