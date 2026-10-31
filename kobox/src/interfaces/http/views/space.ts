@@ -39,9 +39,9 @@ export function memberSpace(space: MeasuredSpace | undefined, viewer: Viewer): R
     return html`<p class="muted">${viewer.t('Space not measured yet.')}</p>`;
   }
   return html`<p>${viewer.t('{free} free of your {allowance} ({used} used), measured {at}.', {
-    free: formatBytes(space.usable.free.toBytes(), viewer.t),
-    allowance: formatBytes(space.allowance.toBytes(), viewer.t),
-    used: formatBytes(space.used.toBytes(), viewer.t),
+    free: formatBytes(space.usable.free.toBytes(), viewer),
+    allowance: formatBytes(space.allowance.toBytes(), viewer),
+    used: formatBytes(space.used.toBytes(), viewer),
     at: space.measuredAt,
   })}</p>${diskWarning(space.usable.limit, viewer)}`;
 }
@@ -52,7 +52,7 @@ export function leftToFill(space: MeasuredSpace | undefined, viewer: Viewer): Ra
   if (space === undefined) {
     return html``;
   }
-  const free = formatBytes(space.usable.free.toBytes(), viewer.t);
+  const free = formatBytes(space.usable.free.toBytes(), viewer);
   switch (space.usable.limit) {
     case 'allowance':
       return html`${viewer.t('{free} left to fill.', { free })}`;

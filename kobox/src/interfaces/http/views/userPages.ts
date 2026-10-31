@@ -7,7 +7,7 @@ import { BROWSER_CHOICE } from '../browserLanguage.js';
 import { formatBytes } from './bytes.js';
 import { memberSpace, type MeasuredSpace } from './space.js';
 import { html, type RawHtml } from '../html.js';
-import { flash, page, sentence, type Viewer } from './layout.js';
+import { flash, page, sentence, type Reader, type Viewer } from './layout.js';
 import type { Translate } from './messages.js';
 import type { BlocklistCoverage } from '../../../domain/tracker/BlocklistCoverage.js';
 
@@ -49,7 +49,8 @@ const VU_PEAK_AT = 19;
 
 // Segments, not a smooth bar: the eye reads a channel running into the red long
 // before it reads a percentage.
-function vuMeter(egressBytes: number, scaleBytes: number, t: Translate): RawHtml {
+function vuMeter(egressBytes: number, scaleBytes: number, reader: Reader): RawHtml {
+  const { t } = reader;
   const ratio = scaleBytes > 0 ? egressBytes / scaleBytes : 0;
   const lit = Math.min(VU_SEGMENTS, Math.round(ratio * VU_SEGMENTS));
   const segments = Array.from({ length: VU_SEGMENTS }, (_unused, index) => {
@@ -60,7 +61,7 @@ function vuMeter(egressBytes: number, scaleBytes: number, t: Translate): RawHtml
     return html`<i class="on${tone}"></i>`;
   });
   return html`<div class="vu" role="img"
-    aria-label="${t('Egress {egress}, busiest channel {busiest}', { egress: formatBytes(egressBytes, t), busiest: formatBytes(scaleBytes, t) })}">${segments}</div>`;
+    aria-label="${t('Egress {egress}, busiest channel {busiest}', { egress: formatBytes(egressBytes, reader), busiest: formatBytes(scaleBytes, reader) })}">${segments}</div>`;
 }
 
 function ledClass(row: SignalRow): string {
@@ -78,7 +79,8 @@ function stateWords(row: SignalRow, t: Translate): string {
   return row.level === 'none' ? service : `${service} · ${t(row.level)}`;
 }
 
-export function signalStrip(row: SignalRow, t: Translate): RawHtml {
+export function signalStrip(row: SignalRow, reader: Reader): RawHtml {
+  const { t } = reader;
   const name =
     row.linked === true
       ? html`<a href="/admin/users/${row.username}">${row.username}</a>`
@@ -87,10 +89,10 @@ export function signalStrip(row: SignalRow, t: Translate): RawHtml {
   <span class="led ${ledClass(row)}"></span>
   <span class="who">${name}<span class="eyebrow">${stateWords(row, t)}</span></span>
   ${row.scaleBytes !== undefined && row.scaleBytes > 0
-    ? vuMeter(row.egressBytes, row.scaleBytes, t)
+    ? vuMeter(row.egressBytes, row.scaleBytes, reader)
     : html`<span>${fairUseChip(row.level, t)}</span>`}
   <span class="figures">${sentence(t, '{sent} sent · {allowance} GiB allowance', {
-    sent: html`<b>${formatBytes(row.egressBytes, t)}</b>`,
+    sent: html`<b>${formatBytes(row.egressBytes, reader)}</b>`,
     allowance: html`${row.quotaGib}`,
   })}</span>
 </div>`;
@@ -218,15 +220,15 @@ ${blocklistWarning(coverage, viewer)}
   <span class="metric"><span class="eyebrow">${viewer.t('Users active')}</span>
     <span class="val">${active}/${rows.length}</span></span>
   <span class="metric"><span class="eyebrow">${viewer.t('Egress this window')}</span>
-    <span class="val">${formatBytes(totalEgress, viewer.t)}</span></span>
+    <span class="val">${formatBytes(totalEgress, viewer)}</span></span>
   <span class="metric"><span class="eyebrow">${viewer.t('Over fair use')}</span>
     <span class="val${flagged > 0 ? ' alert' : ''}">${flagged}</span></span>
   <span class="metric"><span class="eyebrow">${viewer.t('Service down')}</span>
     <span class="val${down > 0 ? ' bad' : ''}">${down}</span></span>
 </div>
 <h2>${viewer.t('Channels')}</h2>
-<p class="muted">${viewer.t('Meters run full scale at the busiest channel ({scale}). Loudest first.', { scale: formatBytes(scaleBytes, viewer.t) })}</p>
-${loudestFirst.map((row) => signalStrip({ ...row, scaleBytes, linked: true }, viewer.t))}
+<p class="muted">${viewer.t('Meters run full scale at the busiest channel ({scale}). Loudest first.', { scale: formatBytes(scaleBytes, viewer) })}</p>
+${loudestFirst.map((row) => signalStrip({ ...row, scaleBytes, linked: true }, viewer))}
 <p class="links"><a href="/admin/users">${viewer.t('Manage users')}</a> ·
 <a href="/admin/fair-use">${viewer.t('Fair use')}</a> ·
 <a href="/admin/health">${viewer.t('Health')}</a></p>`,
