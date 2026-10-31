@@ -4,6 +4,7 @@ import { UsableSpace, type SpaceLimit } from '../../../domain/user/UsableSpace.j
 import type { DiskUsageSample, VolumeSample } from '../../../domain/user/ports.js';
 import { html, type RawHtml } from '../html.js';
 import { formatBytes } from './bytes.js';
+import { formatMoment } from './moment.js';
 import type { Viewer } from './layout.js';
 
 // A member's space as the last hourly pass left it: what they hold, what their
@@ -42,7 +43,7 @@ export function memberSpace(space: MeasuredSpace | undefined, viewer: Viewer): R
     free: formatBytes(space.usable.free.toBytes(), viewer),
     allowance: formatBytes(space.allowance.toBytes(), viewer),
     used: formatBytes(space.used.toBytes(), viewer),
-    at: space.measuredAt,
+    at: formatMoment(space.measuredAt, viewer),
   })}</p>${diskWarning(space.usable.limit, viewer)}`;
 }
 

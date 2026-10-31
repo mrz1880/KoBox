@@ -41,7 +41,7 @@ describe("a member's usable space on their home page", () => {
     await measured(188, 1000);
 
     expect(await homeOf(member)).toContain(
-      '224 GiB free of your 412 GiB (188 GiB used), measured 2026-10-30 19:00:00.',
+      '224 GiB free of your 412 GiB (188 GiB used), measured October 30, 2026 at 8:00 PM.',
     );
   });
 
@@ -74,7 +74,7 @@ describe("a member's usable space on their home page", () => {
 
     const body = await homeOf(member, 'fr-FR');
 
-    expect(body).toContain('50 Gio libres sur vos 412 Gio (188 Gio utilisés), mesuré le 2026-10-30 19:00:00.');
+    expect(body).toContain('50 Gio libres sur vos 412 Gio (188 Gio utilisés), mesuré le 30 octobre 2026 à 20:00.');
     expect(body).toContain(
       'Le disque de la box arrive à saturation : votre allocation ne peut plus être atteinte.',
     );
@@ -107,6 +107,7 @@ describe("an admin's view of a member's space", () => {
     const body = await pageOf('/admin/users/alice');
 
     expect(body).toContain('Using 188 GiB of 412 GiB');
+    expect(body).toContain('measured October 30, 2026 at 8:00 PM');
     expect(body).toContain('224 GiB left to fill.');
   });
 

@@ -162,7 +162,7 @@ function keysSentToTheCatalogue(): ReadonlySet<string> {
     keys.add(english);
     return english;
   };
-  const reader: Reader = { language: Language.fr, t };
+  const reader: Reader = { language: Language.fr, t, zone: 'Europe/Paris' };
   const member: Viewer = { ...reader, username: 'alice', role: 'user', csrfToken: 'csrf' };
   const admin: Viewer = { ...reader, username: 'bob', role: 'admin', csrfToken: 'csrf' };
   const user = aUser().build();

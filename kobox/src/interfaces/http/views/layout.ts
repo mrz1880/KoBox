@@ -214,10 +214,11 @@ iframe.app { width: 100%; height: calc(100vh - 10rem); border: 1px solid var(--l
 `;
 
 // The part of a viewer a page without a session can have: the language it is
-// read in, and the lookup bound to it.
+// read in, the lookup bound to it, and the time zone of the box's clock.
 export interface Reader {
   readonly language: Language;
   readonly t: Translate;
+  readonly zone: string;
 }
 
 // Every view already receives a Viewer, so its language is the one seam that

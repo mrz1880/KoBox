@@ -42,10 +42,15 @@ function isPasswordSelfService(url: string): boolean {
   return path === '/password' || path === '/logout';
 }
 
+// The members live by the box's clock, the zone its host is set to.
+function boxZone(): string {
+  return Intl.DateTimeFormat().resolvedOptions().timeZone;
+}
+
 // Before sign-in there is no member to ask: the browser alone decides.
 export function readerOf(request: FastifyRequest): Reader {
   const language = browserLanguage(request.headers['accept-language']);
-  return { language, t: translatorFor(language) };
+  return { language, t: translatorFor(language), zone: boxZone() };
 }
 
 // The member's stored choice first; a member who never chose reads the portal
@@ -58,6 +63,7 @@ export function viewerOf(session: AuthenticatedSession, request: FastifyRequest)
     csrfToken: session.csrfToken,
     language,
     t: translatorFor(language),
+    zone: boxZone(),
   };
 }
 
@@ -119,11 +125,11 @@ export function buildGuards(authenticate: Authenticate, now: () => string): Guar
     reply: FastifyReply,
     message: string,
   ): Promise<undefined> => {
-    const { language, t } = viewerOf(session, request);
+    const { language, t, zone } = viewerOf(session, request);
     await reply
       .code(403)
       .type('text/html')
-      .send(page('Forbidden', html`<h1>${t('Forbidden')}</h1><p>${t(message)}</p>`, { language, t }));
+      .send(page('Forbidden', html`<h1>${t('Forbidden')}</h1><p>${t(message)}</p>`, { language, t, zone }));
     return undefined;
   };
 

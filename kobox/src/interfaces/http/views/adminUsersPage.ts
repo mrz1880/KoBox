@@ -8,6 +8,7 @@ import { HOME_BASE } from '../../../domain/user/homeDirectory.js';
 import { Quota } from '../../../domain/user/Quota.js';
 import type { SpaceLimit } from '../../../domain/user/UsableSpace.js';
 import { formatBytes } from './bytes.js';
+import { formatMoment } from './moment.js';
 import { leftToFill, measuredSpace, type MeasuredSpace } from './space.js';
 
 function roleOptions(selected: Role): RawHtml[] {
@@ -204,7 +205,7 @@ function storage(
     usage === undefined
       ? html`<p class="muted">${viewer.t('Nothing measured yet. The hourly pass writes this down.')}</p>`
       : html`<p>${viewer.t('storage.using', { used: formatBytes(usage.used.toBytes(), viewer), allowance: formatBytes(user.quota.toBytes(), viewer) })}
-(<span class="muted">${viewer.t('storage.measured', { at: usage.sampledAt })}</span>).
+(<span class="muted">${viewer.t('storage.measured', { at: formatMoment(usage.sampledAt, viewer) })}</span>).
 ${leftToFill(measuredSpace(user, usage, volume), viewer)}</p>`;
   return html`${used}
 <form method="post" action="/admin/users/${name}/quota">
