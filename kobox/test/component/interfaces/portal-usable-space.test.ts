@@ -175,7 +175,7 @@ describe("an admin's view of a member's space", () => {
     expect(body).toContain('<th>Utilisé</th><th>Libre</th>');
     expect(body).toContain('<span class="chip warn">limité par le disque</span>');
     expect(body).toContain('<span class="muted">non mesuré</span>');
-    expect(body).toContain('Disque : 50 Gio libres sur 3.13 Tio. Les allocations totalisent 824 Gio.');
+    expect(body).toContain('Disque : 50 Gio libres sur 3,13 Tio. Les allocations totalisent 824 Gio.');
   });
 
   it('should_say_the_disk_is_not_measured_yet_in_french', async () => {
