@@ -89,6 +89,25 @@ describe('admin health screen', () => {
     expect(response.body).toContain('current');
   });
 
+  // the ledger printed its stored words and UTC stamps, and an em dash for a
+  // release never switched to
+  it('should_say_the_releases_ledger_in_the_admins_words_and_clock', async () => {
+    const id = await releases.record('v1.2.0', '/opt/kobox/releases/abc', '2026-07-25 08:00:00');
+    await releases.setState(id, 'current', '2026-07-25 08:05:00');
+    await releases.record('v1.3.0', '/opt/kobox/releases/def', '2026-07-26 08:00:00');
+
+    const response = await world.server.inject({
+      method: 'GET',
+      url: '/admin/health',
+      headers: { cookie: admin.cookie, 'accept-language': 'fr-FR' },
+    });
+
+    expect(response.body).toContain('<td>en service</td>');
+    expect(response.body).toContain('<td>25 juillet 2026 à 10:05</td>');
+    expect(response.body).toContain('<td><span class="muted">pas encore</span></td>');
+    expect(response.body).not.toContain('—');
+  });
+
   // a table with nothing in it showed its headers alone, like a page that broke
   it('should_say_so_when_a_table_has_nothing_to_show_yet', async () => {
     world = await buildPortalWorld({
