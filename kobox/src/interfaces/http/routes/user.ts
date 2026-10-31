@@ -5,6 +5,7 @@ import type { JobQueuePort } from '../../../application/jobs/JobQueuePort.js';
 import type { VpnProfileStorePort } from '../../../application/portal/ports.js';
 
 import { MediaPath, type MediaFile } from '../../../domain/media/MediaFile.js';
+import { MediaOrder } from '../views/mediaOrder.js';
 import type { MediaRepository } from '../../../domain/media/ports.js';
 import { ComponentName } from '../../../domain/installation/ComponentName.js';
 import type { ComponentRegistry } from '../../../domain/installation/ports.js';
@@ -873,6 +874,7 @@ export function registerUserRoutes(
           viewerOf(session, request),
           files,
           await foldersOf(session.username),
+          MediaOrder.fromQuery(request.query),
           flashOf(request),
         ),
       );

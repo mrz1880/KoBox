@@ -89,6 +89,7 @@ import {
 import { aUser } from '../../../builders/UserBuilder.js';
 import { TrackerBuilder } from '../../../builders/TrackerBuilder.js';
 import { accessFacts, signalRow } from './viewFixtures.js';
+import { MediaOrder } from '../../../../src/interfaces/http/views/mediaOrder.js';
 
 const NOW = '2026-10-28 10:00:00';
 const ED25519 = 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIB7Kk1p2vQ0Hn3xYqZ8mLsRtWuVdEfGhIjKlMnOpQrSt';
@@ -231,8 +232,8 @@ function keysSentToTheCatalogue(): ReadonlySet<string> {
       chosenLanguage: Language.fr,
     }),
   );
-  mediaPage(member, [], []);
-  mediaPage(member, [media('films/a.mp4'), media('films/b.mkv'), media('films/c.txt'), media('loose.mp4')], [films, Label.parse('series')]);
+  mediaPage(member, [], [], MediaOrder.fromQuery({}));
+  mediaPage(member, [media('films/a.mp4'), media('films/b.mkv'), media('films/c.txt'), media('loose.mp4')], [films, Label.parse('series')], MediaOrder.fromQuery({ sort: 'size', order: 'desc' }));
   mediaWatchPage(member, media('films/a.mp4'));
   rutorrentPage(member);
 
