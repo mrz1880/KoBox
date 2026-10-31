@@ -39,7 +39,8 @@ import { BackupHostAdapter } from '../infrastructure/system/BackupHostAdapter.js
 import { GitAdapter } from '../infrastructure/system/GitAdapter.js';
 import { UpgradeHostAdapter } from '../infrastructure/system/UpgradeHostAdapter.js';
 import { SqliteReleaseRepository } from '../infrastructure/persistence/SqliteReleaseRepository.js';
-import { AccountNoticesToAdmins } from '../infrastructure/notifications/AccountNoticesToAdmins.js';
+import { NoticesToEveryAdmin } from '../infrastructure/notifications/NoticesToEveryAdmin.js';
+import { OnlyWhatCallsForAnAdmin } from '../infrastructure/notifications/OnlyWhatCallsForAnAdmin.js';
 import { MultiChannelNotifier } from '../infrastructure/notifications/MultiChannelNotifier.js';
 import { OutboxEmailChannel } from '../infrastructure/notifications/OutboxEmailChannel.js';
 import { SmtpLoopbackTransport } from '../infrastructure/notifications/SmtpLoopbackTransport.js';
@@ -294,15 +295,18 @@ function buildNotifier(
       ? new MultiChannelNotifier(channels, logger, context)
       : new ConsoleNotificationAdapter(logger);
   const alreadyMailed = alertAddress(email);
-  return new AccountNoticesToAdmins({
-    operator,
-    users: new SqliteUserRepository(db),
-    credentials: new SqlitePortalCredentialsRepository(db),
-    outbox,
-    context,
-    now: nowStamp,
-    ...(alreadyMailed !== undefined && { alreadyMailed }),
-  });
+  return new OnlyWhatCallsForAnAdmin(
+    new NoticesToEveryAdmin({
+      operator,
+      users: new SqliteUserRepository(db),
+      credentials: new SqlitePortalCredentialsRepository(db),
+      outbox,
+      context,
+      now: nowStamp,
+      ...(alreadyMailed !== undefined && { alreadyMailed }),
+    }),
+    logger,
+  );
 }
 
 export function fairUsePolicy(): FairUsePolicy {

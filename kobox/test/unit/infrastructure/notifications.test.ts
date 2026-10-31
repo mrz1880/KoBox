@@ -7,7 +7,8 @@ import { OutboxEmailChannel } from '../../../src/infrastructure/notifications/Ou
 import { InMemoryMailOutbox } from '../../../src/infrastructure/persistence/InMemoryMailOutbox.js';
 import { InMemoryPortalCredentialsRepository } from '../../../src/infrastructure/persistence/InMemoryPortalCredentialsRepository.js';
 import { InMemoryUserRepository } from '../../../src/infrastructure/persistence/InMemoryUserRepository.js';
-import { AccountNoticesToAdmins } from '../../../src/infrastructure/notifications/AccountNoticesToAdmins.js';
+import { NoticesToEveryAdmin } from '../../../src/infrastructure/notifications/NoticesToEveryAdmin.js';
+import { OnlyWhatCallsForAnAdmin } from '../../../src/infrastructure/notifications/OnlyWhatCallsForAnAdmin.js';
 import { EmailAddress } from '../../../src/domain/user/EmailAddress.js';
 import { Username } from '../../../src/domain/user/Username.js';
 import { UserBuilder } from '../../builders/UserBuilder.js';
@@ -221,7 +222,38 @@ describe('MultiChannelNotifier', () => {
   });
 });
 
-describe('AccountNoticesToAdmins', () => {
+describe('OnlyWhatCallsForAnAdmin', () => {
+  function filtered() {
+    const passed: AnyDomainEvent[] = [];
+    const notifier = new OnlyWhatCallsForAnAdmin(
+      { notify: (event) => Promise.resolve(void passed.push(event)) },
+      logger,
+    );
+    return { notifier, passed };
+  }
+
+  it('should_pass_on_what_an_admin_has_to_act_on', async () => {
+    const { notifier, passed } = filtered();
+
+    await notifier.notify({ type: 'TrackerDied', host: 'tracker.example.org' });
+
+    expect(passed.map((event) => event.type)).toEqual(['TrackerDied']);
+  });
+
+  // a firewall applied, a member who joined, a throttle that lifted: the
+  // mailbox filled with these and the urgent ones drowned
+  it('should_keep_what_went_fine_or_mended_itself_out_of_every_channel', async () => {
+    const { notifier, passed } = filtered();
+
+    await notifier.notify({ type: 'FirewallApplied', outcome: 'applied' });
+    await notifier.notify({ type: 'UserCreated', username: 'alice' });
+    await notifier.notify({ type: 'FairUseRecovered', username: 'alice' });
+
+    expect(passed).toEqual([]);
+  });
+});
+
+describe('NoticesToEveryAdmin', () => {
   async function world() {
     const users = new InMemoryUserRepository();
     const credentials = new InMemoryPortalCredentialsRepository();
@@ -235,7 +267,7 @@ describe('AccountNoticesToAdmins', () => {
     }
     const outbox = new InMemoryMailOutbox();
     const operator: AnyDomainEvent[] = [];
-    const notifier = new AccountNoticesToAdmins({
+    const notifier = new NoticesToEveryAdmin({
       operator: { notify: (event) => Promise.resolve(void operator.push(event)) },
       users,
       credentials,
@@ -248,24 +280,16 @@ describe('AccountNoticesToAdmins', () => {
     return { notifier, outbox, operator };
   }
 
-  it('should_mail_every_admin_who_joins_leaves_or_asks_for_a_new_password', async () => {
-    const { notifier, outbox, operator } = await world();
-
-    await notifier.notify({ type: 'PasswordResetRequested', username: 'alice' });
-
-    const mails = await outbox.listRecent(10);
-    expect(mails.map((mail) => mail.recipient)).toEqual(['guigui@example.org']);
-    expect(mails[0]?.subject).toContain('alice');
-    expect(operator.map((event) => event.type)).toEqual(['PasswordResetRequested']);
-  });
-
-  it('should_leave_every_other_event_to_the_operator_channels', async () => {
+  // what calls for an admin reaches every admin, not only whoever set the
+  // box's alert address up
+  it('should_mail_every_admin_and_tell_the_operator_channels', async () => {
     const { notifier, outbox, operator } = await world();
 
     await notifier.notify({ type: 'TrackerDied', host: 'tracker.example.org' });
-    await notifier.notify({ type: 'UserSuspended', username: 'alice' });
 
-    expect(await outbox.listRecent(10)).toEqual([]);
-    expect(operator).toHaveLength(2);
+    const mails = await outbox.listRecent(10);
+    expect(mails.map((mail) => mail.recipient)).toEqual(['guigui@example.org']);
+    expect(mails[0]?.subject).toContain('tracker.example.org');
+    expect(operator.map((event) => event.type)).toEqual(['TrackerDied']);
   });
 });

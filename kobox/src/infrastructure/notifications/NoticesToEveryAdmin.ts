@@ -3,7 +3,6 @@ import type { PortalCredentialsPort } from '../../domain/portal/ports.js';
 import type { SecurityNotificationPort } from '../../domain/security/ports.js';
 import type { TrackerNotificationPort } from '../../domain/tracker/ports.js';
 import type { EmailAddress } from '../../domain/user/EmailAddress.js';
-import { concernsEveryAdmin } from '../../domain/user/events.js';
 import type { NotificationPort, UserRepository } from '../../domain/user/ports.js';
 import {
   formatEvent,
@@ -23,18 +22,17 @@ interface Deps {
   readonly alreadyMailed?: EmailAddress;
 }
 
-// Everything goes to the operator's channels as before; an account event also
-// goes, by mail, to every admin, read from the roles at the time it happens.
-export class AccountNoticesToAdmins
+// Every event it is given goes to the operator's channels and, by mail, to every
+// admin, read from the roles at the time it happens: what calls for an admin is
+// not only for whoever set the box's alert address up. OnlyWhatCallsForAnAdmin,
+// in front, decides what gets this far.
+export class NoticesToEveryAdmin
   implements NotificationPort, TrackerNotificationPort, SecurityNotificationPort
 {
   constructor(private readonly deps: Deps) {}
 
   async notify(event: AnyDomainEvent): Promise<void> {
     await this.deps.operator.notify(event);
-    if (!concernsEveryAdmin(event)) {
-      return;
-    }
     const message = formatEvent(event, await this.deps.context());
     for (const address of await this.adminAddresses()) {
       await this.deps.outbox.enqueue(
