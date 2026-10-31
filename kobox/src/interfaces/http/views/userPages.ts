@@ -614,14 +614,6 @@ ${languageSection(viewer, facts)}
   );
 }
 
-function formatSize(bytes: number): string {
-  const gib = bytes / 1024 ** 3;
-  if (gib >= 1) {
-    return `${gib.toFixed(1)} GiB`;
-  }
-  return `${Math.max(1, Math.round(bytes / 1024 ** 2))} MiB`;
-}
-
 // The end of the journey: what actually landed, ready to watch or take away.
 // Grouped by the folder the file came down into, because that is how people
 // think about it — not by the flat table the database happens to hold.
@@ -669,7 +661,7 @@ export function mediaPage(
   <tbody>${items.map(
     (file) => html`<tr>
   <td class="path">${file.path.name}</td>
-  <td class="num">${formatSize(file.sizeBytes)}</td>
+  <td class="num">${formatBytes(file.sizeBytes, viewer)}</td>
   <td>${playbackNote(file, viewer)}</td>
   <td>${file.playback === 'in-browser'
       ? html`<a href="/media/watch?path=${file.path.value}">${viewer.t('Watch')}</a> ·
