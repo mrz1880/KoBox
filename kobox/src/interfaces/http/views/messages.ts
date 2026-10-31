@@ -125,7 +125,8 @@ const FR: Readonly<Record<string, string>> = {
   'Address removed.': 'Adresse retirée.',
   'You are connecting over IPv6. Only IPv4 addresses can be declared.':
     'Vous êtes connecté en IPv6. Seules les adresses IPv4 peuvent être déclarées.',
-  'Updating blocklists.': 'Mise à jour des listes de blocage.',
+  'Blocklists updated.':
+    'Listes de blocage mises à jour.',
   'That token no longer works anywhere.': 'Ce jeton ne fonctionne plus nulle part.',
   'That is not an IPv4 address, like 203.0.113.20.':
     'Ce n’est pas une adresse IPv4, comme 203.0.113.20.',
@@ -141,17 +142,23 @@ const FR: Readonly<Record<string, string>> = {
     'Enregistré. Lancez kobox install sur la box pour demander le certificat.',
   'Saved. It applies to what they add from now on, and changes nothing already on disk.':
     'Enregistré. Cela s’applique à ce qu’il ajoutera désormais, et ne change rien de ce qui est déjà sur le disque.',
-  'Restarting your rTorrent.': 'Redémarrage de votre rTorrent.',
-  'Renewing certificates.': 'Renouvellement des certificats.',
-  'Relay saved. Applying it now.': 'Relais enregistré. Application en cours.',
-  'Putting it back in the queue.': 'Remise en file d’attente.',
-  'Password change under way: it takes a few seconds.':
-    'Changement de mot de passe en cours : cela prend quelques secondes.',
+  'Your rTorrent restarted.':
+    'Votre rTorrent a redémarré.',
+  'Certificates renewed.':
+    'Certificats renouvelés.',
+  'Relay saved and applied.':
+    'Relais enregistré et appliqué.',
+  'Back in the queue.':
+    'De retour dans la file d’attente.',
+  'Password changed.':
+    'Mot de passe changé.',
   'Override applied.': 'Dérogation appliquée.',
   'Measuring the link.': 'Mesure du lien en cours.',
-  'Key accepted. It is being installed.': 'Clé acceptée. Elle est en cours d’installation.',
+  'Key installed.':
+    'Clé installée.',
   'Installing the updates.': 'Installation des mises à jour.',
-  'Importing the catalog.': 'Import du catalogue.',
+  'Catalog imported.':
+    'Catalogue importé.',
   'Hostname removed.': 'Nom d’hôte retiré.',
   'Hostname added. Its address opens within five minutes.':
     'Nom d’hôte ajouté. Son adresse s’ouvre d’ici cinq minutes.',
@@ -370,31 +377,36 @@ const FR: Readonly<Record<string, string>> = {
     'Un fichier qui n’est pas arrivé reste ici jusqu’à ce que vous réessayiez : il n’est jamais abandonné en silence, et réessayer reprend là où le transfert s’est arrêté au lieu de recommencer le fichier.',
 
   // flashes naming something, put in the reader's language at the redirect
-  'Creating the {folder} folder.': 'Création du dossier {folder}.',
+  '{folder} folder created.':
+    'Dossier {folder} créé.',
   'Saved what happens to {folder}.': 'Réglage de {folder} enregistré.',
   '{folder} keeps everything here. Choose when it goes out first.':
     '{folder} garde tout ici. Choisissez d’abord quand il part.',
-  'Queuing what {folder} already holds. Anything already sent stays as it is.':
-    'Mise en file de ce que contient déjà {folder}. Ce qui a déjà été envoyé reste tel quel.',
+  'What {folder} already held is queued. Anything already sent stays as it is.':
+    'Ce que contenait déjà {folder} est en file d’envoi. Ce qui a déjà été envoyé reste tel quel.',
   '{folder} still holds downloads: they seed from its path. Remove them first, then the folder.':
     '{folder} contient encore des téléchargements : ils partagent depuis son chemin. Retirez-les d’abord, puis le dossier.',
-  'Removing the {folder} folder.': 'Suppression du dossier {folder}.',
+  '{folder} folder removed.':
+    'Dossier {folder} supprimé.',
   'There is already a folder named {folder}.': 'Il existe déjà un dossier nommé {folder}.',
-  'Renaming {from} to {to}.': 'Renommage de {from} en {to}.',
+  '{from} renamed to {to}.':
+    '{from} renommé en {to}.',
   '{name} already exists.': '{name} existe déjà.',
-  'Deleting {name}.': 'Suppression de {name}.',
-  'Suspending {name}.': 'Suspension de {name}.',
-  'Restoring {name}.': 'Réactivation de {name}.',
+  '{name} deleted.':
+    '{name} supprimé.',
+  '{name} suspended.':
+    '{name} suspendu.',
+  '{name} restored.':
+    '{name} réactivé.',
   'A reset link is on its way to {name}.': 'Un lien de réinitialisation est en route vers {name}.',
   '{address} is a private address: no connection from the internet comes from it.':
     '{address} est une adresse privée : aucune connexion depuis internet n’en vient.',
-  'Adding the address.': 'Ajout de l’adresse.',
-  'Removing the address.': 'Retrait de l’adresse.',
-  'Adding the hostname.': 'Ajout du nom d’hôte.',
-  'Removing the hostname.': 'Retrait du nom d’hôte.',
-  'Restarting {service}.': 'Redémarrage de {service}.',
-  'Capturing the {service} journal.': 'Capture du journal de {service}.',
-  'Updating {host}.': 'Mise à jour de {host}.',
+  '{service} restarted.':
+    '{service} redémarré.',
+  '{service} journal captured.':
+    'Journal de {service} capturé.',
+  '{host} updated.':
+    '{host} mis à jour.',
 
   // refusal page
   Forbidden: 'Accès refusé',
@@ -477,10 +489,10 @@ const FR: Readonly<Record<string, string>> = {
     'Les scripts de {name} s’exécuteront de nouveau après un téléchargement.',
   "{name}'s own scripts will no longer run after a download.":
     'Les scripts de {name} ne s’exécuteront plus après un téléchargement.',
-  '{name} is going back into the filter, which is rebuilt straight away.':
-    '{name} revient dans le filtre, qui est reconstruit immédiatement.',
-  '{name} is coming out of the filter, which is rebuilt straight away.':
-    '{name} sort du filtre, qui est reconstruit immédiatement.',
+  '{name} is back in the filter, which has been rebuilt.':
+    '{name} est de retour dans le filtre, qui a été reconstruit.',
+  '{name} is out of the filter, which has been rebuilt.':
+    '{name} est sorti du filtre, qui a été reconstruit.',
 
   // trackers and blocklists
   Source: 'Source',

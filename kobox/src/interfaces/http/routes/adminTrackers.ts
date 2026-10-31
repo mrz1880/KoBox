@@ -65,7 +65,7 @@ export function registerAdminTrackerRoutes(
       const job = await deps.queue.enqueue(build(parsed.data.host));
       return redirectOnceApplied(reply, deps.awaitJob, job,
         '/admin/trackers',
-        viewerOf(session, request).t('Updating {host}.', { host: parsed.data.host }),
+        viewerOf(session, request).t('{host} updated.', { host: parsed.data.host }),
       );
     });
   }
@@ -77,7 +77,7 @@ export function registerAdminTrackerRoutes(
     }
     const today = deps.now().slice(0, 10);
     const job = await deps.queue.enqueue(buildJob.renewTrackerCerts({ today }));
-    return redirectOnceApplied(reply, deps.awaitJob, job, '/admin/trackers', 'Renewing certificates.');
+    return redirectOnceApplied(reply, deps.awaitJob, job, '/admin/trackers', 'Certificates renewed.');
   });
 
   server.get('/admin/blocklists', async (request, reply) => {
@@ -97,7 +97,7 @@ export function registerAdminTrackerRoutes(
       return;
     }
     const job = await deps.queue.enqueue(buildJob.updateBlocklists());
-    return redirectOnceApplied(reply, deps.awaitJob, job, '/admin/blocklists', 'Updating blocklists.');
+    return redirectOnceApplied(reply, deps.awaitJob, job, '/admin/blocklists', 'Blocklists updated.');
   });
 
   // one form per row, so a tick and a Save move exactly the list you are
@@ -131,8 +131,8 @@ export function registerAdminTrackerRoutes(
       '/admin/blocklists',
       viewerOf(session, request).t(
         enabled
-          ? '{name} is going back into the filter, which is rebuilt straight away.'
-          : '{name} is coming out of the filter, which is rebuilt straight away.',
+          ? '{name} is back in the filter, which has been rebuilt.'
+          : '{name} is out of the filter, which has been rebuilt.',
         { name: parsed.data.name },
       ),
     );
@@ -144,6 +144,6 @@ export function registerAdminTrackerRoutes(
       return;
     }
     const job = await deps.queue.enqueue(buildJob.importBlocklistCatalog());
-    return redirectOnceApplied(reply, deps.awaitJob, job, '/admin/blocklists', 'Importing the catalog.');
+    return redirectOnceApplied(reply, deps.awaitJob, job, '/admin/blocklists', 'Catalog imported.');
   });
 }

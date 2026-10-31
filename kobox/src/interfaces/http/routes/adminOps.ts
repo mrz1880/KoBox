@@ -116,7 +116,7 @@ export function registerAdminOpsRoutes(
     const job = await deps.queue.enqueue(buildJob.restartService({ service: service.value }));
     return redirectOnceApplied(reply, deps.awaitJob, job,
       '/admin/health',
-      viewerOf(session, request).t('Restarting {service}.', { service: service.value }),
+      viewerOf(session, request).t('{service} restarted.', { service: service.value }),
     );
   });
 
@@ -173,7 +173,7 @@ export function registerAdminOpsRoutes(
     const job = await deps.queue.enqueue(buildJob.captureServiceLog({ service: service.value }));
     return redirectOnceApplied(reply, deps.awaitJob, job,
       '/admin/logs',
-      viewerOf(session, request).t('Capturing the {service} journal.', { service: service.value }),
+      viewerOf(session, request).t('{service} journal captured.', { service: service.value }),
     );
   });
 

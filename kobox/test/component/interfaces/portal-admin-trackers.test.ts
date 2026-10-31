@@ -213,8 +213,8 @@ describe('turning a blocklist on and off', () => {
   });
 
   it.each([
-    [{ enabled: 'on' }, 'ads revient dans le filtre, qui est reconstruit immédiatement.'],
-    [{}, 'ads sort du filtre, qui est reconstruit immédiatement.'],
+    [{ enabled: 'on' }, 'ads est de retour dans le filtre, qui a été reconstruit.'],
+    [{}, 'ads est sorti du filtre, qui a été reconstruit.'],
   ])('should_confirm_the_toggle_in_the_admins_language', async (fields, french) => {
     const response = await world.server.inject({
       method: 'POST',
