@@ -53,7 +53,6 @@ const FR: Readonly<Record<string, string>> = {
   Remove: 'Retirer',
 
   // account
-  'My access': 'Mon accès',
   'Your details': 'Vos informations',
   Username: 'Identifiant',
   Files: 'Fichiers',
@@ -301,7 +300,6 @@ const FR: Readonly<Record<string, string>> = {
     'Une fois la clé installée, envoyez un fichier torrent par SFTP dans un de vos dossiers (remplacez FOLDER par son nom, tel qu’il apparaît dans Dossiers) ; rTorrent le prend en charge en quelques secondes et lui donne l’étiquette de ce dossier :',
 
   // folders and sending to a member's own machine
-  'Your folders': 'Vos dossiers',
   "A folder is what you sort your downloads into. Drop a torrent in a folder's watch directory and what comes out lands in that folder, and, if you ask for it here, gets copied on to your own machine.":
     'Un dossier, c’est là où vous rangez vos téléchargements. Déposez un torrent dans le répertoire watch d’un dossier et ce qui en sort arrive dans ce dossier, puis, si vous le demandez ici, est copié jusqu’à votre propre machine.',
   'You have no folders yet.': 'Vous n’avez pas encore de dossier.',
@@ -511,7 +509,6 @@ const FR: Readonly<Record<string, string>> = {
   'Where certificate notices go': 'Où arrivent les avis de certificat',
 
   // admin overview
-  'Fleet console': 'Console des membres',
   'Users active': 'Membres actifs',
   'Egress this window': 'Sortant sur la période',
   'Over fair use': 'Au-delà de l’usage raisonnable',

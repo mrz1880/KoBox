@@ -31,7 +31,25 @@ const ADMIN_MENU = [
   '/admin/troubleshooting',
 ];
 
+// the label of the menu entry marked current, and the page's own heading
+function currentLabelAndHeading(body: string): [string | undefined, string | undefined] {
+  const label = /aria-current="page"><span class="label">([^<]+)<\/span>/.exec(body)?.[1];
+  const heading = /<h1>([^<]+)/.exec(body)?.[1]?.trim();
+  return [label, heading];
+}
+
 describe('the two spaces of the portal', () => {
+  // "Overview" opened on "Fleet console", "Account" on "My access": the page
+  // reached did not say it was the one asked for
+  it.each([...SEEDBOX_MENU, ...ADMIN_MENU].filter((url) => url !== '/rutorrent' && url !== '/'))(
+    'should_head_%s_with_the_label_of_its_menu_entry',
+    async (url) => {
+      const [label, heading] = currentLabelAndHeading((await get(url, admin)).body);
+
+      expect(heading).toBe(label);
+    },
+  );
+
   it('should_give_a_member_the_seedbox_menu_and_no_way_into_administration', async () => {
     const body = (await get('/', member)).body;
 
@@ -53,7 +71,7 @@ describe('the two spaces of the portal', () => {
     const response = await get('/admin', admin);
 
     expect(response.statusCode).toBe(200);
-    expect(response.body).toContain('Fleet console');
+    expect(response.body).toContain('<h1>Overview</h1>');
     expect(linksOf(response.body, 'Menu')).toEqual(ADMIN_MENU);
   });
 

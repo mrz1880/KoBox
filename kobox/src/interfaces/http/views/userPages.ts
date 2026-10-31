@@ -213,7 +213,7 @@ export function adminHomePage(
   const scaleBytes = loudestFirst[0]?.egressBytes ?? 0;
   return page(
     'Overview',
-    html`<h1>${viewer.t('Fleet console')}</h1>
+    html`<h1>${viewer.t('Overview')}</h1>
 ${flash(viewer.t, message)}
 ${blocklistWarning(coverage, viewer)}
 <div class="ribbon">
@@ -576,8 +576,8 @@ export function accessPage(viewer: Viewer, facts: AccessFacts, message?: string)
 </div>`,
   );
   return page(
-    'My access',
-    html`<h1>${viewer.t('My access')}</h1>
+    'Account',
+    html`<h1>${viewer.t('Account')}</h1>
 ${flash(viewer.t, message)}
 <h2>${viewer.t('Connect over VPN')}</h2>
 <p class="muted">${viewer.t('Download one profile and open it with your OpenVPN client.')}</p>
