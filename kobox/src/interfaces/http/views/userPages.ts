@@ -498,8 +498,26 @@ export interface FileAccessFacts {
   readonly boxInVpn: string;
 }
 
+// Nextcloud is the simplest way, and is offered as such only once installed:
+// missing, it moves last with a word on why.
+function nextcloudChoice(viewer: Viewer, facts: FileAccessFacts): RawHtml {
+  if (!facts.nextcloudInstalled) {
+    return html`<div class="choice">
+  <h3>Nextcloud</h3>
+  <p>${viewer.t('Nextcloud is not installed on this box. Ask an administrator.')}</p>
+</div>`;
+  }
+  return html`<div class="choice pick">
+  <span class="tag">${viewer.t('Simplest')}</span>
+  <h3>Nextcloud</h3>
+  <p>${viewer.t('In the browser, or in the Nextcloud app on a phone or a computer. No VPN, nothing to set up on your network.')}</p>
+  <a class="action" href="${facts.nextcloudHref}">${viewer.t('Open Nextcloud')}</a>
+</div>`;
+}
+
 // Every way to reach one's files, simplest first, all with the portal login.
 export function filesPage(viewer: Viewer, facts: FileAccessFacts): string {
+  const nextcloud = nextcloudChoice(viewer, facts);
   return page(
     'My files',
     html`<h1>${viewer.t('My files')}</h1>
@@ -507,14 +525,7 @@ export function filesPage(viewer: Viewer, facts: FileAccessFacts): string {
   username: html`<span class="mono">${facts.username}</span>`,
 })}</p>
 <div class="choices">
-<div class="choice pick">
-  <span class="tag">${viewer.t('Simplest')}</span>
-  <h3>Nextcloud</h3>
-  ${facts.nextcloudInstalled
-    ? html`<p>${viewer.t('In the browser, or in the Nextcloud app on a phone or a computer. No VPN, nothing to set up on your network.')}</p>
-  <a class="action" href="${facts.nextcloudHref}">${viewer.t('Open Nextcloud')}</a>`
-    : html`<p>${viewer.t('Nextcloud is not installed on this box. Ask an administrator.')}</p>`}
-</div>
+${facts.nextcloudInstalled ? nextcloud : html``}
 <div class="choice">
   <h3>SFTP</h3>
   <p>${viewer.t('For FileZilla, Cyberduck or rsync, and for large transfers.')}</p>
@@ -527,6 +538,7 @@ export function filesPage(viewer: Viewer, facts: FileAccessFacts): string {
   })}</p>
   <p class="mono">smb://${facts.boxInVpn}/${facts.username}</p>
 </div>
+${facts.nextcloudInstalled ? html`` : nextcloud}
 </div>`,
     viewer,
   );
