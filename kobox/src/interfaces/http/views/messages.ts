@@ -804,6 +804,7 @@ const FR: Readonly<Record<string, string>> = {
   'One member saturating the link makes the box unusable for everyone else.':
     'Un membre qui sature le lien rend la box inutilisable pour tous les autres.',
   'How it works': 'Comment ça marche',
+  'just now': 'à l’instant',
   'no certificate': 'aucun certificat',
   'never updated': 'jamais mis à jour',
   'Leave a field empty to keep its current limit.': 'Laissez un champ vide pour garder sa limite actuelle.',
