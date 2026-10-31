@@ -108,4 +108,22 @@ describe('CronSchedule', () => {
     expect(CronSchedule.parse('*/5 * * * *').equals(CronSchedule.parse('*/5 * * * *'))).toBe(true);
     expect(CronSchedule.parse('*/5 * * * *').equals(CronSchedule.parse('0 * * * *'))).toBe(false);
   });
+
+  // a member is told when their space is measured next: the schedule says
+  // whether a given minute of the box's clock is one of its runs
+  it.each([
+    ['20 * * * *', { minute: 20, hour: 9, dayOfMonth: 31, month: 10, dayOfWeek: 6 }, true],
+    ['20 * * * *', { minute: 21, hour: 9, dayOfMonth: 31, month: 10, dayOfWeek: 6 }, false],
+    ['*/15 * * * *', { minute: 45, hour: 3, dayOfMonth: 1, month: 1, dayOfWeek: 0 }, true],
+    ['*/15 * * * *', { minute: 50, hour: 3, dayOfMonth: 1, month: 1, dayOfWeek: 0 }, false],
+    ['30 5 * * *', { minute: 30, hour: 5, dayOfMonth: 2, month: 3, dayOfWeek: 1 }, true],
+    ['30 5 * * *', { minute: 30, hour: 6, dayOfMonth: 2, month: 3, dayOfWeek: 1 }, false],
+    ['0 0 * * 7', { minute: 0, hour: 0, dayOfMonth: 2, month: 3, dayOfWeek: 0 }, true],
+    ['0 0 1 * *', { minute: 0, hour: 0, dayOfMonth: 2, month: 3, dayOfWeek: 0 }, false],
+    ['0 0 * 6 *', { minute: 0, hour: 0, dayOfMonth: 2, month: 3, dayOfWeek: 0 }, false],
+    // a step counts from the field's first value: days start at 1, not 0
+    ['0 0 */2 * *', { minute: 0, hour: 0, dayOfMonth: 1, month: 3, dayOfWeek: 0 }, true],
+  ])('should_tell_whether_%s_runs_at_%o', (raw, time, runs) => {
+    expect(CronSchedule.parse(raw).runsAt(time)).toBe(runs);
+  });
 });

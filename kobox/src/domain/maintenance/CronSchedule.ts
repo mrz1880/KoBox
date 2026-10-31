@@ -45,6 +45,31 @@ function checkField(raw: string, range: FieldRange): string | undefined {
   return `field ${JSON.stringify(raw)} is not *, */n or a number`;
 }
 
+// One minute of the clock the schedule runs on, field by field.
+export interface CronTime {
+  readonly minute: number;
+  readonly hour: number;
+  readonly dayOfMonth: number;
+  readonly month: number;
+  // 0 = Sunday
+  readonly dayOfWeek: number;
+}
+
+const SUNDAY_ALIAS = 7;
+const DAY_OF_WEEK = 4;
+
+// a step counts from the field's first value: days and months start at 1
+function fieldMatches(raw: string, value: number, range: FieldRange): boolean {
+  if (raw === '*') {
+    return true;
+  }
+  const step = /^\*\/([0-9]{1,2})$/.exec(raw);
+  if (step?.[1] !== undefined) {
+    return (value - range.min) % Number(step[1]) === 0;
+  }
+  return Number(raw) === value;
+}
+
 export class CronSchedule {
   private constructor(readonly value: string) {}
 
@@ -61,6 +86,17 @@ export class CronSchedule {
       }
     }
     return new CronSchedule(raw);
+  }
+
+  runsAt(time: CronTime): boolean {
+    const fields = this.value.split(' ');
+    const values = [time.minute, time.hour, time.dayOfMonth, time.month, time.dayOfWeek];
+    return FIELD_RANGES.every((range, index) => {
+      const raw = fields[index] ?? '';
+      const value = values[index] ?? range.min;
+      const sundayAlias = index === DAY_OF_WEEK && value === 0 && fieldMatches(raw, SUNDAY_ALIAS, range);
+      return fieldMatches(raw, value, range) || sundayAlias;
+    });
   }
 
   equals(other: CronSchedule): boolean {
