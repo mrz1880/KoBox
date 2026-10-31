@@ -181,6 +181,16 @@ describe('admin fair-use screen', () => {
     expect(response.body).not.toContain('unhealthy');
   });
 
+  it('should_say_no_event_was_recorded_rather_than_leave_the_heading_alone', async () => {
+    const response = await world.server.inject({
+      method: 'GET',
+      url: '/admin/fair-use',
+      headers: { cookie: admin.cookie },
+    });
+
+    expect(response.body).toContain('<p class="muted">No event recorded yet.</p>');
+  });
+
   it('should_enqueue_an_override_job_translating_clear_to_null', async () => {
     const response = await world.server.inject({
       method: 'POST',

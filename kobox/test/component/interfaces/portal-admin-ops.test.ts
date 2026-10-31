@@ -88,6 +88,25 @@ describe('admin health screen', () => {
     expect(response.body).toContain('v1.2.0');
     expect(response.body).toContain('current');
   });
+
+  // a table with nothing in it showed its headers alone, like a page that broke
+  it('should_say_so_when_a_table_has_nothing_to_show_yet', async () => {
+    world = await buildPortalWorld({
+      health: new FakeHealthProbe(),
+      components: new InMemoryComponentRegistry(),
+      releases: new InMemoryReleaseRepository(),
+    });
+    admin = await loginAs(world, 'boss');
+
+    const response = await world.server.inject({
+      method: 'GET',
+      url: '/admin/health',
+      headers: { cookie: admin.cookie },
+    });
+
+    expect(response.body).toContain('<td colspan="4" class="muted">No component installed yet.</td>');
+    expect(response.body).toContain('<td colspan="4" class="muted">No release deployed yet.</td>');
+  });
 });
 
 describe('admin mails screen', () => {

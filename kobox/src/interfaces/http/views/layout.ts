@@ -348,6 +348,18 @@ ${body}
 // A flash is one of the server's own sentences, so it is looked up like any
 // other; one arriving from elsewhere (it rides in the query string) matches no
 // key, shows as it came, and is escaped like any other text.
+// A table with nothing in it says so in one full-width row, rather than
+// showing its headers alone like a page that broke.
+export function rowsOrEmpty(
+  rows: readonly RawHtml[],
+  empty: { readonly columns: number; readonly message: string },
+  t: Translate,
+): RawHtml | readonly RawHtml[] {
+  return rows.length > 0
+    ? rows
+    : html`<tr><td colspan="${String(empty.columns)}" class="muted">${t(empty.message)}</td></tr>`;
+}
+
 export function flash(
   t: Translate,
   message: string | undefined,
