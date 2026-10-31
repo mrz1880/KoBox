@@ -134,7 +134,37 @@ describe('admin fair-use screen', () => {
     expect(response.statusCode).toBe(200);
     expect(response.body).toContain('throttled');
     expect(response.body).toContain('FairUseBreached');
+    expect(response.body).toContain('<td>July 25, 2026 at 11:00 AM</td>');
     expect(response.body).toContain('alice');
+  });
+
+  it('should_say_the_last_sample_in_the_sizes_and_the_clock_of_every_other_page', async () => {
+    await fairUse.putSample(alice, {
+      egressBytes: 5 * 1024 ** 3,
+      ingressBytes: 42,
+      sampledAt: '2026-07-25 09:55:00',
+    });
+
+    const response = await world.server.inject({
+      method: 'GET',
+      url: '/admin/fair-use',
+      headers: { cookie: admin.cookie },
+    });
+
+    expect(response.body).toContain('<td class="num">5.0 GiB</td>');
+    expect(response.body).toContain('July 25, 2026 at 11:55 AM');
+  });
+
+  it('should_say_a_member_without_a_sample_is_not_measured', async () => {
+    await fairUse.saveState(alice, { level: 'none', healthState: 'healthy' }, '2026-07-25 09:00:00');
+
+    const response = await world.server.inject({
+      method: 'GET',
+      url: '/admin/fair-use',
+      headers: { cookie: admin.cookie },
+    });
+
+    expect(response.body).toContain('<td class="num"><span class="muted">not measured</span></td>');
   });
 
   it('should_enqueue_an_override_job_translating_clear_to_null', async () => {

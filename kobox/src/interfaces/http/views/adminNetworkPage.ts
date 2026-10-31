@@ -2,7 +2,9 @@ import type { DynDnsBinding } from '../../../domain/security/ports.js';
 import type { FairUseLevel, FairUseAuditEntry, UsageSample } from '../../../domain/security/ports.js';
 import type { UserAddress } from '../../../domain/tracker/ports.js';
 import { html, type RawHtml } from '../html.js';
+import { formatBytes } from './bytes.js';
 import { flash, page, sentence, type Viewer } from './layout.js';
+import { formatMoment } from './moment.js';
 import type { Translate } from './messages.js';
 
 export function adminAddressesPage(
@@ -100,8 +102,9 @@ function levelChip(level: FairUseLevel, t: Translate): RawHtml {
   return html`<span class="chip ok">${t('none')}</span>`;
 }
 
-function formatGib(bytes: number): string {
-  return `${(bytes / 1024 ** 3).toFixed(2)} GiB`;
+// a member the hourly pass has not sampled yet
+function notMeasured(viewer: Viewer): RawHtml {
+  return html`<span class="muted">${viewer.t('not measured')}</span>`;
 }
 
 export function adminFairUsePage(
@@ -114,9 +117,9 @@ export function adminFairUsePage(
   <td>${row.username}</td>
   <td>${levelChip(row.level, viewer.t)}</td>
   <td>${row.health}</td>
-  <td class="num">${row.sample === undefined ? '—' : formatGib(row.sample.egressBytes)}</td>
-  <td class="num">${row.sample === undefined ? '—' : formatGib(row.sample.ingressBytes)}</td>
-  <td class="mono">${row.sample?.sampledAt ?? '—'}</td>
+  <td class="num">${row.sample === undefined ? notMeasured(viewer) : formatBytes(row.sample.egressBytes, viewer)}</td>
+  <td class="num">${row.sample === undefined ? notMeasured(viewer) : formatBytes(row.sample.ingressBytes, viewer)}</td>
+  <td>${row.sample === undefined ? notMeasured(viewer) : formatMoment(row.sample.sampledAt, viewer)}</td>
 </tr>`,
   );
   const eventBlocks = rows
@@ -130,7 +133,7 @@ export function adminFairUsePage(
     .reverse()
     .map(
       (event) => html`<tr>
-    <td class="mono">${event.createdAt}</td>
+    <td>${formatMoment(event.createdAt, viewer)}</td>
     <td>${event.eventType}</td>
     <td class="mono">${event.detailJson}</td>
   </tr>`,
