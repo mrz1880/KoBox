@@ -24,7 +24,7 @@ describe('blocklistCoverage', () => {
     expect(blocklistCoverage([])).toBe('no-list-enabled');
     expect(blocklistCoverage([aList('level1', false)])).toBe('no-list-enabled');
     expect(blocklistCoverage([aList('level1', true)])).toBe('not-downloaded-yet');
-    expect(blocklistCoverage([aList('level2', true).recordFailure()])).toBe('not-downloaded-yet');
+    expect(blocklistCoverage([aList('level2', true).recordFailure('2026-07-24 10:00:00')])).toBe('not-downloaded-yet');
     expect(blocklistCoverage([aList('level2', true), downloaded])).toBe('blocking');
   });
 });

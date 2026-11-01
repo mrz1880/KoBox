@@ -18,7 +18,7 @@ function subjectOf(event: AnyEvent): string {
   if ('outcome' in event) {
     return event.outcome;
   }
-  return `${event.author}/${event.name}`;
+  return event.lists.map((list) => `${list.author}/${list.name}`).join(', ');
 }
 
 // Phase 0 stub, widened per phase: real channels (ntfy/email/discord) arrive

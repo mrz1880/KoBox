@@ -121,6 +121,9 @@ export const blocklists = sqliteTable(
     enabled: integer('enabled').notNull().default(0),
     lastUpdateStatus: text('last_update_status', { enum: ['ok', 'failed'] }),
     lastUpdateAt: text('last_update_at'),
+    // while the list fails: when the outage began, and whether an admin was told
+    failingSince: text('failing_since'),
+    failureReported: integer('failure_reported').notNull().default(0),
     sha256: text('sha256'),
   },
   (table) => [unique().on(table.source, table.author, table.name)],

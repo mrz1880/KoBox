@@ -56,7 +56,10 @@ const EVERY_EVENT: readonly AnyDomainEvent[] = [
   { type: 'TrackerDiscovered', host: 'tracker.example.org' },
   { type: 'TrackerDied', host: 'tracker.example.org' },
   { type: 'TrackerCertRenewed', host: 'tracker.example.org', expiresOn: '2027-01-24' },
-  { type: 'BlocklistUpdateFailed', author: 'bluetack', name: 'level1' },
+  {
+    type: 'BlocklistsNotUpdating',
+    lists: [{ author: 'bluetack', name: 'level1', since: '2026-10-31 23:00:00', reason: 'server answered 503' }],
+  },
   { type: 'FairUseBreached', username: 'alice', metric: 'egress', observedBps: 90_000_000, limitBps: 50_000_000 },
   { type: 'AbnormalAuthRate', username: 'alice', perHour: 82, limitPerHour: 30 },
   { type: 'ServiceUnhealthy', username: 'alice', detail: 'rtorrent-alice is not running' },
@@ -118,6 +121,24 @@ describe('formatEvent', () => {
     const formatted = formatEvent({ type: 'UserCreated', username: 'alice' }, context);
     expect(formatted.priority).toBe('default');
     expect(formatted.title).toContain('alice');
+  });
+
+  // one message for a whole outage: every stuck list, since when, and why
+  it('should_name_every_stuck_blocklist_with_since_when_and_why', () => {
+    const formatted = formatEvent(
+      {
+        type: 'BlocklistsNotUpdating',
+        lists: [
+          { author: 'Bluetack', name: 'level1', since: '2026-10-31 23:00:00', reason: 'server answered 503' },
+          { author: 'I-Blocklist', name: 'Japan', since: '2026-10-31 23:00:00', reason: 'timed out after 30 s' },
+        ],
+      },
+      context,
+    );
+
+    expect(formatted.title).toContain('2 blocklists have not updated for a day');
+    expect(formatted.body).toContain('Bluetack/level1: failing since 2026-10-31 23:00 UTC (server answered 503)');
+    expect(formatted.body).toContain('I-Blocklist/Japan: failing since 2026-10-31 23:00 UTC (timed out after 30 s)');
   });
 
   it('should_describe_a_throttle_with_its_rate', () => {

@@ -135,14 +135,20 @@ function noticeOf(event: AnyDomainEvent): Notice {
         page: '/admin/trackers',
         priority: 'default',
       };
-    case 'BlocklistUpdateFailed':
+    case 'BlocklistsNotUpdating':
       return {
-        title: `Blocklist update failed: ${event.author}/${event.name}`,
+        title:
+          event.lists.length === 1
+            ? '1 blocklist has not updated for a day'
+            : `${String(event.lists.length)} blocklists have not updated for a day`,
         facts: [
-          `The update of the ${event.author}/${event.name} blocklist failed.`,
-          'Its last good ranges stay in force, so nothing is let through meanwhile.',
+          ...event.lists.map(
+            (list) =>
+              `${list.author}/${list.name}: failing since ${list.since.slice(0, 16)} UTC (${list.reason})`,
+          ),
+          'Their last good ranges stay in force, so nothing is let through meanwhile.',
         ],
-        todo: 'Check the subscription on the blocklists page; it is retried on the next scheduled run.',
+        todo: 'A list failing this long is usually an expired subscription or a list withdrawn at the source: check it on the blocklists page. It is still retried every six hours, and this is not sent again for the same outage.',
         page: '/admin/blocklists',
         priority: 'default',
       };

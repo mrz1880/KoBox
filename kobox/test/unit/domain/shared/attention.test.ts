@@ -6,7 +6,7 @@ import { callsForAnAdmin } from '../../../../src/domain/shared/attention.js';
 // included. Only what an admin has to act on interrupts them now; the rest is
 // in the portal and the worker's log.
 describe('what calls for an admin', () => {
-  it.each(['ServiceUnhealthy', 'BlocklistUpdateFailed', 'TrackerDied', 'AbnormalAuthRate'])(
+  it.each(['ServiceUnhealthy', 'BlocklistsNotUpdating', 'TrackerDied', 'AbnormalAuthRate'])(
     'should_interrupt_the_admin_for_%s',
     (type) => {
       expect(callsForAnAdmin({ type })).toBe(true);

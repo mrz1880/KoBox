@@ -9,7 +9,7 @@ import type { TrackerEvent } from '../tracker/events.js';
 // than in the admin's mailbox, where it buried these.
 const NEEDS_AN_ADMIN: ReadonlySet<string> = new Set<SecurityEvent['type'] | TrackerEvent['type']>([
   'ServiceUnhealthy',
-  'BlocklistUpdateFailed',
+  'BlocklistsNotUpdating',
   'TrackerDied',
   'AbnormalAuthRate',
 ]);

@@ -63,10 +63,15 @@ export interface DownloadedList {
   readonly sha256: string;
 }
 
-// undefined = download or integrity failure; callers isolate per-list so one
-// expired subscription never blocks the other lists (issue #117).
+// A download or integrity failure, saying why in words an admin can act on.
+// Callers isolate per-list so one expired subscription never blocks the
+// other lists (issue #117).
+export interface DownloadFailure {
+  readonly failure: string;
+}
+
 export interface BlocklistDownloadPort {
-  fetch(url: string): Promise<DownloadedList | undefined>;
+  fetch(url: string): Promise<DownloadedList | DownloadFailure>;
 }
 
 export interface CatalogEntry {

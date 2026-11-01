@@ -10,8 +10,8 @@ type BlocklistRow = typeof blocklists.$inferSelect;
 
 function restore(row: BlocklistRow): Blocklist {
   let lastUpdate: BlocklistUpdate | undefined;
-  if (row.lastUpdateStatus === 'failed') {
-    lastUpdate = { status: 'failed' };
+  if (row.lastUpdateStatus === 'failed' && row.failingSince !== null) {
+    lastUpdate = { status: 'failed', since: row.failingSince, reported: row.failureReported === 1 };
   } else if (row.lastUpdateStatus === 'ok' && row.lastUpdateAt !== null) {
     lastUpdate = { status: 'ok', at: row.lastUpdateAt };
   }
@@ -68,6 +68,8 @@ export class SqliteBlocklistRepository implements BlocklistRepository {
       enabled: blocklist.enabled ? 1 : 0,
       lastUpdateStatus: blocklist.lastUpdate?.status ?? null,
       lastUpdateAt: blocklist.lastUpdate?.status === 'ok' ? blocklist.lastUpdate.at : null,
+      failingSince: blocklist.lastUpdate?.status === 'failed' ? blocklist.lastUpdate.since : null,
+      failureReported: blocklist.lastUpdate?.status === 'failed' && blocklist.lastUpdate.reported ? 1 : 0,
       sha256: blocklist.sha256 ?? null,
     };
     this.db.orm

@@ -537,13 +537,13 @@ describe('SqliteBlocklistRepository', () => {
     expect(found?.lastUpdate).toEqual({ status: 'ok', at: '2026-07-24 10:00:00' });
     expect(found?.sha256).toBe('deadbeef');
 
-    await repo.save(found?.recordFailure() ?? level1());
+    await repo.save(found?.recordFailure('2026-07-24 16:00:00').markReported() ?? level1());
     const failed = await repo.findBySourceAuthorName(
       BlocklistSource.parse('iblocklist'),
       'Example Org',
       'level1',
     );
-    expect(failed?.lastUpdate).toEqual({ status: 'failed' });
+    expect(failed?.lastUpdate).toEqual({ status: 'failed', since: '2026-07-24 16:00:00', reported: true });
     expect(failed?.sha256).toBe('deadbeef');
   });
 
