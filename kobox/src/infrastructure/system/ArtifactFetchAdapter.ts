@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { mkdir, rename, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import type { ArtifactFetchPort } from '../../domain/installation/ports.js';
-import { httpsGet, type HttpsDownloadOptions } from './HttpsBlocklistDownloadAdapter.js';
+import { fetchBody, type HttpsDownloadOptions } from './HttpsBlocklistDownloadAdapter.js';
 
 export class ArtifactFetchError extends Error {
   constructor(message: string) {
@@ -27,20 +27,7 @@ const MAX_ARTIFACT_BYTES = 512 * 1024 * 1024;
 
 export function defaultBodyFetcher(options: HttpsDownloadOptions = {}): HttpsBodyFetcher {
   const withCap: HttpsDownloadOptions = { maxBytes: MAX_ARTIFACT_BYTES, ...options };
-  return async (url) => {
-    let response = await httpsGet(url, withCap);
-    // one https-only redirect hop, like the blocklist downloads
-    if (response?.location?.startsWith('https://')) {
-      response = await httpsGet(response.location, withCap);
-    }
-    if (response === undefined) {
-      return { failure: 'no response: connection error, timeout, or a body over the size cap' };
-    }
-    if (response.body === undefined) {
-      return { failure: `server answered ${String(response.status)}` };
-    }
-    return { body: response.body };
-  };
+  return (url) => fetchBody(url, withCap);
 }
 
 // §5.6 verified downloads for vendored apps (ruTorrent): the artifact only

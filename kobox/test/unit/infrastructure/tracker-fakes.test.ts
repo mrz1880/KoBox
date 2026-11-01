@@ -54,7 +54,9 @@ describe('FakeBlocklistDownload', () => {
       ranges: ['10.0.0.0/8'],
       sha256: 'aa',
     });
-    expect(await fake.fetch('https://list.example.org/other')).toBeUndefined();
+    expect(await fake.fetch('https://list.example.org/other')).toEqual({
+      failure: 'no list served at that address',
+    });
     expect(fake.requestedUrls).toEqual([
       'https://list.example.org/a',
       'https://list.example.org/other',
@@ -84,11 +86,11 @@ describe('FakeNotifications', () => {
     const fake = new FakeNotifications();
     await fake.notify({ type: 'UserCreated', username: 'alice' });
     await fake.notify({ type: 'TrackerDied', host: 'tracker.example.org' });
-    await fake.notify({ type: 'BlocklistUpdateFailed', author: 'a', name: 'level1' });
+    await fake.notify({ type: 'BlocklistsNotUpdating', lists: [] });
     expect(fake.published.map((event) => event.type)).toEqual([
       'UserCreated',
       'TrackerDied',
-      'BlocklistUpdateFailed',
+      'BlocklistsNotUpdating',
     ]);
   });
 });

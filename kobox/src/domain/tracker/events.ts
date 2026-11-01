@@ -14,10 +14,17 @@ export interface TrackerCertRenewed {
   readonly expiresOn: string;
 }
 
-export interface BlocklistUpdateFailed {
-  readonly type: 'BlocklistUpdateFailed';
+export interface StuckBlocklist {
   readonly author: string;
   readonly name: string;
+  readonly since: string; // when its outage began, UTC stamp
+  readonly reason: string; // why the latest attempt failed
 }
 
-export type TrackerEvent = TrackerDiscovered | TrackerDied | TrackerCertRenewed | BlocklistUpdateFailed;
+// Every list that has just gone a day without updating, in one message.
+export interface BlocklistsNotUpdating {
+  readonly type: 'BlocklistsNotUpdating';
+  readonly lists: readonly StuckBlocklist[];
+}
+
+export type TrackerEvent = TrackerDiscovered | TrackerDied | TrackerCertRenewed | BlocklistsNotUpdating;

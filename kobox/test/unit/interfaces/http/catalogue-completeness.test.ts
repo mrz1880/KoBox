@@ -337,7 +337,7 @@ function keysSentToTheCatalogue(): ReadonlySet<string> {
     ],
     admin,
   );
-  adminBlocklistsPage([blocklist(), blocklist({ status: 'ok', at: NOW }), blocklist({ status: 'failed' })], admin);
+  adminBlocklistsPage([blocklist(), blocklist({ status: 'ok', at: NOW }), blocklist({ status: 'failed', since: NOW, reported: false })], admin);
   adminUsersPage(
     [aUser().build(), aUser().withUsername('bob').suspended(), aUser().withUsername('carol').build()],
     new Map([

@@ -114,7 +114,7 @@ describe('UpdateBlocklists', () => {
     }).execute({ now: NOW });
 
     expect(report.updated).toBe(2);
-    expect(report.failed).toBe(0);
+    expect(report.failures).toEqual([]);
     expect(report.ranges).toEqual(['10.0.0.0/8', '192.0.2.0-192.0.2.255']);
     expect(cache.stored).toEqual(['10.0.0.0/8', '192.0.2.0-192.0.2.255']);
     expect(download.requestedUrls).toHaveLength(2); // disabled list never fetched
@@ -144,17 +144,48 @@ describe('UpdateBlocklists', () => {
     }).execute({ now: NOW });
 
     expect(report.updated).toBe(1);
-    expect(report.failed).toBe(1);
+    expect(report.failures).toEqual([{ author: 'me', name: 'expired', reason: 'no list served at that address' }]);
     expect(report.ranges).toEqual(['10.0.0.0/8']);
-    expect(notifications.published).toEqual([
-      { type: 'BlocklistUpdateFailed', author: 'me', name: 'expired' },
-    ]);
     const failed = await blocklists.findBySourceAuthorName(
       BlocklistSource.parse('personal'),
       'me',
       'expired',
     );
-    expect(failed?.lastUpdate).toEqual({ status: 'failed' });
+    expect(failed?.lastUpdate).toEqual({ status: 'failed', since: NOW, reported: false });
+  });
+
+  // a night when the source was down sent one mail per list, twenty in a
+  // second, for something the next run fixed on its own
+  it('should_tell_nobody_about_a_list_that_failed_once', async () => {
+    await blocklists.save(personalList('flaky', 'https://lists.example.net/flaky.gz'));
+
+    await new UpdateBlocklists({ blocklists, download, notifications, cache }).execute({ now: NOW });
+
+    expect(notifications.published).toEqual([]);
+  });
+
+  it('should_tell_once_in_one_message_about_every_list_failing_for_a_day', async () => {
+    await blocklists.save(personalList('expired', 'https://lists.example.net/expired.gz'));
+    await blocklists.save(personalList('withdrawn', 'https://lists.example.net/withdrawn.gz'));
+    const update = new UpdateBlocklists({ blocklists, download, notifications, cache });
+
+    for (const now of ['2026-07-24 10:00:00', '2026-07-24 16:00:00', '2026-07-24 22:00:00', '2026-07-25 04:00:00']) {
+      await update.execute({ now });
+    }
+    expect(notifications.published).toEqual([]);
+
+    await update.execute({ now: '2026-07-25 10:00:00' });
+    await update.execute({ now: '2026-07-25 16:00:00' });
+
+    expect(notifications.published).toEqual([
+      {
+        type: 'BlocklistsNotUpdating',
+        lists: [
+          { author: 'me', name: 'expired', since: '2026-07-24 10:00:00', reason: 'no list served at that address' },
+          { author: 'me', name: 'withdrawn', since: '2026-07-24 10:00:00', reason: 'no list served at that address' },
+        ],
+      },
+    ]);
   });
 
   it('should_merge_the_last_good_ranges_of_a_list_that_fails_this_run', async () => {
@@ -216,7 +247,7 @@ describe('UpdateBlocklists', () => {
     // not an error: without credentials the fetch is guaranteed to fail —
     // skip quietly instead of a failure notification on every run
     expect(report.skipped).toBe(1);
-    expect(report.failed).toBe(0);
+    expect(report.failures).toEqual([]);
     expect(download.requestedUrls).toEqual([]);
     expect(notifications.published).toEqual([]);
   });

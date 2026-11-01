@@ -1,4 +1,8 @@
-import type { BlocklistDownloadPort, DownloadedList } from '../../../domain/tracker/ports.js';
+import type {
+  BlocklistDownloadPort,
+  DownloadedList,
+  DownloadFailure,
+} from '../../../domain/tracker/ports.js';
 
 export class FakeBlocklistDownload implements BlocklistDownloadPort {
   private readonly byUrl = new Map<string, DownloadedList>();
@@ -8,8 +12,8 @@ export class FakeBlocklistDownload implements BlocklistDownloadPort {
     this.byUrl.set(url, list);
   }
 
-  fetch(url: string): Promise<DownloadedList | undefined> {
+  fetch(url: string): Promise<DownloadedList | DownloadFailure> {
     this.requestedUrls.push(url);
-    return Promise.resolve(this.byUrl.get(url));
+    return Promise.resolve(this.byUrl.get(url) ?? { failure: 'no list served at that address' });
   }
 }

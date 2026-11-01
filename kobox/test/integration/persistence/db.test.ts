@@ -7,6 +7,8 @@ import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { KoboxDatabase } from '../../../src/infrastructure/persistence/db.js';
 import { SqliteComponentRegistry } from '../../../src/infrastructure/persistence/SqliteComponentRegistry.js';
+import { SqliteBlocklistRepository } from '../../../src/infrastructure/persistence/SqliteBlocklistRepository.js';
+import { BlocklistSource } from '../../../src/domain/tracker/BlocklistSource.js';
 
 let dir: string;
 
@@ -101,5 +103,27 @@ describe('KoboxDatabase', () => {
     // nothing is left to execute a job of the retired feature
     expect(pending).toEqual([{ type: 'index-media' }]);
     expect(tables).toEqual([]);
+  });
+
+  it('should_count_the_outage_of_a_list_already_failing_from_the_upgrade', async () => {
+    // before 0033 a failing list did not say since when; dropping it back to
+    // "never updated" would hide the failure from the blocklists page
+    const old = boxBefore('0033_blocklist-outage');
+    old
+      .prepare(
+        "INSERT INTO blocklists (source, author, name, url, enabled, last_update_status) VALUES ('iblocklist', 'Example Org', 'level1', 'https://list.example.org/?list=abc', 1, 'failed')",
+      )
+      .run();
+    old.close();
+
+    const db = KoboxDatabase.open(join(dir, 'kobox.db'));
+    const list = await new SqliteBlocklistRepository(db).findBySourceAuthorName(
+      BlocklistSource.parse('iblocklist'),
+      'Example Org',
+      'level1',
+    );
+    db.close();
+
+    expect(list?.lastUpdate).toMatchObject({ status: 'failed', reported: false });
   });
 });

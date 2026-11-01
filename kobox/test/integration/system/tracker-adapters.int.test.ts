@@ -167,7 +167,7 @@ describe.skipIf(!onDebianAsRoot)('HttpsBlocklistDownloadAdapter against a local 
     rmSync(dir, { recursive: true, force: true });
   });
 
-  async function serveBody(body: Buffer): Promise<{ url: string; ca: string }> {
+  async function serveBody(body: Buffer, status = 200): Promise<{ url: string; ca: string }> {
     const { keyPath, certPath } = generateSelfSigned(
       dir,
       'localhost',
@@ -177,7 +177,7 @@ describe.skipIf(!onDebianAsRoot)('HttpsBlocklistDownloadAdapter against a local 
     server = createHttpsServer(
       { key: readFileSync(keyPath), cert: readFileSync(certPath) },
       (_request, response) => {
-        response.writeHead(200);
+        response.writeHead(status);
         response.end(body);
       },
     );
@@ -192,8 +192,17 @@ describe.skipIf(!onDebianAsRoot)('HttpsBlocklistDownloadAdapter against a local 
 
     const list = await adapter.fetch(url);
 
-    expect(list?.ranges).toEqual(['192.0.2.0-192.0.2.255']);
-    expect(list?.sha256).toHaveLength(64);
+    expect(list).toMatchObject({ ranges: ['192.0.2.0-192.0.2.255'] });
+    expect('sha256' in list ? list.sha256 : '').toHaveLength(64);
+  });
+
+  // the log said "blocklist download failed" and nothing else, so a night when
+  // every list failed could not be told apart from an expired subscription
+  it('should_say_what_the_server_answered_when_it_refuses', async () => {
+    const { url, ca } = await serveBody(Buffer.from('busy'), 503);
+    const adapter = new HttpsBlocklistDownloadAdapter(logger, { ca });
+
+    expect(await adapter.fetch(url)).toEqual({ failure: 'server answered 503' });
   });
 
   it('should_reject_a_corrupted_archive', async () => {
@@ -201,7 +210,7 @@ describe.skipIf(!onDebianAsRoot)('HttpsBlocklistDownloadAdapter against a local 
     const { url, ca } = await serveBody(body);
     const adapter = new HttpsBlocklistDownloadAdapter(logger, { ca });
 
-    expect(await adapter.fetch(url)).toBeUndefined();
+    expect(await adapter.fetch(url)).toEqual({ failure: 'the download is not a readable list of ranges' });
   });
 
   it('should_cut_off_a_server_that_accepts_and_stalls', async () => {
@@ -221,7 +230,9 @@ describe.skipIf(!onDebianAsRoot)('HttpsBlocklistDownloadAdapter against a local 
     const adapter = new HttpsBlocklistDownloadAdapter(logger, { ca, timeoutMs: 300 });
 
     const startedAt = Date.now();
-    expect(await adapter.fetch(`https://localhost:${String(port)}/stall.gz`)).toBeUndefined();
+    expect(await adapter.fetch(`https://localhost:${String(port)}/stall.gz`)).toEqual({
+      failure: 'no answer within 0.3 s',
+    });
     expect(Date.now() - startedAt).toBeLessThan(5_000); // no worker stall
   });
 
@@ -230,6 +241,6 @@ describe.skipIf(!onDebianAsRoot)('HttpsBlocklistDownloadAdapter against a local 
     const { url } = await serveBody(body);
     const adapter = new HttpsBlocklistDownloadAdapter(logger);
 
-    expect(await adapter.fetch(url)).toBeUndefined();
+    expect(await adapter.fetch(url)).toEqual({ failure: 'connection failed: DEPTH_ZERO_SELF_SIGNED_CERT' });
   });
 });
