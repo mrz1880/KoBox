@@ -81,9 +81,13 @@ Domain types, all pure:
    crosses them with sent transfers and stores a snapshot of candidates. The
    portal runs non-root and cannot talk to another account's SCGI, so it reads
    the snapshot; the page stays instant.
-2. **Pressure.** On crossing 90 %, the sample queues `NotifySpaceRunningOut` (the
-   once-per-climb marker lives on the member) or, with automatic cleanup on,
-   `CleanUpSpace` with the proposal.
+2. **Pressure.** On crossing 90 %, the sample (`WatchMemberSpace`) puts the
+   mail straight in the outbox, which already retries it, so no job type is
+   needed for it. With automatic cleanup on and a snapshot younger than two
+   hours, it queues `clean-up-space` instead, on the lines a proposal built
+   from the candidates the member's scope allows would check. Either one sets
+   the once-per-climb marker kept with the member's space preferences, so a
+   cleanup that leaves the member past 90 % does not run again every hour.
 3. **Cleanup job.** `CleanUpSpace` takes a list of torrents. Before each deletion
    the worker checks the torrent live against the rule. One that no longer
    qualifies (restarted, being sent) is skipped and the report says why. A
