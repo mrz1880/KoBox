@@ -9,6 +9,7 @@ import type {
   VolumePort,
   VolumeSampleRepository,
 } from '../../domain/user/ports.js';
+import { messageOf } from '../../domain/shared/errorMessage.js';
 
 interface Deps {
   readonly repo: UserRepository;
@@ -60,9 +61,6 @@ export interface UnwatchedMember {
   readonly error: string;
 }
 
-function messageOf(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
 
 // What a pass could not do although it went on. No volume error means the
 // volume was measured.
