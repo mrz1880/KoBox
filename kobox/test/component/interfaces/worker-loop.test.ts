@@ -1233,6 +1233,21 @@ describe('space jobs', () => {
     expect((await world.cleanupReports.find(alice))?.freed.toGib()).toBe(12);
   });
 
+  it('should_keep_that_the_hourly_pass_started_a_cleanup_on_its_own', async () => {
+    const id = await world.queue.enqueue(
+      parseJob('clean-up-space', {
+        username: 'alice',
+        infoHashes: ['A'.repeat(40)],
+        trigger: 'automatic',
+      }),
+    );
+
+    await world.worker.processNext();
+
+    expect(world.queue.statusOf(id)).toBe('done');
+    expect((await world.cleanupReports.find(alice))?.trigger).toBe('automatic');
+  });
+
   // the member reads it on their page; whoever looks after the box reads the log
   it('should_log_a_torrent_the_cleanup_could_not_remove', async () => {
     const scgiPort = ScgiPort.parse(51101);

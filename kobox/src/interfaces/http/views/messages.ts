@@ -199,6 +199,8 @@ const FR: Readonly<Record<string, string>> = {
   'Last cleanup': 'Dernier nettoyage',
   '{when}: {freed} freed.': '{when} : {freed} libérés.',
   '{when}: nothing was deleted.': '{when} : rien n’a été supprimé.',
+  'KoBox cleaned up for you': 'KoBox a fait de la place pour vous',
+  'See the details': 'Voir le détail',
   Deleted: 'Supprimé',
   'Still there': 'Toujours là',
   'Kept: it no longer qualifies, it was restarted or is being sent to your machine.':

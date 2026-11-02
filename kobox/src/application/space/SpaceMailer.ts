@@ -1,7 +1,8 @@
 import type { MailOutboxPort } from '../maintenance/MailOutboxPort.js';
 import type { PortalAddressPort } from '../portal/PasswordLinks.js';
-import { spaceRunningOutMail } from '../portal/spaceMails.js';
+import { automaticCleanupMail, spaceRunningOutMail } from '../portal/spaceMails.js';
 import type { PortalCredentialsPort } from '../../domain/portal/ports.js';
+import type { CleanupReport } from '../../domain/space/CleanupReport.js';
 import type { UserRepository } from '../../domain/user/ports.js';
 import type { Quota } from '../../domain/user/Quota.js';
 import type { Username } from '../../domain/user/Username.js';
@@ -39,6 +40,23 @@ export class SpaceMailer {
         facts: { username: username.value, ...space, url: member.url },
       }),
       at,
+    );
+  }
+
+  async automaticCleanup(username: Username, report: CleanupReport): Promise<void> {
+    const member = await this.memberNamed(username);
+    if (member === undefined) {
+      return;
+    }
+    await this.deps.outbox.enqueue(
+      automaticCleanupMail({
+        recipient: member.recipient,
+        language: member.language,
+        username: username.value,
+        report,
+        url: member.url,
+      }),
+      report.at,
     );
   }
 

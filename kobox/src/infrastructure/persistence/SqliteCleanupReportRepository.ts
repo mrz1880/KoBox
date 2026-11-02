@@ -7,9 +7,6 @@ import type { Username } from '../../domain/user/Username.js';
 import type { KoboxDatabase } from './db.js';
 import { cleanupReports } from './schema.js';
 
-// Every cleanup is one a member asked for until automatic cleanup exists.
-const MEMBER_TRIGGER = 'member';
-
 // The lines as stored: sizes in bytes, the freed total left out since the
 // deleted lines already say it.
 const storedLines = z.object({
@@ -26,7 +23,7 @@ export class SqliteCleanupReportRepository implements CleanupReportRepository {
       skipped: [...report.skipped],
     };
     const values = {
-      trigger: MEMBER_TRIGGER,
+      trigger: report.trigger,
       reportJson: JSON.stringify(lines),
       at: report.at,
     } as const;
@@ -56,6 +53,7 @@ export class SqliteCleanupReportRepository implements CleanupReportRepository {
         })),
         skipped: lines.skipped,
         at: row.at,
+        trigger: row.trigger,
       }),
     );
   }

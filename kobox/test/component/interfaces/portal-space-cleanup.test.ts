@@ -258,6 +258,7 @@ describe('what the last cleanup did', () => {
         ],
         skipped: [],
         at: '2026-07-25 09:30:00',
+        trigger: 'member',
       }),
     );
 
@@ -276,7 +277,12 @@ describe('what the last cleanup did', () => {
   ])('should_say_why_a_torrent_skipped_as_%s_is_still_there', async (reason, said) => {
     await world.cleanupReports.save(
       alice,
-      CleanupReport.of({ deleted: [], skipped: [{ name: 'Kept.Release', reason }], at: '2026-07-25 09:30:00' }),
+      CleanupReport.of({
+        deleted: [],
+        skipped: [{ name: 'Kept.Release', reason }],
+        at: '2026-07-25 09:30:00',
+        trigger: 'member',
+      }),
     );
 
     const body = await cleanupPageOf(member);
@@ -352,5 +358,60 @@ describe('the home points at the cleanup', () => {
 
     expect(body).toContain('<p><b>80 Gio</b> peuvent être libérés.</p>');
     expect(body).toContain('>Voir et nettoyer</a>');
+  });
+});
+
+describe('the home says what an automatic cleanup deleted', () => {
+  function automaticReport(at: string): CleanupReport {
+    return CleanupReport.of({
+      deleted: [
+        { name: 'Old.Release', size: Quota.gib(50) },
+        { name: 'Older.Release', size: Quota.gib(30) },
+      ],
+      skipped: [],
+      at,
+      trigger: 'automatic',
+    });
+  }
+
+  // the world's clock is 2026-07-25 10:00 UTC
+  it('should_show_what_went_and_the_space_it_gave_back_for_a_week', async () => {
+    await world.cleanupReports.save(alice, automaticReport('2026-07-19 10:00:00'));
+
+    const body = await homeOf(member);
+
+    expect(body).toContain('KoBox cleaned up for you');
+    expect(body).toContain('July 19, 2026 at 12:00 PM: 80 GiB freed.');
+    expect(body).toContain('<td class="path">Old.Release</td>\n  <td class="num">50 GiB</td>');
+  });
+
+  it('should_stop_showing_it_after_a_week', async () => {
+    await world.cleanupReports.save(alice, automaticReport('2026-07-18 10:00:00'));
+
+    expect(await homeOf(member)).not.toContain('KoBox cleaned up for you');
+  });
+
+  // a cleanup the member ran is on the cleanup page, where they came from
+  it('should_not_show_a_cleanup_the_member_ran_themselves', async () => {
+    await world.cleanupReports.save(
+      alice,
+      CleanupReport.of({
+        deleted: [{ name: 'Old.Release', size: Quota.gib(50) }],
+        skipped: [],
+        at: '2026-07-25 09:30:00',
+        trigger: 'member',
+      }),
+    );
+
+    expect(await homeOf(member)).not.toContain('Old.Release');
+  });
+
+  it('should_say_it_in_french', async () => {
+    await world.cleanupReports.save(alice, automaticReport('2026-07-19 10:00:00'));
+
+    const body = await homeOf(member, 'fr-FR');
+
+    expect(body).toContain('KoBox a fait de la place pour vous');
+    expect(body).toContain('19 juillet 2026 à 12:00 : 80 Gio libérés.');
   });
 });
