@@ -5,6 +5,7 @@ import type { DiskUsageSample, VolumeSample } from '../../../domain/user/ports.j
 import { html, type RawHtml } from '../html.js';
 import { formatBytes } from './bytes.js';
 import { formatAgo, formatClock, nextRunAfter } from './moment.js';
+import { QuotaPressure } from '../../../domain/space/QuotaPressure.js';
 import { scheduleOf } from '../../../domain/maintenance/schedule.js';
 import { sentence, type Viewer } from './layout.js';
 
@@ -90,6 +91,37 @@ ${gauge(space, viewer)}
   })}</p>
 ${freshness(space, viewer, now)}
 </section>${diskWarning(space.usable.limit, viewer)}`;
+}
+
+// Under the gauge: where a member frees space. A discreet link while nothing
+// presses; from the filling line, what a click would give back. `cleanable` is
+// what the page would check, unknown until the hourly pass made its list.
+export function cleanupHint(
+  space: MeasuredSpace | undefined,
+  cleanable: Quota | undefined,
+  viewer: Viewer,
+): RawHtml {
+  const link = html`<p class="muted"><a href="/space/cleanup">${viewer.t('See what can be cleaned')}</a></p>`;
+  if (space === undefined || cleanable === undefined) {
+    return link;
+  }
+  switch (QuotaPressure.of(space.used, space.allowance)) {
+    case 'relaxed':
+      return link;
+    case 'filling':
+    case 'critical':
+      if (cleanable.toBytes() === 0) {
+        return html`<section class="flash warn">
+<p>${viewer.t('Nothing to clean yet: your torrents are still seeding.')}</p>
+</section>`;
+      }
+      return html`<section class="flash warn">
+<p>${sentence(viewer.t, '{freed} can be freed.', {
+        freed: html`<b>${formatBytes(cleanable.toBytes(), viewer)}</b>`,
+      })}</p>
+<a class="action" href="/space/cleanup">${viewer.t('See and clean')}</a>
+</section>`;
+  }
 }
 
 // The admin's side of the same rule, after the "using X of Y" sentence. Says

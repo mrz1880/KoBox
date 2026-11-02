@@ -297,6 +297,7 @@ export function registerUserRoutes(
             await deps.diskSamples.find(user.username),
             await deps.volumeSamples.find(),
           ),
+          (await cleanupListOf(deps, user.username))?.proposal.freed(),
           deps.now(),
           flashOf(request),
         ),

@@ -3,11 +3,12 @@ import type { MediaFile } from '../../../domain/media/MediaFile.js';
 import type { Label } from '../../../domain/torrent/Label.js';
 import type { SshPublicKey } from '../../../domain/user/SshPublicKey.js';
 import type { SeedboxUser } from '../../../domain/user/SeedboxUser.js';
+import type { Quota } from '../../../domain/user/Quota.js';
 import { BROWSER_CHOICE } from '../browserLanguage.js';
 import { formatBytes } from './bytes.js';
 import { icon } from './icons.js';
 import type { MediaColumn, MediaOrder } from './mediaOrder.js';
-import { memberSpace, type MeasuredSpace } from './space.js';
+import { cleanupHint, memberSpace, type MeasuredSpace } from './space.js';
 import { html, type RawHtml } from '../html.js';
 import { flash, page, sentence, type Reader, type Viewer } from './layout.js';
 import type { Translate } from './messages.js';
@@ -151,6 +152,7 @@ export function userHomePage(
   viewer: Viewer,
   row: SignalRow,
   space: MeasuredSpace | undefined,
+  cleanable: Quota | undefined,
   now: string,
   message?: string,
 ): string {
@@ -167,6 +169,7 @@ export function userHomePage(
 ${flash(viewer.t, message)}
 ${plainStatus(row, viewer)}
 ${memberSpace(space, viewer, now)}
+${cleanupHint(space, cleanable, viewer)}
 <div class="choices">${actions}</div>
 <p class="links"><a href="/access">${viewer.t('My account and connection details')}</a></p>`,
     viewer,

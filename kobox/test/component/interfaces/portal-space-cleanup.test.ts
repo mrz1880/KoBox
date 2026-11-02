@@ -3,6 +3,7 @@ import { CleanupCandidate, type CleanupReason } from '../../../src/domain/space/
 import { CleanupReport, type SkipReason } from '../../../src/domain/space/CleanupReport.js';
 import { InfoHash } from '../../../src/domain/torrent/InfoHash.js';
 import { Quota } from '../../../src/domain/user/Quota.js';
+import { VolumeSpace } from '../../../src/domain/user/VolumeSpace.js';
 import { Username } from '../../../src/domain/user/Username.js';
 import { buildPortalWorld, loginAs, type AgentSession, type PortalWorld } from './portalWorld.js';
 
@@ -46,6 +47,26 @@ async function snapshotWithThreeCandidates(): Promise<void> {
     TAKEN_AT,
   );
 }
+
+async function homeOf(session: AgentSession, language = 'en'): Promise<string> {
+  const response = await world.server.inject({
+    method: 'GET',
+    url: '/',
+    headers: { cookie: session.cookie, 'accept-language': language },
+  });
+  return response.body;
+}
+
+// alice's usage, and a disk with room to spare
+async function measured(usedGib: number): Promise<void> {
+  await world.diskSamples.save({ username: alice, used: Quota.gib(usedGib), sampledAt: TAKEN_AT });
+  await world.volumeSamples.save({
+    space: VolumeSpace.of({ free: Quota.gib(2000), size: Quota.gib(3200) }),
+    measuredAt: TAKEN_AT,
+  });
+}
+
+const DISCREET_LINK = '<p class="muted"><a href="/space/cleanup">See what can be cleaned</a></p>';
 
 // each box of the form, in page order, with whether it is checked
 function boxesOf(body: string): string[] {
@@ -259,5 +280,59 @@ describe('the cleanup page in French', () => {
     expect(body).toContain('<td class="reason">Ratio 2,4 après 12 jours</td>');
     expect(body).toContain('Liste du 25 juillet 2026 à 11:20.');
     expect(body).toContain('Supprimer pour de bon (80 Gio)');
+  });
+});
+
+describe('the home points at the cleanup', () => {
+  // 188 of 412 GiB, under the 80 % line: nothing presses
+  it('should_offer_a_discreet_link_under_the_filling_line', async () => {
+    await measured(188);
+
+    expect(await homeOf(member)).toContain(DISCREET_LINK);
+  });
+
+  // 400 of 412 GiB: the two largest lines are what the page would check
+  it('should_say_how_much_can_be_freed_once_past_the_filling_line', async () => {
+    await measured(400);
+    await snapshotWithThreeCandidates();
+
+    const body = await homeOf(member);
+
+    expect(body).toContain('<p><b>80 GiB</b> can be freed.</p>');
+    expect(body).toContain('<a class="action" href="/space/cleanup">See and clean</a>');
+    expect(body).not.toContain(DISCREET_LINK);
+  });
+
+  it('should_say_in_the_box_that_nothing_can_be_cleaned_yet', async () => {
+    await measured(400);
+    await world.cleanupSnapshots.replace(alice, [], TAKEN_AT);
+
+    const body = await homeOf(member);
+
+    expect(body).toContain(
+      '<section class="flash warn">\n<p>Nothing to clean yet: your torrents are still seeding.</p>',
+    );
+    expect(body).not.toContain('can be freed');
+  });
+
+  // a list exists but nobody knows how full the member is: nothing to claim
+  it('should_keep_to_the_discreet_link_before_the_first_measure', async () => {
+    await snapshotWithThreeCandidates();
+    await world.diskSamples.save({ username: Username.parse('boss'), used: Quota.gib(1), sampledAt: TAKEN_AT });
+
+    const body = await homeOf(member);
+
+    expect(body).toContain('Space not measured yet.');
+    expect(body).toContain(DISCREET_LINK);
+  });
+
+  it('should_point_at_the_cleanup_in_french', async () => {
+    await measured(400);
+    await snapshotWithThreeCandidates();
+
+    const body = await homeOf(member, 'fr-FR');
+
+    expect(body).toContain('<p><b>80 Gio</b> peuvent être libérés.</p>');
+    expect(body).toContain('>Voir et nettoyer</a>');
   });
 });
