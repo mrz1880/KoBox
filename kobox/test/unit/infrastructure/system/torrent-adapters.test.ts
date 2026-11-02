@@ -479,8 +479,8 @@ describe('ScgiRtorrentControlAdapter', () => {
         [str(secondHash), str('Album'), i8(2048), i8(500), i8(1_761_868_800), str('/a')],
       ]);
       const warnings: unknown[] = [];
-      const adapter = new ScgiRtorrentControlAdapter(undefined, {
-        warn: (context: unknown) => warnings.push(context),
+      const adapter = new ScgiRtorrentControlAdapter({
+        logger: { warn: (context: unknown) => warnings.push(context) },
       });
 
       const torrents = await adapter.listFinished(ScgiPort.parse(port));
