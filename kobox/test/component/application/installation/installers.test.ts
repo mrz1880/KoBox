@@ -676,8 +676,8 @@ describe('scheduler installer', () => {
     expect(outcome.state).toBe('installed');
     expect(world.packages.installed).toContain('cron');
     const content = world.host.contentAt('/etc/cron.d/kobox');
-    expect(content).toContain('*/5 * * * * root /usr/local/bin/kobox send-mails');
-    expect(content).toContain('30 5 * * * root /usr/local/bin/kobox run-backup');
+    expect(content).toContain('*/5 * * * * root systemd-cat -t kobox-cron --stderr-priority=warning /usr/local/bin/kobox send-mails');
+    expect(content).toContain('30 5 * * * root systemd-cat -t kobox-cron --stderr-priority=warning /usr/local/bin/kobox run-backup');
     expect(world.systemd.log).toContain('enable-now cron');
   });
 
