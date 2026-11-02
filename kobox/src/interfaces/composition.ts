@@ -793,7 +793,7 @@ export function buildContainer(name: string): Container {
     filing: new MvTorrentFiling(runner),
     services,
     metainfo: new BencodeMetainfoAdapter(),
-    control: new ScgiRtorrentControlAdapter(undefined, logger),
+    control: new ScgiRtorrentControlAdapter({ logger }),
     scripts: new UserScriptRunnerAdapter(runner),
     announcers: new EnqueueAnnouncerSink(queue),
     templates: loadRtorrentTemplates(),
