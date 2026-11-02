@@ -20,6 +20,7 @@ import { Username } from '../../domain/user/Username.js';
 import type {
   MaintenanceUseCases,
   SecurityUseCases,
+  SpaceUseCases,
   SyncUseCases,
   TorrentUseCases,
   TrackerUseCases,
@@ -58,6 +59,7 @@ export class JobWorker {
     private readonly security: SecurityUseCases,
     private readonly maintenance: MaintenanceUseCases,
     private readonly sync: SyncUseCases,
+    private readonly space: SpaceUseCases,
     // the private half of the host key: only the root worker can open a
     // password the portal sealed
     private readonly passwords: PasswordOpenerPort,
@@ -499,6 +501,12 @@ export class JobWorker {
         return;
       case 'render-nfs-exports':
         await this.security.renderNfsExports.execute();
+        return;
+      case 'clean-up-space':
+        await this.space.cleanUpSpace.execute({
+          username: Username.parse(job.payload.username),
+          infoHashes: job.payload.infoHashes.map((raw) => InfoHash.parse(raw)),
+        });
         return;
       case 'add-user-address':
       case 'remove-user-address': {

@@ -70,6 +70,7 @@ export const JOB_TYPES = [
   'set-fair-use-override',
   'render-rutorrent-users',
   'render-nfs-exports',
+  'clean-up-space',
 ] as const;
 
 export type JobType = (typeof JOB_TYPES)[number];
@@ -92,6 +93,9 @@ const sealedPasswordField = z
 const usernameOnly = z.strictObject({ username: usernameField });
 const labelField = z.string().regex(LABEL_PATTERN);
 const infoHashField = z.string().regex(INFO_HASH_PATTERN);
+// One cleanup job carries at most this many torrents: enough for a member who
+// picks a whole page, small enough to keep a queued row readable.
+const CLEANUP_MAX_TORRENTS = 500;
 // Paths from rtorrent hooks: absolute, no traversal. The worker enforces the
 // stronger invariant (must live under the owning user's home) in
 // HandleTorrentEvent before any path is read or stored.
@@ -277,6 +281,12 @@ export const jobPayloadSchemas = {
   'restart-rtorrent': usernameOnly,
   'render-rutorrent-users': z.strictObject({}),
   'render-nfs-exports': z.strictObject({}),
+  // the torrents a member checked: the worker judges each one again before
+  // deleting it, so the list is a wish, not an order
+  'clean-up-space': z.strictObject({
+    username: usernameField,
+    infoHashes: z.array(infoHashField).min(1).max(CLEANUP_MAX_TORRENTS),
+  }),
 } satisfies Record<JobType, z.ZodType>;
 
 export type JobPayload<T extends JobType> = z.infer<(typeof jobPayloadSchemas)[T]>;

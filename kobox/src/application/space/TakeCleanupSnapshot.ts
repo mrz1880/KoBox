@@ -1,38 +1,12 @@
-import { CleanupCandidate } from '../../domain/space/CleanupCandidate.js';
-import type {
-  CleanupSnapshotRepository,
-  MemberTorrentsPort,
-  SeedRuleRepository,
-} from '../../domain/space/ports.js';
-import type { FinishedTorrent } from '../../domain/space/FinishedTorrent.js';
-import { DomainError } from '../../domain/shared/DomainError.js';
-import { LocalPath } from '../../domain/sync/LocalPath.js';
-import type { SyncTransferRepository } from '../../domain/sync/ports.js';
-import { instantOf } from '../../domain/shared/stamp.js';
+import type { CleanupSnapshotRepository, MemberTorrentsPort } from '../../domain/space/ports.js';
 import type { TorrentInstanceRepository } from '../../domain/torrent/ports.js';
 import type { Username } from '../../domain/user/Username.js';
+import { CleanupJudge, type CleanupJudgeDeps } from './CleanupJudge.js';
 
-interface Deps {
+interface Deps extends CleanupJudgeDeps {
   readonly instances: TorrentInstanceRepository;
   readonly torrents: MemberTorrentsPort;
-  readonly transfers: Pick<SyncTransferRepository, 'listSentSources'>;
-  readonly seedRule: SeedRuleRepository;
   readonly snapshots: CleanupSnapshotRepository;
-}
-
-// A sync source went through LocalPath, rTorrent's d.base_path did not: the
-// torrent's path takes the same form before the two are compared. A path that
-// is not a LocalPath (empty while rTorrent has the torrent closed) could not
-// have been sent, and stays as it was.
-function inSourceForm(torrent: FinishedTorrent): FinishedTorrent {
-  try {
-    return { ...torrent, path: LocalPath.parse(torrent.path).value };
-  } catch (error) {
-    if (error instanceof DomainError) {
-      return torrent;
-    }
-    throw error;
-  }
 }
 
 // Writes down what a member could clean, as root, because the portal cannot
@@ -54,16 +28,8 @@ export class TakeCleanupSnapshot {
     if (finished === undefined) {
       return;
     }
-    const context = {
-      rule: await this.deps.seedRule.get(),
-      sentPaths: new Set(
-        (await this.deps.transfers.listSentSources(username)).map((source) => source.value),
-      ),
-      now: instantOf(at),
-    };
-    const candidates = finished.flatMap(
-      (torrent) => CleanupCandidate.judge(inSourceForm(torrent), context) ?? [],
-    );
+    const judge = await CleanupJudge.of(this.deps, username, at);
+    const candidates = finished.flatMap((torrent) => judge.judge(torrent) ?? []);
     await this.deps.snapshots.replace(username, candidates, at);
   }
 }

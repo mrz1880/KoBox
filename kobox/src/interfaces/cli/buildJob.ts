@@ -70,6 +70,10 @@ export const buildJob = {
   requeueTransfer(input: { username: string; id: number }): Job {
     return parseJob('requeue-transfer', input);
   },
+  // the torrents a member checked on their cleanup page
+  cleanUpSpace(input: { username: string; infoHashes: readonly string[] }): Job {
+    return parseJob('clean-up-space', input);
+  },
   checkSyncDestination(input: { username: string }): Job {
     return parseJob('check-sync-destination', input);
   },
