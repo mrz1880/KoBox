@@ -67,6 +67,7 @@ describe('job contract', () => {
       'set-fair-use-override',
       'render-rutorrent-users',
       'render-nfs-exports',
+      'clean-up-space',
     ]);
   });
 
@@ -260,6 +261,25 @@ describe('job contract', () => {
     expect(
       parseJob('set-allow-public-tracker', { username: 'alice', allowed: false }).type,
     ).toBe('set-allow-public-tracker');
+  });
+
+  it('should_parse_a_cleanup_of_the_torrents_a_member_picked', () => {
+    const infoHashes = ['A'.repeat(40), 'b'.repeat(40)];
+
+    expect(parseJob('clean-up-space', { username: 'alice', infoHashes }).payload).toEqual({
+      username: 'alice',
+      infoHashes,
+    });
+  });
+
+  it('should_refuse_a_cleanup_with_no_torrent_too_many_or_one_that_is_not_a_hash', () => {
+    expect(() => parseJob('clean-up-space', { username: 'alice', infoHashes: [] })).toThrow();
+    expect(() =>
+      parseJob('clean-up-space', { username: 'alice', infoHashes: Array(501).fill('A'.repeat(40)) }),
+    ).toThrow();
+    expect(() =>
+      parseJob('clean-up-space', { username: 'alice', infoHashes: ['../../etc/shadow'] }),
+    ).toThrow();
   });
 
   it('should_parse_a_torrent_event_with_optional_paths', () => {

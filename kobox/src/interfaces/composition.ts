@@ -110,6 +110,8 @@ import { CryptoSessionTokens } from '../infrastructure/system/CryptoSessionToken
 import { SqliteSyncTransferRepository } from '../infrastructure/persistence/SqliteSyncTransferRepository.js';
 import { SqliteCleanupSnapshotRepository } from '../infrastructure/persistence/SqliteCleanupSnapshotRepository.js';
 import { SqliteSeedRuleRepository } from '../infrastructure/persistence/SqliteSeedRuleRepository.js';
+import { SqliteCleanupReportRepository } from '../infrastructure/persistence/SqliteCleanupReportRepository.js';
+import { FsTorrentDataAdapter } from '../infrastructure/system/FsTorrentDataAdapter.js';
 import { RsyncOverSshTransfer } from '../infrastructure/system/RsyncOverSshTransfer.js';
 import { FsLocalFileFacts } from '../infrastructure/system/FsLocalFileFacts.js';
 import { RutorrentQuotaGauges } from '../infrastructure/system/RutorrentQuotaGauges.js';
@@ -745,18 +747,24 @@ export function buildContainer(name: string): Container {
   // one client for every member's rTorrent: it holds no state but its timeout
   const rtorrentControl = new ScgiRtorrentControlAdapter({ logger });
   const syncTransferRepo = new SqliteSyncTransferRepository(db);
+  const diskSamples = new SqliteDiskUsageRepository(db);
   const spaceUseCases = buildSpaceUseCases({
     instances: new SqliteTorrentInstanceRepository(db),
     torrents: rtorrentControl,
+    data: new FsTorrentDataAdapter(runner),
     transfers: syncTransferRepo,
     seedRule: new SqliteSeedRuleRepository(db),
     snapshots: new SqliteCleanupSnapshotRepository(db),
+    reports: new SqliteCleanupReportRepository(db),
+    quota,
+    samples: diskSamples,
+    clock: nowStamp,
   });
   const useCases = buildUseCases({
     repo,
     accounts: new SystemAccountAdapter(runner),
     quota,
-    diskSamples: new SqliteDiskUsageRepository(db),
+    diskSamples,
     volume: new LoggedVolume(new StatfsVolumeAdapter(HOME_BASE), logger),
     volumeSamples: new SqliteVolumeSampleRepository(db),
     // ruTorrent's disk meter shows each member their quota from these
@@ -938,6 +946,7 @@ export function buildContainer(name: string): Container {
       securityUseCases,
       maintenanceUseCases,
       syncUseCases,
+      spaceUseCases,
       passwords,
     ),
     speedtestRepo,

@@ -1,4 +1,5 @@
 import type { CleanupCandidate } from './CleanupCandidate.js';
+import type { CleanupReport } from './CleanupReport.js';
 import type { FinishedTorrent } from './FinishedTorrent.js';
 import type { SeedRule } from './SeedRule.js';
 import type { InfoHash } from '../torrent/InfoHash.js';
@@ -42,4 +43,10 @@ export interface CleanupSnapshotRepository {
     takenAt: string,
   ): Promise<void>;
   find(username: Username): Promise<CleanupSnapshot | undefined>;
+}
+
+// The latest cleanup report of each member, so the page can say what went.
+export interface CleanupReportRepository {
+  save(username: Username, report: CleanupReport): Promise<void>;
+  find(username: Username): Promise<CleanupReport | undefined>;
 }

@@ -81,11 +81,14 @@ import type { SecuritySettings } from '../application/security/settings.js';
 import { ChangePassword } from '../application/user/ChangePassword.js';
 import { RemoveSshKey, SetSshKey } from '../application/user/SetSshKey.js';
 import { SampleDiskUsage } from '../application/user/SampleDiskUsage.js';
+import { CleanUpSpace } from '../application/space/CleanUpSpace.js';
 import { TakeCleanupSnapshot } from '../application/space/TakeCleanupSnapshot.js';
 import type {
+  CleanupReportRepository,
   CleanupSnapshotRepository,
   MemberTorrentsPort,
   SeedRuleRepository,
+  TorrentDataPort,
 } from '../domain/space/ports.js';
 import { SetUserQuota } from '../application/user/SetUserQuota.js';
 import { ChangeRole } from '../application/user/ChangeRole.js';
@@ -227,16 +230,26 @@ export interface SpaceUseCaseDeps {
   readonly transfers: SyncTransferRepository;
   readonly seedRule: SeedRuleRepository;
   readonly snapshots: CleanupSnapshotRepository;
+  readonly data: TorrentDataPort;
+  readonly reports: CleanupReportRepository;
+  readonly quota: QuotaPort;
+  readonly samples: DiskUsageRepository;
+  readonly clock: () => string;
 }
 
 // Root-side only: reading a member's rTorrent and erasing their files both need
 // privileges the portal does not have.
 export interface SpaceUseCases {
   readonly takeCleanupSnapshot: TakeCleanupSnapshot;
+  readonly cleanUpSpace: CleanUpSpace;
 }
 
 export function buildSpaceUseCases(deps: SpaceUseCaseDeps): SpaceUseCases {
-  return { takeCleanupSnapshot: new TakeCleanupSnapshot(deps) };
+  const takeCleanupSnapshot = new TakeCleanupSnapshot(deps);
+  return {
+    takeCleanupSnapshot,
+    cleanUpSpace: new CleanUpSpace({ ...deps, snapshot: takeCleanupSnapshot }),
+  };
 }
 
 export interface MaintenanceUseCaseDeps {

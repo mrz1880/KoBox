@@ -10,6 +10,14 @@ import { InMemoryDiagnosticsRepository } from '../../../src/infrastructure/persi
 import { InMemorySpeedtestRepository } from '../../../src/infrastructure/persistence/InMemorySpeedtestRepository.js';
 import type { ClaimedJob, JobQueuePort } from '../../../src/application/jobs/JobQueuePort.js';
 import { InfoHash } from '../../../src/domain/torrent/InfoHash.js';
+import { TorrentInstance } from '../../../src/domain/torrent/TorrentInstance.js';
+import { RtorrentPort, ScgiPort } from '../../../src/domain/user/Port.js';
+import { Quota } from '../../../src/domain/user/Quota.js';
+import { InMemoryCleanupReportRepository } from '../../../src/infrastructure/persistence/InMemoryCleanupReportRepository.js';
+import { InMemoryCleanupSnapshotRepository } from '../../../src/infrastructure/persistence/InMemoryCleanupSnapshotRepository.js';
+import { InMemorySeedRuleRepository } from '../../../src/infrastructure/persistence/InMemorySeedRuleRepository.js';
+import { FakeMemberTorrents } from '../../../src/infrastructure/system/fakes/FakeMemberTorrents.js';
+import { FakeTorrentData } from '../../../src/infrastructure/system/fakes/FakeTorrentData.js';
 import { Label } from '../../../src/domain/torrent/Label.js';
 import { Torrent } from '../../../src/domain/torrent/Torrent.js';
 import { Password } from '../../../src/domain/user/Password.js';
@@ -77,6 +85,7 @@ import { buildJob } from '../../../src/interfaces/cli/buildJob.js';
 import { JobWorker } from '../../../src/interfaces/worker/JobWorker.js';
 import {
   buildMaintenanceUseCases,
+  buildSpaceUseCases,
   buildSyncUseCases,
   buildSecurityUseCases,
   buildTorrentUseCases,
@@ -185,6 +194,8 @@ interface World {
   diagnostics: InMemoryDiagnosticsRepository;
   syncDestinations: InMemorySyncDestinationRepository;
   syncTransfers: InMemorySyncTransferRepository;
+  memberTorrents: FakeMemberTorrents;
+  cleanupReports: InMemoryCleanupReportRepository;
   mailTransport: RecordingMailTransport;
   worker: JobWorker;
   passwords: FakePasswordCipher;
@@ -249,16 +260,32 @@ beforeEach(() => {
   let nextRtorrent = 45000;
   const credentials = new InMemoryPortalCredentialsRepository();
   const sessions = new InMemoryPortalSessionRepository();
+  const instances = new InMemoryTorrentInstanceRepository();
+  const syncTransfers = new InMemorySyncTransferRepository();
+  const diskSamples = new InMemoryDiskUsageRepository();
+  const memberTorrents = new FakeMemberTorrents();
+  const cleanupReports = new InMemoryCleanupReportRepository();
+  const spaceUseCases = buildSpaceUseCases({
+    instances,
+    torrents: memberTorrents,
+    data: new FakeTorrentData(),
+    transfers: syncTransfers,
+    seedRule: new InMemorySeedRuleRepository(),
+    snapshots: new InMemoryCleanupSnapshotRepository(),
+    reports: cleanupReports,
+    quota,
+    samples: diskSamples,
+    clock: () => '2026-07-25 10:00:00',
+  });
   const useCases = buildUseCases({
     repo,
     accounts,
     quota,
-    diskSamples: new InMemoryDiskUsageRepository(),
+    diskSamples,
     volume: new FakeVolume(),
     volumeSamples: new InMemoryVolumeSampleRepository(),
     quotaGauges: new FakeQuotaGauges(),
-    // the snapshot has its own suites; this one checks the job wiring
-    cleanupSnapshot: { execute: () => Promise.resolve() },
+    cleanupSnapshot: spaceUseCases.takeCleanupSnapshot,
     nextcloud,
     components,
     outbox,
@@ -291,7 +318,6 @@ beforeEach(() => {
       claimRtorrentPort: () => Promise.resolve(),
     },
   });
-  const instances = new InMemoryTorrentInstanceRepository();
   const torrents = new InMemoryTorrentRepository();
   const scripts = new FakeUserScriptRunner();
   const rutorrentFiles = new FakeRtorrentConfig();
@@ -395,7 +421,6 @@ beforeEach(() => {
   const queue = new InMemoryJobQueue();
   const diagnosticsRepo = new InMemoryDiagnosticsRepository();
   const syncDestinations = new InMemorySyncDestinationRepository();
-  const syncTransfers = new InMemorySyncTransferRepository();
   const syncUseCases = buildSyncUseCases({
     users: repo,
     instances,
@@ -464,6 +489,8 @@ beforeEach(() => {
     diagnostics: diagnosticsRepo,
     syncDestinations,
     syncTransfers,
+    memberTorrents,
+    cleanupReports,
     worker: new JobWorker(
       queue,
       useCases,
@@ -472,6 +499,7 @@ beforeEach(() => {
       securityUseCases,
       maintenanceUseCases,
       syncUseCases,
+      spaceUseCases,
       passwords,
     ),
   };
@@ -1091,5 +1119,38 @@ describe('diagnostics jobs', () => {
     const snapshot = await world.diagnostics.findPackages();
     expect(snapshot?.upgradableCount).toBe(1);
     expect(snapshot?.checkedAt).toBe('2026-07-25 10:00:00');
+  });
+});
+
+describe('space jobs', () => {
+  it('should_delete_the_torrents_a_member_picked_and_report_it', async () => {
+    const scgiPort = ScgiPort.parse(51101);
+    await world.instances.save(
+      TorrentInstance.provision({
+        username: alice,
+        scgiPort,
+        rtorrentPort: RtorrentPort.parse(45000),
+      }).instance,
+    );
+    const film = InfoHash.parse('A'.repeat(40));
+    world.memberTorrents.holds(scgiPort, [
+      {
+        infoHash: film,
+        name: 'Example Film',
+        size: Quota.gib(12),
+        ratio: 3,
+        finishedAt: '2026-07-01T08:00:00.000Z',
+        path: '/home/alice/rtorrent/complete/Films/Example Film',
+      },
+    ]);
+    const id = await world.queue.enqueue(
+      buildJob.cleanUpSpace({ username: 'alice', infoHashes: [film.value] }),
+    );
+
+    await world.worker.processNext();
+
+    expect(world.queue.statusOf(id)).toBe('done');
+    expect(world.memberTorrents.erased).toEqual([film.value]);
+    expect((await world.cleanupReports.find(alice))?.freed.toGib()).toBe(12);
   });
 });
