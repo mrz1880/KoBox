@@ -6,10 +6,8 @@ import type { CleanupReport } from '../../domain/space/CleanupReport.js';
 import type { UserRepository } from '../../domain/user/ports.js';
 import type { Quota } from '../../domain/user/Quota.js';
 import type { Username } from '../../domain/user/Username.js';
+import { CLEANUP_PAGE } from './cleanupPage.js';
 
-// The portal page where a member picks what to delete; the portal's user
-// routes serve it under this same path.
-const CLEANUP_PAGE = '/space/cleanup';
 
 export interface SpaceMailerDeps {
   readonly users: Pick<UserRepository, 'findByUsername'>;
