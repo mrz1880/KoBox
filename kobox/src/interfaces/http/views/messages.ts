@@ -191,6 +191,7 @@ const FR: Readonly<Record<string, string>> = {
   'Ratio {ratio} after {days} day': 'Ratio {ratio} après {days} jour',
   'Ratio {ratio} after {days} days': 'Ratio {ratio} après {days} jours',
   'Already sent to your machine': 'Déjà envoyé sur votre machine',
+  'KoBox does not know whether you fetched it.': 'KoBox ne sait pas si vous l’avez récupéré.',
   'The files will be erased from the seedbox for good. This cannot be undone.':
     'Les fichiers seront effacés de la seedbox pour de bon. Impossible de revenir en arrière.',
   Recalculate: 'Recalculer',

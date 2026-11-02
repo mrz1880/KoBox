@@ -25,18 +25,20 @@ function formatRatio(ratio: number, reader: Reader): string {
 }
 
 // Why a line may go, in the words of when the list was made. `takenAt` is a
-// stamp, the candidate's dates ISO instants.
-function why(candidate: CleanupCandidate, takenAt: string, reader: Reader): string {
-  const said: Readonly<Record<CleanupReason, () => string>> = {
+// stamp, the candidate's dates ISO instants. KoBox only knows what its own sync
+// sent, so a seeded line says it cannot tell whether the member fetched it.
+function why(candidate: CleanupCandidate, takenAt: string, reader: Reader): RawHtml {
+  const said: Readonly<Record<CleanupReason, () => RawHtml>> = {
     seeded: () => {
       const days = candidate.daysSeeded(instantOf(takenAt));
       const one = new Intl.PluralRules(reader.language.value).select(days) === 'one';
-      return reader.t(one ? 'Ratio {ratio} after {days} day' : 'Ratio {ratio} after {days} days', {
+      const ratio = reader.t(one ? 'Ratio {ratio} after {days} day' : 'Ratio {ratio} after {days} days', {
         ratio: formatRatio(candidate.ratio, reader),
         days: String(days),
       });
+      return html`${ratio}<br><span class="muted">${reader.t('KoBox does not know whether you fetched it.')}</span>`;
     },
-    alreadySent: () => reader.t('Already sent to your machine'),
+    alreadySent: () => html`${reader.t('Already sent to your machine')}`,
   };
   return said[candidate.reason]();
 }
