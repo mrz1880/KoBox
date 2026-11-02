@@ -6,6 +6,7 @@ import { html, type RawHtml } from '../html.js';
 import { formatBytes } from './bytes.js';
 import { flash, page, type Reader, type Viewer } from './layout.js';
 import { formatDay, formatMoment } from './moment.js';
+import { formatRatio } from './ratio.js';
 import { CLEANUP_PAGE, CLEANUP_RECALCULATE } from '../../../application/space/cleanupPage.js';
 
 // What the page offers: the proposal built from the hourly pass's snapshot,
@@ -13,16 +14,6 @@ import { CLEANUP_PAGE, CLEANUP_RECALCULATE } from '../../../application/space/cl
 export interface CleanupList {
   readonly proposal: CleanupProposal;
   readonly takenAt: string;
-}
-
-// A ratio to one decimal, or two when the second one says something, with the
-// reader's own decimal mark.
-function formatRatio(ratio: number, reader: Reader): string {
-  return ratio.toLocaleString(reader.language.value, {
-    minimumFractionDigits: 1,
-    maximumFractionDigits: 2,
-    useGrouping: false,
-  });
 }
 
 // Why a line may go, in the words of when the list was made. `takenAt` is a
