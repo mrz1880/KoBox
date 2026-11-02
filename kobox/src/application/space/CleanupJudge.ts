@@ -14,8 +14,8 @@ export interface CleanupJudgeDeps {
 
 // A sync source went through LocalPath, rTorrent's d.base_path did not: the
 // torrent's path takes the same form before the two are compared. A path that
-// is not a LocalPath (empty while rTorrent has the torrent closed) could not
-// have been sent, and stays as it was.
+// is not a LocalPath (relative, climbing out with .., or holding a NUL) could
+// not have been sent, and stays as it was.
 function inSourceForm(torrent: FinishedTorrent): FinishedTorrent {
   try {
     return { ...torrent, path: LocalPath.parse(torrent.path).value };
