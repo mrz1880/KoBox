@@ -13,6 +13,7 @@ import { SeedRule } from '../../../src/domain/space/SeedRule.js';
 import { Username } from '../../../src/domain/user/Username.js';
 import { SqliteCleanupSnapshotRepository } from '../../../src/infrastructure/persistence/SqliteCleanupSnapshotRepository.js';
 import { SqliteSeedRuleRepository } from '../../../src/infrastructure/persistence/SqliteSeedRuleRepository.js';
+import { SqliteSpacePreferenceRepository } from '../../../src/infrastructure/persistence/SqliteSpacePreferenceRepository.js';
 
 let dir: string;
 
@@ -155,5 +156,27 @@ describe('KoboxDatabase', () => {
     expect(before).toBeUndefined();
     expect(after).toEqual({ candidates: [], takenAt: '2026-11-02T09:00:00.000Z' });
     expect(reports).toEqual([]);
+  });
+
+  it('should_leave_automatic_cleanup_off_for_every_member_of_a_box_from_before_it', async () => {
+    // a box that predates the space preferences, with a member already in it
+    const old = boxBefore('0035_space-preferences');
+    old
+      .prepare(
+        "INSERT INTO users (username, email, quota_bytes, scgi_port, rtorrent_port, proxy_port, status) VALUES ('alice', 'alice@example.org', 1, 51101, 45000, 8080, 'active')",
+      )
+      .run();
+    old.close();
+
+    const db = KoboxDatabase.open(join(dir, 'kobox.db'));
+    const alice = Username.parse('alice');
+    const preferences = new SqliteSpacePreferenceRepository(db);
+    const before = await preferences.find(alice);
+    await preferences.chooseAutomatic(alice, 'sentOnly');
+    const after = await preferences.find(alice);
+    db.close();
+
+    expect(before).toEqual({ automatic: 'off', warned: false });
+    expect(after).toEqual({ automatic: 'sentOnly', warned: false });
   });
 });

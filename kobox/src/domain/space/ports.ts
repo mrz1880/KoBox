@@ -1,3 +1,4 @@
+import type { AutomaticCleanup } from './AutomaticCleanup.js';
 import type { CleanupCandidate } from './CleanupCandidate.js';
 import type { CleanupReport } from './CleanupReport.js';
 import type { FinishedTorrent } from './FinishedTorrent.js';
@@ -49,4 +50,21 @@ export interface CleanupSnapshotRepository {
 export interface CleanupReportRepository {
   save(username: Username, report: CleanupReport): Promise<void>;
   find(username: Username): Promise<CleanupReport | undefined>;
+}
+
+// What a member chose for their space and where the critical-line mail stands:
+// whether KoBox may clean on its own, and whether the member was already
+// warned during the climb they are in.
+export interface SpacePreferences {
+  readonly automatic: AutomaticCleanup;
+  readonly warned: boolean;
+}
+
+// Each member's space preferences. A member who never chose anything has
+// automatic cleanup off and was never warned. The choice and the warning are
+// written apart: the member makes one, the hourly pass the other.
+export interface SpacePreferenceRepository {
+  find(username: Username): Promise<SpacePreferences>;
+  chooseAutomatic(username: Username, automatic: AutomaticCleanup): Promise<void>;
+  recordWarned(username: Username, warned: boolean): Promise<void>;
 }
