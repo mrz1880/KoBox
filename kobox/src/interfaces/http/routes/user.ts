@@ -210,7 +210,7 @@ export interface UserRoutesDeps {
   readonly volumeSamples: VolumeSampleRepository;
   // what the hourly pass judged the member could clean
   readonly cleanupSnapshots: CleanupSnapshotRepository;
-  // what the member's last cleanup deleted and kept
+  // what the member's last cleanups deleted and kept, by hand and on its own
   readonly cleanupReports: CleanupReportRepository;
   // what the member lets KoBox delete on its own, and the rule they answer to
   readonly spacePreferences: Pick<SpacePreferenceRepository, 'find' | 'findSeedRule'>;
@@ -241,7 +241,7 @@ async function automaticReportOf(
   deps: Pick<UserRoutesDeps, 'cleanupReports' | 'now'>,
   username: Username,
 ): Promise<CleanupReport | undefined> {
-  const report = await deps.cleanupReports.find(username);
+  const report = await deps.cleanupReports.findTriggeredBy(username, 'automatic');
   return report?.isShownOnHome(deps.now()) === true ? report : undefined;
 }
 

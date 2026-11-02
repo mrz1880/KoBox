@@ -71,4 +71,22 @@ describe('SqliteCleanupReportRepository', () => {
 
     expect((await repo.find(alice))?.trigger).toBe('automatic');
   });
+
+  // the home keeps telling what KoBox deleted on its own after a cleanup by hand
+  it('should_keep_the_latest_report_of_each_trigger_and_find_the_most_recent', async () => {
+    const automatic = CleanupReport.of({
+      deleted: [{ name: 'Example Film', size: Quota.gib(12) }],
+      skipped: [],
+      at: '2026-11-19 12:00:00',
+      trigger: 'automatic',
+    });
+    await repo.save(alice, automatic);
+
+    await repo.save(alice, report);
+
+    expect(await repo.findTriggeredBy(alice, 'automatic')).toEqual(automatic);
+    expect(await repo.findTriggeredBy(alice, 'member')).toEqual(report);
+    expect(await repo.find(alice)).toEqual(report);
+    expect(await repo.findTriggeredBy(bob, 'automatic')).toBeUndefined();
+  });
 });

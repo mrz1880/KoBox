@@ -1,6 +1,6 @@
 import type { AutomaticCleanup } from './AutomaticCleanup.js';
 import type { CleanupCandidate } from './CleanupCandidate.js';
-import type { CleanupReport } from './CleanupReport.js';
+import type { CleanupReport, CleanupTrigger } from './CleanupReport.js';
 import type { FinishedTorrent } from './FinishedTorrent.js';
 import type { BoxSeedRule } from './SeedRule.js';
 import type { SeedRuleChoice } from './SeedRuleChoice.js';
@@ -47,10 +47,14 @@ export interface CleanupSnapshotRepository {
   find(username: Username): Promise<CleanupSnapshot | undefined>;
 }
 
-// The latest cleanup report of each member, so the page can say what went.
+// The latest cleanup report of each member for each trigger, so the page can
+// say what went and a cleanup by hand does not hide from the home what KoBox
+// deleted on its own. Saving a report replaces only the one of its trigger.
 export interface CleanupReportRepository {
   save(username: Username, report: CleanupReport): Promise<void>;
+  // the most recent report, whoever started it
   find(username: Username): Promise<CleanupReport | undefined>;
+  findTriggeredBy(username: Username, trigger: CleanupTrigger): Promise<CleanupReport | undefined>;
 }
 
 // What a member chose for their space and where the critical-line mail stands:
