@@ -20,6 +20,7 @@ import { BlocklistSource } from '../../domain/tracker/BlocklistSource.js';
 import { Quota } from '../../domain/user/Quota.js';
 import type { PasswordOpenerPort } from '../../domain/user/ports.js';
 import type { Logger } from '../../infrastructure/logging/logger.js';
+import { diskUsagePassWarnings } from '../diskUsagePassWarnings.js';
 import { Username } from '../../domain/user/Username.js';
 import type {
   MaintenanceUseCases,
@@ -241,19 +242,8 @@ export class JobWorker {
         return;
       case 'sample-disk-usage': {
         const pass = await this.deps.useCases.sampleDiskUsage.execute();
-        // the member only sees an older list; the operator is told why
-        for (const stale of pass.staleSnapshots) {
-          this.deps.logger.warn(
-            { username: stale.username.value, cause: stale.cause, error: stale.error },
-            'space cleanup: list not refreshed',
-          );
-        }
-        // a member past the line may have missed their mail or their cleanup
-        for (const member of pass.unwatched) {
-          this.deps.logger.warn(
-            { username: member.username.value, error: member.error },
-            'space watch: member not watched',
-          );
+        for (const warning of diskUsagePassWarnings(pass)) {
+          this.deps.logger.warn(warning.context, warning.message);
         }
         return;
       }
