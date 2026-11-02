@@ -415,3 +415,74 @@ describe('the home says what an automatic cleanup deleted', () => {
     expect(body).toContain('19 juillet 2026 à 12:00 : 80 Gio libérés.');
   });
 });
+
+describe('automatic cleanup in My account', () => {
+  async function accountOf(session: AgentSession, language = 'en'): Promise<string> {
+    const response = await world.server.inject({
+      method: 'GET',
+      url: '/access',
+      headers: { cookie: session.cookie, 'accept-language': language },
+    });
+    return response.body;
+  }
+
+  function choiceOf(body: string): string | undefined {
+    return /name="automatic" value="(\w+)" checked/.exec(body)?.[1];
+  }
+
+  it('should_offer_the_three_choices_with_automatic_cleanup_off_until_the_member_turns_it_on', async () => {
+    const body = await accountOf(member);
+
+    expect(body).toContain('<form class="card" method="post" action="/access/automatic-cleanup">');
+    expect([...body.matchAll(/name="automatic" value="(\w+)"/g)].map(([, value]) => value)).toEqual([
+      'off',
+      'sentOnly',
+      'sentOrSeeded',
+    ]);
+    expect(choiceOf(body)).toBe('off');
+  });
+
+  it('should_tick_the_choice_the_member_made', async () => {
+    await world.spacePreferences.chooseAutomatic(alice, 'sentOrSeeded');
+
+    expect(choiceOf(await accountOf(member))).toBe('sentOrSeeded');
+  });
+
+  // KoBox only knows what its own sync sent
+  it('should_warn_that_the_third_choice_can_delete_files_never_fetched', async () => {
+    expect(await accountOf(member)).toContain(
+      'KoBox only knows what its own sync sent. With the last choice, files you fetched another way, or never fetched, can be deleted for good.',
+    );
+  });
+
+  it('should_hand_the_choice_to_the_worker_for_the_session_member', async () => {
+    const sent = await submit('/access/automatic-cleanup', `_csrf=${member.csrf}&automatic=sentOnly`);
+
+    expect(sent.status).toBe(303);
+    expect(sent.location).toBe(`/access?flash=${encodeURIComponent('Saved.')}`);
+    expect(world.queue.jobs).toEqual([
+      { type: 'set-automatic-cleanup', payload: { username: 'alice', scope: 'sentOnly' } },
+    ]);
+  });
+
+  it('should_refuse_a_choice_the_page_does_not_offer_without_enqueueing', async () => {
+    const sent = await submit('/access/automatic-cleanup', `_csrf=${member.csrf}&automatic=everything`);
+
+    expect(sent.status).toBe(400);
+    expect(world.queue.jobs).toEqual([]);
+  });
+
+  it('should_require_csrf_to_change_it', async () => {
+    const sent = await submit('/access/automatic-cleanup', 'automatic=sentOrSeeded');
+
+    expect(sent.status).toBe(403);
+    expect(world.queue.jobs).toEqual([]);
+  });
+
+  it('should_offer_it_in_french', async () => {
+    const body = await accountOf(member, 'fr-FR');
+
+    expect(body).toContain('Nettoyage automatique');
+    expect(body).toContain('Ce que KoBox a envoyé, ou ce qui a assez partagé');
+  });
+});

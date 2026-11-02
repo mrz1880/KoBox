@@ -75,6 +75,7 @@ async function main(): Promise<void> {
     volumeSamples: container.volumeSamples,
     cleanupSnapshots: container.cleanupSnapshots,
     cleanupReports: container.cleanupReports,
+    spacePreferences: container.spacePreferences,
     mailRelay: container.mailRelay,
     boxInVpn: container.boxInVpn,
     sshPort: container.sshPort,

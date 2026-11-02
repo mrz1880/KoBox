@@ -66,7 +66,11 @@ import type {
   SendPasswordLink,
   SetPasswordFromLink,
 } from '../../application/portal/PasswordLinks.js';
-import type { CleanupReportRepository, CleanupSnapshotRepository } from '../../domain/space/ports.js';
+import type {
+  CleanupReportRepository,
+  CleanupSnapshotRepository,
+  SpacePreferenceRepository,
+} from '../../domain/space/ports.js';
 import { registerUserRoutes } from './routes/user.js';
 import { loginPage, twoStepCodePage } from './views/loginPage.js';
 
@@ -123,6 +127,8 @@ export interface PortalServerDeps {
   readonly cleanupSnapshots: CleanupSnapshotRepository;
   // read-only from here: the worker writes what a cleanup did
   readonly cleanupReports: CleanupReportRepository;
+  // read-only from here: the worker writes a member's choice
+  readonly spacePreferences: Pick<SpacePreferenceRepository, 'find'>;
   readonly mailRelay: MailRelayRepository;
   readonly boxInVpn: string;
   readonly sshPort: number;

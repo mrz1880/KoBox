@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { ROLES } from '../../domain/portal/Role.js';
+import { AUTOMATIC_CLEANUPS } from '../../domain/space/AutomaticCleanup.js';
 import { CLEANUP_TRIGGERS } from '../../domain/space/CleanupReport.js';
 import { IPV4_PATTERN } from '../../domain/shared/IpAddress.js';
 import { INFO_HASH_PATTERN } from '../../domain/torrent/InfoHash.js';
@@ -72,6 +73,7 @@ export const JOB_TYPES = [
   'render-rutorrent-users',
   'render-nfs-exports',
   'clean-up-space',
+  'set-automatic-cleanup',
 ] as const;
 
 export type JobType = (typeof JOB_TYPES)[number];
@@ -289,6 +291,11 @@ export const jobPayloadSchemas = {
     infoHashes: z.array(infoHashField).min(1).max(CLEANUP_MAX_TORRENTS),
     // absent from a job queued before automatic cleanup: the member asked
     trigger: z.enum(CLEANUP_TRIGGERS).default('member'),
+  }),
+  // what KoBox may delete on its own once the member passes 90 %
+  'set-automatic-cleanup': z.strictObject({
+    username: usernameField,
+    scope: z.enum(AUTOMATIC_CLEANUPS),
   }),
 } satisfies Record<JobType, z.ZodType>;
 

@@ -1,3 +1,4 @@
+import type { AutomaticCleanup } from './AutomaticCleanup.js';
 import type { QuotaPressure } from './QuotaPressure.js';
 
 // Where the critical-line warning stands after one reading of the member's
@@ -22,5 +23,13 @@ export const SpaceWarning = {
       case 'relaxed':
         return { warned: false, send: false };
     }
+  },
+
+  // Whether the member still counts as warned once they changed what KoBox
+  // may delete on its own. Letting it clean starts afresh, so the next pass
+  // past the line cleans rather than waiting for the next climb; turning it
+  // off keeps the warning, so the member is not mailed twice in one climb.
+  afterChoosing(warned: boolean, automatic: AutomaticCleanup): boolean {
+    return automatic === 'off' ? warned : false;
   },
 };

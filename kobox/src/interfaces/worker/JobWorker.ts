@@ -8,6 +8,7 @@ import { stampOf } from '../../domain/shared/stamp.js';
 import { TrackerHost } from '../../domain/tracker/TrackerHost.js';
 import { EventHook } from '../../domain/torrent/EventHook.js';
 import { InfoHash } from '../../domain/torrent/InfoHash.js';
+import { parseAutomaticCleanup } from '../../domain/space/AutomaticCleanup.js';
 import { Label } from '../../domain/torrent/Label.js';
 import { SyncMode } from '../../domain/torrent/SyncMode.js';
 import { EmailAddress } from '../../domain/user/EmailAddress.js';
@@ -537,6 +538,12 @@ export class JobWorker {
         }
         return;
       }
+      case 'set-automatic-cleanup':
+        await this.space.setAutomaticCleanup.execute({
+          username: Username.parse(job.payload.username),
+          automatic: parseAutomaticCleanup(job.payload.scope),
+        });
+        return;
       case 'add-user-address':
       case 'remove-user-address': {
         const report = await this.trackers.manageUserAddress.execute({

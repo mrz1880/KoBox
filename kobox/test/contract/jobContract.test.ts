@@ -68,6 +68,7 @@ describe('job contract', () => {
       'render-rutorrent-users',
       'render-nfs-exports',
       'clean-up-space',
+      'set-automatic-cleanup',
     ]);
   });
 
@@ -293,6 +294,15 @@ describe('job contract', () => {
     ).toThrow();
     expect(() =>
       parseJob('clean-up-space', { username: 'alice', infoHashes: ['../../etc/shadow'] }),
+    ).toThrow();
+  });
+
+  it('should_parse_a_members_automatic_cleanup_choice_and_refuse_one_the_page_does_not_offer', () => {
+    expect(
+      parseJob('set-automatic-cleanup', { username: 'alice', scope: 'sentOrSeeded' }).payload,
+    ).toEqual({ username: 'alice', scope: 'sentOrSeeded' });
+    expect(() =>
+      parseJob('set-automatic-cleanup', { username: 'alice', scope: 'everything' }),
     ).toThrow();
   });
 

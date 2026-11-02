@@ -74,6 +74,10 @@ export const buildJob = {
   cleanUpSpace(input: { username: string; infoHashes: readonly string[] }): Job {
     return parseJob('clean-up-space', input);
   },
+  // what a member lets KoBox delete on its own past 90 %
+  setAutomaticCleanup(input: { username: string; scope: string }): Job {
+    return parseJob('set-automatic-cleanup', input);
+  },
   checkSyncDestination(input: { username: string }): Job {
     return parseJob('check-sync-destination', input);
   },

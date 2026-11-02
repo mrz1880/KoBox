@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type { AutomaticCleanup } from '../../../../src/domain/space/AutomaticCleanup.js';
 import type { QuotaPressure } from '../../../../src/domain/space/QuotaPressure.js';
 import { SpaceWarning } from '../../../../src/domain/space/SpaceWarning.js';
 
@@ -17,5 +18,17 @@ describe('SpaceWarning', () => {
     [false, 'relaxed', { warned: false, send: false }],
   ])('should_go_from_warned_%s_at_%s_to_%o', (warned, pressure, next) => {
     expect(SpaceWarning.after(warned, pressure)).toEqual(next);
+  });
+
+  // a member mailed past the line who then lets KoBox clean expects it to act
+  // at the next pass, not after their next climb
+  it.each<[boolean, AutomaticCleanup, boolean]>([
+    [true, 'sentOnly', false],
+    [true, 'sentOrSeeded', false],
+    // turning it off must not mail the member again for the same climb
+    [true, 'off', true],
+    [false, 'off', false],
+  ])('should_go_from_warned_%s_to_%s_once_the_member_chooses_%s', (warned, automatic, next) => {
+    expect(SpaceWarning.afterChoosing(warned, automatic)).toBe(next);
   });
 });
