@@ -25,14 +25,19 @@ describe('maintenance rendering', () => {
     expectGolden('cron-kobox.golden', file.content);
   });
 
-  it('should_run_every_entry_as_root_through_the_kobox_cli', () => {
+  // Cron mails whatever a job prints to root, and every run prints a line: the
+  // box piled up thousands of local mails, where a real warning would drown.
+  // The journal keeps the output instead, what goes to stderr as a warning.
+  it('should_run_every_entry_as_root_through_the_kobox_cli_into_the_journal', () => {
     const file = renderCronFile({ koboxBin: '/usr/local/bin/kobox' });
     const entries = file.content
       .split('\n')
       .filter((line) => line !== '' && !line.startsWith('#') && !/^[A-Z]+=/.test(line));
     expect(entries).toHaveLength(10);
     for (const line of entries) {
-      expect(line).toMatch(/ root \/usr\/local\/bin\/kobox [a-z0-9-]+$/);
+      expect(line).toMatch(
+        / root systemd-cat -t kobox-cron --stderr-priority=warning \/usr\/local\/bin\/kobox [a-z0-9-]+$/,
+      );
     }
   });
 

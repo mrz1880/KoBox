@@ -36,15 +36,21 @@ export function renderKoboxCommand(settings: {
   };
 }
 
+// Cron mails root whatever a job prints, and every run prints a line: the
+// output goes to the journal instead, stderr as a warning so a job that went
+// wrong stands out there.
+const TO_THE_JOURNAL = 'systemd-cat -t kobox-cron --stderr-priority=warning';
+
 export function renderCronFile(settings: CronRenderSettings): RenderedFile {
   const lines = [
     '# kobox scheduler - managed by KoBox, do not edit',
-    '# Every entry enqueues a typed job; the kobox-worker service executes.',
+    '# Each entry runs the kobox CLI, which mostly enqueues a typed job for the',
+    '# kobox-worker service; its output goes to the journal (tag kobox-cron).',
     'SHELL=/bin/sh',
     'PATH=/usr/sbin:/usr/bin:/sbin:/bin',
     '',
     ...SCHEDULED_JOBS.map(
-      (job) => `${job.schedule.value} root ${settings.koboxBin} ${job.command}`,
+      (job) => `${job.schedule.value} root ${TO_THE_JOURNAL} ${settings.koboxBin} ${job.command}`,
     ),
     '',
   ];
