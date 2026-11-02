@@ -216,7 +216,22 @@ function keysSentToTheCatalogue(): ReadonlySet<string> {
     signalRow({ level: 'throttled' }),
     signalRow({ level: 'alerted' }),
   ]) {
-    userHomePage(user, member, row, undefined, NOW);
+    userHomePage(user, member, row, undefined, undefined, NOW);
+  }
+  // under the filling line, then past it with something and with nothing to clean
+  for (const [usedGib, cleanableGib] of [[100, 10], [400, 80], [400, 0]] as const) {
+    userHomePage(
+      user,
+      member,
+      signalRow(),
+      measuredSpace(
+        user,
+        { username: alice, used: Quota.gib(usedGib), sampledAt: NOW },
+        { space: volume(1000), measuredAt: NOW },
+      ),
+      Quota.gib(cleanableGib),
+      NOW,
+    );
   }
   for (const diskFreeGib of [1000, 10]) {
     userHomePage(
@@ -228,6 +243,7 @@ function keysSentToTheCatalogue(): ReadonlySet<string> {
         { username: alice, used: Quota.gib(100), sampledAt: NOW },
         { space: volume(diskFreeGib), measuredAt: NOW },
       ),
+      undefined,
       NOW,
     );
   }

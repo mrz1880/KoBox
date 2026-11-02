@@ -174,6 +174,9 @@ const FR: Readonly<Record<string, string>> = {
 
   // freeing space: what can go, deleting it, and what the last cleanup did
   'Free up space': 'Libérer de l’espace',
+  'See what can be cleaned': 'Voir ce qui peut être nettoyé',
+  '{freed} can be freed.': '{freed} peuvent être libérés.',
+  'See and clean': 'Voir et nettoyer',
   'The first list arrives within the hour.': 'La première liste arrive dans l’heure.',
   'Nothing to clean yet: your torrents are still seeding.':
     'Rien à nettoyer pour l’instant : vos torrents sont encore en partage.',
