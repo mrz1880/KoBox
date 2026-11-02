@@ -13,12 +13,8 @@ import type {
   SeedRuleRepository,
   SpacePreferenceRepository,
 } from '../../../domain/space/ports.js';
-import {
-  InvalidSeedRuleError,
-  SEED_RULE_LIMITS,
-  SeedRule,
-  type BoxSeedRule,
-} from '../../../domain/space/SeedRule.js';
+import { SEED_RULE_LIMITS, type SeedRule } from '../../../domain/space/SeedRule.js';
+import { typedSeedRule } from '../typedSeedRule.js';
 import type {
   DiskUsageRepository,
   DiskUsageSample,
@@ -81,18 +77,6 @@ const ACTION_WORDS: Readonly<Record<'delete' | 'suspend' | 'resume', string>> = 
   suspend: '{name} suspended.',
   resume: '{name} restored.',
 };
-
-// The rule the admin typed, or nothing when the value object refuses it.
-function seedRuleOf(raw: { readonly ratio: number; readonly days: number }): BoxSeedRule | undefined {
-  try {
-    return SeedRule.of(raw);
-  } catch (error) {
-    if (error instanceof InvalidSeedRuleError) {
-      return undefined;
-    }
-    throw error;
-  }
-}
 
 // A login with no password yet: they have not followed their invitation.
 function awaitsInvitation(login: PortalCredentials | undefined): boolean {
@@ -219,7 +203,7 @@ export function registerAdminUserRoutes(
     }
     const viewer = viewerOf(session, request);
     const parsed = seedRuleSchema.safeParse(request.body);
-    const rule = parsed.success ? seedRuleOf(parsed.data) : undefined;
+    const rule = parsed.success ? typedSeedRule(parsed.data) : undefined;
     if (rule === undefined) {
       const { ratio, days } = SEED_RULE_LIMITS;
       return redirectWithFlash(
