@@ -9,7 +9,12 @@ import type {
   MemberTorrentsPort,
   TorrentDataPort,
 } from '../../domain/space/ports.js';
-import type { DiskUsageRepository, QuotaPort } from '../../domain/user/ports.js';
+import type {
+  DiskUsageRepository,
+  QuotaGaugePort,
+  QuotaPort,
+  UserRepository,
+} from '../../domain/user/ports.js';
 import type { InfoHash } from '../../domain/torrent/InfoHash.js';
 import type { TorrentInstanceRepository } from '../../domain/torrent/ports.js';
 import type { Username } from '../../domain/user/Username.js';
@@ -30,6 +35,9 @@ interface Deps extends CleanupJudgeDeps {
   readonly reports: CleanupReportRepository;
   readonly quota: Pick<QuotaPort, 'getUsage'>;
   readonly samples: DiskUsageRepository;
+  // ruTorrent's meter, shown the new usage against the member's allowance
+  readonly users: Pick<UserRepository, 'findByUsername'>;
+  readonly gauges: QuotaGaugePort;
   readonly snapshot: Pick<TakeCleanupSnapshot, 'execute'>;
   readonly mail: SpaceMailerDeps;
   readonly clock: () => string;
@@ -40,7 +48,8 @@ interface Deps extends CleanupJudgeDeps {
 // first, then its files, so no file is removed under a torrent still seeding.
 // One torrent that cannot go is reported and the others still go. The report
 // is saved before the usage is measured again, so a failing measure cannot
-// lose what was deleted.
+// lose what was deleted. The new usage is shown on the home and on ruTorrent's
+// meter at once, rather than at the next hourly pass.
 export class CleanUpSpace {
   private readonly mailer: SpaceMailer;
 
@@ -95,6 +104,11 @@ export class CleanUpSpace {
     }
     const used = await this.deps.quota.getUsage(command.username);
     await this.deps.samples.save({ username: command.username, used, sampledAt: at });
+    // a member removed meanwhile has no meter left to show it on
+    const user = await this.deps.users.findByUsername(command.username);
+    if (user !== undefined) {
+      await this.deps.gauges.show(command.username, used, user.quota);
+    }
     await this.deps.snapshot.execute(command.username, at);
     return report;
   }

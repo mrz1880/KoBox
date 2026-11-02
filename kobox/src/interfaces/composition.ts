@@ -761,6 +761,8 @@ export function buildContainer(name: string): Container {
   const syncTransferRepo = new SqliteSyncTransferRepository(db);
   const diskSamples = new SqliteDiskUsageRepository(db);
   const queue = new SqliteJobQueue(db);
+  // ruTorrent's disk meter shows each member their quota from these
+  const quotaGauges = new RutorrentQuotaGauges(new RtorrentConfigAdapter(runner));
   const spaceUseCases = buildSpaceUseCases({
     instances: new SqliteTorrentInstanceRepository(db),
     torrents: rtorrentControl,
@@ -771,6 +773,8 @@ export function buildContainer(name: string): Container {
     reports: new SqliteCleanupReportRepository(db),
     quota,
     samples: diskSamples,
+    users: repo,
+    gauges: quotaGauges,
     preferences: new SqliteSpacePreferenceRepository(db),
     queue,
     // a member hears about their space in their language, with a link to it
@@ -784,8 +788,7 @@ export function buildContainer(name: string): Container {
     diskSamples,
     volume: new LoggedVolume(new StatfsVolumeAdapter(HOME_BASE), logger),
     volumeSamples: new SqliteVolumeSampleRepository(db),
-    // ruTorrent's disk meter shows each member their quota from these
-    quotaGauges: new RutorrentQuotaGauges(new RtorrentConfigAdapter(runner)),
+    quotaGauges,
     cleanupSnapshot: spaceUseCases.takeCleanupSnapshot,
     spaceWatch: spaceUseCases.watchMemberSpace,
     nextcloud,

@@ -275,6 +275,7 @@ beforeEach(() => {
   const queue = new InMemoryJobQueue();
   const spacePreferences = new InMemorySpacePreferenceRepository();
   const seedRule = new InMemorySeedRuleRepository();
+  const quotaGauges = new FakeQuotaGauges();
   const spaceUseCases = buildSpaceUseCases({
     instances,
     torrents: memberTorrents,
@@ -285,6 +286,8 @@ beforeEach(() => {
     reports: cleanupReports,
     quota,
     samples: diskSamples,
+    users: repo,
+    gauges: quotaGauges,
     preferences: spacePreferences,
     queue,
     mail: {
@@ -302,7 +305,7 @@ beforeEach(() => {
     diskSamples,
     volume: new FakeVolume(),
     volumeSamples: new InMemoryVolumeSampleRepository(),
-    quotaGauges: new FakeQuotaGauges(),
+    quotaGauges,
     cleanupSnapshot: spaceUseCases.takeCleanupSnapshot,
     spaceWatch: spaceUseCases.watchMemberSpace,
     nextcloud,

@@ -23,6 +23,7 @@ import { InMemorySyncTransferRepository } from '../../../../src/infrastructure/p
 import { InMemoryTorrentInstanceRepository } from '../../../../src/infrastructure/persistence/InMemoryTorrentInstanceRepository.js';
 import { FakeMemberTorrents } from '../../../../src/infrastructure/system/fakes/FakeMemberTorrents.js';
 import { FakeQuota } from '../../../../src/infrastructure/system/fakes/FakeQuota.js';
+import { FakeQuotaGauges } from '../../../../src/infrastructure/system/fakes/FakeQuotaGauges.js';
 import { FakeTorrentData } from '../../../../src/infrastructure/system/fakes/FakeTorrentData.js';
 import { aUser } from '../../../builders/UserBuilder.js';
 
@@ -95,6 +96,7 @@ interface World {
   torrents: FakeMemberTorrents;
   data: FakeTorrentData;
   quota: FakeQuota;
+  gauges: FakeQuotaGauges;
   samples: InMemoryDiskUsageRepository;
   reports: InMemoryCleanupReportRepository;
   snapshots: InMemoryCleanupSnapshotRepository;
@@ -130,10 +132,14 @@ beforeEach(async () => {
   };
   const users = new InMemoryUserRepository();
   await users.save(aUser().build());
+  const gauges = new FakeQuotaGauges();
   world = {
     ...deps,
+    gauges,
     cleanUp: new CleanUpSpace({
       ...deps,
+      users,
+      gauges,
       snapshot: new TakeCleanupSnapshot(deps),
       mail: {
         users,
@@ -306,6 +312,16 @@ describe('CleanUpSpace', () => {
     const sample = await world.samples.find(alice);
     expect(sample?.used.toGib()).toBe(20);
     expect(sample?.sampledAt).toBe(AT);
+  });
+
+  // ruTorrent's meter must not wait for the hourly pass either
+  it('should_show_the_member_their_usage_again_on_rutorrents_gauge_once_done', async () => {
+    world.torrents.holds(aliceScgi, [seededFilm()]);
+    world.quota.setUsageForTest(alice, Quota.gib(20));
+
+    await world.cleanUp.execute({ username: alice, infoHashes: [FILM], trigger: 'member' });
+
+    expect(world.gauges.shown).toEqual([{ username: 'alice', usedGib: 20, quotaGib: 412 }]);
   });
 
   // the page lists the snapshot: what went must not still be offered
