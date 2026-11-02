@@ -39,6 +39,7 @@ import {
 import { buildJob } from './buildJob.js';
 import { readFileSync } from 'node:fs';
 import { loadWorkerEnvInto } from '../envSnapshot.js';
+import { diskUsagePassWarnings, warningLine } from '../diskUsagePassWarnings.js';
 import { TwoStepSetup } from '../../application/portal/TwoStepSetup.js';
 import { CryptoTotp } from '../../infrastructure/system/CryptoTotp.js';
 
@@ -729,7 +730,11 @@ program
   .description('record what the disk holds for each member, for the portal to read')
   .action(async () => {
     const c = container();
-    await c.useCases.sampleDiskUsage.execute();
+    const pass = await c.useCases.sampleDiskUsage.execute();
+    // informational: the pass went on, so the exit code stays 0
+    for (const warning of diskUsagePassWarnings(pass)) {
+      process.stderr.write(`${warningLine(warning)}\n`);
+    }
     process.stdout.write('disk usage sampled\n');
   });
 
