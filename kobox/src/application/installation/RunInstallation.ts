@@ -26,7 +26,7 @@ export type ConvergenceJobType = (typeof CONVERGENCE_JOBS)[number];
 export class PreflightFailedError extends Error {
   constructor(readonly failures: readonly PreflightFailure[]) {
     super(
-      ['preflight failed — nothing was changed:', ...failures.map((f) => `  - ${f.message}`)].join(
+      ['preflight failed, nothing was changed:', ...failures.map((f) => `  - ${f.message}`)].join(
         '\n',
       ),
     );
@@ -40,7 +40,7 @@ export class ComponentInstallError extends Error {
     cause: unknown,
   ) {
     super(
-      `component ${component} failed: ${messageOf(cause)} — fix the cause and re-run kobox install (completed components are not redone)`,
+      `component ${component} failed: ${messageOf(cause)}; fix the cause and re-run kobox install (completed components are not redone)`,
     );
     this.name = 'ComponentInstallError';
   }
@@ -117,10 +117,10 @@ export class RunInstallation {
           // A component skips for lack of CONFIGURATION, not for lack of an
           // artifact. Since the plan revisits everything, a run that does not
           // carry a pin would otherwise flip a working component to skipped and
-          // make the registry lie about the box — Health read "no ruTorrent
+          // make the registry lie about the box: Health read "no ruTorrent
           // release pinned" while ruTorrent was installed and serving.
           if (alreadyInstalled.includes(name)) {
-            this.deps.onProgress?.(`${name}: left installed — ${outcome.reason}`);
+            this.deps.onProgress?.(`${name}: left installed (${outcome.reason})`);
           } else {
             await deps.registry.markSkipped(spec.name, outcome.reason, deps.now());
             skipped.push(name);
