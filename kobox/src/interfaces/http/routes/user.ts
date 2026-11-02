@@ -80,6 +80,7 @@ import { DEFAULT_TRANSFER_MAILS, TRANSFER_MAILS } from '../../../domain/sync/Tra
 import type { BlocklistRepository, UserAddressRepository } from '../../../domain/tracker/ports.js';
 import { blocklistCoverage } from '../../../domain/tracker/BlocklistCoverage.js';
 import type { TwoStepSetup } from '../../../application/portal/TwoStepSetup.js';
+import { CLEANUP_PAGE, CLEANUP_RECALCULATE } from '../../../application/space/cleanupPage.js';
 
 const categorySchema = z.object({ label: z.string().min(1).max(64) });
 const categoryRenameSchema = z.object({
@@ -322,7 +323,7 @@ export function registerUserRoutes(
       );
   });
 
-  server.get('/space/cleanup', async (request, reply) => {
+  server.get(CLEANUP_PAGE, async (request, reply) => {
     const session = await guards.requireSession(request, reply);
     if (session === undefined) {
       return;
@@ -345,7 +346,7 @@ export function registerUserRoutes(
   // since the form carries the CSRF token, which must never end up in an
   // address; and it draws the page itself, so no list of hashes travels in a
   // redirect either.
-  server.post('/space/cleanup/recalculate', async (request, reply) => {
+  server.post(CLEANUP_RECALCULATE, async (request, reply) => {
     const session = await guards.requireCsrf(request, reply);
     if (session === undefined) {
       return;
@@ -367,7 +368,7 @@ export function registerUserRoutes(
 
   // The username comes from the session, never from the form: a member only
   // ever cleans their own space. The worker judges each torrent again live.
-  server.post('/space/cleanup', async (request, reply) => {
+  server.post(CLEANUP_PAGE, async (request, reply) => {
     const session = await guards.requireCsrf(request, reply);
     if (session === undefined) {
       return;
@@ -377,7 +378,7 @@ export function registerUserRoutes(
       return reply.code(400).send();
     }
     if (picked.length === 0) {
-      return redirectWithFlash(reply, '/space/cleanup', 'You did not choose anything to delete.');
+      return redirectWithFlash(reply, CLEANUP_PAGE, 'You did not choose anything to delete.');
     }
     const job = await deps.queue.enqueue(
       buildJob.cleanUpSpace({
@@ -389,7 +390,7 @@ export function registerUserRoutes(
       reply,
       deps.awaitJob,
       job,
-      '/space/cleanup',
+      CLEANUP_PAGE,
       'Cleanup done. The list and your space are up to date.',
     );
   });

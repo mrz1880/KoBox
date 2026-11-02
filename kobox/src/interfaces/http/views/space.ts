@@ -8,6 +8,7 @@ import { formatAgo, formatClock, nextRunAfter } from './moment.js';
 import { QuotaPressure } from '../../../domain/space/QuotaPressure.js';
 import { scheduleOf } from '../../../domain/maintenance/schedule.js';
 import { sentence, type Viewer } from './layout.js';
+import { CLEANUP_PAGE } from '../../../application/space/cleanupPage.js';
 
 // the scheduled pass that measures every member's space
 const SAMPLE_COMMAND = 'sample-disk-usage';
@@ -101,7 +102,7 @@ export function cleanupHint(
   cleanable: Quota | undefined,
   viewer: Viewer,
 ): RawHtml {
-  const link = html`<p class="muted"><a href="/space/cleanup">${viewer.t('See what can be cleaned')}</a></p>`;
+  const link = html`<p class="muted"><a href="${CLEANUP_PAGE}">${viewer.t('See what can be cleaned')}</a></p>`;
   if (space === undefined || cleanable === undefined) {
     return link;
   }
@@ -119,7 +120,7 @@ export function cleanupHint(
 <p>${sentence(viewer.t, '{freed} can be freed.', {
         freed: html`<b>${formatBytes(cleanable.toBytes(), viewer)}</b>`,
       })}</p>
-<a class="action" href="/space/cleanup">${viewer.t('See and clean')}</a>
+<a class="action" href="${CLEANUP_PAGE}">${viewer.t('See and clean')}</a>
 </section>`;
   }
 }

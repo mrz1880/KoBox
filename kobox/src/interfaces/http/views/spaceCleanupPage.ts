@@ -6,6 +6,7 @@ import { html, type RawHtml } from '../html.js';
 import { formatBytes } from './bytes.js';
 import { flash, page, type Reader, type Viewer } from './layout.js';
 import { formatDay, formatMoment } from './moment.js';
+import { CLEANUP_PAGE, CLEANUP_RECALCULATE } from '../../../application/space/cleanupPage.js';
 
 // What the page offers: the proposal built from the hourly pass's snapshot,
 // and when that pass ran.
@@ -59,14 +60,14 @@ function row(line: ProposalLine, takenAt: string, viewer: Viewer): RawHtml {
 // again; the second one deletes.
 function form(list: CleanupList, viewer: Viewer): RawHtml {
   const freed = formatBytes(list.proposal.freed().toBytes(), viewer);
-  return html`<form method="post" action="/space/cleanup">
+  return html`<form method="post" action="${CLEANUP_PAGE}">
 <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
 <table class="cleanup">
   <thead><tr><th class="pick">${viewer.t('Delete')}</th><th>${viewer.t('Torrent')}</th><th>${viewer.t('Size')}</th><th class="ratio">${viewer.t('Ratio')}</th><th class="finished">${viewer.t('Finished')}</th><th>${viewer.t('Why')}</th></tr></thead>
   <tbody>${list.proposal.lines.map((line) => row(line, list.takenAt, viewer))}</tbody>
 </table>
 <p class="flash warn">${viewer.t('The files will be erased from the seedbox for good. This cannot be undone.')}</p>
-<button type="submit" class="ghost" formaction="/space/cleanup/recalculate">${viewer.t('Recalculate')}</button>
+<button type="submit" class="ghost" formaction="${CLEANUP_RECALCULATE}">${viewer.t('Recalculate')}</button>
 <button type="submit" class="danger">${viewer.t('Delete for good ({size})', { size: freed })}</button>
 </form>`;
 }
@@ -151,7 +152,7 @@ export function automaticCleanupNotice(report: CleanupReport | undefined, viewer
   return html`<section class="panel">
 <h2>${viewer.t('KoBox cleaned up for you')}</h2>
 ${deletedSummary(report, viewer)}
-<p class="muted"><a href="/space/cleanup">${viewer.t('See the details')}</a></p>
+<p class="muted"><a href="${CLEANUP_PAGE}">${viewer.t('See the details')}</a></p>
 </section>`;
 }
 
