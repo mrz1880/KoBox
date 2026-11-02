@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { CleanupCandidate, type CleanupReason } from '../../../src/domain/space/CleanupCandidate.js';
 import { CleanupReport, type SkipReason } from '../../../src/domain/space/CleanupReport.js';
+import { SeedRule } from '../../../src/domain/space/SeedRule.js';
 import { InfoHash } from '../../../src/domain/torrent/InfoHash.js';
 import { Quota } from '../../../src/domain/user/Quota.js';
 import { VolumeSpace } from '../../../src/domain/user/VolumeSpace.js';
@@ -170,6 +171,19 @@ describe('the cleanup page', () => {
     expect(await cleanupPageOf(member)).toContain('Ratio 2.4 after 1 day<');
   });
 
+  // alice asks only seven days, whatever the ratio: the line says that
+  it('should_word_the_reason_after_a_members_rule_on_days_alone', async () => {
+    await world.spacePreferences.chooseSeedRule(alice, {
+      kind: 'own',
+      rule: SeedRule.of({ days: 7 }),
+    });
+    await snapshotWithThreeCandidates();
+
+    expect(await cleanupPageOf(member)).toContain(
+      '<td class="reason">Finished 12 days ago (your rule: 7 days)<br><span class="muted">KoBox does not know whether you fetched it.</span></td>',
+    );
+  });
+
   // the list is an hour old at most: the member knows what it reflects
   it('should_say_when_the_list_was_made', async () => {
     await snapshotWithThreeCandidates();
@@ -304,6 +318,22 @@ describe('the cleanup page in French', () => {
     );
     expect(body).toContain('Liste du 25 juillet 2026 à 11:20.');
     expect(body).toContain('Supprimer pour de bon (80 Gio)');
+  });
+
+  it('should_word_the_reason_after_a_members_rule_on_days_alone_in_french', async () => {
+    await world.spacePreferences.chooseSeedRule(alice, {
+      kind: 'own',
+      rule: SeedRule.of({ days: 1 }),
+    });
+    await world.cleanupSnapshots.replace(
+      alice,
+      [candidate(SEEDED, 'Big.Release', 50, 'seeded', '2026-07-24T08:00:00.000Z')],
+      TAKEN_AT,
+    );
+
+    expect(await cleanupPageOf(member, 'fr-FR')).toContain(
+      '<td class="reason">Terminé il y a 1 jour (votre règle : 1 jour)<br>',
+    );
   });
 });
 

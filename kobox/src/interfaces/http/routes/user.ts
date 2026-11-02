@@ -31,6 +31,7 @@ import {
   SeedRule,
 } from '../../../domain/space/SeedRule.js';
 import { formatRatio } from '../views/ratio.js';
+import { seedRuleFor } from '../../../application/space/seedRuleFor.js';
 import type { TorrentInstanceRepository } from '../../../domain/torrent/ports.js';
 import type { SyncDestinationRepository, SyncTransferRepository } from '../../../domain/sync/ports.js';
 import type { SetSyncDestination } from '../../../application/sync/SetSyncDestination.js';
@@ -247,6 +248,14 @@ async function automaticReportOf(
   return report?.isShownOnHome(deps.now()) === true ? report : undefined;
 }
 
+// The rule the member's torrents are judged by, which words the cleanup page.
+function ruleOf(
+  deps: Pick<UserRoutesDeps, 'spacePreferences' | 'seedRule'>,
+  username: Username,
+): Promise<SeedRule> {
+  return seedRuleFor({ seedRule: deps.seedRule, preferences: deps.spacePreferences }, username);
+}
+
 // The rule a member typed, or nothing when the value object refuses it.
 function ownSeedRuleOf(raw: {
   readonly ratio: number | undefined;
@@ -347,6 +356,7 @@ export function registerUserRoutes(
           viewerOf(session, request),
           {
             list: await cleanupListOf(deps, session.username),
+            rule: await ruleOf(deps, session.username),
             report: await deps.cleanupReports.find(session.username),
           },
           flashOf(request),
@@ -373,6 +383,7 @@ export function registerUserRoutes(
       .send(
         spaceCleanupPage(viewerOf(session, request), {
           list: list === undefined ? undefined : { ...list, proposal: list.proposal.pick(picked) },
+          rule: await ruleOf(deps, session.username),
           report: await deps.cleanupReports.find(session.username),
         }),
       );

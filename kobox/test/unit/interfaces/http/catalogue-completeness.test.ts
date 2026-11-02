@@ -262,9 +262,10 @@ function keysSentToTheCatalogue(): ReadonlySet<string> {
       NOW,
     );
   }
-  spaceCleanupPage(member, { list: undefined, report: undefined });
+  spaceCleanupPage(member, { list: undefined, rule: SeedRule.DEFAULT, report: undefined });
   spaceCleanupPage(member, {
     list: { proposal: CleanupProposal.of({ candidates: [], used: Quota.gib(1), allowance: Quota.gib(412) }), takenAt: NOW },
+    rule: SeedRule.DEFAULT,
     report: CleanupReport.of({
       deleted: [],
       skipped: SKIP_REASONS.map((reason) => ({ name: 'Kept.Release', reason })),
@@ -272,15 +273,19 @@ function keysSentToTheCatalogue(): ReadonlySet<string> {
       trigger: 'member',
     }),
   });
-  spaceCleanupPage(member, {
-    list: { proposal: cleanupProposal(), takenAt: NOW },
-    report: CleanupReport.of({
-      deleted: [{ name: 'Old.Release', size: Quota.gib(10) }],
-      skipped: [],
-      at: NOW,
-      trigger: 'member',
-    }),
-  });
+  // a member's own rule on days alone words a seeded line after it
+  for (const rule of [SeedRule.DEFAULT, SeedRule.of({ days: 1 })]) {
+    spaceCleanupPage(member, {
+      list: { proposal: cleanupProposal(), takenAt: NOW },
+      rule,
+      report: CleanupReport.of({
+        deleted: [{ name: 'Old.Release', size: Quota.gib(10) }],
+        skipped: [],
+        at: NOW,
+        trigger: 'member',
+      }),
+    });
+  }
   passwordPage(member);
   twoStepSetupPage(member, 'alice', 'JBSWY3DPEHPK3PXP');
   for (const nextcloudInstalled of [true, false]) {
