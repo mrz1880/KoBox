@@ -26,7 +26,7 @@ export const SpaceWarning = {
   },
 
   // Whether the member still counts as warned once they changed what KoBox
-  // may delete on its own. Letting it clean starts afresh, so the next pass
+  // may delete on its own, or the rule that decides it. Letting it clean starts afresh, so the next pass
   // past the line cleans rather than waiting for the next climb; turning it
   // off keeps the warning, so the member is not mailed twice in one climb.
   afterChoosing(warned: boolean, automatic: AutomaticCleanup): boolean {
