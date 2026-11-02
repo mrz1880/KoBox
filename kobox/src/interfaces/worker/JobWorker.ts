@@ -16,6 +16,7 @@ import { RecyclingMode } from '../../domain/torrent/RecyclingMode.js';
 import { BlocklistSource } from '../../domain/tracker/BlocklistSource.js';
 import { Quota } from '../../domain/user/Quota.js';
 import type { PasswordOpenerPort } from '../../domain/user/ports.js';
+import type { Logger } from '../../infrastructure/logging/logger.js';
 import { Username } from '../../domain/user/Username.js';
 import type {
   MaintenanceUseCases,
@@ -63,6 +64,8 @@ export class JobWorker {
     // the private half of the host key: only the root worker can open a
     // password the portal sealed
     private readonly passwords: PasswordOpenerPort,
+    // told what a job could not do although the job itself succeeded
+    private readonly logger: Pick<Logger, 'warn'>,
   ) {}
 
   async processNext(): Promise<boolean> {
@@ -502,12 +505,22 @@ export class JobWorker {
       case 'render-nfs-exports':
         await this.security.renderNfsExports.execute();
         return;
-      case 'clean-up-space':
-        await this.space.cleanUpSpace.execute({
-          username: Username.parse(job.payload.username),
+      case 'clean-up-space': {
+        const username = Username.parse(job.payload.username);
+        const report = await this.space.cleanUpSpace.execute({
+          username,
           infoHashes: job.payload.infoHashes.map((raw) => InfoHash.parse(raw)),
         });
+        // the member reads the report on their page; the name, not the path,
+        // keeps the log short and the member's tree out of it
+        for (const failure of report.failures) {
+          this.logger.warn(
+            { username: username.value, torrent: failure.name, reason: failure.reason },
+            'space cleanup: torrent not removed',
+          );
+        }
         return;
+      }
       case 'add-user-address':
       case 'remove-user-address': {
         const report = await this.trackers.manageUserAddress.execute({

@@ -10,6 +10,16 @@ import { Quota } from '../user/Quota.js';
 export const SKIP_REASONS = ['noLongerQualifies', 'gone', 'notErased', 'dataKept'] as const;
 export type SkipReason = (typeof SKIP_REASONS)[number];
 
+// Whether a reason means the box failed to remove what the member picked, as
+// opposed to the pick no longer applying. A record rather than a list: a new
+// reason does not compile until someone decides which side it falls on.
+const IS_A_FAILURE: Readonly<Record<SkipReason, boolean>> = {
+  noLongerQualifies: false,
+  gone: false,
+  notErased: true,
+  dataKept: true,
+};
+
 export interface DeletedLine {
   readonly name: string;
   readonly size: Quota;
@@ -35,6 +45,12 @@ export class CleanupReport {
     readonly at: string;
   }): CleanupReport {
     return new CleanupReport([...lines.deleted], [...lines.skipped], lines.at);
+  }
+
+  // what the box could not remove: the member is told, and so is whoever
+  // looks after the box
+  get failures(): readonly SkippedLine[] {
+    return this.skipped.filter((line) => IS_A_FAILURE[line.reason]);
   }
 
   // the space given back: what was deleted, never what was only asked for
