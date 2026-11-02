@@ -38,6 +38,28 @@ see below** — auto-`git reset --hard` was the legacy's №1 ops hazard).
   deleted), copies the dump in place, restarts the worker. Config archives are
   restored manually (`tar -xzf … -C /`) if needed — they rarely are, because
   every KoBox config re-renders from the DB.
+- **Members' restart kits**: each backup also holds `members/<username>.tar.gz`,
+  what lets a member's rTorrent start again by itself if `/home` is lost: its
+  session (`rtorrent/.session`), the kept `.torrent` files (`rtorrent/torrents`),
+  the drop-ins (`rtorrent/config.d`) and the member's `scripts`. Paths are
+  relative to the home, owners and modes recorded. Downloads are not in it:
+  rTorrent fetches them again. A member whose archive fails is logged by the
+  worker (`backup: restart kit not archived`) and the rest of the backup goes on.
+- **Restoring `/home`** after a disk replacement, once `/home` is mounted again,
+  for each member (`alice` here):
+
+  ```sh
+  systemctl stop rtorrent-alice
+  install -d -o alice -g alice -m 0711 /home/alice
+  tar -xzpf /var/backups/kobox/<stamp>/members/alice.tar.gz -C /home/alice
+  kobox --direct render-rtorrent-config alice   # dirs, .rtorrent.rc, unit
+  systemctl start rtorrent-alice
+  ```
+
+  `kobox install` does not touch members' homes: `render-rtorrent-config` is
+  what recreates the watch, complete and log directories and the files KoBox
+  renders. rTorrent then reloads its list from the session and downloads the
+  data again; nobody re-adds a torrent.
 
 ## Upgrades (transactional, versioned)
 
