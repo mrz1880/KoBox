@@ -25,11 +25,8 @@ import type {
 } from '../../../domain/space/ports.js';
 import { AUTOMATIC_CLEANUPS } from '../../../domain/space/AutomaticCleanup.js';
 import type { CleanupReport } from '../../../domain/space/CleanupReport.js';
-import {
-  InvalidSeedRuleError,
-  SEED_RULE_LIMITS,
-  SeedRule,
-} from '../../../domain/space/SeedRule.js';
+import { SEED_RULE_LIMITS, type SeedRule } from '../../../domain/space/SeedRule.js';
+import { typedSeedRule } from '../typedSeedRule.js';
 import { formatRatio } from '../views/ratio.js';
 import { seedRuleFor } from '../../../application/space/seedRuleFor.js';
 import type { TorrentInstanceRepository } from '../../../domain/torrent/ports.js';
@@ -254,21 +251,6 @@ function ruleOf(
   username: Username,
 ): Promise<SeedRule> {
   return seedRuleFor({ seedRule: deps.seedRule, preferences: deps.spacePreferences }, username);
-}
-
-// The rule a member typed, or nothing when the value object refuses it.
-function ownSeedRuleOf(raw: {
-  readonly ratio: number | undefined;
-  readonly days: number;
-}): SeedRule | undefined {
-  try {
-    return SeedRule.of(raw);
-  } catch (error) {
-    if (error instanceof InvalidSeedRuleError) {
-      return undefined;
-    }
-    throw error;
-  }
 }
 
 // The rule a member's torrents answer to, and the box's they may keep.
@@ -1152,7 +1134,7 @@ export function registerUserRoutes(
     const rule =
       form.rule === 'box'
         ? null
-        : ownSeedRuleOf({ days: form.days, ratio: form.ratio === '' ? undefined : Number(form.ratio) });
+        : typedSeedRule({ days: form.days, ratio: form.ratio === '' ? undefined : Number(form.ratio) });
     if (rule === undefined) {
       const viewer = viewerOf(session, request);
       const { ratio, days } = SEED_RULE_LIMITS;
