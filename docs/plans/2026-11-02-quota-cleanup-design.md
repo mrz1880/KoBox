@@ -24,6 +24,12 @@ in.
 - Nothing is deleted without a click, unless the member turned on automatic
   cleanup in their account (off by default). Then KoBox cleans from 90 % down
   under 80 % and reports what it deleted.
+- KoBox only knows what its own sync sent. A file fetched over SFTP, Nextcloud,
+  NFS or imported by Sonarr is invisible to it. So automatic cleanup has a
+  scope the member picks: **only what KoBox sync already sent** (the default,
+  and safe) or **also what seeded enough**, with a plain warning that files
+  never fetched can go. On the page, a line proposed for having seeded says
+  "KoBox does not know whether you fetched it".
 - An admin sees a member's usage and what is cleanable, without a delete button:
   the files are the member's.
 - A member whose files are read by another machine without KoBox sync (a NAS over
@@ -49,7 +55,8 @@ in.
   again only after the member went back under 80 % and climbed again. It gives the
   usage, what can be freed and the link. With nothing cleanable it says so and
   suggests deleting by hand or asking for more quota.
-- **Automatic cleanup**, a setting in My account. When it runs, the member gets
+- **Automatic cleanup**, a setting in My account: off, on for what KoBox sent,
+  or on for what KoBox sent and what seeded enough. When it runs, the member gets
   one mail listing what was deleted and the space it gave back, and the home page
   shows the same report.
 
@@ -88,7 +95,8 @@ the data goes through its own port.
 ## Storage
 
 - The seed rule in the admin settings.
-- On the member: automatic cleanup on or off, and the "90 % mail sent" marker.
+- On the member: the automatic cleanup scope (off, sent only, sent or seeded)
+  and the "90 % mail sent" marker.
 - A table holding the latest candidate snapshot per member, with its date.
 
 ## Errors
