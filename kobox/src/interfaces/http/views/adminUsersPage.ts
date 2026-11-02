@@ -4,11 +4,13 @@ import type { SeedboxUser } from '../../../domain/user/SeedboxUser.js';
 import type { DiskUsageSample, VolumeSample } from '../../../domain/user/ports.js';
 import { html, type RawHtml } from '../html.js';
 import { explained, flash, page, sentence, type Viewer } from './layout.js';
+import { SEED_RULE_LIMITS, type SeedRule } from '../../../domain/space/SeedRule.js';
 import { HOME_BASE } from '../../../domain/user/homeDirectory.js';
 import { Quota } from '../../../domain/user/Quota.js';
 import type { SpaceLimit } from '../../../domain/user/UsableSpace.js';
 import { formatBytes } from './bytes.js';
 import { formatMoment } from './moment.js';
+import { formatRatio } from './ratio.js';
 import { leftToFill, measuredSpace, type MeasuredSpace } from './space.js';
 
 const ROLE_LABELS: Record<Role, string> = { admin: 'Administrator', user: 'Member' };
@@ -94,6 +96,7 @@ export function adminUsersPage(
   users: readonly SeedboxUser[],
   logins: ReadonlyMap<string, MemberLogin>,
   disk: DiskReadings,
+  rule: SeedRule,
   viewer: Viewer,
   message?: string,
 ): string {
@@ -144,10 +147,29 @@ ${boxDisk(users, disk.volume, viewer)}
   <label for="role">${viewer.t('Portal role')}</label>
   <select id="role" name="role">${roleOptions('user', viewer)}</select>
   <button type="submit">${viewer.t('Send the invitation')}</button>
-</form>`,
+</form>
+${cleanupRule(rule, viewer)}`,
     viewer,
     'admin',
   );
+}
+
+// The box-wide rule a finished torrent must meet before it may be cleaned.
+function cleanupRule(rule: SeedRule, viewer: Viewer): RawHtml {
+  const { ratio, days } = SEED_RULE_LIMITS;
+  return html`<h2>${viewer.t('Cleanup rule')}</h2>
+<p class="muted">${viewer.t(
+    'A finished torrent can be cleaned once it has given back {ratio} times its size and finished {days} days ago; members always confirm unless they chose automatic cleanup.',
+    { ratio: formatRatio(rule.ratio, viewer), days: String(rule.days) },
+  )}</p>
+<form class="card" method="post" action="/admin/users/seed-rule">
+  <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
+  <label for="ratio">${viewer.t('Ratio given back')}</label>
+  <input id="ratio" name="ratio" type="number" required step="any" min="${String(ratio.min)}" max="${String(ratio.max)}" value="${String(rule.ratio)}">
+  <label for="days">${viewer.t('Days since it finished')}</label>
+  <input id="days" name="days" type="number" required step="1" min="${String(days.min)}" max="${String(days.max)}" value="${String(rule.days)}">
+  <button type="submit">${viewer.t('Save the cleanup rule')}</button>
+</form>`;
 }
 
 // The one per-member policy an admin can move. It is phrased as what the member

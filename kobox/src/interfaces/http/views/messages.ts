@@ -222,6 +222,16 @@ const FR: Readonly<Record<string, string>> = {
   'You did not choose anything to delete.': 'Vous n’avez rien choisi à supprimer.',
   'Cleanup done. The list and your space are up to date.':
     'Nettoyage terminé. La liste et votre espace sont à jour.',
+  'Cleanup rule': 'Règle de nettoyage',
+  'A finished torrent can be cleaned once it has given back {ratio} times its size and finished {days} days ago; members always confirm unless they chose automatic cleanup.':
+    'Un torrent terminé peut être nettoyé une fois qu’il a rendu {ratio} fois sa taille et fini depuis {days} jours ; les membres confirment toujours, sauf s’ils ont choisi le nettoyage automatique.',
+  'Ratio given back': 'Ratio rendu',
+  'Days since it finished': 'Jours depuis la fin du téléchargement',
+  'Save the cleanup rule': 'Enregistrer la règle de nettoyage',
+  'Cleanup rule saved. The next hourly pass applies it.':
+    'Règle de nettoyage enregistrée. Le prochain passage horaire l’applique.',
+  'Nothing was saved: the ratio goes from {ratioMin} to {ratioMax}, the days from {daysMin} to {daysMax}.':
+    'Rien n’a été enregistré : le ratio va de {ratioMin} à {ratioMax}, les jours de {daysMin} à {daysMax}.',
 
   // member pages
   Torrents: 'Torrents',

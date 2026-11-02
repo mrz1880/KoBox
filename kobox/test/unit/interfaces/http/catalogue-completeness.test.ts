@@ -30,6 +30,7 @@ import { Blocklist } from '../../../../src/domain/tracker/Blocklist.js';
 import { BlocklistSource } from '../../../../src/domain/tracker/BlocklistSource.js';
 import { BlocklistUrl } from '../../../../src/domain/tracker/BlocklistUrl.js';
 import { RtorrentPort, ScgiPort } from '../../../../src/domain/user/Port.js';
+import { SeedRule } from '../../../../src/domain/space/SeedRule.js';
 import { Quota } from '../../../../src/domain/user/Quota.js';
 import { SshPublicKey } from '../../../../src/domain/user/SshPublicKey.js';
 import { Username } from '../../../../src/domain/user/Username.js';
@@ -421,6 +422,7 @@ function keysSentToTheCatalogue(): ReadonlySet<string> {
       ['bob', { role: 'admin' as const, invited: true }],
     ]),
     { usages: new Map(), volume: undefined },
+    SeedRule.DEFAULT,
     admin,
   );
   adminUsersPage(
@@ -433,6 +435,7 @@ function keysSentToTheCatalogue(): ReadonlySet<string> {
       ]),
       volume: { space: volume(50), measuredAt: NOW },
     },
+    SeedRule.DEFAULT,
     admin,
   );
   adminUserDetailPage(user, admin, undefined, 'active');
