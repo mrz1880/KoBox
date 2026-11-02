@@ -40,7 +40,7 @@ describe('the cleanup rule on the members page', () => {
 
     expect(fieldValue(body, 'ratio')).toBe('1.5');
     expect(fieldValue(body, 'days')).toBe('14');
-    expect(body).toContain('once it has given back 1.5 times its size and finished 14 days ago');
+    expect(body).toContain('once it has given back 1.5 times its size and finished at least 14 days ago');
   });
 });
 
@@ -115,7 +115,7 @@ describe('the cleanup rule in French', () => {
 
     expect(body).toContain('Règle de nettoyage');
     expect(body).toContain(
-      'Un torrent terminé peut être nettoyé une fois qu’il a rendu 2,0 fois sa taille et fini depuis 7 jours ; les membres confirment toujours, sauf s’ils ont choisi le nettoyage automatique.',
+      'Un torrent terminé peut être nettoyé une fois qu’il a rendu 2,0 fois sa taille et fini depuis au moins 7 jours ; les membres confirment toujours, sauf s’ils ont choisi le nettoyage automatique.',
     );
   });
 

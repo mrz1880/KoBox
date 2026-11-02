@@ -138,7 +138,7 @@ ${flash(viewer.t, message)}
 ${boxDisk(users, disk.volume, viewer)}
 <table>
   <thead>
-    <tr><th>${viewer.t('User')}</th><th>${viewer.t('Email')}</th><th>${viewer.t('Quota')}</th><th>${viewer.t('Used')}</th><th>${viewer.t('Free')}</th><th>${viewer.t('Can be freed')}</th><th>${viewer.t('Role')}</th><th>${viewer.t('SCGI')}</th><th>${viewer.t('Status')}</th></tr>
+    <tr><th>${viewer.t('User')}</th><th>${viewer.t('Email')}</th><th>${viewer.t('Quota')}</th><th>${viewer.t('Used')}</th><th>${viewer.t('Free')}</th><th>${viewer.t('Cleanable')}</th><th>${viewer.t('Role')}</th><th>${viewer.t('SCGI')}</th><th>${viewer.t('Status')}</th></tr>
   </thead>
   <tbody>${rows}</tbody>
 </table>
@@ -168,7 +168,7 @@ function cleanupRule(rule: SeedRule, viewer: Viewer): RawHtml {
   const { ratio, days } = SEED_RULE_LIMITS;
   return html`<h2>${viewer.t('Cleanup rule')}</h2>
 <p class="muted">${viewer.t(
-    'A finished torrent can be cleaned once it has given back {ratio} times its size and finished {days} days ago; members always confirm unless they chose automatic cleanup.',
+    'A finished torrent can be cleaned once it has given back {ratio} times its size and finished at least {days} days ago; members always confirm unless they chose automatic cleanup.',
     { ratio: formatRatio(rule.ratio, viewer), days: String(rule.days) },
   )}</p>
 <form class="card" method="post" action="/admin/users/seed-rule">
