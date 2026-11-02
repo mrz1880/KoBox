@@ -666,6 +666,29 @@ exports[`job contract > should_keep_the_wire_contract_stable 1`] = `
     ],
     "type": "object",
   },
+  "set-automatic-cleanup": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "scope": {
+        "enum": [
+          "off",
+          "sentOnly",
+          "sentOrSeeded",
+        ],
+        "type": "string",
+      },
+      "username": {
+        "pattern": "^[a-z][a-z0-9]{0,31}$",
+        "type": "string",
+      },
+    },
+    "required": [
+      "username",
+      "scope",
+    ],
+    "type": "object",
+  },
   "set-blocklist-enabled": {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "additionalProperties": false,

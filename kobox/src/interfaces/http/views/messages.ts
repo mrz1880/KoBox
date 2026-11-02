@@ -201,6 +201,15 @@ const FR: Readonly<Record<string, string>> = {
   '{when}: nothing was deleted.': '{when} : rien n’a été supprimé.',
   'KoBox cleaned up for you': 'KoBox a fait de la place pour vous',
   'See the details': 'Voir le détail',
+  'Automatic cleanup': 'Nettoyage automatique',
+  'Past 90 % of your space, KoBox can delete for you, down under 80 %, and mail you what went.':
+    'Au-delà de 90 % de votre espace, KoBox peut supprimer à votre place, jusqu’à repasser sous 80 %, et vous écrire ce qui est parti.',
+  'Off: KoBox only mails me': 'Désactivé : KoBox m’écrit seulement',
+  'What KoBox already sent to my machine': 'Ce que KoBox a déjà envoyé sur ma machine',
+  'What KoBox sent, or what seeded enough': 'Ce que KoBox a envoyé, ou ce qui a assez partagé',
+  'KoBox only knows what its own sync sent. With the last choice, files you fetched another way, or never fetched, can be deleted for good.':
+    'KoBox ne connaît que ce que sa propre synchro a envoyé. Avec le dernier choix, des fichiers récupérés autrement, ou jamais récupérés, peuvent être supprimés pour de bon.',
+  'Save automatic cleanup': 'Enregistrer le nettoyage automatique',
   Deleted: 'Supprimé',
   'Still there': 'Toujours là',
   'Kept: it no longer qualifies, it was restarted or is being sent to your machine.':

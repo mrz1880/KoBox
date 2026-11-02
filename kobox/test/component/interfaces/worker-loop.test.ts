@@ -1233,6 +1233,17 @@ describe('space jobs', () => {
     expect((await world.cleanupReports.find(alice))?.freed.toGib()).toBe(12);
   });
 
+  it('should_keep_what_a_member_lets_kobox_delete_on_its_own', async () => {
+    const id = await world.queue.enqueue(
+      buildJob.setAutomaticCleanup({ username: 'alice', scope: 'sentOnly' }),
+    );
+
+    await world.worker.processNext();
+
+    expect(world.queue.statusOf(id)).toBe('done');
+    expect((await world.spacePreferences.find(alice)).automatic).toBe('sentOnly');
+  });
+
   it('should_keep_that_the_hourly_pass_started_a_cleanup_on_its_own', async () => {
     const id = await world.queue.enqueue(
       parseJob('clean-up-space', {

@@ -23,6 +23,7 @@ export function accessFacts(overrides: Partial<AccessFacts> = {}): AccessFacts {
     addresses: [],
     hostnames: [],
     hasTwoStep: false,
+    automaticCleanup: 'off',
     ...overrides,
   };
 }

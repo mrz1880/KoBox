@@ -37,6 +37,7 @@ import { InMemorySshKeyRepository } from '../../../src/infrastructure/persistenc
 import { InMemoryDiskUsageRepository } from '../../../src/infrastructure/persistence/InMemoryDiskUsageRepository.js';
 import { InMemoryCleanupReportRepository } from '../../../src/infrastructure/persistence/InMemoryCleanupReportRepository.js';
 import { InMemoryCleanupSnapshotRepository } from '../../../src/infrastructure/persistence/InMemoryCleanupSnapshotRepository.js';
+import { InMemorySpacePreferenceRepository } from '../../../src/infrastructure/persistence/InMemorySpacePreferenceRepository.js';
 import { InMemoryVolumeSampleRepository } from '../../../src/infrastructure/persistence/InMemoryVolumeSampleRepository.js';
 import { InMemoryTorrentInstanceRepository } from '../../../src/infrastructure/persistence/InMemoryTorrentInstanceRepository.js';
 import { InMemoryDiagnosticsRepository } from '../../../src/infrastructure/persistence/InMemoryDiagnosticsRepository.js';
@@ -157,6 +158,7 @@ export interface PortalWorld {
   readonly volumeSamples: InMemoryVolumeSampleRepository;
   readonly cleanupSnapshots: InMemoryCleanupSnapshotRepository;
   readonly cleanupReports: InMemoryCleanupReportRepository;
+  readonly spacePreferences: InMemorySpacePreferenceRepository;
   readonly sshKeys: InMemorySshKeyRepository;
   readonly addresses: InMemoryUserAddressRepository;
   readonly blocklists: InMemoryBlocklistRepository;
@@ -193,6 +195,7 @@ export async function buildPortalWorld(
   const volumeSamples = new InMemoryVolumeSampleRepository();
   const cleanupSnapshots = new InMemoryCleanupSnapshotRepository();
   const cleanupReports = new InMemoryCleanupReportRepository();
+  const spacePreferences = new InMemorySpacePreferenceRepository();
   const sshKeys = new InMemorySshKeyRepository();
   const addresses = new InMemoryUserAddressRepository();
   const blocklists = new InMemoryBlocklistRepository();
@@ -259,6 +262,7 @@ export async function buildPortalWorld(
     volumeSamples,
     cleanupSnapshots,
     cleanupReports,
+    spacePreferences,
     mailRelay,
     boxInVpn: '10.0.0.1',
     sshPort: 22,
@@ -307,7 +311,7 @@ export async function buildPortalWorld(
     },
     NOW,
   );
-  return { server, users, credentials, sessions, queue, outbox, media, fairUse, diagnostics, instances, diskSamples, volumeSamples, cleanupSnapshots, cleanupReports, sshKeys, addresses, blocklists, totp, components, mailRelay, siteSettings, destinations, transfers, passwords };
+  return { server, users, credentials, sessions, queue, outbox, media, fairUse, diagnostics, instances, diskSamples, volumeSamples, cleanupSnapshots, cleanupReports, spacePreferences, sshKeys, addresses, blocklists, totp, components, mailRelay, siteSettings, destinations, transfers, passwords };
 }
 
 export interface AgentSession {

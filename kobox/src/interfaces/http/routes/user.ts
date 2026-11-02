@@ -17,7 +17,12 @@ import type {
   VolumeSampleRepository,
 } from '../../../domain/user/ports.js';
 import { SyncMode } from '../../../domain/torrent/SyncMode.js';
-import type { CleanupReportRepository, CleanupSnapshotRepository } from '../../../domain/space/ports.js';
+import type {
+  CleanupReportRepository,
+  CleanupSnapshotRepository,
+  SpacePreferenceRepository,
+} from '../../../domain/space/ports.js';
+import { AUTOMATIC_CLEANUPS } from '../../../domain/space/AutomaticCleanup.js';
 import type { CleanupReport } from '../../../domain/space/CleanupReport.js';
 import type { TorrentInstanceRepository } from '../../../domain/torrent/ports.js';
 import type { SyncDestinationRepository, SyncTransferRepository } from '../../../domain/sync/ports.js';
@@ -201,6 +206,8 @@ export interface UserRoutesDeps {
   readonly cleanupSnapshots: CleanupSnapshotRepository;
   // what the member's last cleanup deleted and kept
   readonly cleanupReports: CleanupReportRepository;
+  // what the member lets KoBox delete on its own
+  readonly spacePreferences: Pick<SpacePreferenceRepository, 'find'>;
 }
 
 // One channel of the console, assembled from what the portal can read in the
@@ -1078,6 +1085,28 @@ export function registerUserRoutes(
     return redirectWithFlash(reply, '/access', 'Saved.');
   });
 
+  const automaticCleanupSchema = z.object({ automatic: z.enum(AUTOMATIC_CLEANUPS) });
+
+  // The username comes from the session: a member only ever chooses for
+  // themselves. The worker writes it, the portal only reads it back.
+  server.post('/access/automatic-cleanup', async (request, reply) => {
+    const session = await guards.requireCsrf(request, reply);
+    if (session === undefined) {
+      return;
+    }
+    const parsed = automaticCleanupSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.code(400).send();
+    }
+    const job = await deps.queue.enqueue(
+      buildJob.setAutomaticCleanup({
+        username: session.username.value,
+        scope: parsed.data.automatic,
+      }),
+    );
+    return redirectOnceApplied(reply, deps.awaitJob, job, '/access', 'Saved.');
+  });
+
   server.get('/access', async (request, reply) => {
     const session = await guards.requireSession(request, reply);
     if (session === undefined) {
@@ -1102,6 +1131,7 @@ export function registerUserRoutes(
         ...(await addressFacts(session.username, request.ip)),
         hasTwoStep: session.hasTwoStep,
         ...(session.chosenLanguage !== undefined && { chosenLanguage: session.chosenLanguage }),
+        automaticCleanup: (await deps.spacePreferences.find(session.username)).automatic,
       }, flashOf(request)),
     );
   });
@@ -1133,6 +1163,7 @@ export function registerUserRoutes(
         ...(await addressFacts(session.username, request.ip)),
         hasTwoStep: session.hasTwoStep,
         ...(session.chosenLanguage !== undefined && { chosenLanguage: session.chosenLanguage }),
+        automaticCleanup: (await deps.spacePreferences.find(session.username)).automatic,
       }),
     );
   });

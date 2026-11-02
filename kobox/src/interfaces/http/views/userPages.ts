@@ -11,6 +11,7 @@ import type { MediaColumn, MediaOrder } from './mediaOrder.js';
 import { cleanupHint, memberSpace, type MeasuredSpace } from './space.js';
 import { automaticCleanupNotice } from './spaceCleanupPage.js';
 import type { CleanupReport } from '../../../domain/space/CleanupReport.js';
+import { AUTOMATIC_CLEANUPS, type AutomaticCleanup } from '../../../domain/space/AutomaticCleanup.js';
 import { html, type RawHtml } from '../html.js';
 import { flash, page, sentence, type Reader, type Viewer } from './layout.js';
 import type { Translate } from './messages.js';
@@ -323,6 +324,7 @@ export interface AccessFacts {
   readonly currentAddress?: string;
   // absent while the member lets their browser decide
   readonly chosenLanguage?: Language;
+  readonly automaticCleanup: AutomaticCleanup;
 }
 
 function twoStepSection(viewer: Viewer, facts: AccessFacts): RawHtml {
@@ -581,6 +583,31 @@ function languageSection(viewer: Viewer, facts: AccessFacts): RawHtml {
 </form>`;
 }
 
+// What KoBox may delete on its own past 90 %, in the order of how much it may
+// take: a record, so a new choice does not compile until it has its words.
+const AUTOMATIC_CLEANUP_CHOICES: Readonly<Record<AutomaticCleanup, string>> = {
+  off: 'Off: KoBox only mails me',
+  sentOnly: 'What KoBox already sent to my machine',
+  sentOrSeeded: 'What KoBox sent, or what seeded enough',
+};
+
+function automaticCleanupSection(viewer: Viewer, facts: AccessFacts): RawHtml {
+  const ticked = (value: AutomaticCleanup): RawHtml =>
+    value === facts.automaticCleanup ? html`checked` : html``;
+  return html`<h2 id="automatic-cleanup">${viewer.t('Automatic cleanup')}</h2>
+<p class="muted">${viewer.t('Past 90 % of your space, KoBox can delete for you, down under 80 %, and mail you what went.')}</p>
+<form class="card" method="post" action="/access/automatic-cleanup">
+  <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
+  ${AUTOMATIC_CLEANUPS.map(
+    (value) => html`<label class="check">
+    <input type="radio" name="automatic" value="${value}" ${ticked(value)}>
+    ${viewer.t(AUTOMATIC_CLEANUP_CHOICES[value])}</label>`,
+  )}
+  <p class="flash warn">${viewer.t('KoBox only knows what its own sync sent. With the last choice, files you fetched another way, or never fetched, can be deleted for good.')}</p>
+  <button type="submit">${viewer.t('Save automatic cleanup')}</button>
+</form>`;
+}
+
 export function accessPage(viewer: Viewer, facts: AccessFacts, message?: string): string {
   const choices = VPN_CHOICES.map(
     (choice) => html`<div class="choice${choice.usual === true ? ' pick' : ''}">
@@ -615,6 +642,8 @@ ${twoStepSection(viewer, facts)}
 ${addressesSection(viewer, facts)}
 
 ${sshKeySection(viewer, facts)}
+
+${automaticCleanupSection(viewer, facts)}
 
 ${languageSection(viewer, facts)}
 
