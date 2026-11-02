@@ -1,5 +1,5 @@
 import type { FinishedTorrent } from './FinishedTorrent.js';
-import type { SeedRule } from './SeedRule.js';
+import { wholeDaysSeeded, type SeedRule } from './SeedRule.js';
 import type { InfoHash } from '../torrent/InfoHash.js';
 import type { Quota } from '../user/Quota.js';
 
@@ -29,6 +29,11 @@ export class CleanupCandidate {
     this.finishedAt = torrent.finishedAt;
     this.path = torrent.path;
     this.reason = reason;
+  }
+
+  // How many whole days it had seeded at `now`, an ISO instant.
+  daysSeeded(now: string): number {
+    return wholeDaysSeeded(this.finishedAt, now);
   }
 
   // Brings back a candidate judged earlier, as stored with its reason.

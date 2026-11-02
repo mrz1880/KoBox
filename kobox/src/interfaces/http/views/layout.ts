@@ -82,6 +82,11 @@ th.act, td.act { text-align: right; width: 1%; white-space: nowrap; }
 tr:has(td.act) td { vertical-align: middle; }
 .mono { font-family: ui-monospace, monospace; }
 tr.current td { background: var(--panel); font-weight: 600; }
+/* a box to tick at the head of a row: its own size, not a field's */
+th.pick, td.pick { width: 1%; }
+td.pick input { width: auto; min-height: 0; margin: 0.2rem 0; }
+/* on a phone the cleanup list keeps what decides: the box, the name, the size, why */
+@media (max-width: 40rem) { table.cleanup .ratio, table.cleanup .finished { display: none; } }
 /* Diagnostics: a captured excerpt and the panel that frames it. The excerpt
    scrolls inside its own box: a 200-line journal must not stretch the page. */
 .panel {

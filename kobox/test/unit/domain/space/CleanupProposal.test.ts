@@ -86,4 +86,18 @@ describe('CleanupProposal', () => {
 
     expect(proposal.freed(selection).toGib()).toBe(6);
   });
+
+  // the page draws the boxes the member left checked, and the total follows
+  it('should_check_exactly_the_lines_the_member_picked', () => {
+    const proposal = CleanupProposal.of({
+      candidates: [candidate('a', 10), candidate('b', 4), candidate('c', 3), candidate('d', 2)],
+      used: Quota.gib(95),
+      allowance: Quota.gib(100),
+    });
+
+    const picked = proposal.pick([InfoHash.parse('b'.repeat(40)), InfoHash.parse('d'.repeat(40))]);
+
+    expect(picked.lines.map((line) => line.checked)).toEqual([false, true, false, true]);
+    expect(picked.freed().toGib()).toBe(6);
+  });
 });

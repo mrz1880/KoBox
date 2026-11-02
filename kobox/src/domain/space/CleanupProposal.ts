@@ -39,14 +39,21 @@ export class CleanupProposal {
     return new CleanupProposal(lines);
   }
 
+  // The same lines with the boxes the member left checked instead. A picked
+  // hash that is not a line of this proposal checks nothing.
+  pick(selection: readonly InfoHash[]): CleanupProposal {
+    return new CleanupProposal(
+      this.lines.map((line) => ({
+        candidate: line.candidate,
+        checked: selection.some((infoHash) => infoHash.equals(line.candidate.infoHash)),
+      })),
+    );
+  }
+
   // What deleting frees: the lines checked by the proposal, or the ones the
-  // member picked once they changed the boxes. A picked hash that is not a line
-  // of this proposal frees nothing.
+  // member picked once they changed the boxes.
   freed(selection?: readonly InfoHash[]): Quota {
-    const isPicked = (line: ProposalLine): boolean =>
-      selection === undefined
-        ? line.checked
-        : selection.some((infoHash) => infoHash.equals(line.candidate.infoHash));
-    return Quota.total(this.lines.filter(isPicked).map((line) => line.candidate.size));
+    const lines = selection === undefined ? this.lines : this.pick(selection).lines;
+    return Quota.total(lines.filter((line) => line.checked).map((line) => line.candidate.size));
   }
 }

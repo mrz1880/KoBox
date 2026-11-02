@@ -95,7 +95,7 @@ const labelField = z.string().regex(LABEL_PATTERN);
 const infoHashField = z.string().regex(INFO_HASH_PATTERN);
 // One cleanup job carries at most this many torrents: enough for a member who
 // picks a whole page, small enough to keep a queued row readable.
-const CLEANUP_MAX_TORRENTS = 500;
+export const CLEANUP_MAX_TORRENTS = 500;
 // Paths from rtorrent hooks: absolute, no traversal. The worker enforces the
 // stronger invariant (must live under the owning user's home) in
 // HandleTorrentEvent before any path is read or stored.

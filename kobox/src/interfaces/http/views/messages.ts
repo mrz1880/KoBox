@@ -172,6 +172,42 @@ const FR: Readonly<Record<string, string>> = {
   'That is not a hostname. Give the name on its own, with no https:// and no trailing slash.':
     'Ce n’est pas un nom d’hôte. Donnez le nom seul, sans https:// ni barre oblique finale.',
 
+  // freeing space: what can go, deleting it, and what the last cleanup did
+  'Free up space': 'Libérer de l’espace',
+  'The first list arrives within the hour.': 'La première liste arrive dans l’heure.',
+  'Nothing to clean yet: your torrents are still seeding.':
+    'Rien à nettoyer pour l’instant : vos torrents sont encore en partage.',
+  'List from {when}.': 'Liste du {when}.',
+  'What can be deleted': 'Ce qui peut être supprimé',
+  Delete: 'Supprimer',
+  'Delete {name}': 'Supprimer {name}',
+  Torrent: 'Torrent',
+  Ratio: 'Ratio',
+  Finished: 'Terminé',
+  Why: 'Pourquoi',
+  'Ratio {ratio} after {days} day': 'Ratio {ratio} après {days} jour',
+  'Ratio {ratio} after {days} days': 'Ratio {ratio} après {days} jours',
+  'Already sent to your machine': 'Déjà envoyé sur votre machine',
+  'The files will be erased from the seedbox for good. This cannot be undone.':
+    'Les fichiers seront effacés de la seedbox pour de bon. Impossible de revenir en arrière.',
+  Recalculate: 'Recalculer',
+  'Delete for good ({size})': 'Supprimer pour de bon ({size})',
+  'Last cleanup': 'Dernier nettoyage',
+  '{when}: {freed} freed.': '{when} : {freed} libérés.',
+  '{when}: nothing was deleted.': '{when} : rien n’a été supprimé.',
+  Deleted: 'Supprimé',
+  'Still there': 'Toujours là',
+  'Kept: it no longer qualifies, it was restarted or is being sent to your machine.':
+    'Conservé : il ne remplit plus les conditions, il a été relancé ou il est en cours d’envoi sur votre machine.',
+  'Already gone from your torrents.': 'Déjà absent de vos torrents.',
+  'Kept: rTorrent refused to let it go, so its files were left alone.':
+    'Conservé : rTorrent a refusé de le retirer, ses fichiers n’ont pas été touchés.',
+  'Removed from rTorrent, but its files could not be erased: they are still in your files.':
+    'Retiré de rTorrent, mais ses fichiers n’ont pas pu être effacés : ils sont toujours dans vos fichiers.',
+  'You did not choose anything to delete.': 'Vous n’avez rien choisi à supprimer.',
+  'Cleanup done. The list and your space are up to date.':
+    'Nettoyage terminé. La liste et votre espace sont à jour.',
+
   // member pages
   Torrents: 'Torrents',
   ruTorrent: 'ruTorrent',
