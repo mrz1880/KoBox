@@ -1,6 +1,7 @@
 import { sql } from 'drizzle-orm';
 import { index, integer, sqliteTable, text, unique } from 'drizzle-orm/sqlite-core';
 import { DEFAULT_TRANSFER_MAILS } from '../../domain/sync/TransferMails.js';
+import { AUTOMATIC_CLEANUPS } from '../../domain/space/AutomaticCleanup.js';
 
 export const users = sqliteTable('users', {
   id: integer('id').primaryKey({ autoIncrement: true }),
@@ -492,4 +493,13 @@ export const cleanupReports = sqliteTable('cleanup_reports', {
   trigger: text('trigger', { enum: ['member', 'automatic'] }).notNull(),
   reportJson: text('report_json').notNull(),
   at: text('at').notNull(),
+});
+
+// What each member chose for their space, and whether the hourly pass already
+// warned them during the climb they are in. No row reads as automatic cleanup
+// off and never warned. The root worker writes it; the portal only reads it.
+export const spacePreferences = sqliteTable('space_preferences', {
+  username: text('username').primaryKey(),
+  automatic: text('automatic', { enum: AUTOMATIC_CLEANUPS }).notNull().default('off'),
+  warned: integer('warned').notNull().default(0),
 });
