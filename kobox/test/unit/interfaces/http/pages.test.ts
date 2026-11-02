@@ -136,6 +136,12 @@ describe('portal pages', () => {
     expect(page).toContain('scp -P 2222 my.torrent alice@seedbox.example.org:rtorrent/watch/FOLDER/');
   });
 
+  it('should_name_where_a_members_finished_downloads_land', () => {
+    const page = accessPage(VIEWER, accessFacts());
+
+    expect(page).toContain('<dd>~/rtorrent/complete</dd>');
+  });
+
   // a tab per member must say which member, while the menu still shows where
   // in the console the page sits
   it('should_name_the_member_in_the_title_and_keep_members_highlighted', () => {
