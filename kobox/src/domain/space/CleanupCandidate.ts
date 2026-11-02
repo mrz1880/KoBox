@@ -39,18 +39,21 @@ export class CleanupCandidate {
   }
 
   // A torrent still downloading is never proposed, even if a partial copy was
-  // sent. Having been sent wins over having seeded: a copy on the member's
-  // machine is the stronger reassurance before deleting.
+  // sent. Neither is one KoBox sync is still sending or failed to send: its
+  // copy on the member's machine is missing or incomplete, whatever it seeded.
+  // Having been sent wins over having seeded: a copy on the member's machine
+  // is the stronger reassurance before deleting.
   static judge(
     torrent: FinishedTorrent,
     context: {
       readonly rule: SeedRule;
       readonly sentPaths: ReadonlySet<string>;
+      readonly unsettledPaths: ReadonlySet<string>;
       readonly now: string;
     },
   ): CleanupCandidate | undefined {
     const { finishedAt } = torrent;
-    if (finishedAt === undefined) {
+    if (finishedAt === undefined || context.unsettledPaths.has(torrent.path)) {
       return undefined;
     }
     const complete = { ...torrent, finishedAt };

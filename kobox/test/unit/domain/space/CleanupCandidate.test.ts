@@ -9,6 +9,9 @@ const now = '2026-11-20T12:00:00.000Z';
 const rule = SeedRule.of({ ratio: 2, days: 7 });
 const path = '/home/alice/rtorrent/complete/Example.Release';
 
+// nothing sent, nothing on its way
+const noTransfer = { sentPaths: new Set<string>(), unsettledPaths: new Set<string>() };
+
 const torrent = (overrides: Partial<FinishedTorrent> = {}): FinishedTorrent => ({
   infoHash: InfoHash.parse('A'.repeat(40)),
   name: 'Example.Release',
@@ -23,7 +26,7 @@ describe('CleanupCandidate', () => {
   it('should_propose_a_torrent_that_seeded_enough_as_seeded', () => {
     const candidate = CleanupCandidate.judge(
       torrent({ ratio: 2.4, finishedAt: '2026-11-08T12:00:00.000Z' }),
-      { rule, sentPaths: new Set(), now },
+      { rule, ...noTransfer, now },
     );
 
     expect(candidate?.reason).toBe('seeded');
@@ -31,11 +34,16 @@ describe('CleanupCandidate', () => {
   });
 
   it('should_keep_a_torrent_neither_seeded_enough_nor_sent', () => {
-    expect(CleanupCandidate.judge(torrent(), { rule, sentPaths: new Set(), now })).toBeUndefined();
+    expect(CleanupCandidate.judge(torrent(), { rule, ...noTransfer, now })).toBeUndefined();
   });
 
   it('should_propose_a_torrent_sync_already_sent_as_already_sent', () => {
-    const candidate = CleanupCandidate.judge(torrent(), { rule, sentPaths: new Set([path]), now });
+    const candidate = CleanupCandidate.judge(torrent(), {
+      rule,
+      ...noTransfer,
+      sentPaths: new Set([path]),
+      now,
+    });
 
     expect(candidate?.reason).toBe('alreadySent');
   });
@@ -44,7 +52,7 @@ describe('CleanupCandidate', () => {
   it('should_name_the_sending_when_a_torrent_was_also_seeded_enough', () => {
     const candidate = CleanupCandidate.judge(
       torrent({ ratio: 2.4, finishedAt: '2026-11-08T12:00:00.000Z' }),
-      { rule, sentPaths: new Set([path]), now },
+      { rule, ...noTransfer, sentPaths: new Set([path]), now },
     );
 
     expect(candidate?.reason).toBe('alreadySent');
@@ -53,9 +61,21 @@ describe('CleanupCandidate', () => {
   it('should_keep_a_torrent_still_downloading_even_once_sent', () => {
     const candidate = CleanupCandidate.judge(torrent({ ratio: 3, finishedAt: undefined }), {
       rule,
+      ...noTransfer,
       sentPaths: new Set([path]),
       now,
     });
+
+    expect(candidate).toBeUndefined();
+  });
+
+  // deleting it would cut a transfer short, or erase what never reached the
+  // member's machine
+  it('should_keep_a_seeded_torrent_still_being_sent_or_whose_sending_failed', () => {
+    const candidate = CleanupCandidate.judge(
+      torrent({ ratio: 2.4, finishedAt: '2026-11-08T12:00:00.000Z' }),
+      { rule, sentPaths: new Set([path]), unsettledPaths: new Set([path]), now },
+    );
 
     expect(candidate).toBeUndefined();
   });

@@ -8,7 +8,7 @@ import type { SyncTransferRepository } from '../../domain/sync/ports.js';
 import type { Username } from '../../domain/user/Username.js';
 
 export interface CleanupJudgeDeps {
-  readonly transfers: Pick<SyncTransferRepository, 'listSentSources'>;
+  readonly transfers: Pick<SyncTransferRepository, 'listSentSources' | 'listUnsettledSources'>;
   readonly seedRule: SeedRuleRepository;
 }
 
@@ -27,9 +27,14 @@ function inSourceForm(torrent: FinishedTorrent): FinishedTorrent {
   }
 }
 
-// Judges a member's torrents at one moment: the box's rule and what KoBox sync
-// already put on the member's machine are read once, then every torrent is
-// judged against them. The snapshot and the cleanup judge the same way.
+function pathsOf(sources: readonly LocalPath[]): ReadonlySet<string> {
+  return new Set(sources.map((source) => source.value));
+}
+
+// Judges a member's torrents at one moment: the box's rule, what KoBox sync
+// already put on the member's machine and what it has not yet are read once,
+// then every torrent is judged against them. The snapshot and the cleanup
+// judge the same way.
 export class CleanupJudge {
   private constructor(
     private readonly context: Parameters<typeof CleanupCandidate.judge>[1],
@@ -37,10 +42,14 @@ export class CleanupJudge {
 
   // `at` is the worker's stamp; the rule compares instants.
   static async of(deps: CleanupJudgeDeps, username: Username, at: string): Promise<CleanupJudge> {
-    const sources = await deps.transfers.listSentSources(username);
+    const [sent, unsettled] = await Promise.all([
+      deps.transfers.listSentSources(username),
+      deps.transfers.listUnsettledSources(username),
+    ]);
     return new CleanupJudge({
       rule: await deps.seedRule.get(),
-      sentPaths: new Set(sources.map((source) => source.value)),
+      sentPaths: pathsOf(sent),
+      unsettledPaths: pathsOf(unsettled),
       now: instantOf(at),
     });
   }

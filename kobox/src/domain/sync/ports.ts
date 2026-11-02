@@ -47,6 +47,10 @@ export interface SyncTransferRepository {
   // where each download KoBox sync already put on the member's machine came
   // from: the space context does not propose to delete what has no copy yet
   listSentSources(username: Username): Promise<readonly LocalPath[]>;
+  // where each download still waiting, being sent or that failed to send came
+  // from: its copy on the member's machine is missing or incomplete, so the
+  // space context never deletes it, whatever it seeded
+  listUnsettledSources(username: Username): Promise<readonly LocalPath[]>;
 }
 
 // What a finished download actually left on disk. A torrent that produced a
