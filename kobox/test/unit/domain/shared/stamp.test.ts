@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { instantOf, shiftStamp, stampOf } from '../../../../src/domain/shared/stamp.js';
+import { instantOf, millisecondsOf, shiftStamp, stampOf } from '../../../../src/domain/shared/stamp.js';
 
 describe('stamp', () => {
   it('should_write_a_date_as_utc_to_the_second', () => {
@@ -14,5 +14,10 @@ describe('stamp', () => {
   // a stamp carries no zone: it is UTC, whatever zone the box runs in
   it('should_give_the_utc_instant_a_stamp_stands_for', () => {
     expect(instantOf('2026-11-02 10:00:00')).toBe('2026-11-02T10:00:00.000Z');
+  });
+
+  it('should_read_a_stamp_as_utc_milliseconds_and_a_malformed_one_as_nan', () => {
+    expect(millisecondsOf('2026-11-02 10:00:00')).toBe(Date.UTC(2026, 10, 2, 10));
+    expect(millisecondsOf('not a date')).toBeNaN();
   });
 });

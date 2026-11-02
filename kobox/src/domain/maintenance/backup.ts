@@ -1,6 +1,7 @@
 // Backup naming and TTL rotation (Backup-Manager parity) as pure
 // decisions: infrastructure lists directories and deletes what this returns.
 
+import { millisecondsOf } from '../shared/stamp.js';
 import { DAY_MS } from '../shared/time.js';
 
 const STAMP_PATTERN = /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$/;
@@ -34,7 +35,7 @@ export function planBackupRotation(
   now: string,
   options: BackupRotationOptions,
 ): readonly string[] {
-  const nowMs = Date.parse(`${now.replace(' ', 'T')}Z`);
+  const nowMs = millisecondsOf(now);
   if (Number.isNaN(nowMs)) {
     // a malformed clock must fail loudly, not silently skip every rotation
     throw new RangeError(`invalid timestamp ${JSON.stringify(now)}`);
