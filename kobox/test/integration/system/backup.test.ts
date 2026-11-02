@@ -1,8 +1,10 @@
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { RunBackup } from '../../../src/application/maintenance/RunBackup.js';
+import { restartKitTrees } from '../../../src/domain/torrent/RestartKit.js';
+import { InMemoryUserRepository } from '../../../src/infrastructure/persistence/InMemoryUserRepository.js';
 import { KoboxDatabase } from '../../../src/infrastructure/persistence/db.js';
 import { BackupHostAdapter } from '../../../src/infrastructure/system/BackupHostAdapter.js';
 import { ExecFileRunner } from '../../../src/infrastructure/system/CommandRunner.js';
@@ -31,6 +33,7 @@ describe('BackupHostAdapter (real sqlite + tar)', () => {
     const backupRoot = join(dir, 'backups');
     const runBackup = new RunBackup({
       backupHost: adapter,
+      users: new InMemoryUserRepository(),
       settings: { root: backupRoot, ttlDays: 7, keepMin: 3, configDirs: [configDir] },
     });
 
@@ -102,5 +105,40 @@ describe('BackupHostAdapter (real sqlite + tar)', () => {
     await adapter.removeBackup(root, '20260725T053000Z');
     expect(existsSync(join(root, '20260725T053000Z'))).toBe(false);
     await expect(adapter.removeBackup(root, '../../etc')).rejects.toThrow(/refusing/);
+  });
+
+  it('should_archive_the_present_trees_relative_to_the_home_keeping_modes', async () => {
+    const home = join(dir, 'alice');
+    mkdirSync(join(home, 'rtorrent', '.session'), { recursive: true });
+    writeFileSync(join(home, 'rtorrent', '.session', 'abc.torrent.rtorrent'), 'resume');
+    mkdirSync(join(home, 'rtorrent', 'torrents', 'films'), { recursive: true });
+    writeFileSync(join(home, 'rtorrent', 'torrents', 'films', 'movie.torrent'), 'meta');
+    mkdirSync(join(home, 'rtorrent', 'complete'), { recursive: true });
+    writeFileSync(join(home, 'rtorrent', 'complete', 'movie.mkv'), 'data');
+    chmodSync(join(home, 'rtorrent', '.session'), 0o700);
+    // no scripts directory: a missing tree is left out, not an error
+    const dest = join(dir, 'alice.tar.gz');
+
+    await adapter.archiveTrees(home, restartKitTrees(), dest);
+
+    const listing = await new ExecFileRunner().run({
+      command: 'tar',
+      args: ['-tvzf', dest],
+      timeoutMs: 30_000,
+    });
+    expect(listing.stdout).toMatch(/^drwx------ .* rtorrent\/\.session\/?$/m);
+    expect(listing.stdout).toContain('rtorrent/.session/abc.torrent.rtorrent');
+    expect(listing.stdout).toContain('rtorrent/torrents/films/movie.torrent');
+    expect(listing.stdout).not.toContain('movie.mkv');
+  });
+
+  it('should_write_no_archive_when_none_of_the_trees_exists', async () => {
+    const home = join(dir, 'bob');
+    mkdirSync(home);
+    const dest = join(dir, 'bob.tar.gz');
+
+    await adapter.archiveTrees(home, restartKitTrees(), dest);
+
+    expect(existsSync(dest)).toBe(false);
   });
 });

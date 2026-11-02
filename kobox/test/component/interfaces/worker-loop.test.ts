@@ -202,6 +202,7 @@ interface World {
   seedRule: InMemorySeedRuleRepository;
   quota: FakeQuota;
   mailTransport: RecordingMailTransport;
+  backupHost: FakeBackupHost;
   // what the worker logged at warn level, context and message
   warnings: { context: unknown; message: string | undefined }[];
   worker: JobWorker;
@@ -219,7 +220,18 @@ class RecordingMailTransport {
   }
 }
 
-class NoopBackupHost implements BackupHostPort {
+class FakeBackupHost implements BackupHostPort {
+  private readonly unarchivableHomes = new Set<string>();
+
+  refusesToArchive(home: string): void {
+    this.unarchivableHomes.add(home);
+  }
+
+  archiveTrees(baseDir: string): Promise<void> {
+    return this.unarchivableHomes.has(baseDir)
+      ? Promise.reject(new Error('tar: write error'))
+      : Promise.resolve();
+  }
   ensureDir(): Promise<void> {
     return Promise.resolve();
   }
@@ -459,10 +471,12 @@ beforeEach(() => {
     clock: () => '2026-07-25 10:00:00',
   });
   const mailTransport = new RecordingMailTransport();
+  const backupHost = new FakeBackupHost();
   const maintenanceUseCases = buildMaintenanceUseCases({
     outbox,
     transport: mailTransport,
-    backupHost: new NoopBackupHost(),
+    backupHost,
+    users: repo,
     backupSettings: { root: '/var/backups/kobox', ttlDays: 7, keepMin: 3, configDirs: [] },
     speedtest: { measure: () => Promise.reject(new Error('no speedtest in this suite')) },
     speedtests: new InMemorySpeedtestRepository(),
@@ -508,6 +522,7 @@ beforeEach(() => {
     ipset,
     outbox,
     mailTransport,
+    backupHost,
     diagnostics: diagnosticsRepo,
     syncDestinations,
     syncTransfers,
@@ -1336,5 +1351,24 @@ describe('space jobs', () => {
         message: 'space cleanup: torrent not removed',
       },
     ]);
+  });
+});
+
+describe('the daily backup', () => {
+  it('should_warn_about_a_member_whose_restart_kit_was_not_archived', async () => {
+    await enqueueCreateAlice();
+    // creating alice chains her provisioning: let the queue settle first
+    while (await world.worker.processNext()) {
+      // each step ran the next job
+    }
+    world.backupHost.refusesToArchive('/home/alice');
+    await world.queue.enqueue(buildJob.runBackup());
+
+    await world.worker.processNext();
+
+    expect(world.warnings).toContainEqual({
+      context: { username: 'alice', reason: 'tar: write error' },
+      message: 'backup: restart kit not archived',
+    });
   });
 });

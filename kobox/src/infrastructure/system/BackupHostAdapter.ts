@@ -1,6 +1,6 @@
 import { existsSync } from 'node:fs';
 import { chmod, mkdir, readdir, rename, rm, copyFile } from 'node:fs/promises';
-import { basename, dirname } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 import type { BackupHostPort } from '../../application/maintenance/BackupHostPort.js';
 import type { KoboxDatabase } from '../persistence/db.js';
 import { runOrThrow, type CommandRunner } from './CommandRunner.js';
@@ -39,6 +39,21 @@ export class BackupHostAdapter implements BackupHostPort {
       timeoutMs: TAR_TIMEOUT_MS,
     });
     return true;
+  }
+
+  async archiveTrees(baseDir: string, trees: readonly string[], destTarGz: string): Promise<void> {
+    const present = trees.filter((tree) => existsSync(join(baseDir, tree)));
+    if (present.length === 0) {
+      return;
+    }
+    // members relative to baseDir, so the archive extracts into any home;
+    // tar records each entry's owner and mode, which `tar -xzpf` run as root
+    // puts back
+    await runOrThrow(this.runner, {
+      command: 'tar',
+      args: ['-czf', destTarGz, '-C', baseDir, '--', ...present],
+      timeoutMs: TAR_TIMEOUT_MS,
+    });
   }
 
   async listBackups(root: string): Promise<readonly string[]> {

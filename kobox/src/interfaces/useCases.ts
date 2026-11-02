@@ -279,6 +279,7 @@ export interface MaintenanceUseCaseDeps {
   readonly outbox: MailOutboxPort;
   readonly transport: MailTransportPort;
   readonly backupHost: BackupHostPort;
+  readonly users: UserRepository;
   readonly backupSettings: BackupSettings;
   readonly speedtest: SpeedtestPort;
   readonly systemd: SystemdPort;
@@ -316,7 +317,11 @@ export function buildMaintenanceUseCases(deps: MaintenanceUseCaseDeps): Maintena
         systemd: deps.systemd,
       }),
     }),
-    runBackup: new RunBackup({ backupHost: deps.backupHost, settings: deps.backupSettings }),
+    runBackup: new RunBackup({
+      backupHost: deps.backupHost,
+      users: deps.users,
+      settings: deps.backupSettings,
+    }),
     restartService: new RestartService({ systemd: deps.systemd }),
     captureServiceLog: new CaptureServiceLog({
       logs: deps.logs,

@@ -909,6 +909,7 @@ export function buildContainer(name: string): Container {
     outbox,
     transport: new SmtpLoopbackTransport(),
     backupHost: new BackupHostAdapter(runner, db),
+    users: repo,
     backupSettings: backupSettings(),
     speedtest: new LibrespeedAdapter(runner, process.env.KOBOX_SPEEDTEST_BIN),
     systemd: new SystemdAdapter(runner),
