@@ -1,5 +1,5 @@
 import type { CronSchedule, CronTime } from '../../../domain/maintenance/CronSchedule.js';
-import { stampOf } from '../../../domain/shared/stamp.js';
+import { millisecondsOf, stampOf } from '../../../domain/shared/stamp.js';
 import type { Reader } from './layout.js';
 
 const MS_PER_MINUTE = 60_000;
@@ -10,7 +10,7 @@ const MINUTES_PER_DAY = 24 * MINUTES_PER_HOUR;
 const LOOKAHEAD_MINUTES = 7 * MINUTES_PER_DAY;
 
 function dateOf(stamp: string): Date {
-  return new Date(`${stamp.replace(' ', 'T')}Z`);
+  return new Date(millisecondsOf(stamp));
 }
 
 // Stamps are written in UTC (see stampOf); a reader expects the box's own
