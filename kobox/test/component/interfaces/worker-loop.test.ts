@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { parseJob, type Job } from '../../../src/application/jobs/contract.js';
 import type { BackupHostPort } from '../../../src/application/maintenance/BackupHostPort.js';
 import type { MailDelivery } from '../../../src/application/maintenance/MailTransportPort.js';
@@ -15,6 +15,7 @@ import { RtorrentPort, ScgiPort } from '../../../src/domain/user/Port.js';
 import { Quota } from '../../../src/domain/user/Quota.js';
 import { InMemoryCleanupReportRepository } from '../../../src/infrastructure/persistence/InMemoryCleanupReportRepository.js';
 import { InMemoryCleanupSnapshotRepository } from '../../../src/infrastructure/persistence/InMemoryCleanupSnapshotRepository.js';
+import { InMemorySpacePreferenceRepository } from '../../../src/infrastructure/persistence/InMemorySpacePreferenceRepository.js';
 import { InMemorySeedRuleRepository } from '../../../src/infrastructure/persistence/InMemorySeedRuleRepository.js';
 import { FakeMemberTorrents } from '../../../src/infrastructure/system/fakes/FakeMemberTorrents.js';
 import { FakeTorrentData } from '../../../src/infrastructure/system/fakes/FakeTorrentData.js';
@@ -196,6 +197,8 @@ interface World {
   syncTransfers: InMemorySyncTransferRepository;
   memberTorrents: FakeMemberTorrents;
   cleanupReports: InMemoryCleanupReportRepository;
+  spacePreferences: InMemorySpacePreferenceRepository;
+  quota: FakeQuota;
   mailTransport: RecordingMailTransport;
   // what the worker logged at warn level, context and message
   warnings: { context: unknown; message: string | undefined }[];
@@ -267,6 +270,8 @@ beforeEach(() => {
   const diskSamples = new InMemoryDiskUsageRepository();
   const memberTorrents = new FakeMemberTorrents();
   const cleanupReports = new InMemoryCleanupReportRepository();
+  const queue = new InMemoryJobQueue();
+  const spacePreferences = new InMemorySpacePreferenceRepository();
   const spaceUseCases = buildSpaceUseCases({
     instances,
     torrents: memberTorrents,
@@ -277,6 +282,14 @@ beforeEach(() => {
     reports: cleanupReports,
     quota,
     samples: diskSamples,
+    preferences: spacePreferences,
+    queue,
+    mail: {
+      users: repo,
+      credentials,
+      address: { baseUrl: () => Promise.resolve('https://box.example.org') },
+      outbox,
+    },
     clock: () => '2026-07-25 10:00:00',
   });
   const useCases = buildUseCases({
@@ -288,6 +301,7 @@ beforeEach(() => {
     volumeSamples: new InMemoryVolumeSampleRepository(),
     quotaGauges: new FakeQuotaGauges(),
     cleanupSnapshot: spaceUseCases.takeCleanupSnapshot,
+    spaceWatch: spaceUseCases.watchMemberSpace,
     nextcloud,
     components,
     outbox,
@@ -420,7 +434,6 @@ beforeEach(() => {
       },
     },
   });
-  const queue = new InMemoryJobQueue();
   const diagnosticsRepo = new InMemoryDiagnosticsRepository();
   const syncDestinations = new InMemorySyncDestinationRepository();
   const syncUseCases = buildSyncUseCases({
@@ -494,6 +507,8 @@ beforeEach(() => {
     syncTransfers,
     memberTorrents,
     cleanupReports,
+    spacePreferences,
+    quota,
     warnings,
     worker: new JobWorker(
       queue,
@@ -1154,6 +1169,37 @@ describe('space jobs', () => {
         message: 'space cleanup: list not refreshed',
       },
     ]);
+  });
+
+  it('should_mail_a_member_the_hourly_pass_finds_past_the_critical_line', async () => {
+    await enqueueCreateAlice();
+    await world.worker.drain();
+    world.quota.setUsageForTest(alice, Quota.gib(400));
+    await world.queue.enqueue(parseJob('sample-disk-usage', {}));
+
+    await world.worker.processNext();
+
+    const mails = await world.outbox.listRecent(10);
+    expect(mails.map((mail) => [mail.recipient, mail.subject])).toContainEqual([
+      'alice@example.org',
+      'Ta seedbox est presque pleine',
+    ]);
+  });
+
+  // a member past the line may have missed their mail or their cleanup
+  it('should_log_a_member_whose_space_could_not_be_watched', async () => {
+    await enqueueCreateAlice();
+    await world.worker.drain();
+    vi.spyOn(world.spacePreferences, 'find').mockRejectedValue(new Error('database is locked'));
+    const id = await world.queue.enqueue(parseJob('sample-disk-usage', {}));
+
+    await world.worker.processNext();
+
+    expect(world.queue.statusOf(id)).toBe('done');
+    expect(world.warnings).toContainEqual({
+      context: { username: 'alice', error: 'database is locked' },
+      message: 'space watch: member not watched',
+    });
   });
 
   it('should_delete_the_torrents_a_member_picked_and_report_it', async () => {

@@ -20,6 +20,11 @@ const IS_A_FAILURE: Readonly<Record<SkipReason, boolean>> = {
   dataKept: true,
 };
 
+// Who started a cleanup: the member on their page, or the hourly pass on its
+// own for a member who turned automatic cleanup on.
+export const CLEANUP_TRIGGERS = ['member', 'automatic'] as const;
+export type CleanupTrigger = (typeof CLEANUP_TRIGGERS)[number];
+
 export interface DeletedLine {
   readonly name: string;
   readonly size: Quota;

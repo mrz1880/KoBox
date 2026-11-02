@@ -266,10 +266,24 @@ describe('job contract', () => {
   it('should_parse_a_cleanup_of_the_torrents_a_member_picked', () => {
     const infoHashes = ['A'.repeat(40), 'b'.repeat(40)];
 
+    // a job queued before automatic cleanup existed carries no trigger: the
+    // member asked for it
     expect(parseJob('clean-up-space', { username: 'alice', infoHashes }).payload).toEqual({
       username: 'alice',
       infoHashes,
+      trigger: 'member',
     });
+  });
+
+  it('should_parse_a_cleanup_the_hourly_pass_ran_for_the_member_and_refuse_another_trigger', () => {
+    const infoHashes = ['A'.repeat(40)];
+
+    expect(
+      parseJob('clean-up-space', { username: 'alice', infoHashes, trigger: 'automatic' }).payload,
+    ).toEqual({ username: 'alice', infoHashes, trigger: 'automatic' });
+    expect(() =>
+      parseJob('clean-up-space', { username: 'alice', infoHashes, trigger: 'admin' }),
+    ).toThrow();
   });
 
   it('should_refuse_a_cleanup_with_no_torrent_too_many_or_one_that_is_not_a_hash', () => {

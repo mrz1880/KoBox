@@ -148,6 +148,7 @@ interface World {
   instances: InMemoryTorrentInstanceRepository;
   memberTorrents: FakeMemberTorrents;
   cleanupSnapshots: InMemoryCleanupSnapshotRepository;
+  watched: { username: string; usedGib: number; at: string }[];
 }
 
 let world: World;
@@ -174,6 +175,7 @@ beforeEach(() => {
   const instances = new InMemoryTorrentInstanceRepository();
   const memberTorrents = new FakeMemberTorrents();
   const cleanupSnapshots = new InMemoryCleanupSnapshotRepository();
+  const watched: World['watched'] = [];
   const deps = {
     repo, accounts, quota, sftp, services, notifications, credentials, sessions,
     clock, hasher, logins: [samba, nextcloud], links,
@@ -201,7 +203,14 @@ beforeEach(() => {
         seedRule: new InMemorySeedRuleRepository(),
         snapshots: cleanupSnapshots,
       }),
+      spaceWatch: {
+        execute: (member, at) => {
+          watched.push({ username: member.user.username.value, usedGib: member.used.toGib(), at });
+          return Promise.resolve();
+        },
+      },
     }),
+    watched,
     instances,
     memberTorrents,
     cleanupSnapshots,
@@ -792,6 +801,7 @@ describe('SampleDiskUsage', () => {
             ? Promise.reject(new Error('database is locked'))
             : Promise.resolve({ kind: 'taken' }),
       },
+      spaceWatch: { execute: () => Promise.resolve() },
     });
 
     const pass = await sampling.execute();
@@ -800,5 +810,47 @@ describe('SampleDiskUsage', () => {
     expect(pass.staleSnapshots).toEqual([
       { username: alice, cause: 'failed', error: 'database is locked' },
     ]);
+  });
+
+  // past the critical line a member is mailed or cleaned for: that needs both
+  // their fresh usage and their fresh list
+  it('should_watch_each_members_space_with_the_usage_just_sampled', async () => {
+    await world.createUser.execute(createUserCommand());
+    world.quota.setUsageForTest(alice, Quota.gib(37));
+
+    await world.sampleDiskUsage.execute();
+
+    expect(world.watched).toEqual([{ username: 'alice', usedGib: 37, at: '2026-07-25 10:00:00' }]);
+  });
+
+  it('should_still_watch_the_next_member_and_report_the_one_whose_watch_failed', async () => {
+    const bob = Username.parse('bob');
+    await world.createUser.execute(createUserCommand());
+    await world.createUser.execute({
+      ...createUserCommand(),
+      username: bob,
+      email: EmailAddress.parse('bob@example.org'),
+    });
+    const watchedBob: string[] = [];
+    const sampling = new SampleDiskUsage({
+      ...world,
+      samples: world.diskSamples,
+      clock: () => '2026-07-25 10:00:00',
+      cleanupSnapshot: { execute: () => Promise.resolve({ kind: 'taken' }) },
+      spaceWatch: {
+        execute: (member) => {
+          if (member.user.username.equals(alice)) {
+            return Promise.reject(new Error('database is locked'));
+          }
+          watchedBob.push(member.user.username.value);
+          return Promise.resolve();
+        },
+      },
+    });
+
+    const pass = await sampling.execute();
+
+    expect(watchedBob).toEqual(['bob']);
+    expect(pass.unwatched).toEqual([{ username: alice, error: 'database is locked' }]);
   });
 });

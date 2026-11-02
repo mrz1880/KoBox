@@ -214,7 +214,10 @@ describe('deleting from the cleanup page', () => {
       `/space/cleanup?flash=${encodeURIComponent('Cleanup done. The list and your space are up to date.')}`,
     );
     expect(world.queue.jobs).toEqual([
-      { type: 'clean-up-space', payload: { username: 'alice', infoHashes: [SEEDED, SENT] } },
+      {
+        type: 'clean-up-space',
+        payload: { username: 'alice', infoHashes: [SEEDED, SENT], trigger: 'member' },
+      },
     ]);
   });
 

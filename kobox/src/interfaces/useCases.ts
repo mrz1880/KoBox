@@ -83,11 +83,15 @@ import { RemoveSshKey, SetSshKey } from '../application/user/SetSshKey.js';
 import { SampleDiskUsage } from '../application/user/SampleDiskUsage.js';
 import { CleanUpSpace } from '../application/space/CleanUpSpace.js';
 import { TakeCleanupSnapshot } from '../application/space/TakeCleanupSnapshot.js';
+import type { SpaceMailerDeps } from '../application/space/SpaceMailer.js';
+import { WatchMemberSpace } from '../application/space/WatchMemberSpace.js';
+import type { JobQueuePort } from '../application/jobs/JobQueuePort.js';
 import type {
   CleanupReportRepository,
   CleanupSnapshotRepository,
   MemberTorrentsPort,
   SeedRuleRepository,
+  SpacePreferenceRepository,
   TorrentDataPort,
 } from '../domain/space/ports.js';
 import { SetUserQuota } from '../application/user/SetUserQuota.js';
@@ -174,6 +178,8 @@ export interface UseCaseDeps {
   readonly quotaGauges: QuotaGaugePort;
   // what each member can clean, read in the same hourly pass as their usage
   readonly cleanupSnapshot: Pick<TakeCleanupSnapshot, 'execute'>;
+  // and, past the critical line, mails the member or cleans up for them
+  readonly spaceWatch: Pick<WatchMemberSpace, 'execute'>;
   readonly nextcloud: NextcloudPort;
   readonly components: ComponentRegistry;
   readonly outbox: MailOutboxPort;
@@ -234,6 +240,10 @@ export interface SpaceUseCaseDeps {
   readonly reports: CleanupReportRepository;
   readonly quota: QuotaPort;
   readonly samples: DiskUsageRepository;
+  readonly preferences: SpacePreferenceRepository;
+  // where the hourly pass queues an automatic cleanup
+  readonly queue: Pick<JobQueuePort, 'enqueue'>;
+  readonly mail: SpaceMailerDeps;
   readonly clock: () => string;
 }
 
@@ -242,6 +252,7 @@ export interface SpaceUseCaseDeps {
 export interface SpaceUseCases {
   readonly takeCleanupSnapshot: TakeCleanupSnapshot;
   readonly cleanUpSpace: CleanUpSpace;
+  readonly watchMemberSpace: WatchMemberSpace;
 }
 
 export function buildSpaceUseCases(deps: SpaceUseCaseDeps): SpaceUseCases {
@@ -249,6 +260,7 @@ export function buildSpaceUseCases(deps: SpaceUseCaseDeps): SpaceUseCases {
   return {
     takeCleanupSnapshot,
     cleanUpSpace: new CleanUpSpace({ ...deps, snapshot: takeCleanupSnapshot }),
+    watchMemberSpace: new WatchMemberSpace(deps),
   };
 }
 
