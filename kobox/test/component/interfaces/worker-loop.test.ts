@@ -1130,6 +1130,32 @@ describe('diagnostics jobs', () => {
 });
 
 describe('space jobs', () => {
+  // the member only sees an older list; whoever looks after the box reads why
+  it('should_log_a_member_whose_cleanup_list_could_not_be_refreshed', async () => {
+    await enqueueCreateAlice();
+    await world.worker.drain();
+    const instance = await world.instances.findByUsername(alice);
+    if (instance === undefined) {
+      throw new Error('alice was not given an rTorrent');
+    }
+    world.memberTorrents.goesDown(instance.scgiPort);
+    const id = await world.queue.enqueue(parseJob('sample-disk-usage', {}));
+
+    await world.worker.processNext();
+
+    expect(world.queue.statusOf(id)).toBe('done');
+    expect(world.warnings).toEqual([
+      {
+        context: {
+          username: 'alice',
+          cause: 'rtorrentSilent',
+          error: `rtorrent SCGI on ${String(instance.scgiPort.value)} does not answer`,
+        },
+        message: 'space cleanup: list not refreshed',
+      },
+    ]);
+  });
+
   it('should_delete_the_torrents_a_member_picked_and_report_it', async () => {
     const scgiPort = ScgiPort.parse(51101);
     await world.instances.save(

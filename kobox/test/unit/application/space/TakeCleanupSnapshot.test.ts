@@ -89,7 +89,7 @@ describe('TakeCleanupSnapshot', () => {
   it('should_keep_what_the_member_can_clean_with_when_it_was_judged', async () => {
     world.torrents.holds(aliceScgi, [seededFilm()]);
 
-    await world.take.execute(alice, AT);
+    await expect(world.take.execute(alice, AT)).resolves.toEqual({ kind: 'taken' });
 
     const snapshot = await world.snapshots.find(alice);
     expect(snapshot?.takenAt).toBe(AT);
@@ -128,7 +128,10 @@ describe('TakeCleanupSnapshot', () => {
     await world.take.execute(alice, '2026-11-20 11:00:00');
     world.torrents.goesDown(aliceScgi);
 
-    await expect(world.take.execute(alice, AT)).resolves.toBeUndefined();
+    await expect(world.take.execute(alice, AT)).resolves.toEqual({
+      kind: 'rtorrentSilent',
+      error: 'rtorrent SCGI on 51101 does not answer',
+    });
 
     const snapshot = await world.snapshots.find(alice);
     expect(snapshot?.takenAt).toBe('2026-11-20 11:00:00');
@@ -139,7 +142,7 @@ describe('TakeCleanupSnapshot', () => {
     await world.snapshots.replace(alice, [], '2026-11-20 11:00:00');
     await world.instances.delete(alice);
 
-    await expect(world.take.execute(alice, AT)).resolves.toBeUndefined();
+    await expect(world.take.execute(alice, AT)).resolves.toEqual({ kind: 'noRtorrent' });
 
     expect((await world.snapshots.find(alice))?.takenAt).toBe('2026-11-20 11:00:00');
   });

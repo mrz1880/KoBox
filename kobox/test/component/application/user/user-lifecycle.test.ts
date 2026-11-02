@@ -750,7 +750,30 @@ describe('SampleDiskUsage', () => {
     expect(snapshot?.candidates.map((candidate) => candidate.name)).toEqual(['Example Film']);
   });
 
-  it('should_still_sample_the_next_member_when_a_cleanup_snapshot_fails', async () => {
+  // the member only sees an older date: the operator is the one told why
+  it('should_report_a_member_whose_rtorrent_did_not_answer_for_the_cleanup_list', async () => {
+    const user = await world.createUser.execute(createUserCommand());
+    await world.instances.save(
+      TorrentInstance.provision({
+        username: alice,
+        scgiPort: user.scgiPort,
+        rtorrentPort: RtorrentPort.parse(45000),
+      }).instance,
+    );
+    world.memberTorrents.goesDown(user.scgiPort);
+
+    const pass = await world.sampleDiskUsage.execute();
+
+    expect(pass.staleSnapshots).toEqual([
+      {
+        username: alice,
+        cause: 'rtorrentSilent',
+        error: `rtorrent SCGI on ${String(user.scgiPort.value)} does not answer`,
+      },
+    ]);
+  });
+
+  it('should_still_sample_the_next_member_and_report_the_one_whose_cleanup_snapshot_failed', async () => {
     const bob = Username.parse('bob');
     await world.createUser.execute(createUserCommand());
     await world.createUser.execute({
@@ -767,12 +790,15 @@ describe('SampleDiskUsage', () => {
         execute: (username) =>
           username.equals(alice)
             ? Promise.reject(new Error('database is locked'))
-            : Promise.resolve(),
+            : Promise.resolve({ kind: 'taken' }),
       },
     });
 
-    await sampling.execute();
+    const pass = await sampling.execute();
 
     expect((await world.diskSamples.find(bob))?.used.toGib()).toBe(5);
+    expect(pass.staleSnapshots).toEqual([
+      { username: alice, cause: 'failed', error: 'database is locked' },
+    ]);
   });
 });
