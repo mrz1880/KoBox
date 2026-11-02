@@ -442,6 +442,7 @@ describe('ScgiRtorrentControlAdapter', () => {
           i8(2450),
           i8(1_761_955_200),
           str('/home/alice/rtorrent/complete/films/Some &amp; Film'),
+          i8(1_761_000_000),
         ],
         [
           str(secondHash),
@@ -450,6 +451,7 @@ describe('ScgiRtorrentControlAdapter', () => {
           '<value><int>500</int></value>',
           i8(1_761_868_800),
           str('/home/alice/rtorrent/complete/Album'),
+          i8(1_761_000_000),
         ],
       ]);
       const adapter = new ScgiRtorrentControlAdapter();
@@ -475,8 +477,8 @@ describe('ScgiRtorrentControlAdapter', () => {
     it('should_skip_a_row_it_cannot_read_and_keep_the_others', async () => {
       // one odd torrent must not blind the whole snapshot
       reply = rowsReply([
-        [str('not-a-hash'), str('Odd'), i8(10), i8(0), i8(0), str('/home/alice/odd')],
-        [str(secondHash), str('Album'), i8(2048), i8(500), i8(1_761_868_800), str('/a')],
+        [str('not-a-hash'), str('Odd'), i8(10), i8(0), i8(0), str('/home/alice/odd'), i8(1_761_000_000)],
+        [str(secondHash), str('Album'), i8(2048), i8(500), i8(1_761_868_800), str('/a'), i8(1_761_000_000)],
       ]);
       const warnings: unknown[] = [];
       const adapter = new ScgiRtorrentControlAdapter({
@@ -492,9 +494,9 @@ describe('ScgiRtorrentControlAdapter', () => {
     it('should_skip_a_row_missing_a_field_or_with_a_field_of_the_wrong_type', async () => {
       reply = rowsReply([
         [str(firstHash), str('No path'), i8(10), i8(0), i8(0)],
-        [str(firstHash), str('Size as text'), str('10'), i8(0), i8(0), str('/a')],
-        [str(firstHash), str('Negative'), i8(-1), i8(0), i8(0), str('/a')],
-        [str(secondHash), str('Album'), i8(2048), i8(500), i8(1_761_868_800), str('/a')],
+        [str(firstHash), str('Size as text'), str('10'), i8(0), i8(0), str('/a'), i8(1_761_000_000)],
+        [str(firstHash), str('Negative'), i8(-1), i8(0), i8(0), str('/a'), i8(1_761_000_000)],
+        [str(secondHash), str('Album'), i8(2048), i8(500), i8(1_761_868_800), str('/a'), i8(1_761_000_000)],
       ]);
       const adapter = new ScgiRtorrentControlAdapter();
 
@@ -503,14 +505,18 @@ describe('ScgiRtorrentControlAdapter', () => {
       expect(torrents.map((torrent) => torrent.name)).toEqual(['Album']);
     });
 
-    it('should_leave_the_finish_date_unknown_when_rtorrent_never_saw_it_finish', async () => {
-      // a download added with its data already complete reports 0
-      reply = rowsReply([[str(firstHash), str('Seeded'), i8(10), i8(0), i8(0), str('/a')]]);
+    it('should_date_a_torrent_added_already_complete_from_when_it_was_loaded', async () => {
+      // a download added with its data already there (recycled, hash-checked)
+      // never finishes in rtorrent's eyes and reports 0: it has been seeding
+      // since it was loaded
+      reply = rowsReply([
+        [str(firstHash), str('Seeded'), i8(10), i8(0), i8(0), str('/a'), i8(1_761_868_800)],
+      ]);
       const adapter = new ScgiRtorrentControlAdapter();
 
       const [torrent] = await adapter.listFinished(ScgiPort.parse(port));
 
-      expect(torrent?.finishedAt).toBeUndefined();
+      expect(torrent?.finishedAt).toBe('2025-10-31T00:00:00.000Z');
     });
 
     it('should_reject_when_rtorrent_answers_a_fault', async () => {
@@ -531,6 +537,7 @@ describe('ScgiRtorrentControlAdapter', () => {
           i8(0),
           i8(0),
           '<value><string/></value>',
+          i8(1_761_000_000),
         ],
       ]);
       const adapter = new ScgiRtorrentControlAdapter();
