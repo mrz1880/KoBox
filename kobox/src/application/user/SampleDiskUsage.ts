@@ -46,6 +46,13 @@ function staleness(attempt: SnapshotAttempt): Omit<StaleCleanupSnapshot, 'userna
   }
 }
 
+// A member whose quota could not be read: they keep their previous sample, so
+// the operator is told why their usage stopped moving.
+export interface UnmeasuredMember {
+  readonly username: Username;
+  readonly error: string;
+}
+
 // A member whose space was measured but not watched: they may have missed the
 // critical-line mail or their automatic cleanup, so the operator is told.
 export interface UnwatchedMember {
@@ -57,8 +64,11 @@ function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-// What a pass could not do although it went on.
+// What a pass could not do although it went on. No volume error means the
+// volume was measured.
 export interface DiskUsagePass {
+  readonly volumeError: string | undefined;
+  readonly unmeasured: readonly UnmeasuredMember[];
   readonly staleSnapshots: readonly StaleCleanupSnapshot[];
   readonly unwatched: readonly UnwatchedMember[];
 }
@@ -68,21 +78,30 @@ export interface DiskUsagePass {
 // One member's unreadable quota must not cost the others their reading, so a
 // failure is skipped rather than propagated. The volume all of them share is
 // read once per pass, and an unreadable volume is skipped the same way. Each
-// sampled member also gets their cleanup snapshot, for the same reason, and
-// the pass returns whose list could not be refreshed for the caller to log.
+// sampled member also gets their cleanup snapshot, for the same reason. The
+// pass returns what it skipped and whose list could not be refreshed, for the
+// caller to log.
 export class SampleDiskUsage {
   constructor(private readonly deps: Deps) {}
 
   async execute(): Promise<DiskUsagePass> {
     const at = this.deps.clock();
+    const unmeasured: UnmeasuredMember[] = [];
     const staleSnapshots: StaleCleanupSnapshot[] = [];
     const unwatched: UnwatchedMember[] = [];
-    const space = await this.deps.volume.measure().catch(() => undefined);
+    let volumeError: string | undefined;
+    const space = await this.deps.volume.measure().catch((error: unknown) => {
+      volumeError = messageOf(error);
+      return undefined;
+    });
     if (space !== undefined) {
       await this.deps.volumeSamples.save({ space, measuredAt: at });
     }
     for (const user of await this.deps.repo.listAll()) {
-      const used = await this.deps.quota.getUsage(user.username).catch(() => undefined);
+      const used = await this.deps.quota.getUsage(user.username).catch((error: unknown) => {
+        unmeasured.push({ username: user.username, error: messageOf(error) });
+        return undefined;
+      });
       if (used === undefined) {
         continue;
       }
@@ -103,6 +122,6 @@ export class SampleDiskUsage {
         unwatched.push({ username: user.username, error: messageOf(error) });
       });
     }
-    return { staleSnapshots, unwatched };
+    return { volumeError, unmeasured, staleSnapshots, unwatched };
   }
 }
