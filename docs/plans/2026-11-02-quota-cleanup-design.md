@@ -131,3 +131,22 @@ the data goes through its own port.
   migration.
 - **Portal.** The page, the box at 80 %, the golden render.
 - **E2E.** One path, from a seeded torrent to the space given back.
+
+## Addendum, 2026-11-02: a member's own seed rule
+
+Members seed on different trackers, and their accounts carry the risk. One
+member deletes after two weeks whatever the ratio.
+
+- The admin's rule becomes the box default. Nothing changes for a member who
+  keeps it.
+- In My account a member keeps the box rule or sets their own: a minimum number
+  of days since the download finished (required, at least one), and a minimum
+  ratio that may be left empty, in which case only the days count.
+- The member's rule applies everywhere for them: their list, their manual
+  cleanup, their automatic cleanup, and the live recheck before deleting.
+- The page words the reason after the rule that applied ("finished 16 days
+  ago, your rule: 14 days" when only the days count).
+- The admin's members list shows who set their own rule.
+- No floor set by the admin: a low ratio can cost a member a private tracker
+  account, but it is their account, and they can already delete by hand.
+- "Already sent" is unchanged.
