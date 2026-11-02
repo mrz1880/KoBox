@@ -78,6 +78,10 @@ export const buildJob = {
   setAutomaticCleanup(input: { username: string; scope: string }): Job {
     return parseJob('set-automatic-cleanup', input);
   },
+  // what a torrent must give back before it may go, for the whole box
+  setSeedRule(input: { ratio: number; days: number }): Job {
+    return parseJob('set-seed-rule', input);
+  },
   checkSyncDestination(input: { username: string }): Job {
     return parseJob('check-sync-destination', input);
   },

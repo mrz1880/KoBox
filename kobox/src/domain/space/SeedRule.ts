@@ -11,6 +11,14 @@ export class InvalidSeedRuleError extends DomainError {
 const DEFAULT_RATIO = 2;
 const DEFAULT_DAYS = 7;
 
+// What an admin may ask: below a tenth of the size given back a torrent would
+// go almost at once, past a year it would never go. The job contract and the
+// admin form read these bounds from here.
+export const SEED_RULE_LIMITS = {
+  ratio: { min: 0.1, max: 100 },
+  days: { min: 1, max: 365 },
+} as const;
+
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 // The whole days a torrent seeded from when it finished until `now`, both ISO
@@ -30,12 +38,18 @@ export class SeedRule {
   ) {}
 
   static of(raw: { readonly ratio: number; readonly days: number }): SeedRule {
-    if (!Number.isFinite(raw.ratio) || raw.ratio <= 0) {
-      throw new InvalidSeedRuleError(`ratio ${String(raw.ratio)} must be above 0`);
+    const { ratio, days } = SEED_RULE_LIMITS;
+    // NaN fails both comparisons, so it is refused explicitly
+    if (Number.isNaN(raw.ratio) || raw.ratio < ratio.min || raw.ratio > ratio.max) {
+      throw new InvalidSeedRuleError(
+        `ratio ${String(raw.ratio)} must be from ${String(ratio.min)} to ${String(ratio.max)}`,
+      );
     }
     // whole days: the admin form asks for days, and a fraction would hide hours in it
-    if (!Number.isInteger(raw.days) || raw.days < 1) {
-      throw new InvalidSeedRuleError(`${String(raw.days)} days must be at least one whole day`);
+    if (!Number.isInteger(raw.days) || raw.days < days.min || raw.days > days.max) {
+      throw new InvalidSeedRuleError(
+        `${String(raw.days)} days must be whole, from ${String(days.min)} to ${String(days.max)}`,
+      );
     }
     return new SeedRule(raw.ratio, raw.days);
   }

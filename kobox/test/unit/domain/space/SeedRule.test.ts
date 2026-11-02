@@ -13,6 +13,22 @@ describe('SeedRule', () => {
     expect(() => SeedRule.of({ ratio: 2, days })).toThrow(InvalidSeedRuleError);
   });
 
+  // what an admin may set: below a tenth nothing seeds, past a year nothing goes
+  it.each([
+    { ratio: 0.09, days: 7 },
+    { ratio: 100.5, days: 7 },
+    { ratio: 2, days: 366 },
+  ])('should_refuse_a_rule_out_of_what_an_admin_may_set_%o', (raw) => {
+    expect(() => SeedRule.of(raw)).toThrow(InvalidSeedRuleError);
+  });
+
+  it.each([
+    { ratio: 0.1, days: 1 },
+    { ratio: 100, days: 365 },
+  ])('should_accept_the_limits_an_admin_may_set_%o', (raw) => {
+    expect(SeedRule.of(raw)).toMatchObject(raw);
+  });
+
   it('should_ask_a_ratio_of_two_over_a_week_by_default', () => {
     expect(SeedRule.DEFAULT.ratio).toBe(2);
     expect(SeedRule.DEFAULT.days).toBe(7);

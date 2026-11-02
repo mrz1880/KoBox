@@ -823,6 +823,27 @@ exports[`job contract > should_keep_the_wire_contract_stable 1`] = `
     ],
     "type": "object",
   },
+  "set-seed-rule": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "days": {
+        "maximum": 365,
+        "minimum": 1,
+        "type": "integer",
+      },
+      "ratio": {
+        "maximum": 100,
+        "minimum": 0.1,
+        "type": "number",
+      },
+    },
+    "required": [
+      "ratio",
+      "days",
+    ],
+    "type": "object",
+  },
   "set-ssh-key": {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "additionalProperties": false,

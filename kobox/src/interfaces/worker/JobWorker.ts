@@ -9,6 +9,7 @@ import { TrackerHost } from '../../domain/tracker/TrackerHost.js';
 import { EventHook } from '../../domain/torrent/EventHook.js';
 import { InfoHash } from '../../domain/torrent/InfoHash.js';
 import { parseAutomaticCleanup } from '../../domain/space/AutomaticCleanup.js';
+import { SeedRule } from '../../domain/space/SeedRule.js';
 import { Label } from '../../domain/torrent/Label.js';
 import { SyncMode } from '../../domain/torrent/SyncMode.js';
 import { EmailAddress } from '../../domain/user/EmailAddress.js';
@@ -543,6 +544,9 @@ export class JobWorker {
           username: Username.parse(job.payload.username),
           automatic: parseAutomaticCleanup(job.payload.scope),
         });
+        return;
+      case 'set-seed-rule':
+        await this.space.setSeedRule.execute(SeedRule.of(job.payload));
         return;
       case 'add-user-address':
       case 'remove-user-address': {

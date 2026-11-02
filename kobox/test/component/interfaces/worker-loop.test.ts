@@ -16,6 +16,7 @@ import { Quota } from '../../../src/domain/user/Quota.js';
 import { InMemoryCleanupReportRepository } from '../../../src/infrastructure/persistence/InMemoryCleanupReportRepository.js';
 import { InMemoryCleanupSnapshotRepository } from '../../../src/infrastructure/persistence/InMemoryCleanupSnapshotRepository.js';
 import { InMemorySpacePreferenceRepository } from '../../../src/infrastructure/persistence/InMemorySpacePreferenceRepository.js';
+import { SeedRule } from '../../../src/domain/space/SeedRule.js';
 import { InMemorySeedRuleRepository } from '../../../src/infrastructure/persistence/InMemorySeedRuleRepository.js';
 import { FakeMemberTorrents } from '../../../src/infrastructure/system/fakes/FakeMemberTorrents.js';
 import { FakeTorrentData } from '../../../src/infrastructure/system/fakes/FakeTorrentData.js';
@@ -198,6 +199,7 @@ interface World {
   memberTorrents: FakeMemberTorrents;
   cleanupReports: InMemoryCleanupReportRepository;
   spacePreferences: InMemorySpacePreferenceRepository;
+  seedRule: InMemorySeedRuleRepository;
   quota: FakeQuota;
   mailTransport: RecordingMailTransport;
   // what the worker logged at warn level, context and message
@@ -272,12 +274,13 @@ beforeEach(() => {
   const cleanupReports = new InMemoryCleanupReportRepository();
   const queue = new InMemoryJobQueue();
   const spacePreferences = new InMemorySpacePreferenceRepository();
+  const seedRule = new InMemorySeedRuleRepository();
   const spaceUseCases = buildSpaceUseCases({
     instances,
     torrents: memberTorrents,
     data: new FakeTorrentData(),
     transfers: syncTransfers,
-    seedRule: new InMemorySeedRuleRepository(),
+    seedRule,
     snapshots: new InMemoryCleanupSnapshotRepository(),
     reports: cleanupReports,
     quota,
@@ -508,6 +511,7 @@ beforeEach(() => {
     memberTorrents,
     cleanupReports,
     spacePreferences,
+    seedRule,
     quota,
     warnings,
     worker: new JobWorker(
@@ -1242,6 +1246,15 @@ describe('space jobs', () => {
 
     expect(world.queue.statusOf(id)).toBe('done');
     expect((await world.spacePreferences.find(alice)).automatic).toBe('sentOnly');
+  });
+
+  it('should_keep_the_seed_rule_an_admin_set_for_the_whole_box', async () => {
+    const id = await world.queue.enqueue(buildJob.setSeedRule({ ratio: 1.5, days: 14 }));
+
+    await world.worker.processNext();
+
+    expect(world.queue.statusOf(id)).toBe('done');
+    expect(await world.seedRule.get()).toEqual(SeedRule.of({ ratio: 1.5, days: 14 }));
   });
 
   it('should_keep_that_the_hourly_pass_started_a_cleanup_on_its_own', async () => {
