@@ -216,7 +216,7 @@ function keysSentToTheCatalogue(): ReadonlySet<string> {
     signalRow({ level: 'throttled' }),
     signalRow({ level: 'alerted' }),
   ]) {
-    userHomePage(user, member, row, undefined, undefined, NOW);
+    userHomePage(user, member, row, undefined, undefined, undefined, NOW);
   }
   // under the filling line, then past it with something and with nothing to clean
   for (const [usedGib, cleanableGib] of [[100, 10], [400, 80], [400, 0]] as const) {
@@ -230,6 +230,7 @@ function keysSentToTheCatalogue(): ReadonlySet<string> {
         { space: volume(1000), measuredAt: NOW },
       ),
       Quota.gib(cleanableGib),
+      undefined,
       NOW,
     );
   }
@@ -244,6 +245,19 @@ function keysSentToTheCatalogue(): ReadonlySet<string> {
         { space: volume(diskFreeGib), measuredAt: NOW },
       ),
       undefined,
+      undefined,
+      NOW,
+    );
+  }
+  // what an automatic cleanup deleted, and one that deleted nothing
+  for (const deleted of [[{ name: 'Old.Release', size: Quota.gib(10) }], []]) {
+    userHomePage(
+      user,
+      member,
+      signalRow(),
+      undefined,
+      undefined,
+      CleanupReport.of({ deleted, skipped: [], at: NOW, trigger: 'automatic' }),
       NOW,
     );
   }
@@ -254,11 +268,17 @@ function keysSentToTheCatalogue(): ReadonlySet<string> {
       deleted: [],
       skipped: SKIP_REASONS.map((reason) => ({ name: 'Kept.Release', reason })),
       at: NOW,
+      trigger: 'member',
     }),
   });
   spaceCleanupPage(member, {
     list: { proposal: cleanupProposal(), takenAt: NOW },
-    report: CleanupReport.of({ deleted: [{ name: 'Old.Release', size: Quota.gib(10) }], skipped: [], at: NOW }),
+    report: CleanupReport.of({
+      deleted: [{ name: 'Old.Release', size: Quota.gib(10) }],
+      skipped: [],
+      at: NOW,
+      trigger: 'member',
+    }),
   });
   passwordPage(member);
   twoStepSetupPage(member, 'alice', 'JBSWY3DPEHPK3PXP');

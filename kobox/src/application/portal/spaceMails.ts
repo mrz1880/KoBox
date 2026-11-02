@@ -1,5 +1,6 @@
 import type { OutboxMailDraft } from '../maintenance/MailOutboxPort.js';
 import type { Language } from '../../domain/portal/Language.js';
+import type { CleanupReport } from '../../domain/space/CleanupReport.js';
 import type { Quota } from '../../domain/user/Quota.js';
 
 type MailLanguage = 'fr' | 'en';
@@ -107,5 +108,86 @@ export function spaceRunningOutMail(input: {
     recipient: input.recipient,
     subject: text.subject,
     body: text.lines(input.facts, language).join('\n'),
+  };
+}
+
+interface CleanupMailText {
+  readonly subject: string;
+  readonly lines: (
+    input: { readonly username: string; readonly report: CleanupReport; readonly url: string },
+    language: MailLanguage,
+  ) => readonly string[];
+}
+
+const AUTOMATIC_CLEANUP: Record<MailLanguage, CleanupMailText> = {
+  fr: {
+    subject: 'KoBox a fait de la place sur ta seedbox',
+    lines: ({ username, report, url }, language) => [
+      `Bonjour ${username},`,
+      '',
+      'Ta seedbox avait dépassé 90 % de ton espace.',
+      ...(report.deleted.length === 0
+        ? [
+            "Comme tu l'as choisi, KoBox devait faire de la place, mais n'a finalement rien supprimé :",
+            'ce qui était prévu ne remplissait plus les conditions.',
+          ]
+        : [
+            "Comme tu l'as choisi, KoBox a supprimé pour de bon :",
+            '',
+            ...report.deleted.map((line) => `- ${line.name} (${inGib(line.size, language)})`),
+            '',
+            `Espace libéré : ${inGib(report.freed, language)}.`,
+          ]),
+      '',
+      'Le détail, et ce que tu peux encore supprimer toi-même, sont ici :',
+      '',
+      url,
+      '',
+      'Tu peux changer ce choix dans Mon compte.',
+    ],
+  },
+  en: {
+    subject: 'KoBox made room on your seedbox',
+    lines: ({ username, report, url }, language) => [
+      `Hello ${username},`,
+      '',
+      'Your seedbox went past 90 % of your space.',
+      ...(report.deleted.length === 0
+        ? [
+            'As you chose, KoBox was to make room, but deleted nothing in the end:',
+            'what it planned to delete no longer qualified.',
+          ]
+        : [
+            'As you chose, KoBox deleted for good:',
+            '',
+            ...report.deleted.map((line) => `- ${line.name} (${inGib(line.size, language)})`),
+            '',
+            `Space given back: ${inGib(report.freed, language)}.`,
+          ]),
+      '',
+      'The details, and what you can still delete yourself, are here:',
+      '',
+      url,
+      '',
+      'You can change this choice in My account.',
+    ],
+  },
+};
+
+// After a cleanup KoBox ran on its own: the member did not click anything, so
+// they are told what went for good and what it gave back.
+export function automaticCleanupMail(input: {
+  readonly recipient: string;
+  readonly language: Language | undefined;
+  readonly username: string;
+  readonly report: CleanupReport;
+  readonly url: string;
+}): OutboxMailDraft {
+  const language = languageOf(input.language);
+  const text = AUTOMATIC_CLEANUP[language];
+  return {
+    recipient: input.recipient,
+    subject: text.subject,
+    body: text.lines(input, language).join('\n'),
   };
 }

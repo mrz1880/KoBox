@@ -1,4 +1,9 @@
-import { CleanupReport, type DeletedLine, type SkippedLine } from '../../domain/space/CleanupReport.js';
+import {
+  CleanupReport,
+  type CleanupTrigger,
+  type DeletedLine,
+  type SkippedLine,
+} from '../../domain/space/CleanupReport.js';
 import type {
   CleanupReportRepository,
   MemberTorrentsPort,
@@ -9,11 +14,13 @@ import type { InfoHash } from '../../domain/torrent/InfoHash.js';
 import type { TorrentInstanceRepository } from '../../domain/torrent/ports.js';
 import type { Username } from '../../domain/user/Username.js';
 import { CleanupJudge, type CleanupJudgeDeps } from './CleanupJudge.js';
+import { SpaceMailer, type SpaceMailerDeps } from './SpaceMailer.js';
 import type { TakeCleanupSnapshot } from './TakeCleanupSnapshot.js';
 
 export interface CleanUpSpaceCommand {
   readonly username: Username;
   readonly infoHashes: readonly InfoHash[];
+  readonly trigger: CleanupTrigger;
 }
 
 interface Deps extends CleanupJudgeDeps {
@@ -24,6 +31,7 @@ interface Deps extends CleanupJudgeDeps {
   readonly quota: Pick<QuotaPort, 'getUsage'>;
   readonly samples: DiskUsageRepository;
   readonly snapshot: Pick<TakeCleanupSnapshot, 'execute'>;
+  readonly mail: SpaceMailerDeps;
   readonly clock: () => string;
 }
 
@@ -34,7 +42,11 @@ interface Deps extends CleanupJudgeDeps {
 // is saved before the usage is measured again, so a failing measure cannot
 // lose what was deleted.
 export class CleanUpSpace {
-  constructor(private readonly deps: Deps) {}
+  private readonly mailer: SpaceMailer;
+
+  constructor(private readonly deps: Deps) {
+    this.mailer = new SpaceMailer(deps.mail);
+  }
 
   // Answers the report it saved, so the worker can log what failed.
   async execute(command: CleanUpSpaceCommand): Promise<CleanupReport> {
@@ -75,8 +87,12 @@ export class CleanUpSpace {
       }
       deleted.push({ name: candidate.name, size: candidate.size });
     }
-    const report = CleanupReport.of({ deleted, skipped, at });
+    const report = CleanupReport.of({ deleted, skipped, at, trigger: command.trigger });
     await this.deps.reports.save(command.username, report);
+    // the member did not click anything: they are told what went
+    if (command.trigger === 'automatic') {
+      await this.mailer.automaticCleanup(command.username, report);
+    }
     const used = await this.deps.quota.getUsage(command.username);
     await this.deps.samples.save({ username: command.username, used, sampledAt: at });
     await this.deps.snapshot.execute(command.username, at);

@@ -123,18 +123,36 @@ function skippedTable(report: CleanupReport, viewer: Viewer): RawHtml {
 </table>`;
 }
 
+// When a cleanup ran, what it gave back, and what went.
+function deletedSummary(report: CleanupReport, viewer: Viewer): RawHtml {
+  const when = formatMoment(report.at, viewer);
+  return html`<p>${report.deleted.length === 0
+    ? viewer.t('{when}: nothing was deleted.', { when })
+    : viewer.t('{when}: {freed} freed.', { when, freed: formatBytes(report.freed.toBytes(), viewer) })}</p>
+${deletedTable(report, viewer)}`;
+}
+
 // What the member's last cleanup did, first: they come back here after it.
 function lastCleanup(report: CleanupReport | undefined, viewer: Viewer): RawHtml {
   if (report === undefined) {
     return html``;
   }
-  const when = formatMoment(report.at, viewer);
   return html`<h2>${viewer.t('Last cleanup')}</h2>
-<p>${report.deleted.length === 0
-    ? viewer.t('{when}: nothing was deleted.', { when })
-    : viewer.t('{when}: {freed} freed.', { when, freed: formatBytes(report.freed.toBytes(), viewer) })}</p>
-${deletedTable(report, viewer)}
+${deletedSummary(report, viewer)}
 ${skippedTable(report, viewer)}`;
+}
+
+// On the home, for a cleanup KoBox ran on its own: the member did not ask for
+// it, so they are told what went, and where the rest of the story is.
+export function automaticCleanupNotice(report: CleanupReport | undefined, viewer: Viewer): RawHtml {
+  if (report === undefined) {
+    return html``;
+  }
+  return html`<section class="panel">
+<h2>${viewer.t('KoBox cleaned up for you')}</h2>
+${deletedSummary(report, viewer)}
+<p class="muted"><a href="/space/cleanup">${viewer.t('See the details')}</a></p>
+</section>`;
 }
 
 // What the page shows: the list to pick from, and what the last cleanup did.

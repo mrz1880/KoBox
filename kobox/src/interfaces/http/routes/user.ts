@@ -18,6 +18,7 @@ import type {
 } from '../../../domain/user/ports.js';
 import { SyncMode } from '../../../domain/torrent/SyncMode.js';
 import type { CleanupReportRepository, CleanupSnapshotRepository } from '../../../domain/space/ports.js';
+import type { CleanupReport } from '../../../domain/space/CleanupReport.js';
 import type { TorrentInstanceRepository } from '../../../domain/torrent/ports.js';
 import type { SyncDestinationRepository, SyncTransferRepository } from '../../../domain/sync/ports.js';
 import type { SetSyncDestination } from '../../../application/sync/SetSyncDestination.js';
@@ -243,6 +244,15 @@ async function cleanupListOf(
   };
 }
 
+// What KoBox deleted on its own for the member, while the home still shows it.
+async function automaticReportOf(
+  deps: Pick<UserRoutesDeps, 'cleanupReports' | 'now'>,
+  username: Username,
+): Promise<CleanupReport | undefined> {
+  const report = await deps.cleanupReports.find(username);
+  return report?.isShownOnHome(deps.now()) === true ? report : undefined;
+}
+
 // The name members reach the box by over SFTP: only known when the operator
 // configured one, so a page shows it rather than guessing.
 // The firewall filters IPv4 only, so an IPv6 visitor has nothing to declare.
@@ -298,6 +308,7 @@ export function registerUserRoutes(
             await deps.volumeSamples.find(),
           ),
           (await cleanupListOf(deps, user.username))?.proposal.freed(),
+          await automaticReportOf(deps, user.username),
           deps.now(),
           flashOf(request),
         ),

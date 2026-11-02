@@ -1,3 +1,4 @@
+import { shiftStamp } from '../shared/stamp.js';
 import { Quota } from '../user/Quota.js';
 
 // Why a torrent the member picked is still on the box:
@@ -25,6 +26,11 @@ const IS_A_FAILURE: Readonly<Record<SkipReason, boolean>> = {
 export const CLEANUP_TRIGGERS = ['member', 'automatic'] as const;
 export type CleanupTrigger = (typeof CLEANUP_TRIGGERS)[number];
 
+// How long the home page shows what an automatic cleanup deleted: the member
+// did not ask for it, so they are told until they had time to see it.
+const REPORT_SHOWN_FOR_DAYS = 7;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
 export interface DeletedLine {
   readonly name: string;
   readonly size: Quota;
@@ -42,14 +48,24 @@ export class CleanupReport {
     readonly deleted: readonly DeletedLine[],
     readonly skipped: readonly SkippedLine[],
     readonly at: string,
+    readonly trigger: CleanupTrigger,
   ) {}
 
   static of(lines: {
     readonly deleted: readonly DeletedLine[];
     readonly skipped: readonly SkippedLine[];
     readonly at: string;
+    readonly trigger: CleanupTrigger;
   }): CleanupReport {
-    return new CleanupReport([...lines.deleted], [...lines.skipped], lines.at);
+    return new CleanupReport([...lines.deleted], [...lines.skipped], lines.at, lines.trigger);
+  }
+
+  // Whether the member's home still shows this report at `now`. Both are
+  // stamps, which compare as strings in time.
+  isShownOnHome(now: string): boolean {
+    return (
+      this.trigger === 'automatic' && now < shiftStamp(this.at, REPORT_SHOWN_FOR_DAYS * DAY_MS)
+    );
   }
 
   // what the box could not remove: the member is told, and so is whoever

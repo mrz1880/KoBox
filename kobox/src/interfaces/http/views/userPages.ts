@@ -9,6 +9,8 @@ import { formatBytes } from './bytes.js';
 import { icon } from './icons.js';
 import type { MediaColumn, MediaOrder } from './mediaOrder.js';
 import { cleanupHint, memberSpace, type MeasuredSpace } from './space.js';
+import { automaticCleanupNotice } from './spaceCleanupPage.js';
+import type { CleanupReport } from '../../../domain/space/CleanupReport.js';
 import { html, type RawHtml } from '../html.js';
 import { flash, page, sentence, type Reader, type Viewer } from './layout.js';
 import type { Translate } from './messages.js';
@@ -153,6 +155,8 @@ export function userHomePage(
   row: SignalRow,
   space: MeasuredSpace | undefined,
   cleanable: Quota | undefined,
+  // what KoBox deleted on its own lately, while the home still shows it
+  automaticReport: CleanupReport | undefined,
   now: string,
   message?: string,
 ): string {
@@ -170,6 +174,7 @@ ${flash(viewer.t, message)}
 ${plainStatus(row, viewer)}
 ${memberSpace(space, viewer, now)}
 ${cleanupHint(space, cleanable, viewer)}
+${automaticCleanupNotice(automaticReport, viewer)}
 <div class="choices">${actions}</div>
 <p class="links"><a href="/access">${viewer.t('My account and connection details')}</a></p>`,
     viewer,

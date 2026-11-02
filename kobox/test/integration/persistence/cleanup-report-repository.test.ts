@@ -19,6 +19,7 @@ const report = CleanupReport.of({
     { name: 'C'.repeat(40), reason: 'gone' },
   ],
   at: '2026-11-20 12:00:00',
+  trigger: 'member',
 });
 
 let dir: string;
@@ -45,11 +46,29 @@ describe('SqliteCleanupReportRepository', () => {
   });
 
   it('should_keep_only_the_latest_report_of_a_member', async () => {
-    const later = CleanupReport.of({ deleted: [], skipped: [], at: '2026-11-21 08:00:00' });
+    const later = CleanupReport.of({
+      deleted: [],
+      skipped: [],
+      at: '2026-11-21 08:00:00',
+      trigger: 'member',
+    });
     await repo.save(alice, report);
 
     await repo.save(alice, later);
 
     expect(await repo.find(alice)).toEqual(later);
+  });
+
+  it('should_remember_that_a_cleanup_ran_on_its_own', async () => {
+    const automatic = CleanupReport.of({
+      deleted: [{ name: 'Example Film', size: Quota.gib(12) }],
+      skipped: [],
+      at: '2026-11-20 12:00:00',
+      trigger: 'automatic',
+    });
+
+    await repo.save(alice, automatic);
+
+    expect((await repo.find(alice))?.trigger).toBe('automatic');
   });
 });

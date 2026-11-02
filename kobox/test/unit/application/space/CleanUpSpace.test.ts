@@ -13,12 +13,16 @@ import { Username } from '../../../../src/domain/user/Username.js';
 import { InMemoryCleanupReportRepository } from '../../../../src/infrastructure/persistence/InMemoryCleanupReportRepository.js';
 import { InMemoryCleanupSnapshotRepository } from '../../../../src/infrastructure/persistence/InMemoryCleanupSnapshotRepository.js';
 import { InMemoryDiskUsageRepository } from '../../../../src/infrastructure/persistence/InMemoryDiskUsageRepository.js';
+import { InMemoryMailOutbox } from '../../../../src/infrastructure/persistence/InMemoryMailOutbox.js';
+import { InMemoryPortalCredentialsRepository } from '../../../../src/infrastructure/persistence/InMemoryPortalCredentialsRepository.js';
+import { InMemoryUserRepository } from '../../../../src/infrastructure/persistence/InMemoryUserRepository.js';
 import { InMemorySeedRuleRepository } from '../../../../src/infrastructure/persistence/InMemorySeedRuleRepository.js';
 import { InMemorySyncTransferRepository } from '../../../../src/infrastructure/persistence/InMemorySyncTransferRepository.js';
 import { InMemoryTorrentInstanceRepository } from '../../../../src/infrastructure/persistence/InMemoryTorrentInstanceRepository.js';
 import { FakeMemberTorrents } from '../../../../src/infrastructure/system/fakes/FakeMemberTorrents.js';
 import { FakeQuota } from '../../../../src/infrastructure/system/fakes/FakeQuota.js';
 import { FakeTorrentData } from '../../../../src/infrastructure/system/fakes/FakeTorrentData.js';
+import { aUser } from '../../../builders/UserBuilder.js';
 
 const alice = Username.parse('alice');
 const aliceScgi = ScgiPort.parse(51101);
@@ -92,6 +96,7 @@ interface World {
   samples: InMemoryDiskUsageRepository;
   reports: InMemoryCleanupReportRepository;
   snapshots: InMemoryCleanupSnapshotRepository;
+  outbox: InMemoryMailOutbox;
   cleanUp: CleanUpSpace;
 }
 
@@ -116,11 +121,23 @@ beforeEach(async () => {
     samples: new InMemoryDiskUsageRepository(),
     reports: new InMemoryCleanupReportRepository(),
     snapshots: new InMemoryCleanupSnapshotRepository(),
+    outbox: new InMemoryMailOutbox(),
     clock: () => AT,
   };
+  const users = new InMemoryUserRepository();
+  await users.save(aUser().build());
   world = {
     ...deps,
-    cleanUp: new CleanUpSpace({ ...deps, snapshot: new TakeCleanupSnapshot(deps) }),
+    cleanUp: new CleanUpSpace({
+      ...deps,
+      snapshot: new TakeCleanupSnapshot(deps),
+      mail: {
+        users,
+        credentials: new InMemoryPortalCredentialsRepository(),
+        address: { baseUrl: () => Promise.resolve('https://box.example.org') },
+        outbox: deps.outbox,
+      },
+    }),
   };
 });
 
@@ -128,7 +145,7 @@ describe('CleanUpSpace', () => {
   it('should_erase_a_picked_torrent_that_still_qualifies_and_remove_its_files', async () => {
     world.torrents.holds(aliceScgi, [seededFilm()]);
 
-    await world.cleanUp.execute({ username: alice, infoHashes: [FILM] });
+    await world.cleanUp.execute({ username: alice, infoHashes: [FILM], trigger: 'member' });
 
     expect(world.torrents.erased).toEqual([FILM.value]);
     expect(world.data.removed).toEqual([{ username: 'alice', path: FILM_PATH }]);
@@ -138,7 +155,7 @@ describe('CleanUpSpace', () => {
     world.torrents.holds(aliceScgi, [freshFilm()]);
     await sent(world.transfers, FILM_PATH);
 
-    await world.cleanUp.execute({ username: alice, infoHashes: [FILM] });
+    await world.cleanUp.execute({ username: alice, infoHashes: [FILM], trigger: 'member' });
 
     expect(world.torrents.erased).toEqual([FILM.value]);
   });
@@ -147,7 +164,7 @@ describe('CleanUpSpace', () => {
   it('should_keep_a_picked_torrent_that_no_longer_qualifies_and_say_why', async () => {
     world.torrents.holds(aliceScgi, [freshFilm()]);
 
-    await world.cleanUp.execute({ username: alice, infoHashes: [FILM] });
+    await world.cleanUp.execute({ username: alice, infoHashes: [FILM], trigger: 'member' });
 
     expect(world.torrents.erased).toEqual([]);
     expect(world.data.removed).toEqual([]);
@@ -162,7 +179,7 @@ describe('CleanUpSpace', () => {
     world.torrents.holds(aliceScgi, [seededFilm()]);
     await beingSent(world.transfers, FILM_PATH);
 
-    await world.cleanUp.execute({ username: alice, infoHashes: [FILM] });
+    await world.cleanUp.execute({ username: alice, infoHashes: [FILM], trigger: 'member' });
 
     expect(world.torrents.erased).toEqual([]);
     expect(world.data.removed).toEqual([]);
@@ -176,7 +193,7 @@ describe('CleanUpSpace', () => {
     const gone = InfoHash.parse('C'.repeat(40));
     world.torrents.holds(aliceScgi, [seededFilm()]);
 
-    await world.cleanUp.execute({ username: alice, infoHashes: [gone] });
+    await world.cleanUp.execute({ username: alice, infoHashes: [gone], trigger: 'member' });
 
     expect(world.torrents.erased).toEqual([]);
     expect((await world.reports.find(alice))?.skipped).toEqual([
@@ -187,7 +204,7 @@ describe('CleanUpSpace', () => {
   it('should_report_every_picked_torrent_as_gone_for_a_member_without_an_rtorrent', async () => {
     await world.instances.delete(alice);
 
-    await world.cleanUp.execute({ username: alice, infoHashes: [FILM] });
+    await world.cleanUp.execute({ username: alice, infoHashes: [FILM], trigger: 'member' });
 
     expect((await world.reports.find(alice))?.skipped).toEqual([
       { name: FILM.value, reason: 'gone' },
@@ -197,12 +214,30 @@ describe('CleanUpSpace', () => {
   it('should_report_what_went_with_the_space_it_gave_back', async () => {
     world.torrents.holds(aliceScgi, [seededFilm()]);
 
-    await world.cleanUp.execute({ username: alice, infoHashes: [FILM] });
+    await world.cleanUp.execute({ username: alice, infoHashes: [FILM], trigger: 'member' });
 
     const report = await world.reports.find(alice);
     expect(report?.deleted).toEqual([{ name: 'Example Film', size: Quota.gib(12) }]);
     expect(report?.freed.toGib()).toBe(12);
     expect(report?.at).toBe(AT);
+    expect(report?.trigger).toBe('member');
+    // the member is on the page that shows it: no mail
+    expect(await world.outbox.listRecent(10)).toEqual([]);
+  });
+
+  // the member did not ask: they hear what went and what it gave back
+  it('should_mail_the_member_what_an_automatic_cleanup_deleted_and_the_space_it_gave_back', async () => {
+    world.torrents.holds(aliceScgi, [seededFilm(), seededAlbum()]);
+
+    await world.cleanUp.execute({ username: alice, infoHashes: [FILM, ALBUM], trigger: 'automatic' });
+
+    expect((await world.reports.find(alice))?.trigger).toBe('automatic');
+    const mails = await world.outbox.listRecent(10);
+    expect(mails).toHaveLength(1);
+    expect(mails[0]?.recipient).toBe('alice@example.org');
+    expect(mails[0]?.body).toContain('Example Film');
+    expect(mails[0]?.body).toContain('Example Album');
+    expect(mails[0]?.body).toContain('13,0 Gio');
   });
 
   // its files are never removed under a torrent rTorrent still holds
@@ -210,7 +245,7 @@ describe('CleanUpSpace', () => {
     world.torrents.holds(aliceScgi, [seededFilm(), seededAlbum()]);
     world.torrents.refusesToErase(FILM);
 
-    await world.cleanUp.execute({ username: alice, infoHashes: [FILM, ALBUM] });
+    await world.cleanUp.execute({ username: alice, infoHashes: [FILM, ALBUM], trigger: 'member' });
 
     expect(world.data.removed).toEqual([{ username: 'alice', path: ALBUM_PATH }]);
     const report = await world.reports.find(alice);
@@ -223,7 +258,7 @@ describe('CleanUpSpace', () => {
     world.torrents.holds(aliceScgi, [seededFilm(), seededAlbum()]);
     world.data.refusesToRemove(FILM_PATH);
 
-    await world.cleanUp.execute({ username: alice, infoHashes: [FILM, ALBUM] });
+    await world.cleanUp.execute({ username: alice, infoHashes: [FILM, ALBUM], trigger: 'member' });
 
     expect(world.torrents.erased).toEqual([FILM.value, ALBUM.value]);
     const report = await world.reports.find(alice);
@@ -236,7 +271,7 @@ describe('CleanUpSpace', () => {
     world.torrents.holds(aliceScgi, [seededFilm()]);
     world.quota.setUsageForTest(alice, Quota.gib(20));
 
-    await world.cleanUp.execute({ username: alice, infoHashes: [FILM] });
+    await world.cleanUp.execute({ username: alice, infoHashes: [FILM], trigger: 'member' });
 
     const sample = await world.samples.find(alice);
     expect(sample?.used.toGib()).toBe(20);
@@ -247,7 +282,7 @@ describe('CleanUpSpace', () => {
   it('should_judge_what_the_member_can_clean_again_once_done', async () => {
     world.torrents.holds(aliceScgi, [seededFilm(), seededAlbum()]);
 
-    await world.cleanUp.execute({ username: alice, infoHashes: [FILM] });
+    await world.cleanUp.execute({ username: alice, infoHashes: [FILM], trigger: 'member' });
 
     const snapshot = await world.snapshots.find(alice);
     expect(snapshot?.takenAt).toBe(AT);

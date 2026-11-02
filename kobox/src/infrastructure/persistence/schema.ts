@@ -2,6 +2,7 @@ import { sql } from 'drizzle-orm';
 import { index, integer, sqliteTable, text, unique } from 'drizzle-orm/sqlite-core';
 import { DEFAULT_TRANSFER_MAILS } from '../../domain/sync/TransferMails.js';
 import { AUTOMATIC_CLEANUPS } from '../../domain/space/AutomaticCleanup.js';
+import { CLEANUP_TRIGGERS } from '../../domain/space/CleanupReport.js';
 
 export const users = sqliteTable('users', {
   id: integer('id').primaryKey({ autoIncrement: true }),
@@ -490,7 +491,7 @@ export const cleanupCandidates = sqliteTable(
 // automatic run did, so the home page can show what went.
 export const cleanupReports = sqliteTable('cleanup_reports', {
   username: text('username').primaryKey(),
-  trigger: text('trigger', { enum: ['member', 'automatic'] }).notNull(),
+  trigger: text('trigger', { enum: CLEANUP_TRIGGERS }).notNull(),
   reportJson: text('report_json').notNull(),
   at: text('at').notNull(),
 });

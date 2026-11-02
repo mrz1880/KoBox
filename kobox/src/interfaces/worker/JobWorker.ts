@@ -525,6 +525,7 @@ export class JobWorker {
         const report = await this.space.cleanUpSpace.execute({
           username,
           infoHashes: job.payload.infoHashes.map((raw) => InfoHash.parse(raw)),
+          trigger: job.payload.trigger,
         });
         // the member reads the report on their page; the name, not the path,
         // keeps the log short and the member's tree out of it
