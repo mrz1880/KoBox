@@ -204,6 +204,7 @@ function world(): World {
         return Promise.resolve({
           created: '/var/backups/kobox/x',
           skippedDirs: [],
+          failedMembers: [],
           deleted: [],
         });
       },
@@ -332,7 +333,7 @@ describe('UpgradeRelease', () => {
       git: w.git,
       releases: w.releases,
       host: w.host,
-      backup: { execute: () => Promise.resolve({ created: '/b', skippedDirs: [], deleted: [] }) },
+      backup: { execute: () => Promise.resolve({ created: '/b', skippedDirs: [], failedMembers: [], deleted: [] }) },
       settings: { ...SETTINGS, packageSubdir: 'kobox' },
     });
 
@@ -468,7 +469,7 @@ describe('UpgradeRelease edges', () => {
       git: w.git,
       releases: w.releases,
       host: w.host,
-      backup: { execute: () => Promise.resolve({ created: '/b', skippedDirs: [], deleted: [] }) },
+      backup: { execute: () => Promise.resolve({ created: '/b', skippedDirs: [], failedMembers: [], deleted: [] }) },
       settings: { ...SETTINGS, packageSubdir: '' },
     });
 
@@ -519,7 +520,7 @@ describe('UpgradeRelease edges', () => {
       git: w.git,
       releases: w.releases,
       host: w.host,
-      backup: { execute: () => Promise.resolve({ created: '/b', skippedDirs: [], deleted: [] }) },
+      backup: { execute: () => Promise.resolve({ created: '/b', skippedDirs: [], failedMembers: [], deleted: [] }) },
       settings: { ...SETTINGS, packageSubdir: 'kobox' },
     });
     await nested.execute({ to: 'v2.0.0', now: NOW });

@@ -511,9 +511,14 @@ export class JobWorker {
       case 'run-speedtest':
         await this.deps.maintenance.runSpeedtest.execute();
         return;
-      case 'run-backup':
-        await this.deps.maintenance.runBackup.execute({ now: nowStamp() });
+      case 'run-backup': {
+        const report = await this.deps.maintenance.runBackup.execute({ now: nowStamp() });
+        // the rest of the backup went through: a warning, not a failed job
+        for (const failure of report.failedMembers) {
+          this.deps.logger.warn(failure, 'backup: restart kit not archived');
+        }
         return;
+      }
       case 'apply-ipset':
         await this.deps.trackers.applyIpset.execute();
         return;
