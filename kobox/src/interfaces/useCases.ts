@@ -86,6 +86,7 @@ import { TakeCleanupSnapshot } from '../application/space/TakeCleanupSnapshot.js
 import type { SpaceMailerDeps } from '../application/space/SpaceMailer.js';
 import { WatchMemberSpace } from '../application/space/WatchMemberSpace.js';
 import { SetAutomaticCleanup } from '../application/space/SetAutomaticCleanup.js';
+import { SetSeedRule } from '../application/space/SetSeedRule.js';
 import type { JobQueuePort } from '../application/jobs/JobQueuePort.js';
 import type {
   CleanupReportRepository,
@@ -255,6 +256,7 @@ export interface SpaceUseCases {
   readonly cleanUpSpace: CleanUpSpace;
   readonly watchMemberSpace: WatchMemberSpace;
   readonly setAutomaticCleanup: SetAutomaticCleanup;
+  readonly setSeedRule: SetSeedRule;
 }
 
 export function buildSpaceUseCases(deps: SpaceUseCaseDeps): SpaceUseCases {
@@ -264,6 +266,7 @@ export function buildSpaceUseCases(deps: SpaceUseCaseDeps): SpaceUseCases {
     cleanUpSpace: new CleanUpSpace({ ...deps, snapshot: takeCleanupSnapshot }),
     watchMemberSpace: new WatchMemberSpace(deps),
     setAutomaticCleanup: new SetAutomaticCleanup(deps),
+    setSeedRule: new SetSeedRule(deps),
   };
 }
 

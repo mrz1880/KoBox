@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { ROLES } from '../../domain/portal/Role.js';
 import { AUTOMATIC_CLEANUPS } from '../../domain/space/AutomaticCleanup.js';
 import { CLEANUP_TRIGGERS } from '../../domain/space/CleanupReport.js';
+import { SEED_RULE_LIMITS } from '../../domain/space/SeedRule.js';
 import { IPV4_PATTERN } from '../../domain/shared/IpAddress.js';
 import { INFO_HASH_PATTERN } from '../../domain/torrent/InfoHash.js';
 import { LABEL_PATTERN } from '../../domain/torrent/Label.js';
@@ -74,6 +75,7 @@ export const JOB_TYPES = [
   'render-nfs-exports',
   'clean-up-space',
   'set-automatic-cleanup',
+  'set-seed-rule',
 ] as const;
 
 export type JobType = (typeof JOB_TYPES)[number];
@@ -296,6 +298,11 @@ export const jobPayloadSchemas = {
   'set-automatic-cleanup': z.strictObject({
     username: usernameField,
     scope: z.enum(AUTOMATIC_CLEANUPS),
+  }),
+  // the box-wide rule an admin set: what a torrent gives back, over how long
+  'set-seed-rule': z.strictObject({
+    ratio: z.number().min(SEED_RULE_LIMITS.ratio.min).max(SEED_RULE_LIMITS.ratio.max),
+    days: z.number().int().min(SEED_RULE_LIMITS.days.min).max(SEED_RULE_LIMITS.days.max),
   }),
 } satisfies Record<JobType, z.ZodType>;
 

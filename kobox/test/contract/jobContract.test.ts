@@ -69,6 +69,7 @@ describe('job contract', () => {
       'render-nfs-exports',
       'clean-up-space',
       'set-automatic-cleanup',
+      'set-seed-rule',
     ]);
   });
 
@@ -304,6 +305,23 @@ describe('job contract', () => {
     expect(() =>
       parseJob('set-automatic-cleanup', { username: 'alice', scope: 'everything' }),
     ).toThrow();
+  });
+
+  it('should_parse_a_seed_rule_within_what_an_admin_may_set', () => {
+    expect(parseJob('set-seed-rule', { ratio: 1.5, days: 14 }).payload).toEqual({
+      ratio: 1.5,
+      days: 14,
+    });
+  });
+
+  it.each([
+    { ratio: 0.05, days: 7 },
+    { ratio: 101, days: 7 },
+    { ratio: 2, days: 0 },
+    { ratio: 2, days: 366 },
+    { ratio: 2, days: 1.5 },
+  ])('should_refuse_a_seed_rule_out_of_bounds_%o', (payload) => {
+    expect(() => parseJob('set-seed-rule', payload)).toThrow();
   });
 
   it('should_parse_a_torrent_event_with_optional_paths', () => {
