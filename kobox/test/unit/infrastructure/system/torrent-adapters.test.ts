@@ -398,6 +398,17 @@ describe('ScgiRtorrentControlAdapter', () => {
     );
   });
 
+  it('should_send_d_erase_with_the_hash', async () => {
+    const adapter = new ScgiRtorrentControlAdapter();
+    const hash = InfoHash.parse('a1b2c3d4e5f6a7b8c9d0a1b2c3d4e5f6a7b8c9d0');
+
+    await adapter.erase(ScgiPort.parse(port), hash);
+
+    expect(received).toHaveLength(1);
+    expect(received[0]).toContain('<methodName>d.erase</methodName>');
+    expect(received[0]).toContain(`<string>${hash.value}</string>`);
+  });
+
   describe('listFinished', () => {
     const firstHash = 'A1B2C3D4E5F6A7B8C9D0A1B2C3D4E5F6A7B8C9D0';
     const secondHash = 'B1B2C3D4E5F6A7B8C9D0A1B2C3D4E5F6A7B8C9D0';
