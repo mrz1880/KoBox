@@ -12,7 +12,28 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { PathOutsideMemberSpaceError } from '../../../src/domain/space/PathOutsideMemberSpaceError.js';
 import { Username } from '../../../src/domain/user/Username.js';
+import type {
+  CommandRequest,
+  CommandResult,
+  CommandRunner,
+} from '../../../src/infrastructure/system/CommandRunner.js';
 import { FsTorrentDataAdapter } from '../../../src/infrastructure/system/FsTorrentDataAdapter.js';
+
+// The adapter erases through `runuser -u <member> -- rm -rf --one-file-system`,
+// which needs root and GNU rm. Here the test user plays the member: the path
+// the adapter hands over is removed the way that rm would remove it.
+const EXPECTED_ERASE = ['rm', '-rf', '--one-file-system', '--'];
+
+class ActingAsTheMember implements CommandRunner {
+  run(request: CommandRequest): Promise<CommandResult> {
+    const erase = request.args.slice(request.args.indexOf('--') + 1);
+    if (request.command !== 'runuser' || erase.slice(0, -1).join(' ') !== EXPECTED_ERASE.join(' ')) {
+      throw new Error(`unexpected command ${request.command} ${request.args.join(' ')}`);
+    }
+    rmSync(erase.at(-1) ?? '', { recursive: true, force: true });
+    return Promise.resolve({ stdout: '', stderr: '', exitCode: 0 });
+  }
+}
 
 const alice = Username.parse('alice');
 
@@ -24,7 +45,7 @@ beforeEach(() => {
   sandbox = mkdtempSync(join(tmpdir(), 'kobox-torrent-data-'));
   downloads = join(sandbox, 'alice', 'rtorrent', 'complete');
   mkdirSync(downloads, { recursive: true });
-  adapter = new FsTorrentDataAdapter(() => downloads);
+  adapter = new FsTorrentDataAdapter(new ActingAsTheMember(), () => downloads);
 });
 
 afterEach(() => {
