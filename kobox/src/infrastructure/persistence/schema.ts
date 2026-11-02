@@ -498,9 +498,14 @@ export const cleanupReports = sqliteTable('cleanup_reports', {
 
 // What each member chose for their space, and whether the hourly pass already
 // warned them during the climb they are in. No row reads as automatic cleanup
-// off and never warned. The root worker writes it; the portal only reads it.
+// off, never warned and the box's seed rule. The root worker writes it; the
+// portal only reads it.
 export const spacePreferences = sqliteTable('space_preferences', {
   username: text('username').primaryKey(),
   automatic: text('automatic', { enum: AUTOMATIC_CLEANUPS }).notNull().default('off'),
   warned: integer('warned').notNull().default(0),
+  // the member's own seed rule: no days means the box's rule, no ratio with
+  // days means only the days count
+  ownRuleRatioMilli: integer('own_rule_ratio_milli'),
+  ownRuleDays: integer('own_rule_days'),
 });

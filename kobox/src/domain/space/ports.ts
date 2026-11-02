@@ -3,6 +3,7 @@ import type { CleanupCandidate } from './CleanupCandidate.js';
 import type { CleanupReport } from './CleanupReport.js';
 import type { FinishedTorrent } from './FinishedTorrent.js';
 import type { BoxSeedRule } from './SeedRule.js';
+import type { SeedRuleChoice } from './SeedRuleChoice.js';
 import type { InfoHash } from '../torrent/InfoHash.js';
 import type { ScgiPort } from '../user/Port.js';
 import type { Username } from '../user/Username.js';
@@ -61,10 +62,13 @@ export interface SpacePreferences {
 }
 
 // Each member's space preferences. A member who never chose anything has
-// automatic cleanup off and was never warned. The choice and the warning are
-// written apart: the member makes one, the hourly pass the other.
+// automatic cleanup off, was never warned, and keeps the box's seed rule. Each
+// is written apart, leaving the others as they were: the member makes the
+// choices, the hourly pass records the warning.
 export interface SpacePreferenceRepository {
   find(username: Username): Promise<SpacePreferences>;
   chooseAutomatic(username: Username, automatic: AutomaticCleanup): Promise<void>;
   recordWarned(username: Username, warned: boolean): Promise<void>;
+  findSeedRule(username: Username): Promise<SeedRuleChoice>;
+  chooseSeedRule(username: Username, choice: SeedRuleChoice): Promise<void>;
 }
