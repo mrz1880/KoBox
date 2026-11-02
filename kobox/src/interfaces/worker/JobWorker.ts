@@ -561,5 +561,9 @@ export class JobWorker {
         };
       }
     }
+    // every case returns: a job type added to the contract without one does
+    // not compile, rather than being marked done without anything run
+    const unhandled: never = job;
+    throw new Error(`no worker case for job ${JSON.stringify(unhandled)}`);
   }
 }
