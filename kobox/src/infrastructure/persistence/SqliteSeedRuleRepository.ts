@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm';
 import type { SeedRuleRepository } from '../../domain/space/ports.js';
-import { SeedRule } from '../../domain/space/SeedRule.js';
+import { SeedRule, type BoxSeedRule } from '../../domain/space/SeedRule.js';
 import type { KoboxDatabase } from './db.js';
 import { fromRatioMilli, toRatioMilli } from './ratioMilli.js';
 import { seedRule } from './schema.js';
@@ -10,7 +10,7 @@ const ONLY_ROW = 1;
 export class SqliteSeedRuleRepository implements SeedRuleRepository {
   constructor(private readonly db: KoboxDatabase) {}
 
-  get(): Promise<SeedRule> {
+  get(): Promise<BoxSeedRule> {
     const row = this.db.orm.select().from(seedRule).where(eq(seedRule.id, ONLY_ROW)).get();
     return Promise.resolve(
       row === undefined
@@ -19,7 +19,7 @@ export class SqliteSeedRuleRepository implements SeedRuleRepository {
     );
   }
 
-  save(rule: SeedRule): Promise<void> {
+  save(rule: BoxSeedRule): Promise<void> {
     const values = { id: ONLY_ROW, ratioMilli: toRatioMilli(rule.ratio), days: rule.days };
     this.db.orm
       .insert(seedRule)

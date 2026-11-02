@@ -2,7 +2,7 @@ import type { AutomaticCleanup } from './AutomaticCleanup.js';
 import type { CleanupCandidate } from './CleanupCandidate.js';
 import type { CleanupReport } from './CleanupReport.js';
 import type { FinishedTorrent } from './FinishedTorrent.js';
-import type { SeedRule } from './SeedRule.js';
+import type { BoxSeedRule } from './SeedRule.js';
 import type { InfoHash } from '../torrent/InfoHash.js';
 import type { ScgiPort } from '../user/Port.js';
 import type { Username } from '../user/Username.js';
@@ -24,8 +24,8 @@ export interface TorrentDataPort {
 
 // The box-wide seed rule an admin set, or the default while none was.
 export interface SeedRuleRepository {
-  get(): Promise<SeedRule>;
-  save(rule: SeedRule): Promise<void>;
+  get(): Promise<BoxSeedRule>;
+  save(rule: BoxSeedRule): Promise<void>;
 }
 
 // What a member could clean, as the hourly pass last judged it. No candidate
