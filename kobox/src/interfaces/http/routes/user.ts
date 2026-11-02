@@ -69,9 +69,8 @@ import {
 } from '../views/userPages.js';
 import { measuredSpace } from '../views/space.js';
 import { syncPage } from '../views/syncPage.js';
-import { spaceCleanupPage, type CleanupList } from '../views/spaceCleanupPage.js';
-import { CleanupProposal } from '../../../domain/space/CleanupProposal.js';
-import { Quota } from '../../../domain/user/Quota.js';
+import { spaceCleanupPage } from '../views/spaceCleanupPage.js';
+import { cleanupListOf } from './cleanupList.js';
 import { LANGUAGES, Language } from '../../../domain/portal/Language.js';
 import { BROWSER_CHOICE } from '../browserLanguage.js';
 import { IPV4_PATTERN, IpAddress } from '../../../domain/shared/IpAddress.js';
@@ -226,29 +225,6 @@ async function signalRowFor(
     level: state.level,
     egressBytes: sample?.egressBytes ?? 0,
     quotaGib: user.quota.toGib(),
-  };
-}
-
-// What a member can clean, as the hourly pass judged it, checked as the
-// proposal says. Never measured, the member is taken as using nothing, so no
-// box is checked for them: the page never guesses what they hold.
-async function cleanupListOf(
-  deps: Pick<UserRoutesDeps, 'users' | 'diskSamples' | 'cleanupSnapshots'>,
-  username: Username,
-): Promise<CleanupList | undefined> {
-  const snapshot = await deps.cleanupSnapshots.find(username);
-  const user = await deps.users.findByUsername(username);
-  if (snapshot === undefined || user === undefined) {
-    return undefined;
-  }
-  const sample = await deps.diskSamples.find(username);
-  return {
-    takenAt: snapshot.takenAt,
-    proposal: CleanupProposal.of({
-      candidates: snapshot.candidates,
-      used: sample?.used ?? Quota.bytes(0),
-      allowance: user.quota,
-    }),
   };
 }
 
