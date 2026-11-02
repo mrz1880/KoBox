@@ -42,3 +42,27 @@ export function scgiCall(
     });
   });
 }
+
+// Resolves once rtorrent accepts connections on its SCGI port, which it opens
+// only after it has parsed its whole config: the proof a (re)start went through.
+export function waitForScgi(port: number, timeoutMs: number): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  return new Promise((resolve, reject) => {
+    const attempt = (): void => {
+      const socket = connect({ host: '127.0.0.1', port });
+      socket.once('connect', () => {
+        socket.destroy();
+        resolve();
+      });
+      socket.once('error', () => {
+        socket.destroy();
+        if (Date.now() > deadline) {
+          reject(new Error(`rtorrent SCGI port ${String(port)} never came up`));
+          return;
+        }
+        setTimeout(attempt, 500);
+      });
+    };
+    attempt();
+  });
+}
