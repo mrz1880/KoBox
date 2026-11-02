@@ -29,6 +29,11 @@ describe('SeedRule', () => {
     expect(SeedRule.of(raw)).toMatchObject(raw);
   });
 
+  // a member may ask only for days, whatever was given back
+  it('should_accept_a_rule_without_a_minimum_ratio', () => {
+    expect(SeedRule.of({ days: 14 }).ratio).toBeUndefined();
+  });
+
   it('should_ask_a_ratio_of_two_over_a_week_by_default', () => {
     expect(SeedRule.DEFAULT.ratio).toBe(2);
     expect(SeedRule.DEFAULT.days).toBe(7);
@@ -50,6 +55,22 @@ describe('SeedRule', () => {
 
     it('should_not_be_met_an_hour_before_the_days_asked_have_passed', () => {
       expect(rule.isMetBy({ ratio: 5, finishedAt: '2026-11-02T13:00:00.000Z' }, now)).toBe(false);
+    });
+
+    describe('without a minimum ratio', () => {
+      const daysOnly = SeedRule.of({ days: 7 });
+
+      it('should_be_met_whatever_was_given_back_once_the_days_asked_have_passed', () => {
+        expect(daysOnly.isMetBy({ ratio: 0, finishedAt: '2026-11-02T12:00:00.000Z' }, now)).toBe(
+          true,
+        );
+      });
+
+      it('should_not_be_met_an_hour_before_the_days_asked_have_passed', () => {
+        expect(daysOnly.isMetBy({ ratio: 5, finishedAt: '2026-11-02T13:00:00.000Z' }, now)).toBe(
+          false,
+        );
+      });
     });
   });
 });

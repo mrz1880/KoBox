@@ -13,6 +13,7 @@ import {
   InvalidSeedRuleError,
   SEED_RULE_LIMITS,
   SeedRule,
+  type BoxSeedRule,
 } from '../../../domain/space/SeedRule.js';
 import type {
   DiskUsageRepository,
@@ -76,7 +77,7 @@ const ACTION_WORDS: Readonly<Record<'delete' | 'suspend' | 'resume', string>> = 
 };
 
 // The rule the admin typed, or nothing when the value object refuses it.
-function seedRuleOf(raw: { readonly ratio: number; readonly days: number }): SeedRule | undefined {
+function seedRuleOf(raw: { readonly ratio: number; readonly days: number }): BoxSeedRule | undefined {
   try {
     return SeedRule.of(raw);
   } catch (error) {

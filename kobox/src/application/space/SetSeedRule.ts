@@ -1,5 +1,5 @@
 import type { SeedRuleRepository } from '../../domain/space/ports.js';
-import type { SeedRule } from '../../domain/space/SeedRule.js';
+import type { BoxSeedRule } from '../../domain/space/SeedRule.js';
 
 interface Deps {
   readonly seedRule: SeedRuleRepository;
@@ -12,7 +12,7 @@ interface Deps {
 export class SetSeedRule {
   constructor(private readonly deps: Deps) {}
 
-  async execute(rule: SeedRule): Promise<void> {
+  async execute(rule: BoxSeedRule): Promise<void> {
     await this.deps.seedRule.save(rule);
   }
 }

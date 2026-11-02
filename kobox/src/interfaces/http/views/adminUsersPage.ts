@@ -4,7 +4,7 @@ import type { SeedboxUser } from '../../../domain/user/SeedboxUser.js';
 import type { DiskUsageSample, VolumeSample } from '../../../domain/user/ports.js';
 import { html, type RawHtml } from '../html.js';
 import { explained, flash, page, sentence, type Viewer } from './layout.js';
-import { SEED_RULE_LIMITS, type SeedRule } from '../../../domain/space/SeedRule.js';
+import { SEED_RULE_LIMITS, type BoxSeedRule } from '../../../domain/space/SeedRule.js';
 import { HOME_BASE } from '../../../domain/user/homeDirectory.js';
 import { Quota } from '../../../domain/user/Quota.js';
 import type { SpaceLimit } from '../../../domain/user/UsableSpace.js';
@@ -105,7 +105,7 @@ export function adminUsersPage(
   users: readonly SeedboxUser[],
   logins: ReadonlyMap<string, MemberLogin>,
   disk: DiskReadings,
-  rule: SeedRule,
+  rule: BoxSeedRule,
   viewer: Viewer,
   message?: string,
 ): string {
@@ -164,7 +164,7 @@ ${cleanupRule(rule, viewer)}`,
 }
 
 // The box-wide rule a finished torrent must meet before it may be cleaned.
-function cleanupRule(rule: SeedRule, viewer: Viewer): RawHtml {
+function cleanupRule(rule: BoxSeedRule, viewer: Viewer): RawHtml {
   const { ratio, days } = SEED_RULE_LIMITS;
   return html`<h2>${viewer.t('Cleanup rule')}</h2>
 <p class="muted">${viewer.t(
