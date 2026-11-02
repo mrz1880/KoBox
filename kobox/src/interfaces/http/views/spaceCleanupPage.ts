@@ -8,7 +8,7 @@ import { flash, page, type Reader, type Viewer } from './layout.js';
 import { formatDay, formatMoment } from './moment.js';
 import { formatRatio } from './ratio.js';
 import type { SeedRule } from '../../../domain/space/SeedRule.js';
-import { daysPhrase } from './seedRule.js';
+import { daysPhrase, isSingular } from './seedRule.js';
 import { CLEANUP_PAGE, CLEANUP_RECALCULATE } from '../../../application/space/cleanupPage.js';
 
 // What the page offers: the proposal built from the hourly pass's snapshot,
@@ -27,7 +27,7 @@ function seededBecause(
   rule: SeedRule,
   reader: Reader,
 ): string {
-  const one = new Intl.PluralRules(reader.language.value).select(days) === 'one';
+  const one = isSingular(days, reader);
   if (rule.ratio === undefined) {
     const finished = one
       ? 'Finished {days} day ago (your rule: {rule})'
