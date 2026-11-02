@@ -1,4 +1,4 @@
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, ne } from 'drizzle-orm';
 import { LocalPath } from '../../domain/sync/LocalPath.js';
 import { SyncTransfer, type TransferState } from '../../domain/sync/SyncTransfer.js';
 import type { SyncTransferRepository } from '../../domain/sync/ports.js';
@@ -110,6 +110,18 @@ export class SqliteSyncTransferRepository implements SyncTransferRepository {
       .select({ source: syncTransfers.source })
       .from(syncTransfers)
       .where(and(eq(syncTransfers.username, username.value), eq(syncTransfers.state, 'sent')))
+      .all();
+    return Promise.resolve(rows.map((row) => LocalPath.parse(row.source)));
+  }
+
+  // Oldest first, like the queue: anything not sent yet is still on its way
+  // or waits for the member to send it again.
+  listUnsettledSources(username: Username): Promise<readonly LocalPath[]> {
+    const rows = this.db.orm
+      .select({ source: syncTransfers.source })
+      .from(syncTransfers)
+      .where(and(eq(syncTransfers.username, username.value), ne(syncTransfers.state, 'sent')))
+      .orderBy(syncTransfers.id)
       .all();
     return Promise.resolve(rows.map((row) => LocalPath.parse(row.source)));
   }

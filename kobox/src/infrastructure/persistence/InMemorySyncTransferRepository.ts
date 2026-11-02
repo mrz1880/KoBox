@@ -76,6 +76,14 @@ export class InMemorySyncTransferRepository implements SyncTransferRepository {
     );
   }
 
+  listUnsettledSources(username: Username): Promise<readonly LocalPath[]> {
+    return Promise.resolve(
+      this.ordered()
+        .filter((row) => row.username.value === username.value && row.state !== 'sent')
+        .map((row) => row.source),
+    );
+  }
+
   private ordered(): SyncTransfer[] {
     return [...this.rows.entries()].sort(([left], [right]) => left - right).map(([, row]) => row);
   }

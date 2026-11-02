@@ -15,7 +15,12 @@ const candidate = (name: string, sizeGib: number, ratio = 2): CleanupCandidate =
       finishedAt: '2026-10-01T12:00:00.000Z',
       path: `/home/alice/rtorrent/complete/${name}`,
     },
-    { rule: SeedRule.DEFAULT, sentPaths: new Set(), now: '2026-11-02T12:00:00.000Z' },
+    {
+      rule: SeedRule.DEFAULT,
+      sentPaths: new Set(),
+      unsettledPaths: new Set(),
+      now: '2026-11-02T12:00:00.000Z',
+    },
   );
   if (judged === undefined) {
     throw new Error(`fixture ${name} should qualify for cleanup`);

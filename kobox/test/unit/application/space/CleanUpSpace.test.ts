@@ -57,8 +57,11 @@ function freshFilm(): FinishedTorrent {
   return seededFilm({ ratio: 0.2, finishedAt: '2026-11-19T08:00:00.000Z' });
 }
 
-async function sent(transfers: InMemorySyncTransferRepository, path: string): Promise<void> {
-  const queued = await transfers.queue(
+async function queued(
+  transfers: InMemorySyncTransferRepository,
+  path: string,
+): Promise<SyncTransfer> {
+  const transfer = await transfers.queue(
     SyncTransfer.queue({
       username: alice,
       label: Label.parse('Films'),
@@ -66,10 +69,18 @@ async function sent(transfers: InMemorySyncTransferRepository, path: string): Pr
       queuedAt: AT,
     }),
   );
-  if (queued === undefined) {
+  if (transfer === undefined) {
     throw new Error(`${path} was already queued`);
   }
-  await transfers.save(queued.start(AT).succeed(AT));
+  return transfer;
+}
+
+async function sent(transfers: InMemorySyncTransferRepository, path: string): Promise<void> {
+  await transfers.save((await queued(transfers, path)).start(AT).succeed(AT));
+}
+
+async function beingSent(transfers: InMemorySyncTransferRepository, path: string): Promise<void> {
+  await transfers.save((await queued(transfers, path)).start(AT));
 }
 
 interface World {
@@ -135,6 +146,21 @@ describe('CleanUpSpace', () => {
   // restarted since the snapshot: its ratio is back under the rule
   it('should_keep_a_picked_torrent_that_no_longer_qualifies_and_say_why', async () => {
     world.torrents.holds(aliceScgi, [freshFilm()]);
+
+    await world.cleanUp.execute({ username: alice, infoHashes: [FILM] });
+
+    expect(world.torrents.erased).toEqual([]);
+    expect(world.data.removed).toEqual([]);
+    expect((await world.reports.find(alice))?.skipped).toEqual([
+      { name: 'Example Film', reason: 'noLongerQualifies' },
+    ]);
+  });
+
+  // sync started sending it since the snapshot: deleting it now would cut the
+  // copy on the member's machine short
+  it('should_keep_a_picked_torrent_now_being_sent_and_say_why', async () => {
+    world.torrents.holds(aliceScgi, [seededFilm()]);
+    await beingSent(world.transfers, FILM_PATH);
 
     await world.cleanUp.execute({ username: alice, infoHashes: [FILM] });
 

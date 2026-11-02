@@ -55,4 +55,23 @@ describe('SqliteSyncTransferRepository', () => {
       '/home/alice/rtorrent/complete/Films/Example Film',
     ]);
   });
+
+  it('should_list_what_is_waiting_being_sent_or_failed_and_only_theirs', async () => {
+    const sent = await queued(alice, '/home/alice/rtorrent/complete/Films/Example Film');
+    await repo.save(sent.start(AT).succeed(AT));
+    const failed = await queued(alice, '/home/alice/rtorrent/complete/Films/Example Show');
+    await repo.save(failed.start(AT).fail('connection refused', AT));
+    const sending = await queued(alice, '/home/alice/rtorrent/complete/Films/Example Album');
+    await repo.save(sending.start(AT));
+    await queued(alice, '/home/alice/rtorrent/complete/Films/Example Clip');
+    await queued(bob, '/home/bob/rtorrent/complete/Films/Example Film');
+
+    const sources = await repo.listUnsettledSources(alice);
+
+    expect(sources.map((source) => source.value)).toEqual([
+      '/home/alice/rtorrent/complete/Films/Example Show',
+      '/home/alice/rtorrent/complete/Films/Example Album',
+      '/home/alice/rtorrent/complete/Films/Example Clip',
+    ]);
+  });
 });
