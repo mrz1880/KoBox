@@ -347,7 +347,7 @@ describe('RunInstallation: what it records and tells the operator', () => {
 
     const failure = runner().execute({ allowNonExt4: false });
 
-    await expect(failure).rejects.toThrow(/^preflight failed .* nothing was changed:\n {2}- kobox install must run as root/);
+    await expect(failure).rejects.toThrow(/^preflight failed, nothing was changed:\n {2}- kobox install must run as root/);
     await expect(failure).rejects.toHaveProperty('name', 'PreflightFailedError');
   });
 
@@ -420,7 +420,7 @@ describe('RunInstallation: what it records and tells the operator', () => {
 
     await reportingRunner(progress).execute({ allowNonExt4: false });
 
-    expect(progress).toContainEqual(expect.stringMatching(/^bind: left installed \S nothing pinned$/));
+    expect(progress).toContainEqual('bind: left installed (nothing pinned)');
   });
 
   it('should_name_the_failed_component_and_its_cause', async () => {
@@ -431,7 +431,7 @@ describe('RunInstallation: what it records and tells the operator', () => {
     const failure = runner().execute({ allowNonExt4: false });
 
     await expect(failure).rejects.toThrow(
-      /^component bind failed: named-checkconf exited 1 .* fix the cause and re-run kobox install \(completed components are not redone\)$/,
+      'component bind failed: named-checkconf exited 1; fix the cause and re-run kobox install (completed components are not redone)',
     );
     await expect(failure).rejects.toMatchObject({ name: 'ComponentInstallError', component: 'bind' });
   });
