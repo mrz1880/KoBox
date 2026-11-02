@@ -31,7 +31,7 @@ import { UserAlreadyExistsError } from '../../../application/user/errors.js';
 import { EmailAddress } from '../../../domain/user/EmailAddress.js';
 import { Quota } from '../../../domain/user/Quota.js';
 import { buildJob } from '../../cli/buildJob.js';
-import { formatRatio } from '../views/ratio.js';
+import { formatRatioBound } from '../views/ratio.js';
 import { cleanupListOf } from './cleanupList.js';
 import { invitationLinkPage } from '../views/passwordLinkPages.js';
 import { flashOf, redirectWithFlash, viewerOf, type Guards, redirectOnceApplied } from '../guards.js';
@@ -212,8 +212,8 @@ export function registerAdminUserRoutes(
         viewer.t(
           'Nothing was saved: the ratio goes from {ratioMin} to {ratioMax}, the days from {daysMin} to {daysMax}.',
           {
-            ratioMin: formatRatio(ratio.min, viewer),
-            ratioMax: formatRatio(ratio.max, viewer),
+            ratioMin: formatRatioBound(ratio.min, viewer),
+            ratioMax: formatRatioBound(ratio.max, viewer),
             daysMin: String(days.min),
             daysMax: String(days.max),
           },

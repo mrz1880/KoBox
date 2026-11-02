@@ -27,7 +27,7 @@ import { AUTOMATIC_CLEANUPS } from '../../../domain/space/AutomaticCleanup.js';
 import type { CleanupReport } from '../../../domain/space/CleanupReport.js';
 import { SEED_RULE_LIMITS, type SeedRule } from '../../../domain/space/SeedRule.js';
 import { typedSeedRule } from '../typedSeedRule.js';
-import { formatRatio } from '../views/ratio.js';
+import { formatRatioBound } from '../views/ratio.js';
 import { seedRuleFor } from '../../../application/space/seedRuleFor.js';
 import type { TorrentInstanceRepository } from '../../../domain/torrent/ports.js';
 import type { SyncDestinationRepository, SyncTransferRepository } from '../../../domain/sync/ports.js';
@@ -1146,8 +1146,8 @@ export function registerUserRoutes(
           {
             daysMin: String(days.min),
             daysMax: String(days.max),
-            ratioMin: formatRatio(ratio.min, viewer),
-            ratioMax: formatRatio(ratio.max, viewer),
+            ratioMin: formatRatioBound(ratio.min, viewer),
+            ratioMax: formatRatioBound(ratio.max, viewer),
           },
         ),
       );

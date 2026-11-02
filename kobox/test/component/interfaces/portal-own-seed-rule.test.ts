@@ -127,7 +127,7 @@ describe('setting my cleanup rule', () => {
 
     expect(sent.status).toBe(303);
     expect(sent.flash).toBe(
-      'Nothing was saved: the days go from 1 to 365, the ratio, when you set one, from 0.1 to 100.0.',
+      'Nothing was saved: the days go from 1 to 365, the ratio, when you set one, from 0.1 to 100.',
     );
     expect(world.queue.jobs).toEqual([]);
   });
@@ -163,7 +163,7 @@ describe('my cleanup rule in French', () => {
     [{ days: '14', ratio: '' }, 'Enregistré. Le prochain passage horaire l’applique.'],
     [
       { days: '0', ratio: '' },
-      'Rien n’a été enregistré : les jours vont de 1 à 365, le ratio, si vous en indiquez un, de 0,1 à 100,0.',
+      'Rien n’a été enregistré : les jours vont de 1 à 365, le ratio, si vous en indiquez un, de 0,1 à 100.',
     ],
   ])('should_confirm_or_refuse_in_the_members_language_%o', async (fields, french) => {
     const sent = await submit({ _csrf: member.csrf, rule: 'own', ...fields }, 'fr-FR');
