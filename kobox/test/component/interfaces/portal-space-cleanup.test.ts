@@ -141,7 +141,20 @@ describe('the cleanup page', () => {
     const body = await cleanupPageOf(member);
 
     expect(body).toContain(
-      '<td class="path">Big.Release</td>\n  <td class="num">50 GiB</td>\n  <td class="num ratio">2.4</td>\n  <td class="when finished">Jul 13, 2026</td>\n  <td class="reason">Ratio 2.4 after 12 days</td>',
+      '<td class="path">Big.Release</td>\n  <td class="num">50 GiB</td>\n  <td class="num ratio">2.4</td>\n  <td class="when finished">Jul 13, 2026</td>\n  <td class="reason">Ratio 2.4 after 12 days<br>',
+    );
+    expect(body).toContain('<td class="reason">Already sent to your machine</td>');
+  });
+
+  // KoBox only knows what its own sync sent: a seeded line may never have
+  // reached the member's machine, a sent one has
+  it('should_say_kobox_does_not_know_whether_a_seeded_torrent_was_fetched', async () => {
+    await snapshotWithThreeCandidates();
+
+    const body = await cleanupPageOf(member);
+
+    expect(body).toContain(
+      '<td class="reason">Ratio 2.4 after 12 days<br><span class="muted">KoBox does not know whether you fetched it.</span></td>',
     );
     expect(body).toContain('<td class="reason">Already sent to your machine</td>');
   });
@@ -277,7 +290,9 @@ describe('the cleanup page in French', () => {
     const body = await cleanupPageOf(member, 'fr-FR');
 
     expect(body).toContain('<td class="when finished">13 juil. 2026</td>');
-    expect(body).toContain('<td class="reason">Ratio 2,4 après 12 jours</td>');
+    expect(body).toContain(
+      '<td class="reason">Ratio 2,4 après 12 jours<br><span class="muted">KoBox ne sait pas si vous l’avez récupéré.</span></td>',
+    );
     expect(body).toContain('Liste du 25 juillet 2026 à 11:20.');
     expect(body).toContain('Supprimer pour de bon (80 Gio)');
   });
