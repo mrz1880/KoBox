@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { CleanUpSpace } from '../../../../src/application/space/CleanUpSpace.js';
 import { TakeCleanupSnapshot } from '../../../../src/application/space/TakeCleanupSnapshot.js';
 import type { FinishedTorrent } from '../../../../src/domain/space/FinishedTorrent.js';
+import { SeedRule } from '../../../../src/domain/space/SeedRule.js';
 import { LocalPath } from '../../../../src/domain/sync/LocalPath.js';
 import { SyncTransfer } from '../../../../src/domain/sync/SyncTransfer.js';
 import { InfoHash } from '../../../../src/domain/torrent/InfoHash.js';
@@ -16,6 +17,7 @@ import { InMemoryDiskUsageRepository } from '../../../../src/infrastructure/pers
 import { InMemoryMailOutbox } from '../../../../src/infrastructure/persistence/InMemoryMailOutbox.js';
 import { InMemoryPortalCredentialsRepository } from '../../../../src/infrastructure/persistence/InMemoryPortalCredentialsRepository.js';
 import { InMemoryUserRepository } from '../../../../src/infrastructure/persistence/InMemoryUserRepository.js';
+import { InMemorySpacePreferenceRepository } from '../../../../src/infrastructure/persistence/InMemorySpacePreferenceRepository.js';
 import { InMemorySeedRuleRepository } from '../../../../src/infrastructure/persistence/InMemorySeedRuleRepository.js';
 import { InMemorySyncTransferRepository } from '../../../../src/infrastructure/persistence/InMemorySyncTransferRepository.js';
 import { InMemoryTorrentInstanceRepository } from '../../../../src/infrastructure/persistence/InMemoryTorrentInstanceRepository.js';
@@ -96,6 +98,7 @@ interface World {
   samples: InMemoryDiskUsageRepository;
   reports: InMemoryCleanupReportRepository;
   snapshots: InMemoryCleanupSnapshotRepository;
+  preferences: InMemorySpacePreferenceRepository;
   outbox: InMemoryMailOutbox;
   cleanUp: CleanUpSpace;
 }
@@ -117,6 +120,7 @@ beforeEach(async () => {
     data: new FakeTorrentData(),
     transfers: new InMemorySyncTransferRepository(),
     seedRule: new InMemorySeedRuleRepository(),
+    preferences: new InMemorySpacePreferenceRepository(),
     quota: new FakeQuota(),
     samples: new InMemoryDiskUsageRepository(),
     reports: new InMemoryCleanupReportRepository(),
@@ -158,6 +162,32 @@ describe('CleanUpSpace', () => {
     await world.cleanUp.execute({ username: alice, infoHashes: [FILM], trigger: 'member' });
 
     expect(world.torrents.erased).toEqual([FILM.value]);
+  });
+
+  // the box asks a ratio of 2 over a week: alice only asks two weeks
+  it('should_recheck_a_picked_torrent_against_the_rule_the_member_set', async () => {
+    await world.preferences.chooseSeedRule(alice, {
+      kind: 'own',
+      rule: SeedRule.of({ days: 14 }),
+    });
+    world.torrents.holds(aliceScgi, [
+      seededFilm({ ratio: 0.3, finishedAt: '2026-11-05T08:00:00.000Z' }),
+    ]);
+
+    await world.cleanUp.execute({ username: alice, infoHashes: [FILM], trigger: 'member' });
+
+    expect(world.torrents.erased).toEqual([FILM.value]);
+    expect(world.data.removed).toEqual([{ username: 'alice', path: FILM_PATH }]);
+  });
+
+  it('should_keep_a_torrent_the_box_rule_would_keep_for_a_member_without_a_rule', async () => {
+    world.torrents.holds(aliceScgi, [
+      seededFilm({ ratio: 0.3, finishedAt: '2026-11-05T08:00:00.000Z' }),
+    ]);
+
+    await world.cleanUp.execute({ username: alice, infoHashes: [FILM], trigger: 'member' });
+
+    expect(world.torrents.erased).toEqual([]);
   });
 
   // restarted since the snapshot: its ratio is back under the rule

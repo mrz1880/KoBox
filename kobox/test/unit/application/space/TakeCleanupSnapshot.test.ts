@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { TakeCleanupSnapshot } from '../../../../src/application/space/TakeCleanupSnapshot.js';
 import type { FinishedTorrent } from '../../../../src/domain/space/FinishedTorrent.js';
+import { SeedRule } from '../../../../src/domain/space/SeedRule.js';
 import { LocalPath } from '../../../../src/domain/sync/LocalPath.js';
 import { SyncTransfer } from '../../../../src/domain/sync/SyncTransfer.js';
 import { InfoHash } from '../../../../src/domain/torrent/InfoHash.js';
@@ -10,6 +11,7 @@ import { RtorrentPort, ScgiPort } from '../../../../src/domain/user/Port.js';
 import { Quota } from '../../../../src/domain/user/Quota.js';
 import { Username } from '../../../../src/domain/user/Username.js';
 import { InMemoryCleanupSnapshotRepository } from '../../../../src/infrastructure/persistence/InMemoryCleanupSnapshotRepository.js';
+import { InMemorySpacePreferenceRepository } from '../../../../src/infrastructure/persistence/InMemorySpacePreferenceRepository.js';
 import { InMemorySeedRuleRepository } from '../../../../src/infrastructure/persistence/InMemorySeedRuleRepository.js';
 import { InMemorySyncTransferRepository } from '../../../../src/infrastructure/persistence/InMemorySyncTransferRepository.js';
 import { InMemoryTorrentInstanceRepository } from '../../../../src/infrastructure/persistence/InMemoryTorrentInstanceRepository.js';
@@ -60,6 +62,7 @@ interface World {
   torrents: FakeMemberTorrents;
   transfers: InMemorySyncTransferRepository;
   seedRule: InMemorySeedRuleRepository;
+  preferences: InMemorySpacePreferenceRepository;
   snapshots: InMemoryCleanupSnapshotRepository;
   take: TakeCleanupSnapshot;
 }
@@ -80,6 +83,7 @@ beforeEach(async () => {
     torrents: new FakeMemberTorrents(),
     transfers: new InMemorySyncTransferRepository(),
     seedRule: new InMemorySeedRuleRepository(),
+    preferences: new InMemorySpacePreferenceRepository(),
     snapshots: new InMemoryCleanupSnapshotRepository(),
   };
   world = { ...deps, take: new TakeCleanupSnapshot(deps) };
@@ -96,6 +100,22 @@ describe('TakeCleanupSnapshot', () => {
     expect(snapshot?.candidates.map((candidate) => [candidate.name, candidate.reason])).toEqual([
       ['Example Film', 'seeded'],
     ]);
+  });
+
+  // the box asks a ratio of 2 over a week: alice only asks two weeks
+  it('should_judge_a_member_by_the_rule_they_set_rather_than_the_box_rule', async () => {
+    await world.preferences.chooseSeedRule(alice, {
+      kind: 'own',
+      rule: SeedRule.of({ days: 14 }),
+    });
+    world.torrents.holds(aliceScgi, [
+      seededFilm({ ratio: 0.3, finishedAt: '2026-11-05T08:00:00.000Z' }),
+    ]);
+
+    await world.take.execute(alice, AT);
+
+    const snapshot = await world.snapshots.find(alice);
+    expect(snapshot?.candidates.map((candidate) => candidate.reason)).toEqual(['seeded']);
   });
 
   it('should_propose_a_download_sync_already_sent_to_the_members_machine', async () => {
