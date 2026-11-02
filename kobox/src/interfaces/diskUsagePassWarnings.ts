@@ -10,6 +10,14 @@ export interface PassWarning {
 
 export function diskUsagePassWarnings(pass: DiskUsagePass): readonly PassWarning[] {
   return [
+    // skipped, the volume and these members keep their previous sample
+    ...(pass.volumeError === undefined
+      ? []
+      : [{ message: 'disk usage: volume not measured', context: { error: pass.volumeError } }]),
+    ...pass.unmeasured.map((member) => ({
+      message: 'disk usage: member not measured',
+      context: { username: member.username.value, error: member.error },
+    })),
     // the member only sees an older list; the operator is told why
     ...pass.staleSnapshots.map((stale) => ({
       message: 'space cleanup: list not refreshed',

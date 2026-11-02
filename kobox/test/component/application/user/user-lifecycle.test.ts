@@ -721,6 +721,34 @@ describe('SampleDiskUsage', () => {
     expect(await world.volumeSamples.find()).toBeUndefined();
   });
 
+  // skipped, the volume still has no sample: the operator is told why
+  it('should_report_the_volume_it_could_not_read', async () => {
+    world.volume.failWith('statfs: no such file or directory');
+
+    const pass = await world.sampleDiskUsage.execute();
+
+    expect(pass.volumeError).toBe('statfs: no such file or directory');
+  });
+
+  // one unreadable quota costs no other member their sample, and is reported
+  it('should_still_sample_the_next_member_and_report_the_one_whose_quota_could_not_be_read', async () => {
+    const bob = Username.parse('bob');
+    await world.createUser.execute(createUserCommand());
+    await world.createUser.execute({
+      ...createUserCommand(),
+      username: bob,
+      email: EmailAddress.parse('bob@example.org'),
+    });
+    world.quota.setUsageForTest(bob, Quota.gib(5));
+    world.quota.failUsageFor(alice, 'quota: cannot read /home');
+
+    const pass = await world.sampleDiskUsage.execute();
+
+    expect(await world.diskSamples.find(alice)).toBeUndefined();
+    expect((await world.diskSamples.find(bob))?.used.toGib()).toBe(5);
+    expect(pass.unmeasured).toEqual([{ username: alice, error: 'quota: cannot read /home' }]);
+  });
+
   // ruTorrent's own meter showed the whole disk's free space: each member's
   // gauge is given what they hold against their own quota instead
   it('should_show_each_member_what_they_hold_against_their_quota', async () => {

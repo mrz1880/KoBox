@@ -6,6 +6,7 @@ export class FakeQuota implements QuotaPort {
   private readonly quotas = new Map<string, Quota>();
   private readonly usages = new Map<string, Quota>();
   private nextFailure: string | undefined;
+  private readonly usageFailures = new Map<string, string>();
 
   failNextSetQuota(message: string): void {
     this.nextFailure = message;
@@ -21,7 +22,16 @@ export class FakeQuota implements QuotaPort {
     return Promise.resolve();
   }
 
+  // the member's usage cannot be read until the test says otherwise
+  failUsageFor(username: Username, message: string): void {
+    this.usageFailures.set(username.value, message);
+  }
+
   getUsage(username: Username): Promise<Quota> {
+    const failure = this.usageFailures.get(username.value);
+    if (failure !== undefined) {
+      return Promise.reject(new Error(failure));
+    }
     return Promise.resolve(this.usages.get(username.value) ?? Quota.bytes(0));
   }
 
