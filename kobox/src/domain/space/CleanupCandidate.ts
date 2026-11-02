@@ -10,8 +10,8 @@ export type CleanupReason = 'seeded' | 'alreadySent';
 type CompleteTorrent = FinishedTorrent & { readonly finishedAt: string };
 
 // A finished torrent a member could delete to free space, with the reason the
-// page shows them. Only `judge` builds one, so a candidate always has a reason
-// that held when it was judged.
+// page shows them. Only `judge` builds a new one, so a candidate always has a
+// reason that held when it was judged; `restore` reads one back from storage.
 export class CleanupCandidate {
   readonly infoHash: InfoHash;
   readonly name: string;
@@ -29,6 +29,13 @@ export class CleanupCandidate {
     this.finishedAt = torrent.finishedAt;
     this.path = torrent.path;
     this.reason = reason;
+  }
+
+  // Brings back a candidate judged earlier, as stored with its reason.
+  static restore(
+    judged: CompleteTorrent & { readonly reason: CleanupReason },
+  ): CleanupCandidate {
+    return new CleanupCandidate(judged, judged.reason);
   }
 
   // A torrent still downloading is never proposed, even if a partial copy was
