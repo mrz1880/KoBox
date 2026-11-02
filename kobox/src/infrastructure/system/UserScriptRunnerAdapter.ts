@@ -4,6 +4,7 @@ import type { FinishedScriptArgs, UserScriptRunnerPort } from '../../domain/torr
 import type { Username } from '../../domain/user/Username.js';
 import type { CommandRunner } from './CommandRunner.js';
 import { homeOf } from '../../domain/user/homeDirectory.js';
+import { FINISH_SCRIPTS_TREE } from '../../domain/torrent/memberTrees.js';
 
 type HomeResolver = (username: Username) => string;
 
@@ -19,7 +20,7 @@ export class UserScriptRunnerAdapter implements UserScriptRunnerPort {
   ) {}
 
   async runFinishedScripts(username: Username, args: FinishedScriptArgs): Promise<void> {
-    const scriptsDir = join(this.homeOf(username), 'scripts');
+    const scriptsDir = join(this.homeOf(username), FINISH_SCRIPTS_TREE);
     let scripts: string[];
     try {
       scripts = readdirSync(scriptsDir)

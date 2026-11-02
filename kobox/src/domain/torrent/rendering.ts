@@ -5,6 +5,7 @@ import type { TorrentInstance } from './TorrentInstance.js';
 import type { WatchDir } from './WatchDir.js';
 import type { RenderedFile } from './ports.js';
 import { homeOf } from '../user/homeDirectory.js';
+import { CONFIG_DROP_IN_TREE } from './memberTrees.js';
 
 export class UnresolvedPlaceholderError extends DomainError {
   constructor(names: readonly string[]) {
@@ -137,7 +138,7 @@ export function renderHomeFiles(
       group,
     },
     {
-      path: `${home}/rtorrent/config.d/80-watch.rc`,
+      path: `${home}/${CONFIG_DROP_IN_TREE}/80-watch.rc`,
       content: renderWatchRc(instance, templates),
       mode: '0640',
       owner,

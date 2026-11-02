@@ -2,6 +2,7 @@ import type { RenderedFile } from '../shared/files.js';
 import type { Username } from '../user/Username.js';
 import type { Tracker } from './Tracker.js';
 import { homeOf } from '../user/homeDirectory.js';
+import { CONFIG_DROP_IN_TREE } from '../torrent/memberTrees.js';
 
 // Pure, deterministic renders of the whole desired state of each network
 // file. The legacy built these with appended `echo`/`sed -i` passes over live
@@ -80,7 +81,7 @@ export function renderUserBlocklistDropin(username: Username, enabled: boolean):
       ]
     : ['# No blocklist enabled — this drop-in is intentionally inert.'];
   return {
-    path: `${home}/rtorrent/config.d/80-blocklist.rc`,
+    path: `${home}/${CONFIG_DROP_IN_TREE}/80-blocklist.rc`,
     content: [
       `# KoBox-managed file for ${username.value} — DO NOT EDIT.`,
       ...body,
