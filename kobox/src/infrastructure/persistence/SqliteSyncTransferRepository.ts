@@ -104,4 +104,13 @@ export class SqliteSyncTransferRepository implements SyncTransferRepository {
       .all();
     return Promise.resolve(rows.length);
   }
+
+  listSentSources(username: Username): Promise<readonly LocalPath[]> {
+    const rows = this.db.orm
+      .select({ source: syncTransfers.source })
+      .from(syncTransfers)
+      .where(and(eq(syncTransfers.username, username.value), eq(syncTransfers.state, 'sent')))
+      .all();
+    return Promise.resolve(rows.map((row) => LocalPath.parse(row.source)));
+  }
 }

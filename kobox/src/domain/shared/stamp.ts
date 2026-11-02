@@ -6,6 +6,18 @@ export function stampOf(date: Date): string {
   return date.toISOString().slice(0, 19).replace('T', ' ');
 }
 
+// A stamp names no zone, and Date.parse would read it in the box's own: it is
+// UTC, so the zone is spelled out before parsing.
+function msOf(stamp: string): number {
+  return Date.parse(`${stamp.replace(' ', 'T')}Z`);
+}
+
 export function shiftStamp(stamp: string, milliseconds: number): string {
-  return stampOf(new Date(Date.parse(`${stamp.replace(' ', 'T')}Z`) + milliseconds));
+  return stampOf(new Date(msOf(stamp) + milliseconds));
+}
+
+// The ISO instant a stamp stands for, for the code that compares instants
+// rather than stored dates.
+export function instantOf(stamp: string): string {
+  return new Date(msOf(stamp)).toISOString();
 }

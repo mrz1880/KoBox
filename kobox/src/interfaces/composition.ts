@@ -108,6 +108,8 @@ import { AuthenticateApp } from '../application/portal/AuthenticateApp.js';
 import { IssueAppToken } from '../application/portal/IssueAppToken.js';
 import { CryptoSessionTokens } from '../infrastructure/system/CryptoSessionTokens.js';
 import { SqliteSyncTransferRepository } from '../infrastructure/persistence/SqliteSyncTransferRepository.js';
+import { SqliteCleanupSnapshotRepository } from '../infrastructure/persistence/SqliteCleanupSnapshotRepository.js';
+import { SqliteSeedRuleRepository } from '../infrastructure/persistence/SqliteSeedRuleRepository.js';
 import { RsyncOverSshTransfer } from '../infrastructure/system/RsyncOverSshTransfer.js';
 import { FsLocalFileFacts } from '../infrastructure/system/FsLocalFileFacts.js';
 import { RutorrentQuotaGauges } from '../infrastructure/system/RutorrentQuotaGauges.js';
@@ -166,6 +168,7 @@ import {
   buildMaintenanceUseCases,
   buildSyncUseCases,
   buildSecurityUseCases,
+  buildSpaceUseCases,
   buildTorrentUseCases,
   buildTrackerUseCases,
   buildUseCases,
@@ -739,6 +742,16 @@ export function buildContainer(name: string): Container {
   const nextcloud = new OccNextcloudAdapter(runner);
   const components = new SqliteComponentRegistry(db);
   const passwords = passwordCipher();
+  // one client for every member's rTorrent: it holds no state but its timeout
+  const rtorrentControl = new ScgiRtorrentControlAdapter({ logger });
+  const syncTransferRepo = new SqliteSyncTransferRepository(db);
+  const spaceUseCases = buildSpaceUseCases({
+    instances: new SqliteTorrentInstanceRepository(db),
+    torrents: rtorrentControl,
+    transfers: syncTransferRepo,
+    seedRule: new SqliteSeedRuleRepository(db),
+    snapshots: new SqliteCleanupSnapshotRepository(db),
+  });
   const useCases = buildUseCases({
     repo,
     accounts: new SystemAccountAdapter(runner),
@@ -748,6 +761,7 @@ export function buildContainer(name: string): Container {
     volumeSamples: new SqliteVolumeSampleRepository(db),
     // ruTorrent's disk meter shows each member their quota from these
     quotaGauges: new RutorrentQuotaGauges(new RtorrentConfigAdapter(runner)),
+    cleanupSnapshot: spaceUseCases.takeCleanupSnapshot,
     nextcloud,
     components,
     outbox,
@@ -793,7 +807,7 @@ export function buildContainer(name: string): Container {
     filing: new MvTorrentFiling(runner),
     services,
     metainfo: new BencodeMetainfoAdapter(),
-    control: new ScgiRtorrentControlAdapter({ logger }),
+    control: rtorrentControl,
     scripts: new UserScriptRunnerAdapter(runner),
     announcers: new EnqueueAnnouncerSink(queue),
     templates: loadRtorrentTemplates(),
@@ -881,7 +895,6 @@ export function buildContainer(name: string): Container {
     clock: nowStamp,
   });
   const syncDestinationRepo = new SqliteSyncDestinationRepository(db);
-  const syncTransferRepo = new SqliteSyncTransferRepository(db);
   const syncUseCases = buildSyncUseCases({
     users: repo,
     instances: new SqliteTorrentInstanceRepository(db),
