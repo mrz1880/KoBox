@@ -1257,6 +1257,33 @@ describe('space jobs', () => {
     expect(await world.seedRule.get()).toEqual(SeedRule.of({ ratio: 1.5, days: 14 }));
   });
 
+  it('should_keep_the_rule_a_member_set_for_their_own_torrents', async () => {
+    const id = await world.queue.enqueue(
+      buildJob.setOwnSeedRule({ username: 'alice', rule: { ratio: null, days: 14 } }),
+    );
+
+    await world.worker.processNext();
+
+    expect(world.queue.statusOf(id)).toBe('done');
+    expect(await world.spacePreferences.findSeedRule(alice)).toEqual({
+      kind: 'own',
+      rule: SeedRule.of({ days: 14 }),
+    });
+  });
+
+  it('should_take_a_member_back_to_the_box_rule', async () => {
+    await world.spacePreferences.chooseSeedRule(alice, {
+      kind: 'own',
+      rule: SeedRule.of({ ratio: 1, days: 14 }),
+    });
+    const id = await world.queue.enqueue(buildJob.setOwnSeedRule({ username: 'alice', rule: null }));
+
+    await world.worker.processNext();
+
+    expect(world.queue.statusOf(id)).toBe('done');
+    expect(await world.spacePreferences.findSeedRule(alice)).toEqual({ kind: 'box' });
+  });
+
   it('should_keep_that_the_hourly_pass_started_a_cleanup_on_its_own', async () => {
     const id = await world.queue.enqueue(
       parseJob('clean-up-space', {

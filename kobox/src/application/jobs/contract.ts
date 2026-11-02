@@ -76,6 +76,7 @@ export const JOB_TYPES = [
   'clean-up-space',
   'set-automatic-cleanup',
   'set-seed-rule',
+  'set-own-seed-rule',
 ] as const;
 
 export type JobType = (typeof JOB_TYPES)[number];
@@ -101,6 +102,13 @@ const infoHashField = z.string().regex(INFO_HASH_PATTERN);
 // One cleanup job carries at most this many torrents: enough for a member who
 // picks a whole page, small enough to keep a queued row readable.
 export const CLEANUP_MAX_TORRENTS = 500;
+// A seed rule's bounds, the box's and a member's alike, mirror the domain's.
+const seedRuleRatio = z.number().min(SEED_RULE_LIMITS.ratio.min).max(SEED_RULE_LIMITS.ratio.max);
+const seedRuleDays = z
+  .number()
+  .int()
+  .min(SEED_RULE_LIMITS.days.min)
+  .max(SEED_RULE_LIMITS.days.max);
 // Paths from rtorrent hooks: absolute, no traversal. The worker enforces the
 // stronger invariant (must live under the owning user's home) in
 // HandleTorrentEvent before any path is read or stored.
@@ -300,9 +308,12 @@ export const jobPayloadSchemas = {
     scope: z.enum(AUTOMATIC_CLEANUPS),
   }),
   // the box-wide rule an admin set: what a torrent gives back, over how long
-  'set-seed-rule': z.strictObject({
-    ratio: z.number().min(SEED_RULE_LIMITS.ratio.min).max(SEED_RULE_LIMITS.ratio.max),
-    days: z.number().int().min(SEED_RULE_LIMITS.days.min).max(SEED_RULE_LIMITS.days.max),
+  'set-seed-rule': z.strictObject({ ratio: seedRuleRatio, days: seedRuleDays }),
+  // the rule a member set for their own torrents, the ratio null when only
+  // the days count; no rule at all takes them back to the box's
+  'set-own-seed-rule': z.strictObject({
+    username: usernameField,
+    rule: z.strictObject({ ratio: seedRuleRatio.nullable(), days: seedRuleDays }).nullable(),
   }),
 } satisfies Record<JobType, z.ZodType>;
 

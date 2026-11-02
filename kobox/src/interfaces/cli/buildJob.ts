@@ -82,6 +82,13 @@ export const buildJob = {
   setSeedRule(input: { ratio: number; days: number }): Job {
     return parseJob('set-seed-rule', input);
   },
+  // the rule a member set for their own torrents, or null for the box's
+  setOwnSeedRule(input: {
+    username: string;
+    rule: { ratio: number | null; days: number } | null;
+  }): Job {
+    return parseJob('set-own-seed-rule', input);
+  },
   checkSyncDestination(input: { username: string }): Job {
     return parseJob('check-sync-destination', input);
   },
