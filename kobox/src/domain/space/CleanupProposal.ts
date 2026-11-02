@@ -50,6 +50,12 @@ export class CleanupProposal {
     );
   }
 
+  // Everything that could go, checked or not: what an admin reads as the
+  // member's cleanable space.
+  cleanable(): Quota {
+    return Quota.total(this.lines.map((line) => line.candidate.size));
+  }
+
   // What deleting frees: the lines checked by the proposal, or the ones the
   // member picked once they changed the boxes.
   freed(selection?: readonly InfoHash[]): Quota {

@@ -120,10 +120,11 @@ export function registerAdminUserRoutes(
       if (usage !== undefined) {
         usages.set(user.username.value, usage);
       }
-      // what the member's own proposal would free, as their home box says
+      // everything the member could clean: what their proposal checks depends
+      // on how full they are, and would read 0 under the filling line
       const list = await cleanupListOf(deps, user.username);
       if (list !== undefined) {
-        freeable.set(user.username.value, list.proposal.freed());
+        freeable.set(user.username.value, list.proposal.cleanable());
       }
     }
     return { usages, freeable, volume: await deps.volumeSamples.find() };

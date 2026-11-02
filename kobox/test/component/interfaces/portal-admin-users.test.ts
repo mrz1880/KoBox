@@ -80,9 +80,10 @@ describe('what each member could free', () => {
     return new RegExp(`<tr>\\s*<td><a href="/admin/users/${name}">[^]*?</tr>`).exec(response.body)?.[0] ?? '';
   }
 
-  // alice's allowance is 412 GiB: at 400 GiB, the 50 and 30 GiB lines bring her
-  // under the 80 % line and the 10 GiB one stays unchecked, as on her own home
-  it('should_show_what_the_members_own_proposal_would_free_without_a_delete_button', async () => {
+  // Everything the member could clean, not what their proposal would check: a
+  // member under 80 % has nothing checked, and the admin would read 0 as
+  // "nothing cleanable".
+  it('should_show_everything_the_member_could_clean_without_a_delete_button', async () => {
     await world.diskSamples.save({ username: alice, used: Quota.gib(400), sampledAt: SAMPLED_AT });
     await world.cleanupSnapshots.replace(
       alice,
@@ -92,7 +93,7 @@ describe('what each member could free', () => {
 
     const row = await rowOf('alice');
 
-    expect(row).toContain('<td class="num">80 GiB</td>');
+    expect(row).toContain('<td class="num">90 GiB</td>');
     expect(row).not.toContain('<form');
   });
 

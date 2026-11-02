@@ -74,6 +74,17 @@ describe('CleanupProposal', () => {
     expect(proposal.freed().toGib()).toBe(17);
   });
 
+  it('should_tell_everything_that_could_go_whatever_is_checked', () => {
+    // under the filling line nothing is checked, yet all of it is cleanable
+    const proposal = CleanupProposal.of({
+      candidates: [candidate('a', 10), candidate('b', 4)],
+      used: Quota.gib(10),
+      allowance: Quota.gib(100),
+    });
+
+    expect(proposal.cleanable().toGib()).toBe(14);
+  });
+
   // the member unchecked a line and checked another one past the line
   it('should_free_what_the_member_selected_instead_once_they_chose', () => {
     const proposal = CleanupProposal.of({
