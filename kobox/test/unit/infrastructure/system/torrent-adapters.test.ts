@@ -536,16 +536,43 @@ describe('ScgiRtorrentControlAdapter', () => {
           i8(10),
           i8(0),
           i8(0),
+          str('/a'),
+          i8(1_761_000_000),
+        ],
+        [
+          str(secondHash),
           '<value><string/></value>',
+          i8(10),
+          i8(0),
+          i8(0),
+          str('/b'),
           i8(1_761_000_000),
         ],
       ]);
       const adapter = new ScgiRtorrentControlAdapter();
 
-      const [torrent] = await adapter.listFinished(ScgiPort.parse(port));
+      const [untyped, empty] = await adapter.listFinished(ScgiPort.parse(port));
 
-      expect(torrent?.name).toBe('Caf\u00e9 & Cr\u00e8me <3> "live" \'');
-      expect(torrent?.path).toBe('');
+      expect(untyped?.name).toBe('Caf\u00e9 & Cr\u00e8me <3> "live" \'');
+      expect(empty?.name).toBe('');
+    });
+
+    // rtorrent forgets where a closed torrent's data is: nothing there to
+    // clean, and nothing odd to warn about
+    it('should_leave_out_a_torrent_whose_data_location_rtorrent_no_longer_knows', async () => {
+      reply = rowsReply([
+        [str(firstHash), str('Closed'), i8(10), i8(0), i8(0), str(''), i8(1_761_000_000)],
+        [str(secondHash), str('Album'), i8(2048), i8(500), i8(1_761_868_800), str('/a'), i8(1_761_000_000)],
+      ]);
+      const warnings: unknown[] = [];
+      const adapter = new ScgiRtorrentControlAdapter({
+        logger: { warn: (context: unknown) => warnings.push(context) },
+      });
+
+      const torrents = await adapter.listFinished(ScgiPort.parse(port));
+
+      expect(torrents.map((torrent) => torrent.name)).toEqual(['Album']);
+      expect(warnings).toEqual([]);
     });
 
     it('should_answer_no_torrent_when_none_is_complete', async () => {
