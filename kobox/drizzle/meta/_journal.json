@@ -253,6 +253,13 @@
       "when": 1793611554244,
       "tag": "0035_space-preferences",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "6",
+      "when": 1793614985742,
+      "tag": "0036_member-seed-rule",
+      "breakpoints": true
     }
   ]
 }

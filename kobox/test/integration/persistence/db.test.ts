@@ -179,4 +179,28 @@ describe('KoboxDatabase', () => {
     expect(before).toEqual({ automatic: 'off', warned: false });
     expect(after).toEqual({ automatic: 'sentOnly', warned: false });
   });
+
+  it('should_keep_every_member_of_a_box_from_before_own_seed_rules_on_the_box_rule', async () => {
+    // a member who already chose automatic cleanup before members had a rule
+    const old = boxBefore('0036_member-seed-rule');
+    old
+      .prepare(
+        "INSERT INTO users (username, email, quota_bytes, scgi_port, rtorrent_port, proxy_port, status) VALUES ('alice', 'alice@example.org', 1, 51101, 45000, 8080, 'active')",
+      )
+      .run();
+    old
+      .prepare("INSERT INTO space_preferences (username, automatic, warned) VALUES ('alice', 'sentOnly', 1)")
+      .run();
+    old.close();
+
+    const db = KoboxDatabase.open(join(dir, 'kobox.db'));
+    const alice = Username.parse('alice');
+    const preferences = new SqliteSpacePreferenceRepository(db);
+    const rule = await preferences.findSeedRule(alice);
+    const kept = await preferences.find(alice);
+    db.close();
+
+    expect(rule).toEqual({ kind: 'box' });
+    expect(kept).toEqual({ automatic: 'sentOnly', warned: true });
+  });
 });
