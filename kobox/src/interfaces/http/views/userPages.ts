@@ -19,6 +19,7 @@ import { html, type RawHtml } from '../html.js';
 import { flash, page, sentence, type Reader, type Viewer } from './layout.js';
 import type { Translate } from './messages.js';
 import type { BlocklistCoverage } from '../../../domain/tracker/BlocklistCoverage.js';
+import { WatchDir } from '../../../domain/torrent/WatchDir.js';
 
 function fairUseChip(level: string, t: Translate): RawHtml {
   if (level === 'throttled') {
@@ -474,7 +475,7 @@ ${facts.sshKey.comment === '' ? html`` : html`<span class="mono">${facts.sshKey.
 ${facts.sftpHost === undefined
     ? html``
     : html`<p class="muted">${viewer.t("With the key installed, send a torrent file over SFTP into one of your folders (replace FOLDER with its name, as listed under Folders); rTorrent picks it up within a few seconds and gives it that folder's label:")}</p>
-<p class="mono">scp -P ${facts.sshPort} my.torrent ${facts.username}@${facts.sftpHost}:rtorrent/watch/FOLDER/</p>`}`;
+<p class="mono">scp -P ${facts.sshPort} my.torrent ${facts.username}@${facts.sftpHost}:${WatchDir.root().watchTree()}/FOLDER/</p>`}`;
 }
 
 // What a member gives to Sonarr, Radarr or any other program that drives their
@@ -662,7 +663,7 @@ ${flash(viewer.t, message)}
   ${facts.sftpHost !== undefined
     ? html`<dt>${viewer.t('SFTP host')}</dt><dd>${facts.sftpHost}</dd>`
     : undefined}
-  <dt>${viewer.t('Files')}</dt><dd>~/rtorrent/complete</dd>
+  <dt>${viewer.t('Files')}</dt><dd>~/${WatchDir.root().completeTree()}</dd>
   <dt>${viewer.t('rTorrent port')}</dt><dd>${facts.rtorrentPort}</dd>
 </dl>
 <p class="muted">${viewer.t('Your SFTP password is the one you use here.')}</p>
