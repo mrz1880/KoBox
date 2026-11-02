@@ -1,3 +1,4 @@
+import type { LocalPath } from '../../domain/sync/LocalPath.js';
 import { SyncTransfer, type TransferState } from '../../domain/sync/SyncTransfer.js';
 import type { SyncTransferRepository } from '../../domain/sync/ports.js';
 import type { Username } from '../../domain/user/Username.js';
@@ -64,6 +65,14 @@ export class InMemorySyncTransferRepository implements SyncTransferRepository {
       this.ordered().filter(
         (row) => row.username.value === username.value && row.state === state,
       ).length,
+    );
+  }
+
+  listSentSources(username: Username): Promise<readonly LocalPath[]> {
+    return Promise.resolve(
+      this.ordered()
+        .filter((row) => row.username.value === username.value && row.state === 'sent')
+        .map((row) => row.source),
     );
   }
 

@@ -81,6 +81,12 @@ import type { SecuritySettings } from '../application/security/settings.js';
 import { ChangePassword } from '../application/user/ChangePassword.js';
 import { RemoveSshKey, SetSshKey } from '../application/user/SetSshKey.js';
 import { SampleDiskUsage } from '../application/user/SampleDiskUsage.js';
+import { TakeCleanupSnapshot } from '../application/space/TakeCleanupSnapshot.js';
+import type {
+  CleanupSnapshotRepository,
+  MemberTorrentsPort,
+  SeedRuleRepository,
+} from '../domain/space/ports.js';
 import { SetUserQuota } from '../application/user/SetUserQuota.js';
 import { ChangeRole } from '../application/user/ChangeRole.js';
 import { CreateUser } from '../application/user/CreateUser.js';
@@ -163,6 +169,8 @@ export interface UseCaseDeps {
   readonly volume: VolumePort;
   readonly volumeSamples: VolumeSampleRepository;
   readonly quotaGauges: QuotaGaugePort;
+  // what each member can clean, read in the same hourly pass as their usage
+  readonly cleanupSnapshot: Pick<TakeCleanupSnapshot, 'execute'>;
   readonly nextcloud: NextcloudPort;
   readonly components: ComponentRegistry;
   readonly outbox: MailOutboxPort;
@@ -211,6 +219,24 @@ export function buildUseCases(deps: UseCaseDeps): UseCases {
     suspendUser: new SuspendUser(deps),
     resumeUser: new ResumeUser(deps),
   };
+}
+
+export interface SpaceUseCaseDeps {
+  readonly instances: TorrentInstanceRepository;
+  readonly torrents: MemberTorrentsPort;
+  readonly transfers: SyncTransferRepository;
+  readonly seedRule: SeedRuleRepository;
+  readonly snapshots: CleanupSnapshotRepository;
+}
+
+// Root-side only: reading a member's rTorrent and erasing their files both need
+// privileges the portal does not have.
+export interface SpaceUseCases {
+  readonly takeCleanupSnapshot: TakeCleanupSnapshot;
+}
+
+export function buildSpaceUseCases(deps: SpaceUseCaseDeps): SpaceUseCases {
+  return { takeCleanupSnapshot: new TakeCleanupSnapshot(deps) };
 }
 
 export interface MaintenanceUseCaseDeps {

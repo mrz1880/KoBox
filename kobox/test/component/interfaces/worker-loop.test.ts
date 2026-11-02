@@ -257,6 +257,8 @@ beforeEach(() => {
     volume: new FakeVolume(),
     volumeSamples: new InMemoryVolumeSampleRepository(),
     quotaGauges: new FakeQuotaGauges(),
+    // the snapshot has its own suites; this one checks the job wiring
+    cleanupSnapshot: { execute: () => Promise.resolve() },
     nextcloud,
     components,
     outbox,

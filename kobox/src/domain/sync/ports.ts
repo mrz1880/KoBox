@@ -44,6 +44,9 @@ export interface SyncTransferRepository {
   listWaiting(username: Username, limit?: number): Promise<readonly SyncTransfer[]>;
   listRecent(username: Username, limit: number): Promise<readonly SyncTransfer[]>;
   countByState(username: Username, state: TransferState): Promise<number>;
+  // where each download KoBox sync already put on the member's machine came
+  // from: the space context does not propose to delete what has no copy yet
+  listSentSources(username: Username): Promise<readonly LocalPath[]>;
 }
 
 // What a finished download actually left on disk. A torrent that produced a

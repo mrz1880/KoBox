@@ -5,6 +5,7 @@ import { DeleteUser } from '../../../../src/application/user/DeleteUser.js';
 import { ResumeUser } from '../../../../src/application/user/ResumeUser.js';
 import { SampleDiskUsage } from '../../../../src/application/user/SampleDiskUsage.js';
 import { SetUserQuota } from '../../../../src/application/user/SetUserQuota.js';
+import { TakeCleanupSnapshot } from '../../../../src/application/space/TakeCleanupSnapshot.js';
 import { SuspendUser } from '../../../../src/application/user/SuspendUser.js';
 import {
   RestartRtorrentInstance,
@@ -27,6 +28,13 @@ import { PasswordLink } from '../../../../src/domain/portal/PasswordLink.js';
 import { InMemoryPortalCredentialsRepository } from '../../../../src/infrastructure/persistence/InMemoryPortalCredentialsRepository.js';
 import { InMemoryPortalSessionRepository } from '../../../../src/infrastructure/persistence/InMemoryPortalSessionRepository.js';
 import { InMemoryDiskUsageRepository } from '../../../../src/infrastructure/persistence/InMemoryDiskUsageRepository.js';
+import { InMemoryCleanupSnapshotRepository } from '../../../../src/infrastructure/persistence/InMemoryCleanupSnapshotRepository.js';
+import { InMemorySeedRuleRepository } from '../../../../src/infrastructure/persistence/InMemorySeedRuleRepository.js';
+import { InMemorySyncTransferRepository } from '../../../../src/infrastructure/persistence/InMemorySyncTransferRepository.js';
+import { InMemoryTorrentInstanceRepository } from '../../../../src/infrastructure/persistence/InMemoryTorrentInstanceRepository.js';
+import { FakeMemberTorrents } from '../../../../src/infrastructure/system/fakes/FakeMemberTorrents.js';
+import { TorrentInstance } from '../../../../src/domain/torrent/TorrentInstance.js';
+import { InfoHash } from '../../../../src/domain/torrent/InfoHash.js';
 import { InMemoryUserRepository } from '../../../../src/infrastructure/persistence/InMemoryUserRepository.js';
 import { InMemoryVolumeSampleRepository } from '../../../../src/infrastructure/persistence/InMemoryVolumeSampleRepository.js';
 import { FakePasswordHasher } from '../../../../src/infrastructure/system/fakes/FakePasswordHasher.js';
@@ -137,6 +145,9 @@ interface World {
   volume: FakeVolume;
   volumeSamples: InMemoryVolumeSampleRepository;
   gauges: FakeQuotaGauges;
+  instances: InMemoryTorrentInstanceRepository;
+  memberTorrents: FakeMemberTorrents;
+  cleanupSnapshots: InMemoryCleanupSnapshotRepository;
 }
 
 let world: World;
@@ -160,6 +171,9 @@ beforeEach(() => {
   const nextcloud = new FakeServiceLogin();
   const allocator = new SequentialPortAllocator();
   const clock = (): string => '2026-07-25 10:00:00';
+  const instances = new InMemoryTorrentInstanceRepository();
+  const memberTorrents = new FakeMemberTorrents();
+  const cleanupSnapshots = new InMemoryCleanupSnapshotRepository();
   const deps = {
     repo, accounts, quota, sftp, services, notifications, credentials, sessions,
     clock, hasher, logins: [samba, nextcloud], links,
@@ -180,7 +194,17 @@ beforeEach(() => {
       gauges,
       volume,
       volumeSamples,
+      cleanupSnapshot: new TakeCleanupSnapshot({
+        instances,
+        torrents: memberTorrents,
+        transfers: new InMemorySyncTransferRepository(),
+        seedRule: new InMemorySeedRuleRepository(),
+        snapshots: cleanupSnapshots,
+      }),
     }),
+    instances,
+    memberTorrents,
+    cleanupSnapshots,
     diskSamples,
     volume,
     volumeSamples,
@@ -695,5 +719,60 @@ describe('SampleDiskUsage', () => {
     await world.sampleDiskUsage.execute();
 
     expect(world.gauges.shown).toEqual([{ username: 'alice', usedGib: 37, quotaGib: 412 }]);
+  });
+
+  // the portal cannot ask a member's rTorrent what can be cleaned: the same
+  // privileged pass writes it down
+  it('should_take_each_members_cleanup_snapshot_after_their_sample', async () => {
+    const user = await world.createUser.execute(createUserCommand());
+    await world.instances.save(
+      TorrentInstance.provision({
+        username: alice,
+        scgiPort: user.scgiPort,
+        rtorrentPort: RtorrentPort.parse(45000),
+      }).instance,
+    );
+    world.memberTorrents.holds(user.scgiPort, [
+      {
+        infoHash: InfoHash.parse('A'.repeat(40)),
+        name: 'Example Film',
+        size: Quota.gib(12),
+        ratio: 3,
+        finishedAt: '2026-07-01T08:00:00.000Z',
+        path: '/home/alice/rtorrent/complete/Films/Example Film',
+      },
+    ]);
+
+    await world.sampleDiskUsage.execute();
+
+    const snapshot = await world.cleanupSnapshots.find(alice);
+    expect(snapshot?.takenAt).toBe('2026-07-25 10:00:00');
+    expect(snapshot?.candidates.map((candidate) => candidate.name)).toEqual(['Example Film']);
+  });
+
+  it('should_still_sample_the_next_member_when_a_cleanup_snapshot_fails', async () => {
+    const bob = Username.parse('bob');
+    await world.createUser.execute(createUserCommand());
+    await world.createUser.execute({
+      ...createUserCommand(),
+      username: bob,
+      email: EmailAddress.parse('bob@example.org'),
+    });
+    world.quota.setUsageForTest(bob, Quota.gib(5));
+    const sampling = new SampleDiskUsage({
+      ...world,
+      samples: world.diskSamples,
+      clock: () => '2026-07-25 10:00:00',
+      cleanupSnapshot: {
+        execute: (username) =>
+          username.equals(alice)
+            ? Promise.reject(new Error('database is locked'))
+            : Promise.resolve(),
+      },
+    });
+
+    await sampling.execute();
+
+    expect((await world.diskSamples.find(bob))?.used.toGib()).toBe(5);
   });
 });

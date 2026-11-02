@@ -1,3 +1,4 @@
+import type { TakeCleanupSnapshot } from '../space/TakeCleanupSnapshot.js';
 import type {
   DiskUsageRepository,
   QuotaGaugePort,
@@ -14,6 +15,7 @@ interface Deps {
   readonly gauges: QuotaGaugePort;
   readonly volume: VolumePort;
   readonly volumeSamples: VolumeSampleRepository;
+  readonly cleanupSnapshot: Pick<TakeCleanupSnapshot, 'execute'>;
   readonly clock: () => string;
 }
 
@@ -21,7 +23,8 @@ interface Deps {
 // portal runs non-root and cannot ask about an account that is not its own.
 // One member's unreadable quota must not cost the others their reading, so a
 // failure is skipped rather than propagated. The volume all of them share is
-// read once per pass, and an unreadable volume is skipped the same way.
+// read once per pass, and an unreadable volume is skipped the same way. Each
+// sampled member also gets their cleanup snapshot, for the same reason.
 export class SampleDiskUsage {
   constructor(private readonly deps: Deps) {}
 
@@ -38,6 +41,9 @@ export class SampleDiskUsage {
       }
       await this.deps.samples.save({ username: user.username, used, sampledAt: at });
       await this.deps.gauges.show(user.username, used, user.quota);
+      // what a member can clean is read once their usage is written down, and
+      // a failure there costs neither that sample nor the next member's
+      await this.deps.cleanupSnapshot.execute(user.username, at).catch(() => undefined);
     }
   }
 }
