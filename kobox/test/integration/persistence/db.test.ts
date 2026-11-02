@@ -9,6 +9,10 @@ import { KoboxDatabase } from '../../../src/infrastructure/persistence/db.js';
 import { SqliteComponentRegistry } from '../../../src/infrastructure/persistence/SqliteComponentRegistry.js';
 import { SqliteBlocklistRepository } from '../../../src/infrastructure/persistence/SqliteBlocklistRepository.js';
 import { BlocklistSource } from '../../../src/domain/tracker/BlocklistSource.js';
+import { SeedRule } from '../../../src/domain/space/SeedRule.js';
+import { Username } from '../../../src/domain/user/Username.js';
+import { SqliteCleanupSnapshotRepository } from '../../../src/infrastructure/persistence/SqliteCleanupSnapshotRepository.js';
+import { SqliteSeedRuleRepository } from '../../../src/infrastructure/persistence/SqliteSeedRuleRepository.js';
 
 let dir: string;
 
@@ -125,5 +129,31 @@ describe('KoboxDatabase', () => {
     db.close();
 
     expect(list?.lastUpdate).toMatchObject({ status: 'failed', reported: false });
+  });
+
+  it('should_start_a_box_from_before_space_cleanup_on_the_default_rule_with_no_snapshot', async () => {
+    // a box that predates space cleanup, with a member already in it
+    const old = boxBefore('0034_space-cleanup');
+    old
+      .prepare(
+        "INSERT INTO users (username, email, quota_bytes, scgi_port, rtorrent_port, proxy_port, status) VALUES ('alice', 'alice@example.org', 1, 51101, 45000, 8080, 'active')",
+      )
+      .run();
+    old.close();
+
+    const db = KoboxDatabase.open(join(dir, 'kobox.db'));
+    const alice = Username.parse('alice');
+    const snapshots = new SqliteCleanupSnapshotRepository(db);
+    const before = await snapshots.find(alice);
+    await snapshots.replace(alice, [], '2026-11-02T09:00:00.000Z');
+    const after = await snapshots.find(alice);
+    const rule = await new SqliteSeedRuleRepository(db).get();
+    const reports = db.raw.prepare('SELECT username FROM cleanup_reports').all();
+    db.close();
+
+    expect(rule).toEqual(SeedRule.DEFAULT);
+    expect(before).toBeUndefined();
+    expect(after).toEqual({ candidates: [], takenAt: '2026-11-02T09:00:00.000Z' });
+    expect(reports).toEqual([]);
   });
 });

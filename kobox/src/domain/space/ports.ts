@@ -1,4 +1,6 @@
+import type { CleanupCandidate } from './CleanupCandidate.js';
 import type { FinishedTorrent } from './FinishedTorrent.js';
+import type { SeedRule } from './SeedRule.js';
 import type { InfoHash } from '../torrent/InfoHash.js';
 import type { ScgiPort } from '../user/Port.js';
 import type { Username } from '../user/Username.js';
@@ -16,4 +18,28 @@ export interface MemberTorrentsPort {
 // `PathOutsideMemberSpaceError`, and a path already gone counts as removed.
 export interface TorrentDataPort {
   remove(username: Username, path: string): Promise<void>;
+}
+
+// The box-wide seed rule an admin set, or the default while none was.
+export interface SeedRuleRepository {
+  get(): Promise<SeedRule>;
+  save(rule: SeedRule): Promise<void>;
+}
+
+// What a member could clean, as the hourly pass last judged it. No candidate
+// with a time still says something: the pass ran and found nothing to clean.
+export interface CleanupSnapshot {
+  readonly candidates: readonly CleanupCandidate[];
+  readonly takenAt: string;
+}
+
+// The latest cleanup snapshot of each member: the root worker writes it, the
+// non-root portal reads it, since only root can ask a member's rTorrent.
+export interface CleanupSnapshotRepository {
+  replace(
+    username: Username,
+    candidates: readonly CleanupCandidate[],
+    takenAt: string,
+  ): Promise<void>;
+  find(username: Username): Promise<CleanupSnapshot | undefined>;
 }

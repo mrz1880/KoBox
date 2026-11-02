@@ -59,4 +59,28 @@ describe('CleanupCandidate', () => {
 
     expect(candidate).toBeUndefined();
   });
+
+  // a snapshot read back from storage keeps the reason it was judged with,
+  // even though the rule or the transfers may have moved on since
+  it('should_restore_a_candidate_as_it_was_judged', () => {
+    const candidate = CleanupCandidate.restore({
+      infoHash: InfoHash.parse('B'.repeat(40)),
+      name: 'Example.Album',
+      size: Quota.bytes(2048),
+      ratio: 0.5,
+      finishedAt: '2026-11-18T12:00:00.000Z',
+      path,
+      reason: 'alreadySent',
+    });
+
+    expect(candidate).toMatchObject({
+      name: 'Example.Album',
+      ratio: 0.5,
+      finishedAt: '2026-11-18T12:00:00.000Z',
+      path,
+      reason: 'alreadySent',
+    });
+    expect(candidate.infoHash.value).toBe('B'.repeat(40));
+    expect(candidate.size.toBytes()).toBe(2048);
+  });
 });

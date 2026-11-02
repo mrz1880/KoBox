@@ -447,3 +447,49 @@ export const passwordLinks = sqliteTable('password_links', {
   issuedAt: text('issued_at').notNull(),
 });
 
+
+// What a torrent must have given back before a member may clean it away: one
+// rule for the whole box, one row once an admin set it. No row means the
+// domain default applies. The ratio is kept in thousandths, as an integer.
+export const seedRule = sqliteTable('seed_rule', {
+  id: integer('id').primaryKey(),
+  ratioMilli: integer('ratio_milli').notNull(),
+  days: integer('days').notNull(),
+});
+
+// When each member's cleanup snapshot was last taken, one row per member. It is
+// kept apart from the candidates so that "taken, nothing to clean" (a row here,
+// no candidate) differs from "never taken" (no row at all). The hourly pass
+// writes it as root; the portal only reads it.
+export const cleanupSnapshots = sqliteTable('cleanup_snapshots', {
+  username: text('username').primaryKey(),
+  takenAt: text('taken_at').notNull(),
+});
+
+// The torrents a member could delete in their latest snapshot, replaced as a
+// whole each time the snapshot is taken.
+export const cleanupCandidates = sqliteTable(
+  'cleanup_candidates',
+  {
+    username: text('username')
+      .notNull()
+      .references(() => cleanupSnapshots.username, { onDelete: 'cascade' }),
+    infoHash: text('info_hash').notNull(),
+    name: text('name').notNull(),
+    sizeBytes: integer('size_bytes').notNull(),
+    ratioMilli: integer('ratio_milli').notNull(),
+    finishedAt: text('finished_at').notNull(),
+    path: text('path').notNull(),
+    reason: text('reason', { enum: ['seeded', 'alreadySent'] }).notNull(),
+  },
+  (table) => [unique().on(table.username, table.infoHash)],
+);
+
+// The latest cleanup report of each member, whether they asked for it or the
+// automatic run did, so the home page can show what went.
+export const cleanupReports = sqliteTable('cleanup_reports', {
+  username: text('username').primaryKey(),
+  trigger: text('trigger', { enum: ['member', 'automatic'] }).notNull(),
+  reportJson: text('report_json').notNull(),
+  at: text('at').notNull(),
+});
