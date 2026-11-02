@@ -293,6 +293,15 @@ function keysSentToTheCatalogue(): ReadonlySet<string> {
     });
   }
   accessPage(member, accessFacts());
+  accessPage(
+    member,
+    accessFacts({
+      seedRule: {
+        box: SeedRule.of({ ratio: 1, days: 1 }),
+        choice: { kind: 'own', rule: SeedRule.of({ days: 14 }) },
+      },
+    }),
+  );
   accessPage(member, accessFacts({ currentAddress: '203.0.113.20' }));
   accessPage(
     member,

@@ -1,3 +1,4 @@
+import { SeedRule } from '../../../../src/domain/space/SeedRule.js';
 import type { AccessFacts, SignalRow } from '../../../../src/interfaces/http/views/userPages.js';
 
 export const G = 1024 ** 3;
@@ -24,6 +25,7 @@ export function accessFacts(overrides: Partial<AccessFacts> = {}): AccessFacts {
     hostnames: [],
     hasTwoStep: false,
     automaticCleanup: 'off',
+    seedRule: { box: SeedRule.DEFAULT, choice: { kind: 'box' } },
     ...overrides,
   };
 }

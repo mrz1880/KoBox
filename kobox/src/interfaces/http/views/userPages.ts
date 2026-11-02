@@ -12,6 +12,9 @@ import { cleanupHint, memberSpace, type MeasuredSpace } from './space.js';
 import { automaticCleanupNotice } from './spaceCleanupPage.js';
 import type { CleanupReport } from '../../../domain/space/CleanupReport.js';
 import { AUTOMATIC_CLEANUPS, type AutomaticCleanup } from '../../../domain/space/AutomaticCleanup.js';
+import { SEED_RULE_LIMITS, type BoxSeedRule } from '../../../domain/space/SeedRule.js';
+import type { SeedRuleChoice } from '../../../domain/space/SeedRuleChoice.js';
+import { seedRuleSummary } from './seedRule.js';
 import { html, type RawHtml } from '../html.js';
 import { flash, page, sentence, type Reader, type Viewer } from './layout.js';
 import type { Translate } from './messages.js';
@@ -325,6 +328,8 @@ export interface AccessFacts {
   // absent while the member lets their browser decide
   readonly chosenLanguage?: Language;
   readonly automaticCleanup: AutomaticCleanup;
+  // the rule the member's torrents answer to, and the box's they may keep
+  readonly seedRule: { readonly box: BoxSeedRule; readonly choice: SeedRuleChoice };
 }
 
 function twoStepSection(viewer: Viewer, facts: AccessFacts): RawHtml {
@@ -608,6 +613,33 @@ function automaticCleanupSection(viewer: Viewer, facts: AccessFacts): RawHtml {
 </form>`;
 }
 
+// The rule a member's own torrents answer to. The fields start from their own
+// rule, or from the box's while they keep it, so "my own rule" starts from
+// something sensible. The days are required only for their own rule, which
+// the portal checks: a browser would ask for them even to keep the box's.
+function ownSeedRuleSection(viewer: Viewer, facts: AccessFacts): RawHtml {
+  const { box, choice } = facts.seedRule;
+  const shown = choice.kind === 'own' ? choice.rule : box;
+  const ticked = (kind: SeedRuleChoice['kind']): RawHtml =>
+    kind === choice.kind ? html`checked` : html``;
+  const { ratio, days } = SEED_RULE_LIMITS;
+  return html`<h2 id="cleanup-rule">${viewer.t('My cleanup rule')}</h2>
+<p class="muted">${viewer.t('What one of your torrents must have seeded before KoBox offers to delete it.')}</p>
+<form class="card" method="post" action="/access/seed-rule">
+  <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
+  <label class="check"><input type="radio" name="rule" value="box" ${ticked('box')}>
+  ${viewer.t('Use the box rule ({rule})', { rule: seedRuleSummary(box, viewer) })}</label>
+  <label class="check"><input type="radio" name="rule" value="own" ${ticked('own')}>
+  ${viewer.t('My own rule')}</label>
+  <label for="own-days">${viewer.t('Days since it finished')}</label>
+  <input id="own-days" name="days" type="number" step="1" min="${String(days.min)}" max="${String(days.max)}" value="${String(shown.days)}">
+  <label for="own-ratio">${viewer.t('Minimum ratio, empty for whatever the ratio')}</label>
+  <input id="own-ratio" name="ratio" type="number" step="any" min="${String(ratio.min)}" max="${String(ratio.max)}" value="${shown.ratio === undefined ? '' : String(shown.ratio)}">
+  <p class="flash warn">${viewer.t('A low ratio can cost you your account on a private tracker. It is your call.')}</p>
+  <button type="submit">${viewer.t('Save my cleanup rule')}</button>
+</form>`;
+}
+
 export function accessPage(viewer: Viewer, facts: AccessFacts, message?: string): string {
   const choices = VPN_CHOICES.map(
     (choice) => html`<div class="choice${choice.usual === true ? ' pick' : ''}">
@@ -644,6 +676,8 @@ ${addressesSection(viewer, facts)}
 ${sshKeySection(viewer, facts)}
 
 ${automaticCleanupSection(viewer, facts)}
+
+${ownSeedRuleSection(viewer, facts)}
 
 ${languageSection(viewer, facts)}
 

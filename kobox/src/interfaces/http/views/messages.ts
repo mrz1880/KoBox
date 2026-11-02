@@ -233,6 +233,21 @@ const FR: Readonly<Record<string, string>> = {
     'Règle de nettoyage enregistrée. Le prochain passage horaire l’applique.',
   'Nothing was saved: the ratio goes from {ratioMin} to {ratioMax}, the days from {daysMin} to {daysMax}.':
     'Rien n’a été enregistré : le ratio va de {ratioMin} à {ratioMax}, les jours de {daysMin} à {daysMax}.',
+  '{days} day': '{days} jour',
+  '{days} days': '{days} jours',
+  'ratio {ratio}, {days}': 'ratio {ratio}, {days}',
+  'My cleanup rule': 'Ma règle de nettoyage',
+  'What one of your torrents must have seeded before KoBox offers to delete it.':
+    'Ce qu’un de vos torrents doit avoir partagé avant que KoBox propose de le supprimer.',
+  'Use the box rule ({rule})': 'Suivre la règle de la box ({rule})',
+  'My own rule': 'Ma propre règle',
+  'Minimum ratio, empty for whatever the ratio': 'Ratio minimum, vide pour n’importe quel ratio',
+  'A low ratio can cost you your account on a private tracker. It is your call.':
+    'Un ratio bas peut vous coûter votre compte sur un tracker privé. C’est votre choix.',
+  'Save my cleanup rule': 'Enregistrer ma règle de nettoyage',
+  'Saved. The next hourly pass applies it.': 'Enregistré. Le prochain passage horaire l’applique.',
+  'Nothing was saved: the days go from {daysMin} to {daysMax}, the ratio, when you set one, from {ratioMin} to {ratioMax}.':
+    'Rien n’a été enregistré : les jours vont de {daysMin} à {daysMax}, le ratio, si vous en indiquez un, de {ratioMin} à {ratioMax}.',
 
   // member pages
   Torrents: 'Torrents',
