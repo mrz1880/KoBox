@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { ROLES } from '../../domain/portal/Role.js';
+import { CLEANUP_TRIGGERS } from '../../domain/space/CleanupReport.js';
 import { IPV4_PATTERN } from '../../domain/shared/IpAddress.js';
 import { INFO_HASH_PATTERN } from '../../domain/torrent/InfoHash.js';
 import { LABEL_PATTERN } from '../../domain/torrent/Label.js';
@@ -286,6 +287,8 @@ export const jobPayloadSchemas = {
   'clean-up-space': z.strictObject({
     username: usernameField,
     infoHashes: z.array(infoHashField).min(1).max(CLEANUP_MAX_TORRENTS),
+    // absent from a job queued before automatic cleanup: the member asked
+    trigger: z.enum(CLEANUP_TRIGGERS).default('member'),
   }),
 } satisfies Record<JobType, z.ZodType>;
 

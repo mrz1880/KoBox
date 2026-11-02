@@ -239,6 +239,13 @@ export class JobWorker {
             'space cleanup: list not refreshed',
           );
         }
+        // a member past the line may have missed their mail or their cleanup
+        for (const member of pass.unwatched) {
+          this.logger.warn(
+            { username: member.username.value, error: member.error },
+            'space watch: member not watched',
+          );
+        }
         return;
       }
       case 'suspend-user':

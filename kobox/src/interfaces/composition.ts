@@ -111,6 +111,7 @@ import { SqliteSyncTransferRepository } from '../infrastructure/persistence/Sqli
 import { SqliteCleanupSnapshotRepository } from '../infrastructure/persistence/SqliteCleanupSnapshotRepository.js';
 import { SqliteSeedRuleRepository } from '../infrastructure/persistence/SqliteSeedRuleRepository.js';
 import { SqliteCleanupReportRepository } from '../infrastructure/persistence/SqliteCleanupReportRepository.js';
+import { SqliteSpacePreferenceRepository } from '../infrastructure/persistence/SqliteSpacePreferenceRepository.js';
 import { FsTorrentDataAdapter } from '../infrastructure/system/FsTorrentDataAdapter.js';
 import { RsyncOverSshTransfer } from '../infrastructure/system/RsyncOverSshTransfer.js';
 import { FsLocalFileFacts } from '../infrastructure/system/FsLocalFileFacts.js';
@@ -753,6 +754,7 @@ export function buildContainer(name: string): Container {
   const rtorrentControl = new ScgiRtorrentControlAdapter({ logger });
   const syncTransferRepo = new SqliteSyncTransferRepository(db);
   const diskSamples = new SqliteDiskUsageRepository(db);
+  const queue = new SqliteJobQueue(db);
   const spaceUseCases = buildSpaceUseCases({
     instances: new SqliteTorrentInstanceRepository(db),
     torrents: rtorrentControl,
@@ -763,6 +765,10 @@ export function buildContainer(name: string): Container {
     reports: new SqliteCleanupReportRepository(db),
     quota,
     samples: diskSamples,
+    preferences: new SqliteSpacePreferenceRepository(db),
+    queue,
+    // a member hears about their space in their language, with a link to it
+    mail: { users: repo, credentials, address: portalAddress(db), outbox },
     clock: nowStamp,
   });
   const useCases = buildUseCases({
@@ -775,6 +781,7 @@ export function buildContainer(name: string): Container {
     // ruTorrent's disk meter shows each member their quota from these
     quotaGauges: new RutorrentQuotaGauges(new RtorrentConfigAdapter(runner)),
     cleanupSnapshot: spaceUseCases.takeCleanupSnapshot,
+    spaceWatch: spaceUseCases.watchMemberSpace,
     nextcloud,
     components,
     outbox,
@@ -799,7 +806,6 @@ export function buildContainer(name: string): Container {
     sessions,
     clock: nowStamp,
   });
-  const queue = new SqliteJobQueue(db);
   const networkServices = new NetworkServiceAdapter(runner, logger, {
     // post-install contract: absent units are breakage, except components
     // kobox install honestly skips (dnscrypt-proxy where Debian does not

@@ -1,4 +1,5 @@
 import type { CleanupSnapshotOutcome, TakeCleanupSnapshot } from '../space/TakeCleanupSnapshot.js';
+import type { WatchMemberSpace } from '../space/WatchMemberSpace.js';
 import type { Username } from '../../domain/user/Username.js';
 import type {
   DiskUsageRepository,
@@ -17,6 +18,7 @@ interface Deps {
   readonly volume: VolumePort;
   readonly volumeSamples: VolumeSampleRepository;
   readonly cleanupSnapshot: Pick<TakeCleanupSnapshot, 'execute'>;
+  readonly spaceWatch: Pick<WatchMemberSpace, 'execute'>;
   readonly clock: () => string;
 }
 
@@ -44,9 +46,21 @@ function staleness(attempt: SnapshotAttempt): Omit<StaleCleanupSnapshot, 'userna
   }
 }
 
+// A member whose space was measured but not watched: they may have missed the
+// critical-line mail or their automatic cleanup, so the operator is told.
+export interface UnwatchedMember {
+  readonly username: Username;
+  readonly error: string;
+}
+
+function messageOf(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 // What a pass could not do although it went on.
 export interface DiskUsagePass {
   readonly staleSnapshots: readonly StaleCleanupSnapshot[];
+  readonly unwatched: readonly UnwatchedMember[];
 }
 
 // Writes down what the disk holds for each member, on a schedule, because the
@@ -62,6 +76,7 @@ export class SampleDiskUsage {
   async execute(): Promise<DiskUsagePass> {
     const at = this.deps.clock();
     const staleSnapshots: StaleCleanupSnapshot[] = [];
+    const unwatched: UnwatchedMember[] = [];
     const space = await this.deps.volume.measure().catch(() => undefined);
     if (space !== undefined) {
       await this.deps.volumeSamples.save({ space, measuredAt: at });
@@ -77,15 +92,17 @@ export class SampleDiskUsage {
       // a failure there costs neither that sample nor the next member's
       const attempt: SnapshotAttempt = await this.deps.cleanupSnapshot
         .execute(user.username, at)
-        .catch((error: unknown) => ({
-          kind: 'failed' as const,
-          error: error instanceof Error ? error.message : String(error),
-        }));
+        .catch((error: unknown) => ({ kind: 'failed' as const, error: messageOf(error) }));
       const stale = staleness(attempt);
       if (stale !== undefined) {
         staleSnapshots.push({ username: user.username, ...stale });
       }
+      // watched once both are written down, from the usage just measured and
+      // whatever list the member has; a failure costs no other member theirs
+      await this.deps.spaceWatch.execute({ user, used }, at).catch((error: unknown) => {
+        unwatched.push({ username: user.username, error: messageOf(error) });
+      });
     }
-    return { staleSnapshots };
+    return { staleSnapshots, unwatched };
   }
 }
