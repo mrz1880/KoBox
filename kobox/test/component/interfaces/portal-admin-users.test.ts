@@ -491,6 +491,16 @@ describe('admin per-instance settings', () => {
     expect(response.body).toContain('/admin/users/alice/finish-scripts');
     expect(response.body).toContain('name="run" checked');
   });
+
+  it('should_say_where_the_member_scripts_live', async () => {
+    const response = await world.server.inject({
+      method: 'GET',
+      url: '/admin/users/alice',
+      headers: { cookie: admin.cookie },
+    });
+
+    expect(response.body).toContain('<span class="mono">/home/alice/scripts</span>');
+  });
 });
 
 describe("a member's portal role", () => {
