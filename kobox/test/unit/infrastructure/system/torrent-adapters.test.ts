@@ -397,4 +397,144 @@ describe('ScgiRtorrentControlAdapter', () => {
       RtorrentFaultError,
     );
   });
+
+  describe('listFinished', () => {
+    const firstHash = 'A1B2C3D4E5F6A7B8C9D0A1B2C3D4E5F6A7B8C9D0';
+    const secondHash = 'B1B2C3D4E5F6A7B8C9D0A1B2C3D4E5F6A7B8C9D0';
+
+    function str(text: string): string {
+      return `<value><string>${text}</string></value>`;
+    }
+
+    function i8(value: number): string {
+      return `<value><i8>${String(value)}</i8></value>`;
+    }
+
+    function rowsReply(rows: readonly string[][]): string {
+      const encoded = rows
+        .map((row) => `<value><array><data>${row.join('')}</data></array></value>`)
+        .join('');
+      return (
+        'Status: 200 OK\r\nContent-Type: text/xml\r\n\r\n' +
+        '<?xml version="1.0" encoding="UTF-8"?><methodResponse><params><param>' +
+        `<value><array><data>${encoded}</data></array></value>` +
+        '</param></params></methodResponse>'
+      );
+    }
+
+    it('should_read_each_complete_torrent_with_its_ratio_size_and_finish_date', async () => {
+      reply = rowsReply([
+        [
+          str(firstHash),
+          str('Some &amp; Film'),
+          i8(1_500_000_000),
+          i8(2450),
+          i8(1_761_955_200),
+          str('/home/alice/rtorrent/complete/films/Some &amp; Film'),
+        ],
+        [
+          str(secondHash),
+          str('Album'),
+          '<value><i4>2048</i4></value>',
+          '<value><int>500</int></value>',
+          i8(1_761_868_800),
+          str('/home/alice/rtorrent/complete/Album'),
+        ],
+      ]);
+      const adapter = new ScgiRtorrentControlAdapter();
+
+      const torrents = await adapter.listFinished(ScgiPort.parse(port));
+
+      expect(received[0]).toContain('<methodName>d.multicall2</methodName>');
+      expect(received[0]).toContain('<string>complete</string>');
+      expect(torrents).toHaveLength(2);
+      const [first, second] = torrents;
+      expect(first?.infoHash.value).toBe(firstHash);
+      expect(first?.name).toBe('Some & Film');
+      expect(first?.size.toBytes()).toBe(1_500_000_000);
+      expect(first?.ratio).toBe(2.45);
+      expect(first?.finishedAt).toBe('2025-11-01T00:00:00.000Z');
+      expect(first?.path).toBe('/home/alice/rtorrent/complete/films/Some & Film');
+      expect(second?.infoHash.value).toBe(secondHash);
+      expect(second?.size.toBytes()).toBe(2048);
+      expect(second?.ratio).toBe(0.5);
+      expect(second?.finishedAt).toBe('2025-10-31T00:00:00.000Z');
+    });
+
+    it('should_skip_a_row_it_cannot_read_and_keep_the_others', async () => {
+      // one odd torrent must not blind the whole snapshot
+      reply = rowsReply([
+        [str('not-a-hash'), str('Odd'), i8(10), i8(0), i8(0), str('/home/alice/odd')],
+        [str(secondHash), str('Album'), i8(2048), i8(500), i8(1_761_868_800), str('/a')],
+      ]);
+      const warnings: unknown[] = [];
+      const adapter = new ScgiRtorrentControlAdapter(undefined, {
+        warn: (context: unknown) => warnings.push(context),
+      });
+
+      const torrents = await adapter.listFinished(ScgiPort.parse(port));
+
+      expect(torrents.map((torrent) => torrent.infoHash.value)).toEqual([secondHash]);
+      expect(warnings).toHaveLength(1);
+    });
+
+    it('should_skip_a_row_missing_a_field_or_with_a_field_of_the_wrong_type', async () => {
+      reply = rowsReply([
+        [str(firstHash), str('No path'), i8(10), i8(0), i8(0)],
+        [str(firstHash), str('Size as text'), str('10'), i8(0), i8(0), str('/a')],
+        [str(firstHash), str('Negative'), i8(-1), i8(0), i8(0), str('/a')],
+        [str(secondHash), str('Album'), i8(2048), i8(500), i8(1_761_868_800), str('/a')],
+      ]);
+      const adapter = new ScgiRtorrentControlAdapter();
+
+      const torrents = await adapter.listFinished(ScgiPort.parse(port));
+
+      expect(torrents.map((torrent) => torrent.name)).toEqual(['Album']);
+    });
+
+    it('should_leave_the_finish_date_unknown_when_rtorrent_never_saw_it_finish', async () => {
+      // a download added with its data already complete reports 0
+      reply = rowsReply([[str(firstHash), str('Seeded'), i8(10), i8(0), i8(0), str('/a')]]);
+      const adapter = new ScgiRtorrentControlAdapter();
+
+      const [torrent] = await adapter.listFinished(ScgiPort.parse(port));
+
+      expect(torrent?.finishedAt).toBeUndefined();
+    });
+
+    it('should_reject_when_rtorrent_answers_a_fault', async () => {
+      reply =
+        'Status: 200 OK\r\nContent-Type: text/xml\r\n\r\n' +
+        '<?xml version="1.0"?><methodResponse><fault><value><struct/></value></fault></methodResponse>';
+      const adapter = new ScgiRtorrentControlAdapter();
+
+      await expect(adapter.listFinished(ScgiPort.parse(port))).rejects.toThrow(RtorrentFaultError);
+    });
+
+    it('should_read_an_empty_list_and_text_without_a_type_tag', async () => {
+      reply = rowsReply([
+        [
+          str(firstHash),
+          '<value>Caf&#233; &#x26; Cr&#xE8;me &lt;3&gt; &quot;live&quot; &apos;</value>',
+          i8(10),
+          i8(0),
+          i8(0),
+          '<value><string/></value>',
+        ],
+      ]);
+      const adapter = new ScgiRtorrentControlAdapter();
+
+      const [torrent] = await adapter.listFinished(ScgiPort.parse(port));
+
+      expect(torrent?.name).toBe('Caf\u00e9 & Cr\u00e8me <3> "live" \'');
+      expect(torrent?.path).toBe('');
+    });
+
+    it('should_answer_no_torrent_when_none_is_complete', async () => {
+      reply = rowsReply([]);
+      const adapter = new ScgiRtorrentControlAdapter();
+
+      await expect(adapter.listFinished(ScgiPort.parse(port))).resolves.toEqual([]);
+    });
+  });
 });
