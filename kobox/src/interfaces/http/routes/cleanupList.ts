@@ -27,6 +27,7 @@ export async function cleanupListOf(
   const sample = await deps.diskSamples.find(username);
   return {
     takenAt: snapshot.takenAt,
+    judgedBy: snapshot.judgedBy,
     proposal: CleanupProposal.of({
       candidates: snapshot.candidates,
       used: sample?.used ?? Quota.bytes(0),

@@ -3,6 +3,7 @@ import type { Job } from '../../../../src/application/jobs/contract.js';
 import type { JobQueuePort } from '../../../../src/application/jobs/JobQueuePort.js';
 import { WatchMemberSpace } from '../../../../src/application/space/WatchMemberSpace.js';
 import { CleanupCandidate, type CleanupReason } from '../../../../src/domain/space/CleanupCandidate.js';
+import { SeedRule } from '../../../../src/domain/space/SeedRule.js';
 import { Language } from '../../../../src/domain/portal/Language.js';
 import { InfoHash } from '../../../../src/domain/torrent/InfoHash.js';
 import { Quota } from '../../../../src/domain/user/Quota.js';
@@ -75,7 +76,7 @@ beforeEach(async () => {
 
 describe('WatchMemberSpace', () => {
   it('should_mail_a_member_past_the_critical_line_what_they_can_free_and_where', async () => {
-    await snapshots.replace(alice.username, [candidate('A', 'seeded', Quota.gib(20))], AT);
+    await snapshots.replace(alice.username, [candidate('A', 'seeded', Quota.gib(20))], AT, SeedRule.DEFAULT);
 
     await watch.execute({ user: alice, used: PAST_CRITICAL }, AT);
 
@@ -89,7 +90,7 @@ describe('WatchMemberSpace', () => {
   });
 
   it('should_not_mail_again_while_the_member_stays_past_the_line', async () => {
-    await snapshots.replace(alice.username, [candidate('A', 'seeded', Quota.gib(20))], AT);
+    await snapshots.replace(alice.username, [candidate('A', 'seeded', Quota.gib(20))], AT, SeedRule.DEFAULT);
 
     await watch.execute({ user: alice, used: PAST_CRITICAL }, AT);
     await watch.execute({ user: alice, used: PAST_CRITICAL }, LATER);
@@ -98,7 +99,7 @@ describe('WatchMemberSpace', () => {
   });
 
   it('should_tell_a_member_with_nothing_to_clean_to_delete_by_hand_or_ask_for_more', async () => {
-    await snapshots.replace(alice.username, [], AT);
+    await snapshots.replace(alice.username, [], AT, SeedRule.DEFAULT);
 
     await watch.execute({ user: alice, used: PAST_CRITICAL }, AT);
 
@@ -114,6 +115,7 @@ describe('WatchMemberSpace', () => {
       alice.username,
       [candidate('A', 'alreadySent', Quota.gib(10)), candidate('B', 'seeded', Quota.gib(20))],
       AT,
+      SeedRule.DEFAULT,
     );
 
     await watch.execute({ user: alice, used: PAST_CRITICAL }, AT);
@@ -134,6 +136,7 @@ describe('WatchMemberSpace', () => {
       alice.username,
       [candidate('A', 'alreadySent', Quota.gib(10))],
       '2026-11-20 09:59:59',
+      SeedRule.DEFAULT,
     );
 
     await watch.execute({ user: alice, used: PAST_CRITICAL }, AT);
@@ -145,7 +148,7 @@ describe('WatchMemberSpace', () => {
   it('should_mail_a_member_who_chose_automatic_cleanup_when_nothing_it_covers_can_go', async () => {
     // only seeded torrents, and the member only lets KoBox delete what it sent
     await preferences.chooseAutomatic(alice.username, 'sentOnly');
-    await snapshots.replace(alice.username, [candidate('B', 'seeded', Quota.gib(20))], AT);
+    await snapshots.replace(alice.username, [candidate('B', 'seeded', Quota.gib(20))], AT, SeedRule.DEFAULT);
 
     await watch.execute({ user: alice, used: PAST_CRITICAL }, AT);
 
@@ -156,10 +159,10 @@ describe('WatchMemberSpace', () => {
 
   it('should_not_clean_up_again_every_hour_while_a_cleanup_left_the_member_past_the_line', async () => {
     await preferences.chooseAutomatic(alice.username, 'sentOnly');
-    await snapshots.replace(alice.username, [candidate('A', 'alreadySent', Quota.gib(1))], AT);
+    await snapshots.replace(alice.username, [candidate('A', 'alreadySent', Quota.gib(1))], AT, SeedRule.DEFAULT);
     await watch.execute({ user: alice, used: PAST_CRITICAL }, AT);
     // the cleanup freed 1 GiB, not enough to go back under the line
-    await snapshots.replace(alice.username, [candidate('C', 'alreadySent', Quota.gib(1))], LATER);
+    await snapshots.replace(alice.username, [candidate('C', 'alreadySent', Quota.gib(1))], LATER, SeedRule.DEFAULT);
 
     await watch.execute({ user: alice, used: Quota.gib(94) }, LATER);
 
@@ -169,10 +172,10 @@ describe('WatchMemberSpace', () => {
 
   it('should_clean_up_again_once_the_member_went_back_under_the_line_and_climbed_anew', async () => {
     await preferences.chooseAutomatic(alice.username, 'sentOnly');
-    await snapshots.replace(alice.username, [candidate('A', 'alreadySent', Quota.gib(20))], AT);
+    await snapshots.replace(alice.username, [candidate('A', 'alreadySent', Quota.gib(20))], AT, SeedRule.DEFAULT);
     await watch.execute({ user: alice, used: PAST_CRITICAL }, AT);
     await watch.execute({ user: alice, used: Quota.gib(75) }, LATER);
-    await snapshots.replace(alice.username, [candidate('C', 'alreadySent', Quota.gib(20))], LATER);
+    await snapshots.replace(alice.username, [candidate('C', 'alreadySent', Quota.gib(20))], LATER, SeedRule.DEFAULT);
 
     await watch.execute({ user: alice, used: PAST_CRITICAL }, LATER);
 
@@ -187,7 +190,7 @@ describe('WatchMemberSpace', () => {
       { username: alice.username, role: 'user', language: Language.en },
       AT,
     );
-    await snapshots.replace(alice.username, [], AT);
+    await snapshots.replace(alice.username, [], AT, SeedRule.DEFAULT);
 
     await watch.execute({ user: alice, used: PAST_CRITICAL }, AT);
 

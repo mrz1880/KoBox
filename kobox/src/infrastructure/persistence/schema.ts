@@ -462,10 +462,13 @@ export const seedRule = sqliteTable('seed_rule', {
 // When each member's cleanup snapshot was last taken, one row per member. It is
 // kept apart from the candidates so that "taken, nothing to clean" (a row here,
 // no candidate) differs from "never taken" (no row at all). The hourly pass
-// writes it as root; the portal only reads it.
+// writes it as root; the portal only reads it. The rule the pass judged by is
+// kept with it, the ratio in thousandths: no ratio means only the days counted.
 export const cleanupSnapshots = sqliteTable('cleanup_snapshots', {
   username: text('username').primaryKey(),
   takenAt: text('taken_at').notNull(),
+  ruleRatioMilli: integer('rule_ratio_milli'),
+  ruleDays: integer('rule_days').notNull(),
 });
 
 // The torrents a member could delete in their latest snapshot, replaced as a

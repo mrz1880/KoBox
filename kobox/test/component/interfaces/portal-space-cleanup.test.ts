@@ -36,7 +36,7 @@ function candidate(
 
 // alice's allowance is 412 GiB: at 400 GiB, the two largest bring her back
 // under the 80 % line (329.6 GiB) and the third stays unchecked
-async function snapshotWithThreeCandidates(): Promise<void> {
+async function snapshotWithThreeCandidates(judgedBy: SeedRule = SeedRule.DEFAULT): Promise<void> {
   await world.diskSamples.save({ username: alice, used: Quota.gib(400), sampledAt: TAKEN_AT });
   await world.cleanupSnapshots.replace(
     alice,
@@ -46,6 +46,7 @@ async function snapshotWithThreeCandidates(): Promise<void> {
       candidate(SENT, 'Sent.Release', 30, 'alreadySent'),
     ],
     TAKEN_AT,
+    judgedBy,
   );
 }
 
@@ -119,7 +120,7 @@ describe('the cleanup page', () => {
   });
 
   it('should_say_there_is_nothing_to_clean_while_the_torrents_still_seed', async () => {
-    await world.cleanupSnapshots.replace(alice, [], TAKEN_AT);
+    await world.cleanupSnapshots.replace(alice, [], TAKEN_AT, SeedRule.DEFAULT);
 
     expect(await cleanupPageOf(member)).toContain(
       'Nothing to clean yet: your torrents are still seeding.',
@@ -166,6 +167,7 @@ describe('the cleanup page', () => {
       alice,
       [candidate(SEEDED, 'Big.Release', 50, 'seeded', '2026-07-24T08:00:00.000Z')],
       TAKEN_AT,
+      SeedRule.DEFAULT,
     );
 
     expect(await cleanupPageOf(member)).toContain('Ratio 2.4 after 1 day<');
@@ -173,14 +175,26 @@ describe('the cleanup page', () => {
 
   // alice asks only seven days, whatever the ratio: the line says that
   it('should_word_the_reason_after_a_members_rule_on_days_alone', async () => {
-    await world.spacePreferences.chooseSeedRule(alice, {
-      kind: 'own',
-      rule: SeedRule.of({ days: 7 }),
-    });
-    await snapshotWithThreeCandidates();
+    await snapshotWithThreeCandidates(SeedRule.of({ days: 7 }));
 
     expect(await cleanupPageOf(member)).toContain(
       '<td class="reason">Finished 12 days ago (your rule: 7 days)<br><span class="muted">KoBox does not know whether you fetched it.</span></td>',
+    );
+  });
+
+  // the list was judged by alice's seven days; the box's rule she went back
+  // to since has not judged it yet, so the line keeps the words it went by
+  it('should_word_the_reason_after_the_rule_the_list_was_judged_by', async () => {
+    await world.cleanupSnapshots.replace(
+      alice,
+      [candidate(SEEDED, 'Big.Release', 50, 'seeded')],
+      TAKEN_AT,
+      SeedRule.of({ days: 7 }),
+    );
+    await world.spacePreferences.chooseSeedRule(alice, { kind: 'box' });
+
+    expect(await cleanupPageOf(member)).toContain(
+      '<td class="reason">Finished 12 days ago (your rule: 7 days)<br>',
     );
   });
 
@@ -321,18 +335,32 @@ describe('the cleanup page in French', () => {
   });
 
   it('should_word_the_reason_after_a_members_rule_on_days_alone_in_french', async () => {
-    await world.spacePreferences.chooseSeedRule(alice, {
-      kind: 'own',
-      rule: SeedRule.of({ days: 1 }),
-    });
     await world.cleanupSnapshots.replace(
       alice,
       [candidate(SEEDED, 'Big.Release', 50, 'seeded', '2026-07-24T08:00:00.000Z')],
       TAKEN_AT,
+      SeedRule.of({ days: 1 }),
     );
 
     expect(await cleanupPageOf(member, 'fr-FR')).toContain(
       '<td class="reason">Terminé il y a 1 jour (votre règle : 1 jour)<br>',
+    );
+  });
+
+  it('should_word_the_reason_after_the_rule_the_list_was_judged_by_in_french', async () => {
+    await world.cleanupSnapshots.replace(
+      alice,
+      [candidate(SEEDED, 'Big.Release', 50, 'seeded')],
+      TAKEN_AT,
+      SeedRule.of({ days: 7 }),
+    );
+    await world.spacePreferences.chooseSeedRule(alice, {
+      kind: 'own',
+      rule: SeedRule.of({ ratio: 1, days: 3 }),
+    });
+
+    expect(await cleanupPageOf(member, 'fr-FR')).toContain(
+      '<td class="reason">Terminé il y a 12 jours (votre règle : 7 jours)<br>',
     );
   });
 });
@@ -359,7 +387,7 @@ describe('the home points at the cleanup', () => {
 
   it('should_say_in_the_box_that_nothing_can_be_cleaned_yet', async () => {
     await measured(400);
-    await world.cleanupSnapshots.replace(alice, [], TAKEN_AT);
+    await world.cleanupSnapshots.replace(alice, [], TAKEN_AT, SeedRule.DEFAULT);
 
     const body = await homeOf(member);
 

@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { CleanupCandidate } from '../../../src/domain/space/CleanupCandidate.js';
+import { SeedRule } from '../../../src/domain/space/SeedRule.js';
 import { InfoHash } from '../../../src/domain/torrent/InfoHash.js';
 import { Quota } from '../../../src/domain/user/Quota.js';
 import { Username } from '../../../src/domain/user/Username.js';
@@ -54,45 +55,62 @@ describe('SqliteCleanupSnapshotRepository', () => {
   it('should_give_back_the_candidates_of_the_latest_snapshot_with_its_time', async () => {
     const repo = new SqliteCleanupSnapshotRepository(db);
 
-    await repo.replace(alice, [film, album], '2026-11-02T09:00:00.000Z');
+    await repo.replace(alice, [film, album], '2026-11-02T09:00:00.000Z', SeedRule.DEFAULT);
 
     expect(await repo.find(alice)).toEqual({
       candidates: [film, album],
       takenAt: '2026-11-02T09:00:00.000Z',
+      judgedBy: SeedRule.DEFAULT,
     });
   });
 
   it('should_drop_the_candidates_of_the_previous_snapshot_when_a_new_one_is_taken', async () => {
     const repo = new SqliteCleanupSnapshotRepository(db);
-    await repo.replace(alice, [film, album], '2026-11-02T09:00:00.000Z');
+    await repo.replace(alice, [film, album], '2026-11-02T09:00:00.000Z', SeedRule.DEFAULT);
 
-    await repo.replace(alice, [album], '2026-11-02T10:00:00.000Z');
+    await repo.replace(alice, [album], '2026-11-02T10:00:00.000Z', SeedRule.DEFAULT);
 
     expect(await repo.find(alice)).toEqual({
       candidates: [album],
       takenAt: '2026-11-02T10:00:00.000Z',
+      judgedBy: SeedRule.DEFAULT,
     });
   });
 
   // "looked, nothing to clean" is not "never looked": the page says which
   it('should_keep_the_time_of_a_snapshot_that_found_nothing_to_clean', async () => {
     const repo = new SqliteCleanupSnapshotRepository(db);
-    await repo.replace(alice, [film], '2026-11-02T09:00:00.000Z');
+    await repo.replace(alice, [film], '2026-11-02T09:00:00.000Z', SeedRule.DEFAULT);
 
-    await repo.replace(alice, [], '2026-11-02T10:00:00.000Z');
+    await repo.replace(alice, [], '2026-11-02T10:00:00.000Z', SeedRule.DEFAULT);
 
-    expect(await repo.find(alice)).toEqual({ candidates: [], takenAt: '2026-11-02T10:00:00.000Z' });
+    expect(await repo.find(alice)).toEqual({
+      candidates: [],
+      takenAt: '2026-11-02T10:00:00.000Z',
+      judgedBy: SeedRule.DEFAULT,
+    });
   });
 
   it('should_keep_each_member_snapshot_apart', async () => {
     const repo = new SqliteCleanupSnapshotRepository(db);
-    await repo.replace(alice, [film], '2026-11-02T09:00:00.000Z');
+    await repo.replace(alice, [film], '2026-11-02T09:00:00.000Z', SeedRule.DEFAULT);
 
-    await repo.replace(bob, [], '2026-11-02T09:05:00.000Z');
+    await repo.replace(bob, [], '2026-11-02T09:05:00.000Z', SeedRule.DEFAULT);
 
     expect(await repo.find(alice)).toEqual({
       candidates: [film],
       takenAt: '2026-11-02T09:00:00.000Z',
+      judgedBy: SeedRule.DEFAULT,
     });
+  });
+
+  // a member's own rule may leave the ratio out: the page words it on days alone
+  it('should_give_back_the_rule_the_snapshot_was_judged_by', async () => {
+    const repo = new SqliteCleanupSnapshotRepository(db);
+    await repo.replace(alice, [film], '2026-11-02T09:00:00.000Z', SeedRule.of({ days: 14 }));
+    await repo.replace(bob, [], '2026-11-02T09:00:00.000Z', SeedRule.of({ ratio: 1.25, days: 3 }));
+
+    expect((await repo.find(alice))?.judgedBy).toEqual(SeedRule.of({ days: 14 }));
+    expect((await repo.find(bob))?.judgedBy).toEqual(SeedRule.of({ ratio: 1.25, days: 3 }));
   });
 });

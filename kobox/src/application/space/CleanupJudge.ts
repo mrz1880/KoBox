@@ -2,6 +2,7 @@ import { CleanupCandidate } from '../../domain/space/CleanupCandidate.js';
 import type { FinishedTorrent } from '../../domain/space/FinishedTorrent.js';
 import { DomainError } from '../../domain/shared/DomainError.js';
 import { instantOf } from '../../domain/shared/stamp.js';
+import type { SeedRule } from '../../domain/space/SeedRule.js';
 import { LocalPath } from '../../domain/sync/LocalPath.js';
 import type { SyncTransferRepository } from '../../domain/sync/ports.js';
 import type { Username } from '../../domain/user/Username.js';
@@ -51,6 +52,11 @@ export class CleanupJudge {
       unsettledPaths: pathsOf(unsettled),
       now: instantOf(at),
     });
+  }
+
+  // the rule this judge holds torrents to, which the snapshot keeps
+  get rule(): SeedRule {
+    return this.context.rule;
   }
 
   judge(torrent: FinishedTorrent): CleanupCandidate | undefined {

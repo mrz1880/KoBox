@@ -42,7 +42,7 @@ export class TakeCleanupSnapshot {
     }
     const judge = await CleanupJudge.of(this.deps, username, at);
     const candidates = finished.flatMap((torrent) => judge.judge(torrent) ?? []);
-    await this.deps.snapshots.replace(username, candidates, at);
+    await this.deps.snapshots.replace(username, candidates, at, judge.rule);
     return { kind: 'taken' };
   }
 }
