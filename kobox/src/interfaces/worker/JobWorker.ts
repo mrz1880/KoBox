@@ -548,6 +548,18 @@ export class JobWorker {
       case 'set-seed-rule':
         await this.space.setSeedRule.execute(SeedRule.of(job.payload));
         return;
+      case 'set-own-seed-rule': {
+        const { rule } = job.payload;
+        await this.space.setOwnSeedRule.execute({
+          username: Username.parse(job.payload.username),
+          // a null ratio on the wire is a rule on days alone
+          choice:
+            rule === null
+              ? { kind: 'box' }
+              : { kind: 'own', rule: SeedRule.of({ ratio: rule.ratio ?? undefined, days: rule.days }) },
+        });
+        return;
+      }
       case 'add-user-address':
       case 'remove-user-address': {
         const report = await this.trackers.manageUserAddress.execute({

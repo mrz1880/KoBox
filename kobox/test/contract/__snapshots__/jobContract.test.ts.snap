@@ -800,6 +800,55 @@ exports[`job contract > should_keep_the_wire_contract_stable 1`] = `
     ],
     "type": "object",
   },
+  "set-own-seed-rule": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "rule": {
+        "anyOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "days": {
+                "maximum": 365,
+                "minimum": 1,
+                "type": "integer",
+              },
+              "ratio": {
+                "anyOf": [
+                  {
+                    "maximum": 100,
+                    "minimum": 0.1,
+                    "type": "number",
+                  },
+                  {
+                    "type": "null",
+                  },
+                ],
+              },
+            },
+            "required": [
+              "ratio",
+              "days",
+            ],
+            "type": "object",
+          },
+          {
+            "type": "null",
+          },
+        ],
+      },
+      "username": {
+        "pattern": "^[a-z][a-z0-9]{0,31}$",
+        "type": "string",
+      },
+    },
+    "required": [
+      "username",
+      "rule",
+    ],
+    "type": "object",
+  },
   "set-recycling": {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "additionalProperties": false,

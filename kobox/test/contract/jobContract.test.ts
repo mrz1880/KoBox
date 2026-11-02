@@ -70,6 +70,7 @@ describe('job contract', () => {
       'clean-up-space',
       'set-automatic-cleanup',
       'set-seed-rule',
+      'set-own-seed-rule',
     ]);
   });
 
@@ -322,6 +323,26 @@ describe('job contract', () => {
     { ratio: 2, days: 1.5 },
   ])('should_refuse_a_seed_rule_out_of_bounds_%o', (payload) => {
     expect(() => parseJob('set-seed-rule', payload)).toThrow();
+  });
+
+  it.each([
+    { username: 'alice', rule: { ratio: 1.5, days: 14 } },
+    { username: 'alice', rule: { ratio: null, days: 14 } },
+    { username: 'alice', rule: null },
+  ])('should_parse_the_rule_a_member_set_or_their_return_to_the_box_rule_%o', (payload) => {
+    expect(parseJob('set-own-seed-rule', payload).payload).toEqual(payload);
+  });
+
+  it.each([
+    { username: 'alice', rule: { ratio: 0.05, days: 7 } },
+    { username: 'alice', rule: { ratio: 101, days: 7 } },
+    { username: 'alice', rule: { ratio: null, days: 0 } },
+    { username: 'alice', rule: { ratio: null, days: 366 } },
+    { username: 'alice', rule: { ratio: null, days: 1.5 } },
+    { username: 'alice', rule: { days: 14 } },
+    { username: '../root', rule: null },
+  ])('should_refuse_a_members_rule_out_of_bounds_%o', (payload) => {
+    expect(() => parseJob('set-own-seed-rule', payload)).toThrow();
   });
 
   it('should_parse_a_torrent_event_with_optional_paths', () => {

@@ -86,6 +86,7 @@ import { TakeCleanupSnapshot } from '../application/space/TakeCleanupSnapshot.js
 import type { SpaceMailerDeps } from '../application/space/SpaceMailer.js';
 import { WatchMemberSpace } from '../application/space/WatchMemberSpace.js';
 import { SetAutomaticCleanup } from '../application/space/SetAutomaticCleanup.js';
+import { SetOwnSeedRule } from '../application/space/SetOwnSeedRule.js';
 import { SetSeedRule } from '../application/space/SetSeedRule.js';
 import type { JobQueuePort } from '../application/jobs/JobQueuePort.js';
 import type {
@@ -257,6 +258,7 @@ export interface SpaceUseCases {
   readonly watchMemberSpace: WatchMemberSpace;
   readonly setAutomaticCleanup: SetAutomaticCleanup;
   readonly setSeedRule: SetSeedRule;
+  readonly setOwnSeedRule: SetOwnSeedRule;
 }
 
 export function buildSpaceUseCases(deps: SpaceUseCaseDeps): SpaceUseCases {
@@ -267,6 +269,7 @@ export function buildSpaceUseCases(deps: SpaceUseCaseDeps): SpaceUseCases {
     watchMemberSpace: new WatchMemberSpace(deps),
     setAutomaticCleanup: new SetAutomaticCleanup(deps),
     setSeedRule: new SetSeedRule(deps),
+    setOwnSeedRule: new SetOwnSeedRule(deps),
   };
 }
 
