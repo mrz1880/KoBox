@@ -550,8 +550,12 @@ describe.skipIf(!onDebianAsRoot)('E2E: fresh Debian 13 -> bootstrap -> full stac
     const command = readFileSync('/etc/cron.d/kobox', 'utf8')
       .split('\n')
       .filter((line) => line !== '' && !line.startsWith('#') && !/^[A-Z]+=/.test(line))
-      // the kobox command comes right before the job's name, whatever wraps it
-      .map((line) => line.split(' ').at(-2))
+      // the kobox command comes right after the wrapper that sends its output
+      // to the journal (it may itself be several words, `node main.js`)
+      .map((line) => {
+        const words = line.split(' ');
+        return words[words.indexOf('--stderr-priority=warning') + 1];
+      })
       .find((c) => c !== undefined);
 
     expect(command).toBeDefined();
