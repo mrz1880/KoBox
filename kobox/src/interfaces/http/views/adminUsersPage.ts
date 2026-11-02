@@ -4,7 +4,8 @@ import type { SeedboxUser } from '../../../domain/user/SeedboxUser.js';
 import type { DiskUsageSample, VolumeSample } from '../../../domain/user/ports.js';
 import { html, type RawHtml } from '../html.js';
 import { explained, flash, page, sentence, type Viewer } from './layout.js';
-import { SEED_RULE_LIMITS, type BoxSeedRule } from '../../../domain/space/SeedRule.js';
+import { SEED_RULE_LIMITS, type BoxSeedRule, type SeedRule } from '../../../domain/space/SeedRule.js';
+import { seedRuleSummary } from './seedRule.js';
 import { HOME_BASE } from '../../../domain/user/homeDirectory.js';
 import { Quota } from '../../../domain/user/Quota.js';
 import type { SpaceLimit } from '../../../domain/user/UsableSpace.js';
@@ -47,10 +48,13 @@ export interface MemberLogin {
 
 // What the hourly pass last measured: each member's usage and what the
 // proposal on their own home would free, by username, and the volume they all
-// share. A member the pass never judged has no freeable entry.
+// share. A member the pass never judged has no freeable entry. What a member
+// could free depends on the rule they answer to: those who set their own are
+// listed with it, the others keep the box's.
 export interface DiskReadings {
   readonly usages: ReadonlyMap<string, DiskUsageSample>;
   readonly freeable: ReadonlyMap<string, Quota>;
+  readonly ownRules: ReadonlyMap<string, SeedRule>;
   readonly volume: VolumeSample | undefined;
 }
 
@@ -61,10 +65,22 @@ function usedCell(usage: DiskUsageSample | undefined, viewer: Viewer): RawHtml {
 }
 
 // Only what could go: the files are the member's, so the admin gets no button.
-function freeableCell(freeable: Quota | undefined, viewer: Viewer): RawHtml {
-  return freeable === undefined
-    ? html`<td class="num"><span class="muted">${viewer.t('not measured')}</span></td>`
-    : html`<td class="num">${formatBytes(freeable.toBytes(), viewer)}</td>`;
+// A member who set their own rule has it said under, since it decides what
+// could go.
+function freeableCell(
+  freeable: Quota | undefined,
+  ownRule: SeedRule | undefined,
+  viewer: Viewer,
+): RawHtml {
+  const amount =
+    freeable === undefined
+      ? html`<span class="muted">${viewer.t('not measured')}</span>`
+      : html`${formatBytes(freeable.toBytes(), viewer)}`;
+  const rule =
+    ownRule === undefined
+      ? html``
+      : html`<br><span class="muted">${viewer.t('own rule: {rule}', { rule: seedRuleSummary(ownRule, viewer) })}</span>`;
+  return html`<td class="num">${amount}${rule}</td>`;
 }
 
 function freeCell(space: MeasuredSpace | undefined, viewer: Viewer): RawHtml {
@@ -116,7 +132,7 @@ export function adminUsersPage(
   <td><a href="/admin/users/${user.username.value}">${user.username.value}</a></td>
   <td>${user.email.value}</td>
   <td class="num">${formatBytes(user.quota.toBytes(), viewer)}</td>
-  ${usedCell(usage, viewer)}${freeCell(measuredSpace(user, usage, disk.volume), viewer)}${freeableCell(disk.freeable.get(user.username.value), viewer)}
+  ${usedCell(usage, viewer)}${freeCell(measuredSpace(user, usage, disk.volume), viewer)}${freeableCell(disk.freeable.get(user.username.value), disk.ownRules.get(user.username.value), viewer)}
   <td>${login === undefined
     ? html`<span class="muted">${viewer.t('No portal login')}</span>`
     : viewer.t(ROLE_LABELS[login.role])}</td>

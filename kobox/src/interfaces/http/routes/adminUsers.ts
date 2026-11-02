@@ -8,7 +8,11 @@ import { ROLES } from '../../../domain/portal/Role.js';
 import { USERNAME_PATTERN } from '../../../domain/user/Username.js';
 import { Username } from '../../../domain/user/Username.js';
 import type { TorrentInstanceRepository } from '../../../domain/torrent/ports.js';
-import type { CleanupSnapshotRepository, SeedRuleRepository } from '../../../domain/space/ports.js';
+import type {
+  CleanupSnapshotRepository,
+  SeedRuleRepository,
+  SpacePreferenceRepository,
+} from '../../../domain/space/ports.js';
 import {
   InvalidSeedRuleError,
   SEED_RULE_LIMITS,
@@ -64,6 +68,8 @@ export interface AdminUsersDeps {
   readonly seedRule: Pick<SeedRuleRepository, 'get'>;
   // read-only from here: only root can ask a member's rTorrent what can go
   readonly cleanupSnapshots: Pick<CleanupSnapshotRepository, 'find'>;
+  // who set their own seed rule, which what they could clean depends on
+  readonly spacePreferences: Pick<SpacePreferenceRepository, 'findSeedRule'>;
 }
 
 // Every mutation is an enqueue of the same typed jobs the CLI produces; the
@@ -116,6 +122,7 @@ export function registerAdminUserRoutes(
   const diskOf = async (users: readonly SeedboxUser[]): Promise<DiskReadings> => {
     const usages = new Map<string, DiskUsageSample>();
     const freeable = new Map<string, Quota>();
+    const ownRules = new Map<string, SeedRule>();
     for (const user of users) {
       const usage = await deps.diskSamples.find(user.username);
       if (usage !== undefined) {
@@ -127,8 +134,12 @@ export function registerAdminUserRoutes(
       if (list !== undefined) {
         freeable.set(user.username.value, list.proposal.cleanable());
       }
+      const choice = await deps.spacePreferences.findSeedRule(user.username);
+      if (choice.kind === 'own') {
+        ownRules.set(user.username.value, choice.rule);
+      }
     }
-    return { usages, freeable, volume: await deps.volumeSamples.find() };
+    return { usages, freeable, ownRules, volume: await deps.volumeSamples.find() };
   };
 
   server.get('/admin/users', async (request, reply) => {

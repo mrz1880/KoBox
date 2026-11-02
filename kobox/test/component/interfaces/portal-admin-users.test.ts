@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { CleanupCandidate } from '../../../src/domain/space/CleanupCandidate.js';
+import { SeedRule } from '../../../src/domain/space/SeedRule.js';
 import { InfoHash } from '../../../src/domain/torrent/InfoHash.js';
 import { Quota } from '../../../src/domain/user/Quota.js';
 import { Username } from '../../../src/domain/user/Username.js';
@@ -106,6 +107,47 @@ describe('what each member could free', () => {
 
     // quota, used, free, can be freed, SCGI
     expect(cells[3]).toBe('<span class="muted">not measured</span>');
+  });
+
+  // what a member could clean depends on the rule they answer to
+  it('should_say_which_members_set_their_own_rule_and_what_it_asks', async () => {
+    await world.diskSamples.save({ username: alice, used: Quota.gib(400), sampledAt: SAMPLED_AT });
+    await world.cleanupSnapshots.replace(alice, [seeded('A', 10)], SAMPLED_AT);
+    await world.spacePreferences.chooseSeedRule(alice, {
+      kind: 'own',
+      rule: SeedRule.of({ days: 14 }),
+    });
+
+    expect(await rowOf('alice')).toContain(
+      '<td class="num">10 GiB<br><span class="muted">own rule: 14 days</span></td>',
+    );
+    expect(await rowOf('boss')).not.toContain('own rule');
+  });
+
+  it('should_say_the_ratio_a_members_own_rule_asks', async () => {
+    await world.spacePreferences.chooseSeedRule(alice, {
+      kind: 'own',
+      rule: SeedRule.of({ ratio: 1.5, days: 10 }),
+    });
+
+    expect(await rowOf('alice')).toContain(
+      '<span class="muted">not measured</span><br><span class="muted">own rule: ratio 1.5, 10 days</span>',
+    );
+  });
+
+  it('should_say_a_members_own_rule_in_french', async () => {
+    await world.spacePreferences.chooseSeedRule(alice, {
+      kind: 'own',
+      rule: SeedRule.of({ ratio: 1.5, days: 1 }),
+    });
+
+    const response = await world.server.inject({
+      method: 'GET',
+      url: '/admin/users',
+      headers: { cookie: admin.cookie, 'accept-language': 'fr-FR' },
+    });
+
+    expect(response.body).toContain('sa propre règle : ratio 1,5, 1 jour');
   });
 });
 
