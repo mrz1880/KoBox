@@ -3,6 +3,7 @@ import type { WatchDirPort } from '../../domain/torrent/ports.js';
 import type { WatchDir } from '../../domain/torrent/WatchDir.js';
 import type { Username } from '../../domain/user/Username.js';
 import { homeOf } from '../../domain/user/homeDirectory.js';
+import { CONFIG_DROP_IN_TREE } from '../../domain/torrent/memberTrees.js';
 import { runAllowing, runOrThrow, type CommandRunner } from './CommandRunner.js';
 
 // systemctl's exit status for a unit that does not exist
@@ -24,7 +25,7 @@ export class WatchDirAdapter implements WatchDirPort {
     await this.install(username, '0750', `${home}/rtorrent`);
     // read by rtorrent alone: the web server, in the member's group for
     // Nextcloud and the media player, has no business in the config or logs
-    await this.install(username, '0700', `${home}/rtorrent/config.d`);
+    await this.install(username, '0700', `${home}/${CONFIG_DROP_IN_TREE}`);
     await this.install(username, '0700', `${home}/logs`);
     for (const dir of watchDirs) {
       // setgid: a .torrent the web server drops keeps the member's group

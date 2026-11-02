@@ -7,6 +7,7 @@ import { explained, flash, page, sentence, type Viewer } from './layout.js';
 import { SEED_RULE_LIMITS, type BoxSeedRule, type SeedRule } from '../../../domain/space/SeedRule.js';
 import { seedRuleSummary } from './seedRule.js';
 import { HOME_BASE } from '../../../domain/user/homeDirectory.js';
+import { FINISH_SCRIPTS_TREE } from '../../../domain/torrent/memberTrees.js';
 import { Quota } from '../../../domain/user/Quota.js';
 import type { SpaceLimit } from '../../../domain/user/UsableSpace.js';
 import { formatBytes } from './bytes.js';
@@ -228,7 +229,7 @@ function finishScripts(name: string, instance: TorrentInstance | undefined, view
   }
   const run = !instance.syncDisabled;
   return html`<p>${sentence(viewer.t, "Scripts in {path} currently {state} when one of {name}'s downloads finishes.", {
-    path: html`<span class="mono">${HOME_BASE}/${name}/scripts</span>`,
+    path: html`<span class="mono">${HOME_BASE}/${name}/${FINISH_SCRIPTS_TREE}</span>`,
     state: html`<strong>${viewer.t(run ? 'run' : 'do not run')}</strong>`,
     name: html`${name}`,
   })}</p>
