@@ -600,6 +600,7 @@ export interface PortalContainer {
   readonly cleanupSnapshots: SqliteCleanupSnapshotRepository;
   readonly cleanupReports: SqliteCleanupReportRepository;
   readonly spacePreferences: SqliteSpacePreferenceRepository;
+  readonly seedRule: SqliteSeedRuleRepository;
   readonly mailRelay: SqliteMailRelayRepository;
   readonly siteSettings: SiteSettingsWithInstallDefault;
   readonly boxInVpn: string;
@@ -708,6 +709,8 @@ export function buildPortalContainer(name: string): PortalContainer {
     cleanupReports: new SqliteCleanupReportRepository(db),
     // read-only from here: a member's choice goes to the worker as a job
     spacePreferences: new SqliteSpacePreferenceRepository(db),
+    // read-only from here: an admin's new rule goes to the worker as a job
+    seedRule: new SqliteSeedRuleRepository(db),
     mailRelay,
     siteSettings: siteSettings(db),
     // members reach Samba and NFS at the box's address in the usual tunnel

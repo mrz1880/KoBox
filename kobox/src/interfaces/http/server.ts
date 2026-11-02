@@ -69,6 +69,7 @@ import type {
 import type {
   CleanupReportRepository,
   CleanupSnapshotRepository,
+  SeedRuleRepository,
   SpacePreferenceRepository,
 } from '../../domain/space/ports.js';
 import { registerUserRoutes } from './routes/user.js';
@@ -129,6 +130,8 @@ export interface PortalServerDeps {
   readonly cleanupReports: CleanupReportRepository;
   // read-only from here: the worker writes a member's choice
   readonly spacePreferences: Pick<SpacePreferenceRepository, 'find'>;
+  // read-only from here: an admin's new rule goes to the worker as a job
+  readonly seedRule: Pick<SeedRuleRepository, 'get'>;
   readonly mailRelay: MailRelayRepository;
   readonly boxInVpn: string;
   readonly sshPort: number;

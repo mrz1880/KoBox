@@ -8,6 +8,12 @@ import { ROLES } from '../../../domain/portal/Role.js';
 import { USERNAME_PATTERN } from '../../../domain/user/Username.js';
 import { Username } from '../../../domain/user/Username.js';
 import type { TorrentInstanceRepository } from '../../../domain/torrent/ports.js';
+import type { SeedRuleRepository } from '../../../domain/space/ports.js';
+import {
+  InvalidSeedRuleError,
+  SEED_RULE_LIMITS,
+  SeedRule,
+} from '../../../domain/space/SeedRule.js';
 import type {
   DiskUsageRepository,
   DiskUsageSample,
@@ -24,6 +30,7 @@ import { UserAlreadyExistsError } from '../../../application/user/errors.js';
 import { EmailAddress } from '../../../domain/user/EmailAddress.js';
 import { Quota } from '../../../domain/user/Quota.js';
 import { buildJob } from '../../cli/buildJob.js';
+import { formatRatio } from '../views/ratio.js';
 import { invitationLinkPage } from '../views/passwordLinkPages.js';
 import { flashOf, redirectWithFlash, viewerOf, type Guards, redirectOnceApplied } from '../guards.js';
 import {
@@ -52,6 +59,7 @@ export interface AdminUsersDeps {
   readonly diskSamples: DiskUsageRepository;
   readonly volumeSamples: VolumeSampleRepository;
   readonly credentials: PortalCredentialsPort;
+  readonly seedRule: Pick<SeedRuleRepository, 'get'>;
 }
 
 // Every mutation is an enqueue of the same typed jobs the CLI produces; the
@@ -63,6 +71,18 @@ const ACTION_WORDS: Readonly<Record<'delete' | 'suspend' | 'resume', string>> = 
   suspend: '{name} suspended.',
   resume: '{name} restored.',
 };
+
+// The rule the admin typed, or nothing when the value object refuses it.
+function seedRuleOf(raw: { readonly ratio: number; readonly days: number }): SeedRule | undefined {
+  try {
+    return SeedRule.of(raw);
+  } catch (error) {
+    if (error instanceof InvalidSeedRuleError) {
+      return undefined;
+    }
+    throw error;
+  }
+}
 
 // A login with no password yet: they have not followed their invitation.
 function awaitsInvitation(login: PortalCredentials | undefined): boolean {
@@ -113,6 +133,7 @@ export function registerAdminUserRoutes(
           users,
           await loginsOf(users),
           await diskOf(users),
+          await deps.seedRule.get(),
           viewerOf(session, request),
           flashOf(request),
         ),
@@ -135,6 +156,7 @@ export function registerAdminUserRoutes(
             users,
             await loginsOf(users),
             await diskOf(users),
+            await deps.seedRule.get(),
             viewerOf(session, request),
             undefined,
           ),
@@ -162,6 +184,43 @@ export function registerAdminUserRoutes(
     return reply
       .type('text/html')
       .send(invitationLinkPage(parsed.data.username, invitation.url, viewerOf(session, request)));
+  });
+
+  // Box-wide, not per member: the rule every member's torrents are judged by.
+  // The value object decides what is valid; the form only carries numbers.
+  const seedRuleSchema = z.object({ ratio: z.coerce.number(), days: z.coerce.number() });
+
+  server.post('/admin/users/seed-rule', async (request, reply) => {
+    const session = await guards.requireAdminCsrf(request, reply);
+    if (session === undefined) {
+      return;
+    }
+    const viewer = viewerOf(session, request);
+    const parsed = seedRuleSchema.safeParse(request.body);
+    const rule = parsed.success ? seedRuleOf(parsed.data) : undefined;
+    if (rule === undefined) {
+      const { ratio, days } = SEED_RULE_LIMITS;
+      return redirectWithFlash(
+        reply,
+        '/admin/users',
+        viewer.t(
+          'Nothing was saved: the ratio goes from {ratioMin} to {ratioMax}, the days from {daysMin} to {daysMax}.',
+          {
+            ratioMin: formatRatio(ratio.min, viewer),
+            ratioMax: formatRatio(ratio.max, viewer),
+            daysMin: String(days.min),
+            daysMax: String(days.max),
+          },
+        ),
+      );
+    }
+    const job = await deps.queue.enqueue(
+      buildJob.setSeedRule({ ratio: rule.ratio, days: rule.days }),
+    );
+    return redirectOnceApplied(reply, deps.awaitJob, job,
+      '/admin/users',
+      viewer.t('Cleanup rule saved. The next hourly pass applies it.'),
+    );
   });
 
   server.get('/admin/users/:name', async (request, reply) => {
