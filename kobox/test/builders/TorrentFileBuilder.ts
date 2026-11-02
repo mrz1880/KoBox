@@ -30,16 +30,40 @@ export interface TorrentFixture {
   readonly infoHash: string; // uppercase hex, as rtorrent reports it
 }
 
+const PIECE_LENGTH = 262144;
+// what a fixture without content claims to hold: its pieces match nothing
+const PLACEHOLDER_LENGTH = 1024;
+const SHA1_LENGTH = 20;
+
+// The SHA-1 of each piece, end to end, as the info dictionary carries them: a
+// client checking files against them finds the content whole.
+function pieceHashes(content: Buffer): Buffer {
+  const hashes: Buffer[] = [];
+  for (let offset = 0; offset < content.length; offset += PIECE_LENGTH) {
+    hashes.push(
+      createHash('sha1')
+        .update(content.subarray(offset, offset + PIECE_LENGTH))
+        .digest(),
+    );
+  }
+  return Buffer.concat(hashes);
+}
+
+// A single-file torrent. With `content`, its pieces are the real hashes of
+// those bytes, so a client loading it next to a file holding them sees the
+// download complete; without, the pieces match nothing.
 export function aTorrentFile(options: {
   readonly name: string;
   readonly isPrivate: boolean;
   readonly announce?: string;
+  readonly content?: Buffer;
 }): TorrentFixture {
   const info: Record<string, Bencodable> = {
     name: options.name,
-    'piece length': 262144,
-    pieces: Buffer.alloc(20),
-    length: 1024,
+    'piece length': PIECE_LENGTH,
+    pieces:
+      options.content === undefined ? Buffer.alloc(SHA1_LENGTH) : pieceHashes(options.content),
+    length: options.content?.length ?? PLACEHOLDER_LENGTH,
     ...(options.isPrivate && { private: 1 }),
   };
   const data = bencode({
