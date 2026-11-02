@@ -74,6 +74,11 @@ import {
 } from '../../../../src/interfaces/http/views/passwordLinkPages.js';
 import { measuredSpace } from '../../../../src/interfaces/http/views/space.js';
 import { syncPage } from '../../../../src/interfaces/http/views/syncPage.js';
+import { spaceCleanupPage } from '../../../../src/interfaces/http/views/spaceCleanupPage.js';
+import { CleanupCandidate } from '../../../../src/domain/space/CleanupCandidate.js';
+import { CleanupProposal } from '../../../../src/domain/space/CleanupProposal.js';
+import { CleanupReport, SKIP_REASONS } from '../../../../src/domain/space/CleanupReport.js';
+import { InfoHash } from '../../../../src/domain/torrent/InfoHash.js';
 import {
   accessPage,
   adminHomePage,
@@ -144,6 +149,28 @@ function instance(allowPublicTracker: boolean, syncDisabled: boolean): TorrentIn
   });
 }
 
+// one seeded a single day, one seeded long, one already sent
+function cleanupProposal(): CleanupProposal {
+  const candidates = (
+    [
+      ['A', 'seeded', '2026-10-27T09:00:00.000Z'],
+      ['B', 'seeded', '2026-10-01T09:00:00.000Z'],
+      ['C', 'alreadySent', '2026-10-01T09:00:00.000Z'],
+    ] as const
+  ).map(([hash, reason, finishedAt]) =>
+    CleanupCandidate.restore({
+      infoHash: InfoHash.parse(hash.repeat(40)),
+      name: `${hash}.Release`,
+      size: Quota.gib(10),
+      ratio: 2,
+      finishedAt,
+      path: `/home/alice/rtorrent/complete/${hash}.Release`,
+      reason,
+    }),
+  );
+  return CleanupProposal.of({ candidates, used: Quota.gib(400), allowance: Quota.gib(412) });
+}
+
 function blocklist(lastUpdate?: Blocklist['lastUpdate']): Blocklist {
   return Blocklist.restore({
     source: BlocklistSource.parse('iblocklist'),
@@ -204,6 +231,19 @@ function keysSentToTheCatalogue(): ReadonlySet<string> {
       NOW,
     );
   }
+  spaceCleanupPage(member, { list: undefined, report: undefined });
+  spaceCleanupPage(member, {
+    list: { proposal: CleanupProposal.of({ candidates: [], used: Quota.gib(1), allowance: Quota.gib(412) }), takenAt: NOW },
+    report: CleanupReport.of({
+      deleted: [],
+      skipped: SKIP_REASONS.map((reason) => ({ name: 'Kept.Release', reason })),
+      at: NOW,
+    }),
+  });
+  spaceCleanupPage(member, {
+    list: { proposal: cleanupProposal(), takenAt: NOW },
+    report: CleanupReport.of({ deleted: [{ name: 'Old.Release', size: Quota.gib(10) }], skipped: [], at: NOW }),
+  });
   passwordPage(member);
   twoStepSetupPage(member, 'alice', 'JBSWY3DPEHPK3PXP');
   for (const nextcloudInstalled of [true, false]) {

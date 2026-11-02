@@ -23,6 +23,14 @@ export function formatMoment(stamp: string, reader: Reader): string {
   });
 }
 
+// the day alone, on the box's clock, short enough for a table cell
+export function formatDay(stamp: string, reader: Reader): string {
+  return dateOf(stamp).toLocaleDateString(reader.language.value, {
+    dateStyle: 'medium',
+    timeZone: reader.zone,
+  });
+}
+
 // the hour and minute alone, on the box's clock
 export function formatClock(stamp: string, reader: Reader): string {
   return dateOf(stamp).toLocaleTimeString(reader.language.value, {

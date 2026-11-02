@@ -596,6 +596,8 @@ export interface PortalContainer {
   readonly instances: SqliteTorrentInstanceRepository;
   readonly diskSamples: SqliteDiskUsageRepository;
   readonly volumeSamples: SqliteVolumeSampleRepository;
+  readonly cleanupSnapshots: SqliteCleanupSnapshotRepository;
+  readonly cleanupReports: SqliteCleanupReportRepository;
   readonly mailRelay: SqliteMailRelayRepository;
   readonly siteSettings: SiteSettingsWithInstallDefault;
   readonly boxInVpn: string;
@@ -699,6 +701,9 @@ export function buildPortalContainer(name: string): PortalContainer {
     diskSamples: new SqliteDiskUsageRepository(db),
     // read-only from here: the worker measures the homes volume
     volumeSamples: new SqliteVolumeSampleRepository(db),
+    // read-only from here: only root can ask a member's rTorrent what can go
+    cleanupSnapshots: new SqliteCleanupSnapshotRepository(db),
+    cleanupReports: new SqliteCleanupReportRepository(db),
     mailRelay,
     siteSettings: siteSettings(db),
     // members reach Samba and NFS at the box's address in the usual tunnel

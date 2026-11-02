@@ -103,4 +103,14 @@ describe('CleanupCandidate', () => {
     expect(candidate.infoHash.value).toBe('B'.repeat(40));
     expect(candidate.size.toBytes()).toBe(2048);
   });
+
+  // the page says how long it seeded when the list was made; a part day does not count
+  it('should_count_the_whole_days_it_seeded_up_to_a_moment', () => {
+    const candidate = CleanupCandidate.judge(
+      torrent({ ratio: 2.4, finishedAt: '2026-11-08T12:00:00.000Z' }),
+      { rule, ...noTransfer, now },
+    );
+
+    expect(candidate?.daysSeeded('2026-11-20T11:59:59.000Z')).toBe(11);
+  });
 });

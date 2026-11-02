@@ -17,6 +17,7 @@ import type {
   VolumeSampleRepository,
 } from '../../../domain/user/ports.js';
 import { SyncMode } from '../../../domain/torrent/SyncMode.js';
+import type { CleanupReportRepository, CleanupSnapshotRepository } from '../../../domain/space/ports.js';
 import type { TorrentInstanceRepository } from '../../../domain/torrent/ports.js';
 import type { SyncDestinationRepository, SyncTransferRepository } from '../../../domain/sync/ports.js';
 import type { SetSyncDestination } from '../../../application/sync/SetSyncDestination.js';
@@ -41,6 +42,8 @@ import type {
 } from '../../../domain/user/ports.js';
 import type { SeedboxUser } from '../../../domain/user/SeedboxUser.js';
 import { buildJob } from '../../cli/buildJob.js';
+import { CLEANUP_MAX_TORRENTS } from '../../../application/jobs/contract.js';
+import { InfoHash } from '../../../domain/torrent/InfoHash.js';
 import { passwordField } from '../passwordField.js';
 import { flashOf, redirectWithFlash, viewerOf, type Guards, redirectOnceApplied } from '../guards.js';
 import type { Viewer } from '../views/layout.js';
@@ -60,6 +63,9 @@ import {
 } from '../views/userPages.js';
 import { measuredSpace } from '../views/space.js';
 import { syncPage } from '../views/syncPage.js';
+import { spaceCleanupPage, type CleanupList } from '../views/spaceCleanupPage.js';
+import { CleanupProposal } from '../../../domain/space/CleanupProposal.js';
+import { Quota } from '../../../domain/user/Quota.js';
 import { LANGUAGES, Language } from '../../../domain/portal/Language.js';
 import { BROWSER_CHOICE } from '../browserLanguage.js';
 import { IPV4_PATTERN, IpAddress } from '../../../domain/shared/IpAddress.js';
@@ -91,6 +97,29 @@ const categoryModeSchema = z.object({
   label: z.string().min(1).max(64),
   mode: z.string().min(1).max(16),
 });
+
+// The boxes a member left checked: one `pick` arrives as a string, several
+// as a list. Never more than one cleanup job can carry.
+const pickSchema = z.object({
+  pick: z.union([z.string(), z.array(z.string()).max(CLEANUP_MAX_TORRENTS)]).optional(),
+});
+
+// The info hashes a member left checked, or undefined when the form is not one
+// this page sends.
+function pickedFrom(body: unknown): readonly InfoHash[] | undefined {
+  const parsed = pickSchema.safeParse(body);
+  if (!parsed.success) {
+    return undefined;
+  }
+  try {
+    return [parsed.data.pick ?? []].flat().map((raw) => InfoHash.parse(raw));
+  } catch (error) {
+    if (error instanceof DomainError) {
+      return undefined;
+    }
+    throw error;
+  }
+}
 
 const passwordSchema = z.object({
   current: z.string().min(1).max(1024),
@@ -167,6 +196,10 @@ export interface UserRoutesDeps {
   // what the hourly pass measured of the member's space and of the disk
   readonly diskSamples: DiskUsageRepository;
   readonly volumeSamples: VolumeSampleRepository;
+  // what the hourly pass judged the member could clean
+  readonly cleanupSnapshots: CleanupSnapshotRepository;
+  // what the member's last cleanup deleted and kept
+  readonly cleanupReports: CleanupReportRepository;
 }
 
 // One channel of the console, assembled from what the portal can read in the
@@ -184,6 +217,29 @@ async function signalRowFor(
     level: state.level,
     egressBytes: sample?.egressBytes ?? 0,
     quotaGib: user.quota.toGib(),
+  };
+}
+
+// What a member can clean, as the hourly pass judged it, checked as the
+// proposal says. Never measured, the member is taken as using nothing, so no
+// box is checked for them: the page never guesses what they hold.
+async function cleanupListOf(
+  deps: Pick<UserRoutesDeps, 'users' | 'diskSamples' | 'cleanupSnapshots'>,
+  username: Username,
+): Promise<CleanupList | undefined> {
+  const snapshot = await deps.cleanupSnapshots.find(username);
+  const user = await deps.users.findByUsername(username);
+  if (snapshot === undefined || user === undefined) {
+    return undefined;
+  }
+  const sample = await deps.diskSamples.find(username);
+  return {
+    takenAt: snapshot.takenAt,
+    proposal: CleanupProposal.of({
+      candidates: snapshot.candidates,
+      used: sample?.used ?? Quota.bytes(0),
+      allowance: user.quota,
+    }),
   };
 }
 
@@ -245,6 +301,78 @@ export function registerUserRoutes(
           flashOf(request),
         ),
       );
+  });
+
+  server.get('/space/cleanup', async (request, reply) => {
+    const session = await guards.requireSession(request, reply);
+    if (session === undefined) {
+      return;
+    }
+    return reply
+      .type('text/html')
+      .send(
+        spaceCleanupPage(
+          viewerOf(session, request),
+          {
+            list: await cleanupListOf(deps, session.username),
+            report: await deps.cleanupReports.find(session.username),
+          },
+          flashOf(request),
+        ),
+      );
+  });
+
+  // Counts again what the boxes the member left checked would free. A POST,
+  // since the form carries the CSRF token, which must never end up in an
+  // address; and it draws the page itself, so no list of hashes travels in a
+  // redirect either.
+  server.post('/space/cleanup/recalculate', async (request, reply) => {
+    const session = await guards.requireCsrf(request, reply);
+    if (session === undefined) {
+      return;
+    }
+    const picked = pickedFrom(request.body);
+    if (picked === undefined) {
+      return reply.code(400).send();
+    }
+    const list = await cleanupListOf(deps, session.username);
+    return reply
+      .type('text/html')
+      .send(
+        spaceCleanupPage(viewerOf(session, request), {
+          list: list === undefined ? undefined : { ...list, proposal: list.proposal.pick(picked) },
+          report: await deps.cleanupReports.find(session.username),
+        }),
+      );
+  });
+
+  // The username comes from the session, never from the form: a member only
+  // ever cleans their own space. The worker judges each torrent again live.
+  server.post('/space/cleanup', async (request, reply) => {
+    const session = await guards.requireCsrf(request, reply);
+    if (session === undefined) {
+      return;
+    }
+    const picked = pickedFrom(request.body);
+    if (picked === undefined) {
+      return reply.code(400).send();
+    }
+    if (picked.length === 0) {
+      return redirectWithFlash(reply, '/space/cleanup', 'You did not choose anything to delete.');
+    }
+    const job = await deps.queue.enqueue(
+      buildJob.cleanUpSpace({
+        username: session.username.value,
+        infoHashes: picked.map((infoHash) => infoHash.value),
+      }),
+    );
+    return redirectOnceApplied(
+      reply,
+      deps.awaitJob,
+      job,
+      '/space/cleanup',
+      'Cleanup done. The list and your space are up to date.',
+    );
   });
 
   server.get('/files', async (request, reply) => {

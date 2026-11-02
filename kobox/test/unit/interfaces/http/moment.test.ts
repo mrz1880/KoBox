@@ -3,6 +3,7 @@ import { CronSchedule } from '../../../../src/domain/maintenance/CronSchedule.js
 import {
   formatAgo,
   formatClock,
+  formatDay,
   formatMoment,
   nextRunAfter,
 } from '../../../../src/interfaces/http/views/moment.js';
@@ -15,6 +16,13 @@ const french = { language: Language.fr, t: translatorFor(Language.fr), zone: 'Eu
 describe('formatMoment', () => {
   it('should_say_a_utc_stamp_in_the_box_time_zone_and_the_readers_words', () => {
     expect(formatMoment('2026-10-30 19:37:28', french)).toBe('30 octobre 2026 à 20:37');
+  });
+});
+
+// a day in a table: the date alone, on the box's clock (23:30 UTC is the next day in Paris)
+describe('formatDay', () => {
+  it('should_say_the_day_of_a_utc_stamp_on_the_box_clock', () => {
+    expect(formatDay('2026-10-30 23:30:00', french)).toBe('31 oct. 2026');
   });
 });
 

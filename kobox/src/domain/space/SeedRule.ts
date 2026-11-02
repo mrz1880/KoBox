@@ -13,6 +13,12 @@ const DEFAULT_DAYS = 7;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
+// The whole days a torrent seeded from when it finished until `now`, both ISO
+// instants: a part day does not count.
+export function wholeDaysSeeded(finishedAt: string, now: string): number {
+  return Math.floor((Date.parse(now) - Date.parse(finishedAt)) / DAY_MS);
+}
+
 // When a finished torrent has seeded enough to be deleted: one rule for the
 // whole box, both conditions required.
 export class SeedRule {
@@ -38,7 +44,7 @@ export class SeedRule {
     torrent: { readonly ratio: number; readonly finishedAt: string },
     now: string,
   ): boolean {
-    const seededMs = Date.parse(now) - Date.parse(torrent.finishedAt);
-    return torrent.ratio >= this.ratio && seededMs >= this.days * DAY_MS;
+    // whole days compare as the elapsed time would: the rule's days are whole
+    return torrent.ratio >= this.ratio && wholeDaysSeeded(torrent.finishedAt, now) >= this.days;
   }
 }
