@@ -243,6 +243,8 @@ export interface SpaceUseCaseDeps {
   readonly reports: CleanupReportRepository;
   readonly quota: QuotaPort;
   readonly samples: DiskUsageRepository;
+  readonly users: UserRepository;
+  readonly gauges: QuotaGaugePort;
   readonly preferences: SpacePreferenceRepository;
   // where the hourly pass queues an automatic cleanup
   readonly queue: Pick<JobQueuePort, 'enqueue'>;
