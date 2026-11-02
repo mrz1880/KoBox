@@ -1,4 +1,5 @@
 import { DomainError } from '../shared/DomainError.js';
+import { DAY_MS } from '../shared/time.js';
 
 export class InvalidCertExpiryError extends DomainError {
   constructor(raw: string) {
@@ -7,7 +8,6 @@ export class InvalidCertExpiryError extends DomainError {
 }
 
 const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
-const DAY_MS = 24 * 60 * 60 * 1000;
 
 function toUtcMs(isoDate: string): number {
   return Date.parse(`${isoDate}T00:00:00Z`);

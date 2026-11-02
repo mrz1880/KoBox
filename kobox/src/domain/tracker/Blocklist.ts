@@ -1,5 +1,6 @@
 import { DomainError } from '../shared/DomainError.js';
 import { shiftStamp } from '../shared/stamp.js';
+import { DAY_MS } from '../shared/time.js';
 import type { BlocklistSource } from './BlocklistSource.js';
 import type { BlocklistUrl } from './BlocklistUrl.js';
 
@@ -18,7 +19,7 @@ export type BlocklistUpdate =
 // While a list fails its last good ranges stay in force, so a source that is
 // down for a run or two harms nobody. A day of failures is no longer a hiccup:
 // an expired subscription, a withdrawn list. Four runs, at one every six hours.
-const OVERDUE_AFTER_MS = 24 * 60 * 60 * 1000;
+const OVERDUE_AFTER_MS = DAY_MS;
 
 interface BlocklistProps {
   readonly source: BlocklistSource;

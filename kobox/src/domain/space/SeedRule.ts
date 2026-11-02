@@ -1,4 +1,5 @@
 import { DomainError } from '../shared/DomainError.js';
+import { DAY_MS } from '../shared/time.js';
 
 export class InvalidSeedRuleError extends DomainError {
   constructor(reason: string) {
@@ -18,8 +19,6 @@ export const SEED_RULE_LIMITS = {
   ratio: { min: 0.1, max: 100 },
   days: { min: 1, max: 365 },
 } as const;
-
-const DAY_MS = 24 * 60 * 60 * 1000;
 
 // The whole days a torrent seeded from when it finished until `now`, both ISO
 // instants: a part day does not count.

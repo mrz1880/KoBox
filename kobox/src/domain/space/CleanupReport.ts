@@ -1,4 +1,5 @@
 import { shiftStamp } from '../shared/stamp.js';
+import { DAY_MS } from '../shared/time.js';
 import { Quota } from '../user/Quota.js';
 
 // Why a torrent the member picked is still on the box:
@@ -29,7 +30,6 @@ export type CleanupTrigger = (typeof CLEANUP_TRIGGERS)[number];
 // How long the home page shows what an automatic cleanup deleted: the member
 // did not ask for it, so they are told until they had time to see it.
 const REPORT_SHOWN_FOR_DAYS = 7;
-const DAY_MS = 24 * 60 * 60 * 1000;
 
 export interface DeletedLine {
   readonly name: string;
