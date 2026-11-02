@@ -29,6 +29,7 @@ import { InMemoryPortalCredentialsRepository } from '../../../../src/infrastruct
 import { InMemoryPortalSessionRepository } from '../../../../src/infrastructure/persistence/InMemoryPortalSessionRepository.js';
 import { InMemoryDiskUsageRepository } from '../../../../src/infrastructure/persistence/InMemoryDiskUsageRepository.js';
 import { InMemoryCleanupSnapshotRepository } from '../../../../src/infrastructure/persistence/InMemoryCleanupSnapshotRepository.js';
+import { InMemorySpacePreferenceRepository } from '../../../../src/infrastructure/persistence/InMemorySpacePreferenceRepository.js';
 import { InMemorySeedRuleRepository } from '../../../../src/infrastructure/persistence/InMemorySeedRuleRepository.js';
 import { InMemorySyncTransferRepository } from '../../../../src/infrastructure/persistence/InMemorySyncTransferRepository.js';
 import { InMemoryTorrentInstanceRepository } from '../../../../src/infrastructure/persistence/InMemoryTorrentInstanceRepository.js';
@@ -201,6 +202,7 @@ beforeEach(() => {
         torrents: memberTorrents,
         transfers: new InMemorySyncTransferRepository(),
         seedRule: new InMemorySeedRuleRepository(),
+        preferences: new InMemorySpacePreferenceRepository(),
         snapshots: cleanupSnapshots,
       }),
       spaceWatch: {
