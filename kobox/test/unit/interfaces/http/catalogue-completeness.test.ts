@@ -421,7 +421,7 @@ function keysSentToTheCatalogue(): ReadonlySet<string> {
       ['alice', { role: 'user' as const, invited: false }],
       ['bob', { role: 'admin' as const, invited: true }],
     ]),
-    { usages: new Map(), volume: undefined },
+    { usages: new Map(), freeable: new Map(), volume: undefined },
     SeedRule.DEFAULT,
     admin,
   );
@@ -433,6 +433,7 @@ function keysSentToTheCatalogue(): ReadonlySet<string> {
         ['alice', { username: alice, used: Quota.gib(100), sampledAt: NOW }],
         ['bob', { username: Username.parse('bob'), used: Quota.gib(1), sampledAt: NOW }],
       ]),
+      freeable: new Map([['alice', Quota.gib(80)]]),
       volume: { space: volume(50), measuredAt: NOW },
     },
     SeedRule.DEFAULT,

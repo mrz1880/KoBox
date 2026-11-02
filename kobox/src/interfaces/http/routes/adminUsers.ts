@@ -8,7 +8,7 @@ import { ROLES } from '../../../domain/portal/Role.js';
 import { USERNAME_PATTERN } from '../../../domain/user/Username.js';
 import { Username } from '../../../domain/user/Username.js';
 import type { TorrentInstanceRepository } from '../../../domain/torrent/ports.js';
-import type { SeedRuleRepository } from '../../../domain/space/ports.js';
+import type { CleanupSnapshotRepository, SeedRuleRepository } from '../../../domain/space/ports.js';
 import {
   InvalidSeedRuleError,
   SEED_RULE_LIMITS,
@@ -31,6 +31,7 @@ import { EmailAddress } from '../../../domain/user/EmailAddress.js';
 import { Quota } from '../../../domain/user/Quota.js';
 import { buildJob } from '../../cli/buildJob.js';
 import { formatRatio } from '../views/ratio.js';
+import { cleanupListOf } from './cleanupList.js';
 import { invitationLinkPage } from '../views/passwordLinkPages.js';
 import { flashOf, redirectWithFlash, viewerOf, type Guards, redirectOnceApplied } from '../guards.js';
 import {
@@ -60,6 +61,8 @@ export interface AdminUsersDeps {
   readonly volumeSamples: VolumeSampleRepository;
   readonly credentials: PortalCredentialsPort;
   readonly seedRule: Pick<SeedRuleRepository, 'get'>;
+  // read-only from here: only root can ask a member's rTorrent what can go
+  readonly cleanupSnapshots: Pick<CleanupSnapshotRepository, 'find'>;
 }
 
 // Every mutation is an enqueue of the same typed jobs the CLI produces; the
@@ -111,13 +114,19 @@ export function registerAdminUserRoutes(
 
   const diskOf = async (users: readonly SeedboxUser[]): Promise<DiskReadings> => {
     const usages = new Map<string, DiskUsageSample>();
+    const freeable = new Map<string, Quota>();
     for (const user of users) {
       const usage = await deps.diskSamples.find(user.username);
       if (usage !== undefined) {
         usages.set(user.username.value, usage);
       }
+      // what the member's own proposal would free, as their home box says
+      const list = await cleanupListOf(deps, user.username);
+      if (list !== undefined) {
+        freeable.set(user.username.value, list.proposal.freed());
+      }
     }
-    return { usages, volume: await deps.volumeSamples.find() };
+    return { usages, freeable, volume: await deps.volumeSamples.find() };
   };
 
   server.get('/admin/users', async (request, reply) => {
