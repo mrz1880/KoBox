@@ -1,4 +1,5 @@
 import { shiftStamp } from '../shared/stamp.js';
+import { DAY_MS } from '../shared/time.js';
 import type { Role } from './Role.js';
 // Portal auth policy constants and the expiries they set, as stamps.
 
@@ -11,7 +12,7 @@ export function lockExpiry(now: string): string {
 }
 
 export function sessionExpiry(now: string): string {
-  return shiftStamp(now, SESSION_TTL_DAYS * 24 * 60 * 60_000);
+  return shiftStamp(now, SESSION_TTL_DAYS * DAY_MS);
 }
 
 export function isLocked(lockedUntil: string | undefined, now: string): boolean {

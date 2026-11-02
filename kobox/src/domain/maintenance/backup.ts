@@ -1,8 +1,9 @@
 // Backup naming and TTL rotation (Backup-Manager parity) as pure
 // decisions: infrastructure lists directories and deletes what this returns.
 
+import { DAY_MS } from '../shared/time.js';
+
 const STAMP_PATTERN = /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$/;
-const DAY_MS = 86_400_000;
 
 export interface BackupRotationOptions {
   readonly ttlDays: number;

@@ -1,19 +1,18 @@
 import { DomainError } from '../shared/DomainError.js';
 import type { Username } from '../user/Username.js';
 import { shiftStamp } from '../shared/stamp.js';
+import { DAY_MS, HOUR_MS } from '../shared/time.js';
 
 // Why a member is handed a link to choose their password: they were just
 // invited, or they forgot it.
 export const PASSWORD_LINK_PURPOSES = ['invitation', 'reset'] as const;
 export type PasswordLinkPurpose = (typeof PASSWORD_LINK_PURPOSES)[number];
 
-const HOUR_MS = 60 * 60_000;
-
 // An invitation waits for someone to read their mail; a reset answers a
 // request the member made a minute ago, and is worth less the longer it lies
 // in a mailbox.
 const LIFETIME_MS: Record<PasswordLinkPurpose, number> = {
-  invitation: 7 * 24 * HOUR_MS,
+  invitation: 7 * DAY_MS,
   reset: HOUR_MS,
 };
 
