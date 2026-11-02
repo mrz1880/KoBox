@@ -5,6 +5,7 @@ import { MediaPath } from '../../domain/media/MediaFile.js';
 import type { MediaEntry, MediaScanPort } from '../../domain/media/ports.js';
 import type { Username } from '../../domain/user/Username.js';
 import { HOME_BASE } from '../../domain/user/homeDirectory.js';
+import { WatchDir } from '../../domain/torrent/WatchDir.js';
 
 // deep enough for complete/<category>/<release>/<file>, shallow enough that a
 // symlink loop or a pathological tree cannot spin the worker
@@ -16,7 +17,7 @@ export class FsMediaScanner implements MediaScanPort {
   constructor(private readonly homeBase: string = HOME_BASE) {}
 
   async scan(username: Username): Promise<readonly MediaEntry[]> {
-    const root = join(this.homeBase, username.value, 'rtorrent', 'complete');
+    const root = WatchDir.root().completePath(join(this.homeBase, username.value));
     const found: MediaEntry[] = [];
     await this.walk(root, root, 0, found);
     return found;

@@ -12,6 +12,7 @@ import { PORTAL_USER_VARIABLE } from './NextcloudPort.js';
 import { DomainError } from '../shared/DomainError.js';
 import type { RenderedFile } from '../shared/files.js';
 import { HOME_BASE, homeOf } from '../user/homeDirectory.js';
+import { WatchDir } from '../torrent/WatchDir.js';
 import type { AccountIds } from '../security/ports.js';
 import type { Username } from '../user/Username.js';
 
@@ -510,7 +511,7 @@ export function renderNginxVhost(settings: NginxVhostSettings): RenderedFile {
       // ever see it.
       '    location ~ ^/internal-media/([^/]+)/(.+)$ {',
       '        internal;',
-      `        alias ${HOME_BASE}/$1/rtorrent/complete/$2;`,
+      `        alias ${WatchDir.root().completePath(`${HOME_BASE}/$1`)}/$2;`,
       '    }',
       '',
       '    location /monitoring/ {',
