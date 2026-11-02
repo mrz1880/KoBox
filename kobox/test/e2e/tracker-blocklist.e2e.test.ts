@@ -10,7 +10,6 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { createServer as createHttpsServer } from 'node:https';
-import { connect } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createServer as createTlsServer, type Server as TlsServer } from 'node:tls';
@@ -18,7 +17,7 @@ import { gzipSync } from 'node:zlib';
 import Database from 'better-sqlite3';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { aTorrentFile } from '../builders/TorrentFileBuilder.js';
-import { scgiCall } from './support/scgi.js';
+import { scgiCall, waitForScgi } from './support/scgi.js';
 
 // Full Phase 2 E2E on a fresh Debian 13: a real torrent insert discovers the
 // tracker, a REAL openssl fetches its certificate from a local TLS fixture,
@@ -95,28 +94,6 @@ function dbRun(query: string, ...params: string[]): void {
 
 function unitProperty(name: string): string {
   return sh('systemctl', ['show', '-p', name, '--value', `rtorrent-${USER}`]).trim();
-}
-
-function waitForScgi(timeoutMs: number): Promise<void> {
-  const deadline = Date.now() + timeoutMs;
-  return new Promise((resolve, reject) => {
-    const attempt = (): void => {
-      const socket = connect({ host: '127.0.0.1', port: SCGI_PORT });
-      socket.once('connect', () => {
-        socket.destroy();
-        resolve();
-      });
-      socket.once('error', () => {
-        socket.destroy();
-        if (Date.now() > deadline) {
-          reject(new Error('rtorrent SCGI port never came up'));
-          return;
-        }
-        setTimeout(attempt, 500);
-      });
-    };
-    attempt();
-  });
 }
 
 function generateCert(cn: string, san: string): { key: Buffer; cert: Buffer } {
@@ -205,7 +182,7 @@ describe.skipIf(!onDebianAsRoot)('E2E: tracker discovery, certs, whitelist and b
   it('should_discover_the_tracker_from_a_real_insert_and_fetch_its_cert', async () => {
     kobox(['create-user', USER, '--email', 'e2e@example.org', '--quota-gib', '5'], 'pw123456\n');
     await drainQueue(); // create-user + chained provision
-    await waitForScgi(20_000);
+    await waitForScgi(SCGI_PORT, 20_000);
 
     const fixture = aTorrentFile({
       name: 'private-linux.iso',
@@ -290,7 +267,7 @@ describe.skipIf(!onDebianAsRoot)('E2E: tracker discovery, certs, whitelist and b
     // a real rtorrent must accept the drop-in + filter file — and PROVE the
     // parse through its own XML-RPC answer, not just by staying alive
     sh('systemctl', ['restart', `rtorrent-${USER}`]);
-    await waitForScgi(20_000);
+    await waitForScgi(SCGI_PORT, 20_000);
     expect(unitProperty('ActiveState')).toBe('active');
     const sizeAnswer = await scgiCall(SCGI_PORT, 'ipv4_filter.size_data');
     const loaded = Number(/<i[48]>(\d+)<\/i[48]>/.exec(sizeAnswer)?.[1]);

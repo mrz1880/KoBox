@@ -1,6 +1,5 @@
 import { execFileSync, type ExecFileSyncOptions } from 'node:child_process';
 import { chmodSync, existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
-import { connect } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import Database from 'better-sqlite3';
@@ -8,7 +7,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { aTorrentFile } from '../builders/TorrentFileBuilder.js';
 import { DEFAULT_SPOOL_DIR } from '../../src/infrastructure/spool/TorrentEventSpool.js';
 import { openString } from '../../src/infrastructure/system/rsaSealing.js';
-import { scgiCall } from './support/scgi.js';
+import { scgiCall, waitForScgi } from './support/scgi.js';
 
 // Full Phase 1 E2E on a fresh Debian 13 with a REAL rtorrent:
 // provision -> config validated by rtorrent itself -> declarative re-render
@@ -49,28 +48,6 @@ function dbRow(query: string, ...params: string[]): Record<string, unknown> | un
   } finally {
     db.close();
   }
-}
-
-function waitForScgi(timeoutMs: number): Promise<void> {
-  const deadline = Date.now() + timeoutMs;
-  return new Promise((resolve, reject) => {
-    const attempt = (): void => {
-      const socket = connect({ host: '127.0.0.1', port: SCGI_PORT });
-      socket.once('connect', () => {
-        socket.destroy();
-        resolve();
-      });
-      socket.once('error', () => {
-        socket.destroy();
-        if (Date.now() > deadline) {
-          reject(new Error(`rtorrent SCGI port ${String(SCGI_PORT)} never came up`));
-          return;
-        }
-        setTimeout(attempt, 500);
-      });
-    };
-    attempt();
-  });
 }
 
 // d.state as rtorrent reports it: 1 started, 0 stopped, undefined not loaded
@@ -168,7 +145,7 @@ describe.skipIf(!onDebianAsRoot)('E2E: torrent lifecycle with a real rtorrent', 
     expect(existsSync(join(HOME, 'rtorrent/config.d/80-watch.rc'))).toBe(true);
 
     expect(unitProperty('ActiveState')).toBe('active');
-    await waitForScgi(20_000); // rtorrent parsed our config and opened SCGI
+    await waitForScgi(SCGI_PORT, 20_000); // rtorrent parsed our config and opened SCGI
   });
 
   it('should_keep_other_members_out_of_a_tree_the_web_server_can_reach', () => {
@@ -230,7 +207,7 @@ describe.skipIf(!onDebianAsRoot)('E2E: torrent lifecycle with a real rtorrent', 
     expect(existsSync(join(HOME, 'rtorrent/watch/films'))).toBe(true);
     expect(unitProperty('ActiveState')).toBe('active');
     expect(unitProperty('ActiveEnterTimestampMonotonic')).not.toBe(startedAt); // restarted
-    await waitForScgi(20_000);
+    await waitForScgi(SCGI_PORT, 20_000);
   });
 
   it('should_remember_what_a_category_does_with_a_finished_download', () => {
@@ -523,7 +500,7 @@ describe.skipIf(!onDebianAsRoot)('E2E: torrent lifecycle with a real rtorrent', 
     kobox(['render-blocklist-filters', USER]);
     drainQueue(); // the CLI enqueues; the worker is what writes the files
     sh('systemctl', ['restart', `rtorrent-${USER}`]);
-    await waitForScgi(30_000);
+    await waitForScgi(SCGI_PORT, 30_000);
 
     expect(sh('systemctl', ['is-active', `rtorrent-${USER}`]).trim()).toBe('active');
   }, 60_000);
