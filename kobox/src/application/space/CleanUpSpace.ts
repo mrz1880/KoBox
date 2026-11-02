@@ -36,7 +36,8 @@ interface Deps extends CleanupJudgeDeps {
 export class CleanUpSpace {
   constructor(private readonly deps: Deps) {}
 
-  async execute(command: CleanUpSpaceCommand): Promise<void> {
+  // Answers the report it saved, so the worker can log what failed.
+  async execute(command: CleanUpSpaceCommand): Promise<CleanupReport> {
     const at = this.deps.clock();
     const instance = await this.deps.instances.findByUsername(command.username);
     // without an rTorrent, nothing picked is still there to delete
@@ -74,9 +75,11 @@ export class CleanUpSpace {
       }
       deleted.push({ name: candidate.name, size: candidate.size });
     }
-    await this.deps.reports.save(command.username, CleanupReport.of({ deleted, skipped, at }));
+    const report = CleanupReport.of({ deleted, skipped, at });
+    await this.deps.reports.save(command.username, report);
     const used = await this.deps.quota.getUsage(command.username);
     await this.deps.samples.save({ username: command.username, used, sampledAt: at });
     await this.deps.snapshot.execute(command.username, at);
+    return report;
   }
 }

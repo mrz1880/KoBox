@@ -948,6 +948,7 @@ export function buildContainer(name: string): Container {
       syncUseCases,
       spaceUseCases,
       passwords,
+      logger,
     ),
     speedtestRepo,
     diagnosticsRepo,

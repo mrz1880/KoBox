@@ -197,6 +197,8 @@ interface World {
   memberTorrents: FakeMemberTorrents;
   cleanupReports: InMemoryCleanupReportRepository;
   mailTransport: RecordingMailTransport;
+  // what the worker logged at warn level, context and message
+  warnings: { context: unknown; message: string | undefined }[];
   worker: JobWorker;
   passwords: FakePasswordCipher;
   samba: FakeServiceLogin;
@@ -458,6 +460,7 @@ beforeEach(() => {
     installHost: new FakeInstallHost(),
     clock: () => '2026-07-25 10:00:00',
   });
+  const warnings: World['warnings'] = [];
   world = {
     nextcloud,
     components,
@@ -491,6 +494,7 @@ beforeEach(() => {
     syncTransfers,
     memberTorrents,
     cleanupReports,
+    warnings,
     worker: new JobWorker(
       queue,
       useCases,
@@ -501,6 +505,9 @@ beforeEach(() => {
       syncUseCases,
       spaceUseCases,
       passwords,
+      {
+        warn: (context: unknown, message?: string) => warnings.push({ context, message }),
+      },
     ),
   };
 });
@@ -1152,5 +1159,41 @@ describe('space jobs', () => {
     expect(world.queue.statusOf(id)).toBe('done');
     expect(world.memberTorrents.erased).toEqual([film.value]);
     expect((await world.cleanupReports.find(alice))?.freed.toGib()).toBe(12);
+  });
+
+  // the member reads it on their page; whoever looks after the box reads the log
+  it('should_log_a_torrent_the_cleanup_could_not_remove', async () => {
+    const scgiPort = ScgiPort.parse(51101);
+    await world.instances.save(
+      TorrentInstance.provision({
+        username: alice,
+        scgiPort,
+        rtorrentPort: RtorrentPort.parse(45000),
+      }).instance,
+    );
+    const film = InfoHash.parse('A'.repeat(40));
+    world.memberTorrents.holds(scgiPort, [
+      {
+        infoHash: film,
+        name: 'Example Film',
+        size: Quota.gib(12),
+        ratio: 3,
+        finishedAt: '2026-07-01T08:00:00.000Z',
+        path: '/home/alice/rtorrent/complete/Films/Example Film',
+      },
+    ]);
+    world.memberTorrents.refusesToErase(film);
+    await world.queue.enqueue(
+      buildJob.cleanUpSpace({ username: 'alice', infoHashes: [film.value] }),
+    );
+
+    await world.worker.processNext();
+
+    expect(world.warnings).toEqual([
+      {
+        context: { username: 'alice', torrent: 'Example Film', reason: 'notErased' },
+        message: 'space cleanup: torrent not removed',
+      },
+    ]);
   });
 });
