@@ -514,20 +514,20 @@ beforeEach(() => {
     seedRule,
     quota,
     warnings,
-    worker: new JobWorker(
+    worker: new JobWorker({
       queue,
       useCases,
-      torrentUseCases,
-      trackerUseCases,
-      securityUseCases,
-      maintenanceUseCases,
-      syncUseCases,
-      spaceUseCases,
+      torrents: torrentUseCases,
+      trackers: trackerUseCases,
+      security: securityUseCases,
+      maintenance: maintenanceUseCases,
+      sync: syncUseCases,
+      space: spaceUseCases,
       passwords,
-      {
+      logger: {
         warn: (context: unknown, message?: string) => warnings.push({ context, message }),
       },
-    ),
+    }),
   };
 });
 
