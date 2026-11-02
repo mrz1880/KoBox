@@ -38,23 +38,41 @@ export class WatchDir {
   }
 
   watchPath(home: string): string {
-    return this.scoped(home, 'watch');
+    return this.underHome(home, this.watchTree());
   }
 
   completePath(home: string): string {
-    return this.scoped(home, 'complete');
+    return this.underHome(home, this.completeTree());
   }
 
   torrentsPath(home: string): string {
-    return this.scoped(home, 'torrents');
+    return this.underHome(home, this.torrentsTree());
+  }
+
+  // The same trees relative to the member's home, for what names them from
+  // there: a Nextcloud mount, a path a member types.
+  watchTree(): string {
+    return this.scoped('watch');
+  }
+
+  completeTree(): string {
+    return this.scoped('complete');
+  }
+
+  torrentsTree(): string {
+    return this.scoped('torrents');
   }
 
   equals(other: WatchDir): boolean {
     return (this.label?.value ?? '') === (other.label?.value ?? '');
   }
 
-  private scoped(home: string, tree: string): string {
-    const base = `${home.replace(/\/$/, '')}/rtorrent/${tree}`;
+  private underHome(home: string, tree: string): string {
+    return `${home.replace(/\/$/, '')}/${tree}`;
+  }
+
+  private scoped(tree: string): string {
+    const base = `rtorrent/${tree}`;
     return this.label ? `${base}/${this.label.value}` : base;
   }
 }

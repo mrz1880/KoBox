@@ -1,13 +1,14 @@
 import type { Password } from '../user/Password.js';
 import type { Username } from '../user/Username.js';
+import { WatchDir } from '../torrent/WatchDir.js';
 
 // The three folders a member expects at the root of their Nextcloud, and where
 // each one really lives. Named after what they are rather than after the path,
 // because the path is an implementation detail of this box.
 export const NEXTCLOUD_MOUNTS: readonly { readonly label: string; readonly under: string }[] = [
-  { label: 'rTorrent Complete', under: 'rtorrent/complete' },
-  { label: 'rTorrent Torrents', under: 'rtorrent/torrents' },
-  { label: 'rTorrent Watch', under: 'rtorrent/watch' },
+  { label: 'rTorrent Complete', under: WatchDir.root().completeTree() },
+  { label: 'rTorrent Torrents', under: WatchDir.root().torrentsTree() },
+  { label: 'rTorrent Watch', under: WatchDir.root().watchTree() },
 ];
 
 // What Nextcloud's own admin page asks of a box, as occ system values.

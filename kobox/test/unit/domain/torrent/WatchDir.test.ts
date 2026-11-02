@@ -19,6 +19,13 @@ describe('WatchDir', () => {
     expect(films.torrentsPath('/home/alice')).toBe('/home/alice/rtorrent/torrents/films');
   });
 
+  it('should_name_each_tree_relative_to_the_home', () => {
+    const films = WatchDir.labeled(Label.parse('films'));
+    expect(WatchDir.root().completeTree()).toBe('rtorrent/complete');
+    expect(WatchDir.root().torrentsTree()).toBe('rtorrent/torrents');
+    expect(films.watchTree()).toBe('rtorrent/watch/films');
+  });
+
   it('should_compare_by_label', () => {
     expect(WatchDir.root().equals(WatchDir.root())).toBe(true);
     expect(WatchDir.labeled(Label.parse('films')).equals(WatchDir.labeled(Label.parse('films')))).toBe(true);
