@@ -1,3 +1,4 @@
+import { messageOf } from '../../domain/shared/errorMessage.js';
 import { asc, eq, sql } from 'drizzle-orm';
 import { parseJob, payloadAfterClaim, type Job } from '../../application/jobs/contract.js';
 import type { ClaimedJob, JobQueuePort } from '../../application/jobs/JobQueuePort.js';
@@ -103,7 +104,7 @@ export class SqliteJobQueue implements JobQueuePort, JobProgressPort {
         this.setStatus(
           claimed.id,
           'failed',
-          error instanceof Error ? error.message : String(error),
+          messageOf(error),
         );
       }
     }

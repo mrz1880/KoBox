@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { messageOf } from '../../domain/shared/errorMessage.js';
 import { Command } from 'commander';
 import { EventHook } from '../../domain/torrent/EventHook.js';
 import { InfoHash } from '../../domain/torrent/InfoHash.js';
@@ -1052,6 +1053,6 @@ program
   });
 
 program.parseAsync().catch((error: unknown) => {
-  process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
+  process.stderr.write(`${messageOf(error)}\n`);
   process.exitCode = 1;
 });

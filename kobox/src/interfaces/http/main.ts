@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { messageOf } from '../../domain/shared/errorMessage.js';
 import { Authenticate } from '../../application/portal/Authenticate.js';
 import { Login } from '../../application/portal/Login.js';
 import { Logout } from '../../application/portal/Logout.js';
@@ -110,6 +111,6 @@ async function main(): Promise<void> {
 }
 
 main().catch((error: unknown) => {
-  process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
+  process.stderr.write(`${messageOf(error)}\n`);
   process.exit(1);
 });

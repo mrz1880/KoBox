@@ -1,3 +1,4 @@
+import { messageOf } from '../../domain/shared/errorMessage.js';
 import {
   MAX_MAIL_ATTEMPTS,
   nextAttemptDelayMinutes,
@@ -43,7 +44,7 @@ export class SendMails {
         await this.deps.outbox.markSent(mail.id, input.now);
         sent += 1;
       } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
+        const message = messageOf(error);
         const attemptsSoFar = mail.attempts + 1;
         const delay =
           attemptsSoFar >= MAX_MAIL_ATTEMPTS ? undefined : nextAttemptDelayMinutes(attemptsSoFar);

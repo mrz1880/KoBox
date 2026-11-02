@@ -1,3 +1,4 @@
+import { messageOf } from '../../domain/shared/errorMessage.js';
 import type { FinishedTorrent } from '../../domain/space/FinishedTorrent.js';
 import type { CleanupSnapshotRepository, MemberTorrentsPort } from '../../domain/space/ports.js';
 import type { TorrentInstanceRepository } from '../../domain/torrent/ports.js';
@@ -36,7 +37,7 @@ export class TakeCleanupSnapshot {
     } catch (error) {
       return {
         kind: 'rtorrentSilent',
-        error: error instanceof Error ? error.message : String(error),
+        error: messageOf(error),
       };
     }
     const judge = await CleanupJudge.of(this.deps, username, at);
