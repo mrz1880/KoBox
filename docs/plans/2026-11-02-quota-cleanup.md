@@ -260,7 +260,9 @@ Commit: `feat(space): delete the chosen torrents after checking each one again`
   `?keep=<hash>&keep=...` from the "Recalculate" button: those stay checked,
   the total follows. One form, two submit buttons: "Recalculate" (GET) and
   "Delete for good (N GiB)" (POST with CSRF).
-- Each line: name, size (`formatBytes`), ratio, finished date, reason text.
+- Each line: name, size (`formatBytes`), ratio, finished date, reason text. A
+  line proposed for having seeded adds "KoBox does not know whether you fetched
+  it".
 - Snapshot date shown; no snapshot yet → "The first list arrives within the
   hour".
 - POST enqueues `clean-up-space` and redirects with a flash; the latest report
@@ -293,8 +295,10 @@ rTorrent entry are gone. Open the PR; merge and release only when asked.
 
 ### Task 13: member preferences
 
-**Files:** table `space_preferences` (username unique, automatic int default 0,
-warned int default 0), repository, port `SpacePreferenceRepository`, migration.
+**Files:** table `space_preferences` (username unique, automatic scope text
+`'off' | 'sentOnly' | 'sentOrSeeded'` default `'off'`, warned int default 0),
+domain union `AutomaticCleanup` with its parse, repository, port
+`SpacePreferenceRepository`, migration.
 
 Commit: `feat(space): remember a member's cleanup choice and whether they were warned`
 
@@ -318,7 +322,9 @@ Commit: `feat(space): warn a member once each time they climb past 90 %`
   address: usage, freeable total, link. Nothing freeable → the "nothing to
   clean" variant.
 - Critical, automatic on, snapshot younger than two hours (`STALE_AFTER_MS`
-  here) → enqueue `clean-up-space` with the checked lines. Nothing freeable or a
+  here) → enqueue `clean-up-space` with the lines a proposal built only from the
+  candidates the scope allows checks (`sentOnly`: reason `alreadySent` only;
+  `sentOrSeeded`: both). The scope rule lives in the domain. Nothing freeable or a
   stale snapshot → the ordinary mail.
 - Mail texts live in a `spaceMails.ts` next to `passwordLinkMail.ts`, in the
   member's language like the other member mails.
@@ -338,9 +344,10 @@ Commit: `feat(space): tell a member what automatic cleanup deleted`
 
 ### Task 17: the setting in My account
 
-**Files:** job `set-automatic-cleanup` (username, enabled boolean), use case,
-`accessPage` section with a sentence that says it deletes for good, POST route,
-messages, golden.
+**Files:** job `set-automatic-cleanup` (username, scope), use case,
+`accessPage` section with three choices (off, what KoBox sent, what KoBox sent
+or what seeded enough) and the warning that the third can delete files never
+fetched, POST route, messages, golden.
 
 Commit: `feat(portal): let a member turn on automatic cleanup`
 
