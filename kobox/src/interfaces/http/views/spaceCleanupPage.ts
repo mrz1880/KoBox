@@ -12,13 +12,14 @@ import { daysPhrase } from './seedRule.js';
 import { CLEANUP_PAGE, CLEANUP_RECALCULATE } from '../../../application/space/cleanupPage.js';
 
 // What the page offers: the proposal built from the hourly pass's snapshot,
-// and when that pass ran.
+// when that pass ran, and the rule it judged by, which words each reason.
 export interface CleanupList {
   readonly proposal: CleanupProposal;
   readonly takenAt: string;
+  readonly judgedBy: SeedRule;
 }
 
-// Why a seeded line may go, in the words of the rule the member answers to:
+// Why a seeded line may go, in the words of the rule the list was judged by:
 // its ratio when the rule asks one, only the days otherwise.
 function seededBecause(
   candidate: CleanupCandidate,
@@ -67,13 +68,13 @@ function row(line: ProposalLine, takenAt: string, rule: SeedRule, viewer: Viewer
 
 // One form, two buttons: the first one, the one Enter presses, only counts
 // again; the second one deletes.
-function form(list: CleanupList, rule: SeedRule, viewer: Viewer): RawHtml {
+function form(list: CleanupList, viewer: Viewer): RawHtml {
   const freed = formatBytes(list.proposal.freed().toBytes(), viewer);
   return html`<form method="post" action="${CLEANUP_PAGE}">
 <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
 <table class="cleanup">
   <thead><tr><th class="pick">${viewer.t('Delete')}</th><th>${viewer.t('Torrent')}</th><th>${viewer.t('Size')}</th><th class="ratio">${viewer.t('Ratio')}</th><th class="finished">${viewer.t('Finished')}</th><th>${viewer.t('Why')}</th></tr></thead>
-  <tbody>${list.proposal.lines.map((line) => row(line, list.takenAt, rule, viewer))}</tbody>
+  <tbody>${list.proposal.lines.map((line) => row(line, list.takenAt, list.judgedBy, viewer))}</tbody>
 </table>
 <p class="flash warn">${viewer.t('The files will be erased from the seedbox for good. This cannot be undone.')}</p>
 <button type="submit" class="ghost" formaction="${CLEANUP_RECALCULATE}">${viewer.t('Recalculate')}</button>
@@ -81,7 +82,7 @@ function form(list: CleanupList, rule: SeedRule, viewer: Viewer): RawHtml {
 </form>`;
 }
 
-function content(list: CleanupList | undefined, rule: SeedRule, viewer: Viewer): RawHtml {
+function content(list: CleanupList | undefined, viewer: Viewer): RawHtml {
   if (list === undefined) {
     return html`<p class="muted">${viewer.t('The first list arrives within the hour.')}</p>`;
   }
@@ -91,7 +92,7 @@ function content(list: CleanupList | undefined, rule: SeedRule, viewer: Viewer):
 ${made}`;
   }
   return html`${made}
-${form(list, rule, viewer)}`;
+${form(list, viewer)}`;
 }
 
 // Why a torrent the member picked is still there, said once per reason. A
@@ -165,11 +166,9 @@ ${deletedSummary(report, viewer)}
 </section>`;
 }
 
-// What the page shows: the list to pick from, the rule the member answers to,
-// which words each reason, and what the last cleanup did.
+// What the page shows: the list to pick from and what the last cleanup did.
 export interface CleanupPageFacts {
   readonly list: CleanupList | undefined;
-  readonly rule: SeedRule;
   readonly report: CleanupReport | undefined;
 }
 
@@ -186,7 +185,7 @@ export function spaceCleanupPage(
 ${flash(viewer.t, message)}
 ${lastCleanup(facts.report, viewer)}
 <h2>${viewer.t('What can be deleted')}</h2>
-${content(facts.list, facts.rule, viewer)}`,
+${content(facts.list, viewer)}`,
     viewer,
     'seedbox',
     { entry: 'Home', titleValues: {} },

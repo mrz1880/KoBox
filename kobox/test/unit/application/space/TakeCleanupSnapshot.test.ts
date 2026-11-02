@@ -118,6 +118,19 @@ describe('TakeCleanupSnapshot', () => {
     expect(snapshot?.candidates.map((candidate) => candidate.reason)).toEqual(['seeded']);
   });
 
+  // the page words each line after the rule that judged it, not a later one
+  it('should_keep_the_rule_the_list_was_judged_by', async () => {
+    await world.preferences.chooseSeedRule(alice, {
+      kind: 'own',
+      rule: SeedRule.of({ days: 14 }),
+    });
+    world.torrents.holds(aliceScgi, [seededFilm()]);
+
+    await world.take.execute(alice, AT);
+
+    expect((await world.snapshots.find(alice))?.judgedBy).toEqual(SeedRule.of({ days: 14 }));
+  });
+
   it('should_propose_a_download_sync_already_sent_to_the_members_machine', async () => {
     const path = '/home/alice/rtorrent/complete/Films/Example Film';
     world.torrents.holds(aliceScgi, [freshFilm(path)]);
@@ -159,7 +172,7 @@ describe('TakeCleanupSnapshot', () => {
   });
 
   it('should_keep_the_previous_snapshot_of_a_member_without_an_rtorrent', async () => {
-    await world.snapshots.replace(alice, [], '2026-11-20 11:00:00');
+    await world.snapshots.replace(alice, [], '2026-11-20 11:00:00', SeedRule.DEFAULT);
     await world.instances.delete(alice);
 
     await expect(world.take.execute(alice, AT)).resolves.toEqual({ kind: 'noRtorrent' });

@@ -90,6 +90,7 @@ describe('what each member could free', () => {
       alice,
       [seeded('A', 10), seeded('B', 50), seeded('C', 30)],
       SAMPLED_AT,
+      SeedRule.DEFAULT,
     );
 
     const row = await rowOf('alice');
@@ -112,7 +113,7 @@ describe('what each member could free', () => {
   // what a member could clean depends on the rule they answer to
   it('should_say_which_members_set_their_own_rule_and_what_it_asks', async () => {
     await world.diskSamples.save({ username: alice, used: Quota.gib(400), sampledAt: SAMPLED_AT });
-    await world.cleanupSnapshots.replace(alice, [seeded('A', 10)], SAMPLED_AT);
+    await world.cleanupSnapshots.replace(alice, [seeded('A', 10)], SAMPLED_AT, SeedRule.DEFAULT);
     await world.spacePreferences.chooseSeedRule(alice, {
       kind: 'own',
       rule: SeedRule.of({ days: 14 }),

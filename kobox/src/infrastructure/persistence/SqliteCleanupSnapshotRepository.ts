@@ -1,5 +1,6 @@
 import { asc, eq, sql } from 'drizzle-orm';
 import { CleanupCandidate } from '../../domain/space/CleanupCandidate.js';
+import { SeedRule } from '../../domain/space/SeedRule.js';
 import type { CleanupSnapshot, CleanupSnapshotRepository } from '../../domain/space/ports.js';
 import { InfoHash } from '../../domain/torrent/InfoHash.js';
 import { Quota } from '../../domain/user/Quota.js';
@@ -16,11 +17,17 @@ export class SqliteCleanupSnapshotRepository implements CleanupSnapshotRepositor
     username: Username,
     candidates: readonly CleanupCandidate[],
     takenAt: string,
+    judgedBy: SeedRule,
   ): Promise<void> {
+    const values = {
+      takenAt,
+      ruleRatioMilli: judgedBy.ratio === undefined ? null : toRatioMilli(judgedBy.ratio),
+      ruleDays: judgedBy.days,
+    };
     this.db.orm.transaction((tx) => {
       tx.insert(cleanupSnapshots)
-        .values({ username: username.value, takenAt })
-        .onConflictDoUpdate({ target: cleanupSnapshots.username, set: { takenAt } })
+        .values({ username: username.value, ...values })
+        .onConflictDoUpdate({ target: cleanupSnapshots.username, set: values })
         .run();
       tx.delete(cleanupCandidates).where(eq(cleanupCandidates.username, username.value)).run();
       if (candidates.length > 0) {
@@ -72,6 +79,10 @@ export class SqliteCleanupSnapshotRepository implements CleanupSnapshotRepositor
         }),
       ),
       takenAt: snapshot.takenAt,
+      judgedBy: SeedRule.of({
+        ratio: snapshot.ruleRatioMilli === null ? undefined : fromRatioMilli(snapshot.ruleRatioMilli),
+        days: snapshot.ruleDays,
+      }),
     });
   }
 }

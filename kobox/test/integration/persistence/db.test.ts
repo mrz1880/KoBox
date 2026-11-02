@@ -148,7 +148,7 @@ describe('KoboxDatabase', () => {
     const alice = Username.parse('alice');
     const snapshots = new SqliteCleanupSnapshotRepository(db);
     const before = await snapshots.find(alice);
-    await snapshots.replace(alice, [], '2026-11-02T09:00:00.000Z');
+    await snapshots.replace(alice, [], '2026-11-02T09:00:00.000Z', SeedRule.DEFAULT);
     const after = await snapshots.find(alice);
     const rule = await new SqliteSeedRuleRepository(db).get();
     const reports = db.raw.prepare('SELECT username FROM cleanup_reports').all();
@@ -156,7 +156,11 @@ describe('KoboxDatabase', () => {
 
     expect(rule).toEqual(SeedRule.DEFAULT);
     expect(before).toBeUndefined();
-    expect(after).toEqual({ candidates: [], takenAt: '2026-11-02T09:00:00.000Z' });
+    expect(after).toEqual({
+      candidates: [],
+      takenAt: '2026-11-02T09:00:00.000Z',
+      judgedBy: SeedRule.DEFAULT,
+    });
     expect(reports).toEqual([]);
   });
 
@@ -229,5 +233,47 @@ describe('KoboxDatabase', () => {
 
     expect(automatic?.at).toBe('2026-11-01 10:00:00');
     expect(latest?.trigger).toBe('member');
+  });
+
+  it('should_word_a_list_from_before_judged_rules_after_the_rule_each_member_had', async () => {
+    // alice set her own rule on days alone, bob kept the box's rule an admin set
+    const old = boxBefore('0038_snapshot-judged-by');
+    for (const username of ['alice', 'bob']) {
+      old.prepare('INSERT INTO cleanup_snapshots (username, taken_at) VALUES (?, ?)').run(username, '2026-11-02 09:00:00');
+    }
+    old
+      .prepare(
+        "INSERT INTO cleanup_candidates (username, info_hash, name, size_bytes, ratio_milli, finished_at, path, reason) VALUES ('alice', ?, 'Example Film', 1, 2000, '2026-10-01T08:00:00.000Z', '/home/alice/rtorrent/complete/Example Film', 'seeded')",
+      )
+      .run('A'.repeat(40));
+    old
+      .prepare("INSERT INTO space_preferences (username, own_rule_days) VALUES ('alice', 14)")
+      .run();
+    old.prepare('INSERT INTO seed_rule (id, ratio_milli, days) VALUES (1, 1500, 10)').run();
+    old.close();
+
+    const db = KoboxDatabase.open(join(dir, 'kobox.db'));
+    const snapshots = new SqliteCleanupSnapshotRepository(db);
+    const alice = await snapshots.find(Username.parse('alice'));
+    const bob = await snapshots.find(Username.parse('bob'));
+    db.close();
+
+    expect(alice?.judgedBy).toEqual(SeedRule.of({ days: 14 }));
+    expect(alice?.candidates).toHaveLength(1);
+    expect(bob?.judgedBy).toEqual(SeedRule.of({ ratio: 1.5, days: 10 }));
+  });
+
+  it('should_word_a_list_from_before_judged_rules_after_the_default_when_no_admin_set_one', async () => {
+    const old = boxBefore('0038_snapshot-judged-by');
+    old
+      .prepare("INSERT INTO cleanup_snapshots (username, taken_at) VALUES ('alice', '2026-11-02 09:00:00')")
+      .run();
+    old.close();
+
+    const db = KoboxDatabase.open(join(dir, 'kobox.db'));
+    const alice = await new SqliteCleanupSnapshotRepository(db).find(Username.parse('alice'));
+    db.close();
+
+    expect(alice?.judgedBy).toEqual(SeedRule.DEFAULT);
   });
 });

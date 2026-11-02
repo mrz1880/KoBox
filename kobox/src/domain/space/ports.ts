@@ -2,7 +2,7 @@ import type { AutomaticCleanup } from './AutomaticCleanup.js';
 import type { CleanupCandidate } from './CleanupCandidate.js';
 import type { CleanupReport, CleanupTrigger } from './CleanupReport.js';
 import type { FinishedTorrent } from './FinishedTorrent.js';
-import type { BoxSeedRule } from './SeedRule.js';
+import type { BoxSeedRule, SeedRule } from './SeedRule.js';
 import type { SeedRuleChoice } from './SeedRuleChoice.js';
 import type { InfoHash } from '../torrent/InfoHash.js';
 import type { ScgiPort } from '../user/Port.js';
@@ -29,11 +29,14 @@ export interface SeedRuleRepository {
   save(rule: BoxSeedRule): Promise<void>;
 }
 
-// What a member could clean, as the hourly pass last judged it. No candidate
-// with a time still says something: the pass ran and found nothing to clean.
+// What a member could clean, as the hourly pass last judged it, and the rule
+// it judged by: the page words each reason after that rule, not after one the
+// member chose since. No candidate with a time still says something: the pass
+// ran and found nothing to clean.
 export interface CleanupSnapshot {
   readonly candidates: readonly CleanupCandidate[];
   readonly takenAt: string;
+  readonly judgedBy: SeedRule;
 }
 
 // The latest cleanup snapshot of each member: the root worker writes it, the
@@ -43,6 +46,7 @@ export interface CleanupSnapshotRepository {
     username: Username,
     candidates: readonly CleanupCandidate[],
     takenAt: string,
+    judgedBy: SeedRule,
   ): Promise<void>;
   find(username: Username): Promise<CleanupSnapshot | undefined>;
 }
