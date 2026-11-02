@@ -115,7 +115,7 @@ describe('the cleanup rule in French', () => {
 
     expect(body).toContain('Règle de nettoyage');
     expect(body).toContain(
-      'Un torrent terminé peut être nettoyé une fois qu’il a rendu 2,0 fois sa taille et fini depuis au moins 7 jours ; les membres confirment toujours, sauf s’ils ont choisi le nettoyage automatique.',
+      'Par défaut, un torrent terminé peut être nettoyé une fois qu’il a rendu 2,0 fois sa taille et fini depuis au moins 7 jours. Chaque membre peut choisir sa propre règle dans son compte. Les membres confirment toujours, sauf s’ils ont choisi le nettoyage automatique.',
     );
   });
 

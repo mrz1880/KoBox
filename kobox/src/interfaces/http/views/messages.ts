@@ -227,8 +227,8 @@ const FR: Readonly<Record<string, string>> = {
   'Cleanup rule': 'Règle de nettoyage',
   'Cleanable': 'Nettoyable',
   'own rule: {rule}': 'sa propre règle : {rule}',
-  'A finished torrent can be cleaned once it has given back {ratio} times its size and finished at least {days} days ago; members always confirm unless they chose automatic cleanup.':
-    'Un torrent terminé peut être nettoyé une fois qu’il a rendu {ratio} fois sa taille et fini depuis au moins {days} jours ; les membres confirment toujours, sauf s’ils ont choisi le nettoyage automatique.',
+  'By default, a finished torrent can be cleaned once it has given back {ratio} times its size and finished at least {days} days ago. Each member can set their own rule in their account. Members always confirm unless they chose automatic cleanup.':
+    'Par défaut, un torrent terminé peut être nettoyé une fois qu’il a rendu {ratio} fois sa taille et fini depuis au moins {days} jours. Chaque membre peut choisir sa propre règle dans son compte. Les membres confirment toujours, sauf s’ils ont choisi le nettoyage automatique.',
   'Ratio given back': 'Ratio rendu',
   'Days since it finished': 'Jours depuis la fin du téléchargement',
   'Save the cleanup rule': 'Enregistrer la règle de nettoyage',

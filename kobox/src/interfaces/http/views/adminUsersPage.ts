@@ -184,7 +184,7 @@ function cleanupRule(rule: BoxSeedRule, viewer: Viewer): RawHtml {
   const { ratio, days } = SEED_RULE_LIMITS;
   return html`<h2>${viewer.t('Cleanup rule')}</h2>
 <p class="muted">${viewer.t(
-    'A finished torrent can be cleaned once it has given back {ratio} times its size and finished at least {days} days ago; members always confirm unless they chose automatic cleanup.',
+    'By default, a finished torrent can be cleaned once it has given back {ratio} times its size and finished at least {days} days ago. Each member can set their own rule in their account. Members always confirm unless they chose automatic cleanup.',
     { ratio: formatRatio(rule.ratio, viewer), days: String(rule.days) },
   )}</p>
 <form class="card" method="post" action="/admin/users/seed-rule">
