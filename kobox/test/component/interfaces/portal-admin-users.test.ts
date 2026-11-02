@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
+import { CleanupCandidate } from '../../../src/domain/space/CleanupCandidate.js';
+import { InfoHash } from '../../../src/domain/torrent/InfoHash.js';
 import { Quota } from '../../../src/domain/user/Quota.js';
 import { Username } from '../../../src/domain/user/Username.js';
 import { UserBuilder } from '../../builders/UserBuilder.js';
@@ -50,6 +52,59 @@ describe('admin users list', () => {
     expect(rowOf('boss')).toContain('Administrator');
     expect(rowOf('alice')).toContain('Member');
     expect(rowOf('alice')).not.toContain('Administrator');
+  });
+});
+
+describe('what each member could free', () => {
+  const alice = Username.parse('alice');
+  const SAMPLED_AT = '2026-07-25 09:20:00';
+
+  function seeded(hash: string, sizeGib: number): CleanupCandidate {
+    return CleanupCandidate.restore({
+      infoHash: InfoHash.parse(hash.repeat(40)),
+      name: `Release.${hash}`,
+      size: Quota.gib(sizeGib),
+      ratio: 2.4,
+      finishedAt: '2026-07-13T08:00:00.000Z',
+      path: `/home/alice/rtorrent/complete/Release.${hash}`,
+      reason: 'seeded',
+    });
+  }
+
+  async function rowOf(name: string): Promise<string> {
+    const response = await world.server.inject({
+      method: 'GET',
+      url: '/admin/users',
+      headers: { cookie: admin.cookie },
+    });
+    return new RegExp(`<tr>\\s*<td><a href="/admin/users/${name}">[^]*?</tr>`).exec(response.body)?.[0] ?? '';
+  }
+
+  // alice's allowance is 412 GiB: at 400 GiB, the 50 and 30 GiB lines bring her
+  // under the 80 % line and the 10 GiB one stays unchecked, as on her own home
+  it('should_show_what_the_members_own_proposal_would_free_without_a_delete_button', async () => {
+    await world.diskSamples.save({ username: alice, used: Quota.gib(400), sampledAt: SAMPLED_AT });
+    await world.cleanupSnapshots.replace(
+      alice,
+      [seeded('A', 10), seeded('B', 50), seeded('C', 30)],
+      SAMPLED_AT,
+    );
+
+    const row = await rowOf('alice');
+
+    expect(row).toContain('<td class="num">80 GiB</td>');
+    expect(row).not.toContain('<form');
+  });
+
+  it('should_say_a_member_the_hourly_pass_never_judged_is_not_measured_rather_than_nothing_to_free', async () => {
+    await world.diskSamples.save({ username: alice, used: Quota.gib(400), sampledAt: SAMPLED_AT });
+
+    const cells = [...(await rowOf('alice')).matchAll(/<td class="num">(.*?)<\/td>/g)].map(
+      ([, cell]) => cell,
+    );
+
+    // quota, used, free, can be freed, SCGI
+    expect(cells[3]).toBe('<span class="muted">not measured</span>');
   });
 });
 

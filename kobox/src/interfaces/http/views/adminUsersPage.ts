@@ -45,10 +45,12 @@ export interface MemberLogin {
   readonly invited: boolean;
 }
 
-// What the hourly pass last measured: each member's usage, by username, and
-// the volume they all share.
+// What the hourly pass last measured: each member's usage and what the
+// proposal on their own home would free, by username, and the volume they all
+// share. A member the pass never judged has no freeable entry.
 export interface DiskReadings {
   readonly usages: ReadonlyMap<string, DiskUsageSample>;
+  readonly freeable: ReadonlyMap<string, Quota>;
   readonly volume: VolumeSample | undefined;
 }
 
@@ -56,6 +58,13 @@ function usedCell(usage: DiskUsageSample | undefined, viewer: Viewer): RawHtml {
   return usage === undefined
     ? html`<td class="num"><span class="muted">${viewer.t('not measured')}</span></td>`
     : html`<td class="num">${formatBytes(usage.used.toBytes(), viewer)}</td>`;
+}
+
+// Only what could go: the files are the member's, so the admin gets no button.
+function freeableCell(freeable: Quota | undefined, viewer: Viewer): RawHtml {
+  return freeable === undefined
+    ? html`<td class="num"><span class="muted">${viewer.t('not measured')}</span></td>`
+    : html`<td class="num">${formatBytes(freeable.toBytes(), viewer)}</td>`;
 }
 
 function freeCell(space: MeasuredSpace | undefined, viewer: Viewer): RawHtml {
@@ -107,7 +116,7 @@ export function adminUsersPage(
   <td><a href="/admin/users/${user.username.value}">${user.username.value}</a></td>
   <td>${user.email.value}</td>
   <td class="num">${formatBytes(user.quota.toBytes(), viewer)}</td>
-  ${usedCell(usage, viewer)}${freeCell(measuredSpace(user, usage, disk.volume), viewer)}
+  ${usedCell(usage, viewer)}${freeCell(measuredSpace(user, usage, disk.volume), viewer)}${freeableCell(disk.freeable.get(user.username.value), viewer)}
   <td>${login === undefined
     ? html`<span class="muted">${viewer.t('No portal login')}</span>`
     : viewer.t(ROLE_LABELS[login.role])}</td>
@@ -129,7 +138,7 @@ ${flash(viewer.t, message)}
 ${boxDisk(users, disk.volume, viewer)}
 <table>
   <thead>
-    <tr><th>${viewer.t('User')}</th><th>${viewer.t('Email')}</th><th>${viewer.t('Quota')}</th><th>${viewer.t('Used')}</th><th>${viewer.t('Free')}</th><th>${viewer.t('Role')}</th><th>${viewer.t('SCGI')}</th><th>${viewer.t('Status')}</th></tr>
+    <tr><th>${viewer.t('User')}</th><th>${viewer.t('Email')}</th><th>${viewer.t('Quota')}</th><th>${viewer.t('Used')}</th><th>${viewer.t('Free')}</th><th>${viewer.t('Can be freed')}</th><th>${viewer.t('Role')}</th><th>${viewer.t('SCGI')}</th><th>${viewer.t('Status')}</th></tr>
   </thead>
   <tbody>${rows}</tbody>
 </table>
