@@ -7,6 +7,8 @@ import { formatBytes } from './bytes.js';
 import { flash, page, type Reader, type Viewer } from './layout.js';
 import { formatDay, formatMoment } from './moment.js';
 import { formatRatio } from './ratio.js';
+import type { SeedRule } from '../../../domain/space/SeedRule.js';
+import { daysPhrase } from './seedRule.js';
 import { CLEANUP_PAGE, CLEANUP_RECALCULATE } from '../../../application/space/cleanupPage.js';
 
 // What the page offers: the proposal built from the hourly pass's snapshot,
@@ -16,26 +18,42 @@ export interface CleanupList {
   readonly takenAt: string;
 }
 
+// Why a seeded line may go, in the words of the rule the member answers to:
+// its ratio when the rule asks one, only the days otherwise.
+function seededBecause(
+  candidate: CleanupCandidate,
+  days: number,
+  rule: SeedRule,
+  reader: Reader,
+): string {
+  const one = new Intl.PluralRules(reader.language.value).select(days) === 'one';
+  if (rule.ratio === undefined) {
+    const finished = one
+      ? 'Finished {days} day ago (your rule: {rule})'
+      : 'Finished {days} days ago (your rule: {rule})';
+    return reader.t(finished, { days: String(days), rule: daysPhrase(rule.days, reader) });
+  }
+  return reader.t(one ? 'Ratio {ratio} after {days} day' : 'Ratio {ratio} after {days} days', {
+    ratio: formatRatio(candidate.ratio, reader),
+    days: String(days),
+  });
+}
+
 // Why a line may go, in the words of when the list was made. `takenAt` is a
 // stamp, the candidate's dates ISO instants. KoBox only knows what its own sync
 // sent, so a seeded line says it cannot tell whether the member fetched it.
-function why(candidate: CleanupCandidate, takenAt: string, reader: Reader): RawHtml {
+function why(candidate: CleanupCandidate, takenAt: string, rule: SeedRule, reader: Reader): RawHtml {
   const said: Readonly<Record<CleanupReason, () => RawHtml>> = {
     seeded: () => {
       const days = candidate.daysSeeded(instantOf(takenAt));
-      const one = new Intl.PluralRules(reader.language.value).select(days) === 'one';
-      const ratio = reader.t(one ? 'Ratio {ratio} after {days} day' : 'Ratio {ratio} after {days} days', {
-        ratio: formatRatio(candidate.ratio, reader),
-        days: String(days),
-      });
-      return html`${ratio}<br><span class="muted">${reader.t('KoBox does not know whether you fetched it.')}</span>`;
+      return html`${seededBecause(candidate, days, rule, reader)}<br><span class="muted">${reader.t('KoBox does not know whether you fetched it.')}</span>`;
     },
     alreadySent: () => html`${reader.t('Already sent to your machine')}`,
   };
   return said[candidate.reason]();
 }
 
-function row(line: ProposalLine, takenAt: string, viewer: Viewer): RawHtml {
+function row(line: ProposalLine, takenAt: string, rule: SeedRule, viewer: Viewer): RawHtml {
   const { candidate } = line;
   return html`<tr>
   <td class="pick"><input type="checkbox" name="pick" value="${candidate.infoHash.value}"${line.checked ? html` checked` : html``} aria-label="${viewer.t('Delete {name}', { name: candidate.name })}"></td>
@@ -43,19 +61,19 @@ function row(line: ProposalLine, takenAt: string, viewer: Viewer): RawHtml {
   <td class="num">${formatBytes(candidate.size.toBytes(), viewer)}</td>
   <td class="num ratio">${formatRatio(candidate.ratio, viewer)}</td>
   <td class="when finished">${formatDay(stampOf(new Date(candidate.finishedAt)), viewer)}</td>
-  <td class="reason">${why(candidate, takenAt, viewer)}</td>
+  <td class="reason">${why(candidate, takenAt, rule, viewer)}</td>
 </tr>`;
 }
 
 // One form, two buttons: the first one, the one Enter presses, only counts
 // again; the second one deletes.
-function form(list: CleanupList, viewer: Viewer): RawHtml {
+function form(list: CleanupList, rule: SeedRule, viewer: Viewer): RawHtml {
   const freed = formatBytes(list.proposal.freed().toBytes(), viewer);
   return html`<form method="post" action="${CLEANUP_PAGE}">
 <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
 <table class="cleanup">
   <thead><tr><th class="pick">${viewer.t('Delete')}</th><th>${viewer.t('Torrent')}</th><th>${viewer.t('Size')}</th><th class="ratio">${viewer.t('Ratio')}</th><th class="finished">${viewer.t('Finished')}</th><th>${viewer.t('Why')}</th></tr></thead>
-  <tbody>${list.proposal.lines.map((line) => row(line, list.takenAt, viewer))}</tbody>
+  <tbody>${list.proposal.lines.map((line) => row(line, list.takenAt, rule, viewer))}</tbody>
 </table>
 <p class="flash warn">${viewer.t('The files will be erased from the seedbox for good. This cannot be undone.')}</p>
 <button type="submit" class="ghost" formaction="${CLEANUP_RECALCULATE}">${viewer.t('Recalculate')}</button>
@@ -63,7 +81,7 @@ function form(list: CleanupList, viewer: Viewer): RawHtml {
 </form>`;
 }
 
-function content(list: CleanupList | undefined, viewer: Viewer): RawHtml {
+function content(list: CleanupList | undefined, rule: SeedRule, viewer: Viewer): RawHtml {
   if (list === undefined) {
     return html`<p class="muted">${viewer.t('The first list arrives within the hour.')}</p>`;
   }
@@ -73,7 +91,7 @@ function content(list: CleanupList | undefined, viewer: Viewer): RawHtml {
 ${made}`;
   }
   return html`${made}
-${form(list, viewer)}`;
+${form(list, rule, viewer)}`;
 }
 
 // Why a torrent the member picked is still there, said once per reason. A
@@ -147,9 +165,11 @@ ${deletedSummary(report, viewer)}
 </section>`;
 }
 
-// What the page shows: the list to pick from, and what the last cleanup did.
+// What the page shows: the list to pick from, the rule the member answers to,
+// which words each reason, and what the last cleanup did.
 export interface CleanupPageFacts {
   readonly list: CleanupList | undefined;
+  readonly rule: SeedRule;
   readonly report: CleanupReport | undefined;
 }
 
@@ -166,7 +186,7 @@ export function spaceCleanupPage(
 ${flash(viewer.t, message)}
 ${lastCleanup(facts.report, viewer)}
 <h2>${viewer.t('What can be deleted')}</h2>
-${content(facts.list, viewer)}`,
+${content(facts.list, facts.rule, viewer)}`,
     viewer,
     'seedbox',
     { entry: 'Home', titleValues: {} },
