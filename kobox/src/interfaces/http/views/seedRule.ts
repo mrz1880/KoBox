@@ -3,9 +3,13 @@ import type { Reader } from './layout.js';
 import { formatRatio } from './ratio.js';
 
 // A number of days in the reader's words, one day or several.
+// Whether a count takes the singular in the reader's language.
+export function isSingular(count: number, reader: Reader): boolean {
+  return new Intl.PluralRules(reader.language.value).select(count) === 'one';
+}
+
 export function daysPhrase(days: number, reader: Reader): string {
-  const one = new Intl.PluralRules(reader.language.value).select(days) === 'one';
-  return reader.t(one ? '{days} day' : '{days} days', { days: String(days) });
+  return reader.t(isSingular(days, reader) ? '{days} day' : '{days} days', { days: String(days) });
 }
 
 // What a seed rule asks, in a few words: the ratio first when it asks one.
