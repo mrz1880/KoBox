@@ -230,9 +230,17 @@ export class JobWorker {
           username: Username.parse(job.payload.username),
         });
         return;
-      case 'sample-disk-usage':
-        await this.useCases.sampleDiskUsage.execute();
+      case 'sample-disk-usage': {
+        const pass = await this.useCases.sampleDiskUsage.execute();
+        // the member only sees an older list; the operator is told why
+        for (const stale of pass.staleSnapshots) {
+          this.logger.warn(
+            { username: stale.username.value, cause: stale.cause, error: stale.error },
+            'space cleanup: list not refreshed',
+          );
+        }
         return;
+      }
       case 'suspend-user':
         await this.useCases.suspendUser.execute({
           username: Username.parse(job.payload.username),

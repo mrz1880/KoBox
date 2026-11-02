@@ -1,4 +1,5 @@
-import type { TakeCleanupSnapshot } from '../space/TakeCleanupSnapshot.js';
+import type { CleanupSnapshotOutcome, TakeCleanupSnapshot } from '../space/TakeCleanupSnapshot.js';
+import type { Username } from '../../domain/user/Username.js';
 import type {
   DiskUsageRepository,
   QuotaGaugePort,
@@ -19,17 +20,48 @@ interface Deps {
   readonly clock: () => string;
 }
 
+// A member whose cleanup list stayed as it was although they have an rTorrent:
+// they only see an older date, so the operator is the one told why.
+export interface StaleCleanupSnapshot {
+  readonly username: Username;
+  readonly cause: 'rtorrentSilent' | 'failed';
+  readonly error: string;
+}
+
+// What a member's snapshot attempt came to, a throw included.
+type SnapshotAttempt = CleanupSnapshotOutcome | { readonly kind: 'failed'; readonly error: string };
+
+// The attempts that left a stale list, without a catch-all: a new outcome does
+// not compile until it is classified here.
+function staleness(attempt: SnapshotAttempt): Omit<StaleCleanupSnapshot, 'username'> | undefined {
+  switch (attempt.kind) {
+    case 'taken':
+    case 'noRtorrent':
+      return undefined;
+    case 'rtorrentSilent':
+    case 'failed':
+      return { cause: attempt.kind, error: attempt.error };
+  }
+}
+
+// What a pass could not do although it went on.
+export interface DiskUsagePass {
+  readonly staleSnapshots: readonly StaleCleanupSnapshot[];
+}
+
 // Writes down what the disk holds for each member, on a schedule, because the
 // portal runs non-root and cannot ask about an account that is not its own.
 // One member's unreadable quota must not cost the others their reading, so a
 // failure is skipped rather than propagated. The volume all of them share is
 // read once per pass, and an unreadable volume is skipped the same way. Each
-// sampled member also gets their cleanup snapshot, for the same reason.
+// sampled member also gets their cleanup snapshot, for the same reason, and
+// the pass returns whose list could not be refreshed for the caller to log.
 export class SampleDiskUsage {
   constructor(private readonly deps: Deps) {}
 
-  async execute(): Promise<void> {
+  async execute(): Promise<DiskUsagePass> {
     const at = this.deps.clock();
+    const staleSnapshots: StaleCleanupSnapshot[] = [];
     const space = await this.deps.volume.measure().catch(() => undefined);
     if (space !== undefined) {
       await this.deps.volumeSamples.save({ space, measuredAt: at });
@@ -43,7 +75,17 @@ export class SampleDiskUsage {
       await this.deps.gauges.show(user.username, used, user.quota);
       // what a member can clean is read once their usage is written down, and
       // a failure there costs neither that sample nor the next member's
-      await this.deps.cleanupSnapshot.execute(user.username, at).catch(() => undefined);
+      const attempt: SnapshotAttempt = await this.deps.cleanupSnapshot
+        .execute(user.username, at)
+        .catch((error: unknown) => ({
+          kind: 'failed' as const,
+          error: error instanceof Error ? error.message : String(error),
+        }));
+      const stale = staleness(attempt);
+      if (stale !== undefined) {
+        staleSnapshots.push({ username: user.username, ...stale });
+      }
     }
+    return { staleSnapshots };
   }
 }
