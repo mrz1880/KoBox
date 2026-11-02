@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { messageOf } from '../../domain/shared/errorMessage.js';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { parseJob } from '../../application/jobs/contract.js';
 import { ensureSpoolDir } from '../../infrastructure/spool/TorrentEventSpool.js';
@@ -12,7 +13,7 @@ async function sweepSpool(c: Container): Promise<void> {
       await c.queue.enqueue(parseJob('torrent-event', event.payload));
     } catch (error) {
       c.logger.warn(
-        { username: event.username, error: error instanceof Error ? error.message : String(error) },
+        { username: event.username, error: messageOf(error) },
         'invalid torrent event dropped',
       );
     }
@@ -62,6 +63,6 @@ async function main(): Promise<void> {
 }
 
 main().catch((error: unknown) => {
-  process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
+  process.stderr.write(`${messageOf(error)}\n`);
   process.exitCode = 1;
 });

@@ -1,3 +1,4 @@
+import { messageOf } from '../../domain/shared/errorMessage.js';
 import type { ComponentSpec } from '../../domain/installation/catalog.js';
 import { planInstallation } from '../../domain/installation/InstallPlan.js';
 import type {
@@ -39,7 +40,7 @@ export class ComponentInstallError extends Error {
     cause: unknown,
   ) {
     super(
-      `component ${component} failed: ${cause instanceof Error ? cause.message : String(cause)} — fix the cause and re-run kobox install (completed components are not redone)`,
+      `component ${component} failed: ${messageOf(cause)} — fix the cause and re-run kobox install (completed components are not redone)`,
     );
     this.name = 'ComponentInstallError';
   }
@@ -144,7 +145,7 @@ export class RunInstallation {
       } catch (error) {
         await deps.registry.markFailed(
           spec.name,
-          error instanceof Error ? error.message : String(error),
+          messageOf(error),
           deps.now(),
         );
         throw new ComponentInstallError(name, error);

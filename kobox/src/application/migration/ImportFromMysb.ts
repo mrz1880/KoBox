@@ -1,3 +1,4 @@
+import { messageOf } from '../../domain/shared/errorMessage.js';
 import { parseJob } from '../jobs/contract.js';
 import type { JobQueuePort } from '../jobs/JobQueuePort.js';
 import type { MailOutboxPort } from '../maintenance/MailOutboxPort.js';
@@ -64,10 +65,6 @@ interface Deps {
   readonly outbox: MailOutboxPort;
   readonly queue: JobQueuePort;
   readonly clock: () => string;
-}
-
-function messageOf(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }
 
 // Imports a frozen MySB dump into KoBox. Idempotent and re-entrant: a user that

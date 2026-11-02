@@ -1,3 +1,4 @@
+import { messageOf } from '../../domain/shared/errorMessage.js';
 import { parseJob, type Job } from '../../application/jobs/contract.js';
 import type { JobQueuePort } from '../../application/jobs/JobQueuePort.js';
 import { LoggableService, ManagedService } from '../../domain/maintenance/ManagedService.js';
@@ -82,7 +83,7 @@ export class JobWorker {
     } catch (error) {
       await this.queue.markFailed(
         claimed.id,
-        error instanceof Error ? error.message : String(error),
+        messageOf(error),
       );
       return true;
     }

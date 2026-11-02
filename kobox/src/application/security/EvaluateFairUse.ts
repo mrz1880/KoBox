@@ -1,3 +1,4 @@
+import { messageOf } from '../../domain/shared/errorMessage.js';
 import { FairUseEvaluator } from '../../domain/security/FairUseEvaluator.js';
 import type { FairUsePolicy, ResourceBudget } from '../../domain/security/FairUsePolicy.js';
 import { ConnectionRate, EgressRate } from '../../domain/security/Rates.js';
@@ -92,7 +93,7 @@ export class EvaluateFairUse {
         await fairUse.appendEvent(
           user.username,
           'FairUseEvaluationError',
-          JSON.stringify({ message: error instanceof Error ? error.message : String(error) }),
+          JSON.stringify({ message: messageOf(error) }),
           now,
         );
       }

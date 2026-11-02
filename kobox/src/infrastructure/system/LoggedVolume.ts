@@ -1,3 +1,4 @@
+import { messageOf } from '../../domain/shared/errorMessage.js';
 import type { VolumeSpace } from '../../domain/user/VolumeSpace.js';
 import type { VolumePort } from '../../domain/user/ports.js';
 
@@ -19,7 +20,7 @@ export class LoggedVolume implements VolumePort {
       return await this.volume.measure();
     } catch (error) {
       this.log.warn(
-        { reason: error instanceof Error ? error.message : String(error) },
+        { reason: messageOf(error) },
         'volume reading failed',
       );
       throw error;
