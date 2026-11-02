@@ -436,6 +436,25 @@ describe('the home says what an automatic cleanup deleted', () => {
     expect(await homeOf(member)).not.toContain('Old.Release');
   });
 
+  // a cleanup by hand afterwards does not cut the week the member is told for
+  it('should_keep_showing_it_after_the_member_cleans_up_by_hand', async () => {
+    await world.cleanupReports.save(alice, automaticReport('2026-07-19 10:00:00'));
+    await world.cleanupReports.save(
+      alice,
+      CleanupReport.of({
+        deleted: [{ name: 'Hand.Release', size: Quota.gib(5) }],
+        skipped: [],
+        at: '2026-07-25 09:30:00',
+        trigger: 'member',
+      }),
+    );
+
+    const body = await homeOf(member);
+
+    expect(body).toContain('July 19, 2026 at 12:00 PM: 80 GiB freed.');
+    expect(body).not.toContain('Hand.Release');
+  });
+
   it('should_say_it_in_french', async () => {
     await world.cleanupReports.save(alice, automaticReport('2026-07-19 10:00:00'));
 

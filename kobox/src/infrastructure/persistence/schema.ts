@@ -487,14 +487,19 @@ export const cleanupCandidates = sqliteTable(
   (table) => [unique().on(table.username, table.infoHash)],
 );
 
-// The latest cleanup report of each member, whether they asked for it or the
-// automatic run did, so the home page can show what went.
-export const cleanupReports = sqliteTable('cleanup_reports', {
-  username: text('username').primaryKey(),
-  trigger: text('trigger', { enum: CLEANUP_TRIGGERS }).notNull(),
-  reportJson: text('report_json').notNull(),
-  at: text('at').notNull(),
-});
+// The latest cleanup report of each member for each trigger: one they asked
+// for, one the automatic run did, so a cleanup by hand does not hide from the
+// home what KoBox deleted on its own.
+export const cleanupReports = sqliteTable(
+  'cleanup_reports',
+  {
+    username: text('username').notNull(),
+    trigger: text('trigger', { enum: CLEANUP_TRIGGERS }).notNull(),
+    reportJson: text('report_json').notNull(),
+    at: text('at').notNull(),
+  },
+  (table) => [unique().on(table.username, table.trigger)],
+);
 
 // What each member chose for their space, and whether the hourly pass already
 // warned them during the climb they are in. No row reads as automatic cleanup

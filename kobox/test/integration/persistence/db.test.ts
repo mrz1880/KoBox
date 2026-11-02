@@ -9,8 +9,10 @@ import { KoboxDatabase } from '../../../src/infrastructure/persistence/db.js';
 import { SqliteComponentRegistry } from '../../../src/infrastructure/persistence/SqliteComponentRegistry.js';
 import { SqliteBlocklistRepository } from '../../../src/infrastructure/persistence/SqliteBlocklistRepository.js';
 import { BlocklistSource } from '../../../src/domain/tracker/BlocklistSource.js';
+import { CleanupReport } from '../../../src/domain/space/CleanupReport.js';
 import { SeedRule } from '../../../src/domain/space/SeedRule.js';
 import { Username } from '../../../src/domain/user/Username.js';
+import { SqliteCleanupReportRepository } from '../../../src/infrastructure/persistence/SqliteCleanupReportRepository.js';
 import { SqliteCleanupSnapshotRepository } from '../../../src/infrastructure/persistence/SqliteCleanupSnapshotRepository.js';
 import { SqliteSeedRuleRepository } from '../../../src/infrastructure/persistence/SqliteSeedRuleRepository.js';
 import { SqliteSpacePreferenceRepository } from '../../../src/infrastructure/persistence/SqliteSpacePreferenceRepository.js';
@@ -202,5 +204,30 @@ describe('KoboxDatabase', () => {
 
     expect(rule).toEqual({ kind: 'box' });
     expect(kept).toEqual({ automatic: 'sentOnly', warned: true });
+  });
+
+  it('should_keep_the_report_of_a_box_from_before_one_report_per_trigger', async () => {
+    // an automatic report saved when a member had a single report
+    const old = boxBefore('0037_cleanup-report-per-trigger');
+    old
+      .prepare(
+        `INSERT INTO cleanup_reports (username, "trigger", report_json, at) VALUES ('alice', 'automatic', '{"deleted":[],"skipped":[]}', '2026-11-01 10:00:00')`,
+      )
+      .run();
+    old.close();
+
+    const db = KoboxDatabase.open(join(dir, 'kobox.db'));
+    const alice = Username.parse('alice');
+    const reports = new SqliteCleanupReportRepository(db);
+    await reports.save(
+      alice,
+      CleanupReport.of({ deleted: [], skipped: [], at: '2026-11-02 10:00:00', trigger: 'member' }),
+    );
+    const automatic = await reports.findTriggeredBy(alice, 'automatic');
+    const latest = await reports.find(alice);
+    db.close();
+
+    expect(automatic?.at).toBe('2026-11-01 10:00:00');
+    expect(latest?.trigger).toBe('member');
   });
 });
