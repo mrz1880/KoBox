@@ -129,7 +129,7 @@ export interface PortalServerDeps {
   // read-only from here: the worker writes what a cleanup did
   readonly cleanupReports: CleanupReportRepository;
   // read-only from here: the worker writes a member's choice
-  readonly spacePreferences: Pick<SpacePreferenceRepository, 'find'>;
+  readonly spacePreferences: Pick<SpacePreferenceRepository, 'find' | 'findSeedRule'>;
   // read-only from here: an admin's new rule goes to the worker as a job
   readonly seedRule: Pick<SeedRuleRepository, 'get'>;
   readonly mailRelay: MailRelayRepository;

@@ -20,10 +20,17 @@ import { SyncMode } from '../../../domain/torrent/SyncMode.js';
 import type {
   CleanupReportRepository,
   CleanupSnapshotRepository,
+  SeedRuleRepository,
   SpacePreferenceRepository,
 } from '../../../domain/space/ports.js';
 import { AUTOMATIC_CLEANUPS } from '../../../domain/space/AutomaticCleanup.js';
 import type { CleanupReport } from '../../../domain/space/CleanupReport.js';
+import {
+  InvalidSeedRuleError,
+  SEED_RULE_LIMITS,
+  SeedRule,
+} from '../../../domain/space/SeedRule.js';
+import { formatRatio } from '../views/ratio.js';
 import type { TorrentInstanceRepository } from '../../../domain/torrent/ports.js';
 import type { SyncDestinationRepository, SyncTransferRepository } from '../../../domain/sync/ports.js';
 import type { SetSyncDestination } from '../../../application/sync/SetSyncDestination.js';
@@ -63,6 +70,7 @@ import {
   passwordPage,
   rutorrentPage,
   userHomePage,
+  type AccessFacts,
   type FleetRow,
   type MemberHostname,
   type SignalRow,
@@ -206,8 +214,10 @@ export interface UserRoutesDeps {
   readonly cleanupSnapshots: CleanupSnapshotRepository;
   // what the member's last cleanup deleted and kept
   readonly cleanupReports: CleanupReportRepository;
-  // what the member lets KoBox delete on its own
-  readonly spacePreferences: Pick<SpacePreferenceRepository, 'find'>;
+  // what the member lets KoBox delete on its own, and the rule they answer to
+  readonly spacePreferences: Pick<SpacePreferenceRepository, 'find' | 'findSeedRule'>;
+  // the box's rule, which a member keeps until they set their own
+  readonly seedRule: Pick<SeedRuleRepository, 'get'>;
 }
 
 // One channel of the console, assembled from what the portal can read in the
@@ -235,6 +245,32 @@ async function automaticReportOf(
 ): Promise<CleanupReport | undefined> {
   const report = await deps.cleanupReports.find(username);
   return report?.isShownOnHome(deps.now()) === true ? report : undefined;
+}
+
+// The rule a member typed, or nothing when the value object refuses it.
+function ownSeedRuleOf(raw: {
+  readonly ratio: number | undefined;
+  readonly days: number;
+}): SeedRule | undefined {
+  try {
+    return SeedRule.of(raw);
+  } catch (error) {
+    if (error instanceof InvalidSeedRuleError) {
+      return undefined;
+    }
+    throw error;
+  }
+}
+
+// The rule a member's torrents answer to, and the box's they may keep.
+async function seedRuleFacts(
+  deps: Pick<UserRoutesDeps, 'spacePreferences' | 'seedRule'>,
+  username: Username,
+): Promise<AccessFacts['seedRule']> {
+  return {
+    box: await deps.seedRule.get(),
+    choice: await deps.spacePreferences.findSeedRule(username),
+  };
 }
 
 // The name members reach the box by over SFTP: only known when the operator
@@ -1084,6 +1120,60 @@ export function registerUserRoutes(
     return redirectOnceApplied(reply, deps.awaitJob, job, '/access', 'Saved.');
   });
 
+  // A member keeps the box's rule or sets their own, from days and a ratio
+  // that may be left empty. The value object decides what is valid.
+  const ownSeedRuleSchema = z.discriminatedUnion('rule', [
+    z.object({ rule: z.literal('box') }),
+    z.object({ rule: z.literal('own'), days: z.coerce.number(), ratio: z.string() }),
+  ]);
+
+  // The username comes from the session: a member only ever sets their own.
+  server.post('/access/seed-rule', async (request, reply) => {
+    const session = await guards.requireCsrf(request, reply);
+    if (session === undefined) {
+      return;
+    }
+    const parsed = ownSeedRuleSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.code(400).send();
+    }
+    const form = parsed.data;
+    const rule =
+      form.rule === 'box'
+        ? null
+        : ownSeedRuleOf({ days: form.days, ratio: form.ratio === '' ? undefined : Number(form.ratio) });
+    if (rule === undefined) {
+      const viewer = viewerOf(session, request);
+      const { ratio, days } = SEED_RULE_LIMITS;
+      return redirectWithFlash(
+        reply,
+        '/access',
+        viewer.t(
+          'Nothing was saved: the days go from {daysMin} to {daysMax}, the ratio, when you set one, from {ratioMin} to {ratioMax}.',
+          {
+            daysMin: String(days.min),
+            daysMax: String(days.max),
+            ratioMin: formatRatio(ratio.min, viewer),
+            ratioMax: formatRatio(ratio.max, viewer),
+          },
+        ),
+      );
+    }
+    const job = await deps.queue.enqueue(
+      buildJob.setOwnSeedRule({
+        username: session.username.value,
+        rule: rule === null ? null : { ratio: rule.ratio ?? null, days: rule.days },
+      }),
+    );
+    return redirectOnceApplied(
+      reply,
+      deps.awaitJob,
+      job,
+      '/access',
+      viewerOf(session, request).t('Saved. The next hourly pass applies it.'),
+    );
+  });
+
   server.get('/access', async (request, reply) => {
     const session = await guards.requireSession(request, reply);
     if (session === undefined) {
@@ -1109,6 +1199,7 @@ export function registerUserRoutes(
         hasTwoStep: session.hasTwoStep,
         ...(session.chosenLanguage !== undefined && { chosenLanguage: session.chosenLanguage }),
         automaticCleanup: (await deps.spacePreferences.find(session.username)).automatic,
+        seedRule: await seedRuleFacts(deps, session.username),
       }, flashOf(request)),
     );
   });
@@ -1141,6 +1232,7 @@ export function registerUserRoutes(
         hasTwoStep: session.hasTwoStep,
         ...(session.chosenLanguage !== undefined && { chosenLanguage: session.chosenLanguage }),
         automaticCleanup: (await deps.spacePreferences.find(session.username)).automatic,
+        seedRule: await seedRuleFacts(deps, session.username),
       }),
     );
   });
