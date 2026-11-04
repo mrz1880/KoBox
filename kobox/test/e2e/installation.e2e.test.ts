@@ -9,7 +9,11 @@ import { dirname, join } from 'node:path';
 import { promisify } from 'node:util';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { ConfigDocument } from '../../src/domain/installation/ConfigDocument.js';
-import { renderNextcloudSite } from '../../src/domain/installation/rendering.js';
+import {
+  MEMBER_PORT_RESERVATION_PATH,
+  renderNextcloudSite,
+} from '../../src/domain/installation/rendering.js';
+import { buildDump } from '../fixtures/migration/buildDump.js';
 import { waitForScgi } from './support/scgi.js';
 
 // The Phase 4 product: a fresh Debian 13 container becomes a full KoBox box
@@ -24,6 +28,12 @@ const onDebianAsRoot =
 const execFileAsync = promisify(execFile);
 const CLI = 'dist/interfaces/cli/main.js';
 const USER = 'inste2e';
+// a member brought over from MySB with the ports that box gave them, outside
+// the fixed blocks v1.0.62 reserved (45000-45999, 51101-52100)
+const IMPORTED = 'inste2emysb';
+const IMPORTED_RTORRENT_PORT = 38000;
+const IMPORTED_SCGI_PORT = 38001;
+const RESERVED_PORTS_KEY = 'net.ipv4.ip_local_reserved_ports';
 const FIXTURE_IP = '127.0.0.2';
 const ARTIFACT_HOST = 'lists.example.net';
 const ARTIFACT_PORT = 8446;
@@ -37,6 +47,8 @@ let env: NodeJS.ProcessEnv;
 let fixtureDir: string;
 let artifactServer: Server | undefined;
 let artifactSha = '';
+let dumpDir: string | undefined;
+let reservedPortsBefore = '';
 
 function sh(command: string, args: string[], options: ExecFileSyncOptions = {}): string {
   return execFileSync(command, args, { encoding: 'utf8', env, ...options }) as string;
@@ -102,6 +114,72 @@ function buildArtifactTarball(): Buffer {
   return readFileSync(tarPath);
 }
 
+// Stops a member's rtorrent, offers its torrent port to an outgoing connection,
+// then expects rtorrent back on that port at once.
+async function expectRtorrentStraightBackAfterItsPortWasOffered(username: string): Promise<void> {
+  // 2026-11-04, production: a member's rtorrent failed to restart for a
+  // minute with "Could not open/bind port for listening: Address already in
+  // use". While it was down, the kernel had lent its torrent port to an
+  // outgoing connection as an ephemeral source port, and that socket's
+  // TIME_WAIT blocked the bind. Narrowing the ephemeral range to the
+  // member's port alone makes the kernel pick it here too, unless the host
+  // keeps it reserved: then it has no port to lend and refuses the connect.
+  // (A wider range would not do: connect() prefers odd ports, and the
+  // member's may be even.)
+  const unit = `rtorrent-${username}`;
+  const rc = readFileSync(`/home/${username}/.rtorrent.rc`, 'utf8');
+  const torrentPort = Number(/network\.port_range\.set = (\d+)-/.exec(rc)?.[1]);
+  const scgiPort = Number(/network\.scgi\.open_port = 127\.0\.0\.1:(\d+)/.exec(rc)?.[1]);
+  const socketsOn = (port: number, state: string): string =>
+    sh('ss', ['-Htan', 'state', state, `( sport = :${String(port)} )`]).trim();
+
+  sh('systemctl', ['stop', unit]);
+  // sockets the old listener left keep the port bound, and the kernel
+  // never lends a bound port: start from a port nothing holds any more
+  await waitFor('a quiet torrent port', () => socketsOn(torrentPort, 'all') === '', 90_000);
+  const ephemeralRange = sh('sysctl', ['-n', 'net.ipv4.ip_local_port_range']).trim();
+  try {
+    sh('sysctl', [
+      '-qw',
+      `net.ipv4.ip_local_port_range=${String(torrentPort)} ${String(torrentPort)}`,
+    ]);
+    // the client closes first, so the TIME_WAIT lands on its source port
+    sh('python3', [
+      '-c',
+      [
+        'import socket',
+        // a fixed port: one taken from the narrowed range would starve the client
+        `server = socket.create_server(("${FIXTURE_IP}", ${String(PEER_FIXTURE_PORT)}))`,
+        'try:',
+        '    client = socket.create_connection(server.getsockname())',
+        'except OSError as refused:',
+        // EADDRNOTAVAIL: no port left to lend; anything else is a real failure
+        '    if refused.errno != 99:',
+        '        raise',
+        '    raise SystemExit(0)',
+        'peer, _ = server.accept()',
+        'client.close()',
+        'peer.recv(1)',
+        'peer.close()',
+        'server.close()',
+      ].join('\n'),
+    ]);
+  } finally {
+    sh('sysctl', ['-qw', `net.ipv4.ip_local_port_range=${ephemeralRange}`]);
+  }
+  sh('systemctl', ['start', unit]);
+
+  // rtorrent opens SCGI before it binds the torrent port, and a failed bind
+  // leaves SCGI up for an instant: wait on the torrent port itself
+  await waitFor(
+    'rtorrent listening for peers',
+    () => socketsOn(torrentPort, 'listening') !== '',
+    5_000,
+  );
+  await waitForScgi(scgiPort, 5_000);
+  expect(isActive(unit)).toBe(true);
+}
+
 describe.skipIf(!onDebianAsRoot)('E2E: fresh Debian 13 -> bootstrap -> full stack', () => {
   beforeAll(async () => {
     // NOT under /tmp: the portal unit runs ProtectSystem=strict, whose only
@@ -147,12 +225,15 @@ describe.skipIf(!onDebianAsRoot)('E2E: fresh Debian 13 -> bootstrap -> full stac
     };
 
     // leftovers from earlier runs must not shadow this one
-    try {
-      execFileSync('systemctl', ['disable', '--now', `rtorrent-${USER}`], { stdio: 'ignore' });
-    } catch { /* absent */ }
-    try {
-      execFileSync('userdel', ['-r', USER], { stdio: 'ignore' });
-    } catch { /* absent */ }
+    for (const name of [USER, IMPORTED]) {
+      try {
+        execFileSync('systemctl', ['disable', '--now', `rtorrent-${name}`], { stdio: 'ignore' });
+      } catch { /* absent */ }
+      try {
+        execFileSync('userdel', ['-r', name], { stdio: 'ignore' });
+      } catch { /* absent */ }
+    }
+    reservedPortsBefore = execFileSync('sysctl', ['-n', RESERVED_PORTS_KEY], { encoding: 'utf8' }).trim();
     rmSync('/var/www/rutorrent', { recursive: true, force: true });
   }, 120_000);
 
@@ -168,14 +249,22 @@ describe.skipIf(!onDebianAsRoot)('E2E: fresh Debian 13 -> bootstrap -> full stac
     });
     // the container is shared with the other E2E suites: put the Phase 3
     // rules back (fail2ban off, permissive tables) and drop test residue
-    for (const unit of ['kobox-worker', 'kobox-firewall', 'fail2ban', `rtorrent-${USER}`]) {
+    const units = ['kobox-worker', 'kobox-firewall', 'fail2ban', `rtorrent-${USER}`, `rtorrent-${IMPORTED}`];
+    for (const unit of units) {
       try {
         execFileSync('systemctl', ['disable', '--now', unit], { stdio: 'ignore' });
       } catch { /* absent */ }
     }
-    try {
-      execFileSync('userdel', ['-r', USER], { stdio: 'ignore' });
-    } catch { /* absent */ }
+    for (const name of [USER, IMPORTED]) {
+      try {
+        execFileSync('userdel', ['-r', name], { stdio: 'ignore' });
+      } catch { /* absent */ }
+    }
+    if (dumpDir !== undefined) {
+      rmSync(dumpDir, { recursive: true, force: true });
+    }
+    // the reservation this suite's members got lives in the container's kernel
+    execFileSync('sysctl', ['-qw', `${RESERVED_PORTS_KEY}=${reservedPortsBefore}`]);
     // filter only: the nat table is Docker's (embedded DNS DNAT) — flushing
     // it cuts the container's DNS for every later suite
     for (const args of [
@@ -329,69 +418,38 @@ describe.skipIf(!onDebianAsRoot)('E2E: fresh Debian 13 -> bootstrap -> full stac
   it(
     'should_bring_a_members_rtorrent_straight_back_after_an_outgoing_connection_used_its_port',
     async () => {
-      // 2026-11-04, production: a member's rtorrent failed to restart for a
-      // minute with "Could not open/bind port for listening: Address already in
-      // use". While it was down, the kernel had lent its torrent port to an
-      // outgoing connection as an ephemeral source port, and that socket's
-      // TIME_WAIT blocked the bind. Narrowing the ephemeral range to the
-      // member's port alone makes the kernel pick it here too, unless the host
-      // keeps it reserved: then it has no port to lend and refuses the connect.
-      // (A wider range would not do: connect() prefers odd ports, and the
-      // member's may be even.)
-      const unit = `rtorrent-${USER}`;
-      const rc = readFileSync(`/home/${USER}/.rtorrent.rc`, 'utf8');
-      const torrentPort = Number(/network\.port_range\.set = (\d+)-/.exec(rc)?.[1]);
-      const scgiPort = Number(/network\.scgi\.open_port = 127\.0\.0\.1:(\d+)/.exec(rc)?.[1]);
-      const socketsOn = (port: number, state: string): string =>
-        sh('ss', ['-Htan', 'state', state, `( sport = :${String(port)} )`]).trim();
-
-      sh('systemctl', ['stop', unit]);
-      // sockets the old listener left keep the port bound, and the kernel
-      // never lends a bound port: start from a port nothing holds any more
-      await waitFor('a quiet torrent port', () => socketsOn(torrentPort, 'all') === '', 90_000);
-      const ephemeralRange = sh('sysctl', ['-n', 'net.ipv4.ip_local_port_range']).trim();
-      try {
-        sh('sysctl', [
-          '-qw',
-          `net.ipv4.ip_local_port_range=${String(torrentPort)} ${String(torrentPort)}`,
-        ]);
-        // the client closes first, so the TIME_WAIT lands on its source port
-        sh('python3', [
-          '-c',
-          [
-            'import socket',
-            // a fixed port: one taken from the narrowed range would starve the client
-            `server = socket.create_server(("${FIXTURE_IP}", ${String(PEER_FIXTURE_PORT)}))`,
-            'try:',
-            '    client = socket.create_connection(server.getsockname())',
-            'except OSError as refused:',
-            // EADDRNOTAVAIL: no port left to lend; anything else is a real failure
-            '    if refused.errno != 99:',
-            '        raise',
-            '    raise SystemExit(0)',
-            'peer, _ = server.accept()',
-            'client.close()',
-            'peer.recv(1)',
-            'peer.close()',
-            'server.close()',
-          ].join('\n'),
-        ]);
-      } finally {
-        sh('sysctl', ['-qw', `net.ipv4.ip_local_port_range=${ephemeralRange}`]);
-      }
-      sh('systemctl', ['start', unit]);
-
-      // rtorrent opens SCGI before it binds the torrent port, and a failed bind
-      // leaves SCGI up for an instant: wait on the torrent port itself
-      await waitFor(
-        'rtorrent listening for peers',
-        () => socketsOn(torrentPort, 'listening') !== '',
-        5_000,
-      );
-      await waitForScgi(scgiPort, 5_000);
-      expect(isActive(unit)).toBe(true);
+      await expectRtorrentStraightBackAfterItsPortWasOffered(USER);
     },
     120_000,
+  );
+
+  it(
+    'should_hold_back_the_ports_an_imported_member_kept_from_mysb_wherever_they_lie',
+    async () => {
+      // v1.0.62 reserved two fixed blocks at the start of the pools, and a
+      // member imported from MySB keeps the ports that box gave them
+      dumpDir = buildDump({
+        users: [
+          {
+            username: IMPORTED,
+            email: `${IMPORTED}@example.org`,
+            scgiPort: IMPORTED_SCGI_PORT,
+            rtorrentPort: IMPORTED_RTORRENT_PORT,
+          },
+        ],
+      });
+      kobox(['migrate-from-mysb', '--dump', dumpDir, '--apply']);
+      // the INSTALLED worker provisions them, the reservation first
+      await waitFor('the imported rtorrent instance', () => isActive(`rtorrent-${IMPORTED}`));
+
+      const reserved = sh('sysctl', ['-n', RESERVED_PORTS_KEY]).trim().split(',');
+      expect(reserved).toContain(`${String(IMPORTED_RTORRENT_PORT)}-${String(IMPORTED_SCGI_PORT)}`);
+      expect(readFileSync(MEMBER_PORT_RESERVATION_PATH, 'utf8')).toContain(
+        `${String(IMPORTED_RTORRENT_PORT)}-${String(IMPORTED_SCGI_PORT)}`,
+      );
+      await expectRtorrentStraightBackAfterItsPortWasOffered(IMPORTED);
+    },
+    240_000,
   );
 
   it('should_open_the_members_network_share_with_their_portal_password', async () => {
@@ -640,6 +698,7 @@ describe.skipIf(!onDebianAsRoot)('E2E: fresh Debian 13 -> bootstrap -> full stac
 
     expect(existsSync('/etc/systemd/system/kobox-worker.service')).toBe(false);
     expect(existsSync('/etc/systemd/system/kobox-firewall.service')).toBe(false);
+    expect(existsSync(MEMBER_PORT_RESERVATION_PATH)).toBe(false);
     expect(isActive('kobox-worker')).toBe(false);
     // the anti-CleanAll contract: the user, their home and the DB survive
     expect(userExists()).toBe(true);
