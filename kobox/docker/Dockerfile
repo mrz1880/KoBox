@@ -26,7 +26,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     xz-utils \
     && rm -rf /var/lib/apt/lists/* \
     && rm -f /lib/systemd/system/multi-user.target.wants/getty.target \
-    && systemctl mask systemd-logind.service getty@tty1.service
+    && systemctl mask systemd-logind.service getty@tty1.service \
+    # Privileged, this container shares the host kernel's binfmt_misc table:
+    # systemd-binfmt flushes it on start and stop, which unregisters Docker
+    # Desktop's Rosetta and the CI runner's emulators.
+    && systemctl mask systemd-binfmt.service
 
 ARG NODE_VERSION=24
 RUN curl -fsSL "https://deb.nodesource.com/setup_${NODE_VERSION}.x" | bash - \
