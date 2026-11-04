@@ -1,5 +1,5 @@
 import { DomainError } from '../shared/DomainError.js';
-import { MEMBER_PORT_RESERVATION_PATH } from './rendering.js';
+import { KERNEL_TUNING_PATH, MEMBER_PORT_RESERVATION_PATH } from './rendering.js';
 
 export class UnknownConfigDocumentError extends DomainError {
   constructor(raw: string) {
@@ -171,7 +171,7 @@ const CATALOG: readonly ConfigDocument[] = [
   ConfigDocument.of(
     'sysctl-dropin',
     'Kernel tuning',
-    '/etc/sysctl.d/90-kobox.conf',
+    KERNEL_TUNING_PATH,
     'Network buffers and limits sized for many simultaneous transfers.',
   ),
   ConfigDocument.of(

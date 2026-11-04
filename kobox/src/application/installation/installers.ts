@@ -50,6 +50,7 @@ import {
   renderSmbConf,
   renderSshdDropin,
   renderSysctlTweaks,
+  KERNEL_TUNING_PATH,
   MEMBER_PORT_RESERVATION_PATH,
   renderWorkerEnv,
   renderWorkerUnit,
@@ -198,7 +199,6 @@ const FIREWALL_UNIT = '/etc/systemd/system/kobox-firewall.service';
 const WORKER_ENV = '/etc/kobox/worker.env';
 const PORTAL_ENV = '/etc/kobox/portal.env';
 const SSHD_DROPIN = '/etc/ssh/sshd_config.d/90-kobox.conf';
-const SYSCTL_DROPIN = '/etc/sysctl.d/90-kobox.conf';
 const NGINX_VHOST = '/etc/nginx/conf.d/kobox.conf';
 const HTPASSWD = '/etc/nginx/kobox.htpasswd';
 const NEXTCLOUD_DIR = '/var/www/nextcloud';
@@ -360,7 +360,7 @@ class TweaksInstaller implements ComponentInstaller {
   }
 
   async uninstall(): Promise<void> {
-    await this.ctx.host.removeFile(SYSCTL_DROPIN);
+    await this.ctx.host.removeFile(KERNEL_TUNING_PATH);
     // rendered by the reserve-member-ports job, but kernel tuning all the same
     await this.ctx.host.removeFile(MEMBER_PORT_RESERVATION_PATH);
     await this.ctx.host.applySysctl();
