@@ -1,3 +1,6 @@
+import { existsSync, mkdtempSync, readdirSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { LoneFilePlacement } from '../../../../src/domain/sync/LoneFilePlacement.js';
 import { RemoteAccount } from '../../../../src/domain/sync/RemoteAccount.js';
@@ -18,18 +21,53 @@ import { Username } from '../../../../src/domain/user/Username.js';
 
 class ScriptedRunner implements CommandRunner {
   readonly calls: CommandRequest[] = [];
-  private readonly results = new Map<string, CommandResult>();
+  // what each rsync call found in its local source folder, read while it ran:
+  // the probe removes its scratch folders once done
+  readonly sentTrees: (readonly string[] | undefined)[] = [];
+  private readonly results = new Map<string, CommandResult[]>();
 
-  onCommand(command: string, result: Partial<CommandResult>): void {
-    this.results.set(command, { stdout: '', stderr: '', exitCode: 0, ...result });
+  // answers given in turn to successive calls of that command, the last one
+  // repeating
+  onCommand(command: string, ...results: Partial<CommandResult>[]): void {
+    this.results.set(
+      command,
+      results.map((result) => ({ stdout: '', stderr: '', exitCode: 0, ...result })),
+    );
   }
 
   run(request: CommandRequest): Promise<CommandResult> {
     this.calls.push(request);
-    return Promise.resolve(
-      this.results.get(request.command) ?? { stdout: '', stderr: '', exitCode: 0 },
-    );
+    if (request.command === 'rsync') {
+      const local = request.args.at(-2);
+      this.sentTrees.push(
+        local !== undefined && local.startsWith('/') && existsSync(local)
+          ? readdirSync(local)
+          : undefined,
+      );
+    }
+    const queue = this.results.get(request.command) ?? [];
+    const result = (queue.length > 1 ? queue.shift() : queue[0]) ?? {
+      stdout: '',
+      stderr: '',
+      exitCode: 0,
+    };
+    return Promise.resolve(result);
   }
+
+  rsyncs(): CommandRequest[] {
+    return this.calls.filter((call) => call.command === 'rsync');
+  }
+}
+
+const PROBE_FOLDER = '.kobox-write-check-test';
+
+function aProbe(runner: CommandRunner): SshRemoteProbe {
+  return new SshRemoteProbe(
+    runner,
+    '/var/lib/kobox/sync',
+    mkdtempSync(join(tmpdir(), 'kobox-test-')),
+    () => PROBE_FOLDER,
+  );
 }
 
 const destination = SyncDestination.define({
@@ -77,7 +115,7 @@ describe('SshRemoteProbe', () => {
     await new SshRemoteProbe(runner, '/var/lib/kobox/sync').probe(destination, password);
 
     const remote = runner.calls.filter((call) => ['sshpass', 'ssh', 'rsync'].includes(call.command));
-    expect(remote.map((call) => call.command)).toEqual(['rsync']);
+    expect(new Set(remote.map((call) => call.command))).toEqual(new Set(['rsync']));
     expect(remote[0]?.args).toContain('--list-only');
     expect(remote[0]?.args.at(-1)).toBe('seedbox@nas.example.org:/volume1/torrents/');
   });
@@ -129,5 +167,70 @@ describe('SshRemoteProbe', () => {
 
     expect(outcome.ok).toBe(false);
     expect(outcome.detail).toContain('different identity');
+  });
+
+  // seen on 2026-11-04: an account that could list the folder but not write in
+  // it passed the check, and every transfer failed right after
+  it('should_prove_the_account_can_write_by_making_a_probe_folder_there', async () => {
+    const runner = new ScriptedRunner();
+
+    await aProbe(runner).probe(destination, password);
+
+    const write = runner.rsyncs()[1];
+    expect(write?.args.at(-1)).toBe('seedbox@nas.example.org:/volume1/torrents/');
+    expect(runner.sentTrees[1]).toEqual([PROBE_FOLDER]);
+  });
+
+  it('should_say_the_account_signs_in_but_cannot_write_when_the_write_is_refused', async () => {
+    const runner = new ScriptedRunner();
+    runner.onCommand(
+      'rsync',
+      { exitCode: 0 },
+      {
+        exitCode: 23,
+        stderr: `rsync: [generator] recv_generator: mkdir "/volume1/torrents/${PROBE_FOLDER}" failed: Permission denied (13)`,
+      },
+    );
+
+    const outcome = await aProbe(runner).probe(destination, password);
+
+    expect(outcome).toMatchObject({
+      ok: false,
+      detail: 'the account can sign in but cannot write in that folder',
+    });
+  });
+
+  it('should_say_the_account_can_write_there_once_it_has', async () => {
+    const outcome = await aProbe(new ScriptedRunner()).probe(destination, password);
+
+    expect(outcome).toMatchObject({
+      ok: true,
+      detail: 'the machine answered, and the account can write in that folder',
+    });
+  });
+
+  it('should_remove_the_probe_folder_and_nothing_else', async () => {
+    const runner = new ScriptedRunner();
+
+    await aProbe(runner).probe(destination, password);
+
+    const removal = runner.rsyncs()[2];
+    // an empty folder sent with --delete would empty the member's whole folder:
+    // the filters let only the probe folder go, and --max-delete caps the harm
+    // at one entry should they ever be wrong
+    expect(removal?.args).toEqual(
+      expect.arrayContaining([
+        '--delete',
+        `--include=/${PROBE_FOLDER}/`,
+        '--exclude=*',
+        '--max-delete=1',
+      ]),
+    );
+    expect(removal?.args.indexOf(`--include=/${PROBE_FOLDER}/`)).toBeLessThan(
+      removal?.args.indexOf('--exclude=*') ?? -1,
+    );
+    expect(removal?.args).not.toContain('--delete-excluded');
+    expect(runner.sentTrees[2]).toEqual([]);
+    expect(removal?.args.at(-1)).toBe('seedbox@nas.example.org:/volume1/torrents/');
   });
 });
