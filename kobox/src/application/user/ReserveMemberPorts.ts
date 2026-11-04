@@ -19,6 +19,10 @@ interface Deps {
   readonly kernel: KernelSettingsPort;
 }
 
+// Keeps the kernel from lending any member's port as the source of an outgoing
+// connection (see MemberPort): renders the whole ledger into its sysctl drop-in
+// and loads it at once, only when it changed. Run after every change of the
+// ledger and on each install, as the reserve-member-ports job.
 export class ReserveMemberPorts {
   constructor(private readonly deps: Deps) {}
 
