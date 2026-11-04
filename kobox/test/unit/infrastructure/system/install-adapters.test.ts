@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { ConfigCheckAdapter } from '../../../../src/infrastructure/system/ConfigCheckAdapter.js';
 import { InstallHostAdapter } from '../../../../src/infrastructure/system/InstallHostAdapter.js';
+import { SysctlAdapter } from '../../../../src/infrastructure/system/SysctlAdapter.js';
 import { SystemdAdapter } from '../../../../src/infrastructure/system/SystemdAdapter.js';
 import type {
   CommandRequest,
@@ -34,6 +35,25 @@ class RecordingRunner implements CommandRunner {
     return this.calls.map((c) => [c.command, ...c.args].join(' '));
   }
 }
+
+describe('SysctlAdapter', () => {
+  it('should_load_one_drop_in_into_the_running_kernel_argv_only', async () => {
+    const runner = new RecordingRunner();
+
+    await new SysctlAdapter(runner).load('/etc/sysctl.d/91-kobox-member-ports.conf');
+
+    expect(runner.argvs()).toEqual(['sysctl -q -p /etc/sysctl.d/91-kobox-member-ports.conf']);
+  });
+
+  it('should_fail_when_the_kernel_refuses_the_drop_in', async () => {
+    const runner = new RecordingRunner();
+    runner.on(() => ({ stdout: '', stderr: 'Invalid argument', exitCode: 1 }));
+
+    await expect(new SysctlAdapter(runner).load('/etc/sysctl.d/x.conf')).rejects.toThrow(
+      /Invalid argument/,
+    );
+  });
+});
 
 describe('SystemdAdapter', () => {
   it('should_map_operations_to_argv_only_systemctl_calls', async () => {

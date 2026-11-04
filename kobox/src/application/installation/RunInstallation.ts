@@ -19,6 +19,7 @@ export const CONVERGENCE_JOBS = [
   'render-openvpn',
   'render-nfs-exports',
   'render-rutorrent-users',
+  'reserve-member-ports',
 ] as const;
 
 export type ConvergenceJobType = (typeof CONVERGENCE_JOBS)[number];

@@ -186,6 +186,9 @@ export class ImportFromMysb {
   // generic (passwordless) welcome mail. Every job here is idempotent, so it is
   // safe to re-enqueue on a repair re-run.
   private async enqueueProvisioning(username: string): Promise<void> {
+    // the ports kept from MySB may lie anywhere: the kernel must hold them back
+    // before rtorrent first binds them (unique: one render covers every member)
+    await this.deps.queue.enqueueUnique(parseJob('reserve-member-ports', {}));
     await this.deps.queue.enqueue(parseJob('provision-rtorrent', { username }));
     await this.deps.queue.enqueue(parseJob('provision-vpn-user', { username }));
     await this.deps.queue.enqueue(parseJob('render-nfs-exports', {}));

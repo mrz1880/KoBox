@@ -166,6 +166,22 @@ describe('SqlitePortAllocator', () => {
       PortAlreadyClaimedError,
     );
   });
+
+  it('should_list_every_port_held_by_a_member_with_its_kind_and_forget_a_released_one', async () => {
+    const allocator = new SqlitePortAllocator(db);
+    const scgi = await allocator.allocateScgiPort();
+    await allocator.allocateRtorrentPort();
+    // kept from an import, far from either pool
+    await allocator.claimRtorrentPort(RtorrentPort.parse(36000));
+    await allocator.releaseScgiPort(scgi);
+
+    const listed = await allocator.listAllocated();
+
+    expect(listed.map((port) => [port.constructor.name, port.value])).toEqual([
+      ['RtorrentPort', 36000],
+      ['RtorrentPort', 45000],
+    ]);
+  });
 });
 
 describe('SqliteJobQueue', () => {

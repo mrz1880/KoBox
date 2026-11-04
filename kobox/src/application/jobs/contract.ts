@@ -77,6 +77,7 @@ export const JOB_TYPES = [
   'set-automatic-cleanup',
   'set-seed-rule',
   'set-own-seed-rule',
+  'reserve-member-ports',
 ] as const;
 
 export type JobType = (typeof JOB_TYPES)[number];
@@ -294,6 +295,8 @@ export const jobPayloadSchemas = {
   'restart-rtorrent': usernameOnly,
   'render-rutorrent-users': z.strictObject({}),
   'render-nfs-exports': z.strictObject({}),
+  // the kernel's reserved ports, re-rendered from the ports ledger
+  'reserve-member-ports': z.strictObject({}),
   // the torrents a member checked: the worker judges each one again before
   // deleting it, so the list is a wish, not an order
   'clean-up-space': z.strictObject({

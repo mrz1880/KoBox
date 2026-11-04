@@ -101,6 +101,11 @@ import { SetUserQuota } from '../application/user/SetUserQuota.js';
 import { ChangeRole } from '../application/user/ChangeRole.js';
 import { CreateUser } from '../application/user/CreateUser.js';
 import { DeleteUser } from '../application/user/DeleteUser.js';
+import {
+  ReserveMemberPorts,
+  type AllocatedPortsPort,
+  type KernelSettingsPort,
+} from '../application/user/ReserveMemberPorts.js';
 import { ResumeUser } from '../application/user/ResumeUser.js';
 import { SuspendUser } from '../application/user/SuspendUser.js';
 import type {
@@ -192,6 +197,10 @@ export interface UseCaseDeps {
   readonly services: ServiceControlPort;
   readonly notifications: NotificationPort;
   readonly allocator: PortAllocatorPort;
+  // the ports handed to members, which the kernel must never lend out
+  readonly portLedger: AllocatedPortsPort;
+  readonly files: ManagedFilesPort;
+  readonly kernel: KernelSettingsPort;
   readonly credentials: PortalCredentialsPort;
   readonly sessions: SessionStorePort;
   readonly hasher: PasswordHasherPort;
@@ -204,6 +213,7 @@ export interface UseCaseDeps {
 export interface UseCases {
   readonly createUser: CreateUser;
   readonly deleteUser: DeleteUser;
+  readonly reserveMemberPorts: ReserveMemberPorts;
   readonly changePassword: ChangePassword;
   readonly setUserQuota: SetUserQuota;
   readonly changeRole: ChangeRole;
@@ -218,6 +228,7 @@ export function buildUseCases(deps: UseCaseDeps): UseCases {
   return {
     createUser: new CreateUser(deps),
     deleteUser: new DeleteUser(deps),
+    reserveMemberPorts: new ReserveMemberPorts({ ...deps, ledger: deps.portLedger }),
     changePassword: new ChangePassword(deps),
     setUserQuota: new SetUserQuota(deps),
     changeRole: new ChangeRole(deps),

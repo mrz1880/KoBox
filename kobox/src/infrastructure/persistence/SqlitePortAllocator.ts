@@ -1,13 +1,31 @@
-import { and, eq, gte } from 'drizzle-orm';
+import { and, asc, eq, gte } from 'drizzle-orm';
+import type { AllocatedPortsPort } from '../../application/user/ReserveMemberPorts.js';
 import { FIRST_RTORRENT_PORT, FIRST_SCGI_PORT } from '../../domain/user/memberPortPools.js';
+import type { MemberPort } from '../../domain/user/memberPortReservation.js';
 import { RtorrentPort, ScgiPort } from '../../domain/user/Port.js';
 import type { PortAllocatorPort } from '../../domain/user/PortAllocatorPort.js';
 import { PortAlreadyClaimedError } from '../../domain/user/PortAllocatorPort.js';
 import type { KoboxDatabase } from './db.js';
 import { allocatedPorts } from './schema.js';
 
-export class SqlitePortAllocator implements PortAllocatorPort {
+type PortKind = (typeof allocatedPorts.kind.enumValues)[number];
+
+function memberPortOf(kind: PortKind, port: number): MemberPort {
+  switch (kind) {
+    case 'scgi':
+      return ScgiPort.parse(port);
+    case 'rtorrent':
+      return RtorrentPort.parse(port);
+  }
+}
+
+export class SqlitePortAllocator implements PortAllocatorPort, AllocatedPortsPort {
   constructor(private readonly db: KoboxDatabase) {}
+
+  listAllocated(): Promise<readonly MemberPort[]> {
+    const rows = this.db.orm.select().from(allocatedPorts).orderBy(asc(allocatedPorts.port)).all();
+    return Promise.resolve(rows.map((row) => memberPortOf(row.kind, row.port)));
+  }
 
   allocateScgiPort(): Promise<ScgiPort> {
     return Promise.resolve(ScgiPort.parse(this.claim('scgi', FIRST_SCGI_PORT)));
@@ -37,7 +55,7 @@ export class SqlitePortAllocator implements PortAllocatorPort {
 
   // better-sqlite3 runs the transaction synchronously, so a rejected claim
   // throws *synchronously*; wrap it to honour the async Port contract.
-  private claimAsPromise(kind: 'scgi' | 'rtorrent', port: number): Promise<void> {
+  private claimAsPromise(kind: PortKind, port: number): Promise<void> {
     try {
       this.claimExplicit(kind, port);
       return Promise.resolve();
@@ -48,7 +66,7 @@ export class SqlitePortAllocator implements PortAllocatorPort {
 
   // Same write-locked transaction as claim(): the existence check + INSERT are
   // atomic, so two concurrent claims of the same legacy port can't both win.
-  private claimExplicit(kind: 'scgi' | 'rtorrent', port: number): void {
+  private claimExplicit(kind: PortKind, port: number): void {
     this.db.orm.transaction(
       (tx) => {
         const taken = tx
@@ -67,7 +85,7 @@ export class SqlitePortAllocator implements PortAllocatorPort {
 
   // Atomicity: the whole find-lowest-free + INSERT runs inside one immediate
   // (write-locked) transaction; the primary key on port is the final arbiter.
-  private claim(kind: 'scgi' | 'rtorrent', base: number): number {
+  private claim(kind: PortKind, base: number): number {
     return this.db.orm.transaction(
       (tx) => {
         const taken = tx
