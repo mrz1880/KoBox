@@ -13,19 +13,17 @@ interface Deps {
   readonly blocklists: BlocklistRepository;
 }
 
-// The protective lists enabled on FIRST import only; operator toggles always
-// win on re-import. MySB (funcs_PeerGuardian) also enabled whole countries said
-// to pursue torrenting: on a real box they cut off most peers (seedboxes in
-// Germany, Finland, the United States, the United Kingdom) for little
-// protection, the monitoring firms being in level1 already.
+// The targeted lists enabled on FIRST import only; operator toggles always
+// win on re-import. MySB (funcs_PeerGuardian) also enabled whole countries
+// said to pursue torrenting, and the broad PeerGuardian lists (level1, level2,
+// Microsoft) that block whole companies, hosts and universities. On a real box
+// they cut off most peers, seedboxes included, and ruTorrent's own port
+// checker; MySB never actually applied them, so its members seeded freely.
 const CURATED_ENABLED = new Set([
   'cruzit',
   'malc0de',
   'zeus',
   'badpeers',
-  'level1',
-  'level2',
-  'microsoft',
   'rangetest',
   'pedophiles',
 ]);

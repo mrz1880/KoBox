@@ -53,7 +53,7 @@ function personalList(name: string, url: string, enabled = true): Blocklist {
 
 describe('ImportBlocklistCatalog', () => {
   const catalog = new FakeIblocklistCatalog([
-    { name: 'level1', author: 'Example Org', listId: 'aaa', url: 'https://l.example/aaa', subscription: false },
+    { name: 'badpeers', author: 'Example Org', listId: 'aaa', url: 'https://l.example/aaa', subscription: false },
     { name: 'obscure', author: 'Example Org', listId: 'bbb', url: 'https://l.example/bbb', subscription: false },
     { name: 'paid', author: 'Example Org', listId: 'ccc', url: 'https://l.example/ccc', subscription: true },
     { name: 'P2P allow', author: 'Example Org', listId: 'ddd', url: 'https://l.example/ddd', subscription: false },
@@ -65,7 +65,7 @@ describe('ImportBlocklistCatalog', () => {
     expect(report.imported).toBe(3); // P2P allow skipped (legacy rule)
     const all = await blocklists.listAll();
     const byName = new Map(all.map((list) => [list.name, list]));
-    expect(byName.get('level1')?.enabled).toBe(true); // curated default
+    expect(byName.get('badpeers')?.enabled).toBe(true); // curated default
     expect(byName.get('obscure')?.enabled).toBe(false);
     expect(byName.get('paid')?.enabled).toBe(false); // subscription never auto-enabled
     expect(byName.get('P2P allow')).toBeUndefined();
@@ -74,19 +74,19 @@ describe('ImportBlocklistCatalog', () => {
   it('should_keep_operator_toggles_on_reimport', async () => {
     const useCase = new ImportBlocklistCatalog({ catalog, blocklists });
     await useCase.execute();
-    const level1 = await blocklists.findBySourceAuthorName(
+    const curated = await blocklists.findBySourceAuthorName(
       BlocklistSource.parse('iblocklist'),
       'Example Org',
-      'level1',
+      'badpeers',
     );
-    await blocklists.save(level1?.disable() ?? personalList('x', 'https://x.example/x'));
+    await blocklists.save(curated?.disable() ?? personalList('x', 'https://x.example/x'));
 
     await useCase.execute(); // reimport must not re-enable
 
     const after = await blocklists.findBySourceAuthorName(
       BlocklistSource.parse('iblocklist'),
       'Example Org',
-      'level1',
+      'badpeers',
     );
     expect(after?.enabled).toBe(false);
   });
