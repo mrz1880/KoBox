@@ -1,4 +1,5 @@
 import { DomainError } from '../shared/DomainError.js';
+import { MEMBER_PORT_RESERVATION_PATH } from './rendering.js';
 
 export class UnknownConfigDocumentError extends DomainError {
   constructor(raw: string) {
@@ -171,6 +172,12 @@ const CATALOG: readonly ConfigDocument[] = [
     'sysctl-dropin',
     'Kernel tuning',
     '/etc/sysctl.d/90-kobox.conf',
-    'Network buffers and limits sized for many simultaneous transfers, and each member\'s rTorrent ports kept free so a restart gets them back at once.',
+    'Network buffers and limits sized for many simultaneous transfers.',
+  ),
+  ConfigDocument.of(
+    'member-port-reservation',
+    'Members\' reserved ports',
+    MEMBER_PORT_RESERVATION_PATH,
+    'Every member\'s rTorrent ports, kept free so a restart gets them back at once.',
   ),
 ];
