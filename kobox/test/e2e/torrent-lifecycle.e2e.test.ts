@@ -1,5 +1,5 @@
 import { execFileSync, type ExecFileSyncOptions } from 'node:child_process';
-import { chmodSync, existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import Database from 'better-sqlite3';
@@ -255,7 +255,27 @@ describe.skipIf(!onDebianAsRoot)('E2E: torrent lifecycle with a real rtorrent', 
     expect(opened).toBe(SECRET);
     // first sight pinned the key rather than accepting anything that answers
     expect(existsSync(`/var/lib/kobox/sync/${USER}.known_hosts`)).toBe(true);
+    // writing was proven with a folder of KoBox's own, gone again afterwards
+    expect(readdirSync(`/home/${TARGET}/incoming`)).toEqual([]);
   }, 120_000);
+
+  it('should_fail_the_check_for_a_folder_the_account_sees_but_cannot_write_in', () => {
+    // seen on 2026-11-04: the account could list the folder, and every transfer
+    // was refused right after a green check
+    const TARGET = 'e2esynctarget';
+    const readOnly = `/home/${TARGET}/readonly`;
+    sh('install', ['-d', '-o', 'root', '-g', 'root', '-m', '0755', readOnly]);
+    kobox(
+      ['set-sync-destination', USER, '127.0.0.1', '22', TARGET, readOnly],
+      'nas-password-42\n',
+    );
+    kobox(['check-sync-destination', USER]);
+    drainQueue();
+
+    const row = dbRow('SELECT last_check_ok, last_check_detail FROM sync_destinations WHERE username = ?', USER);
+    expect(row?.last_check_ok).toBe(0);
+    expect(row?.last_check_detail).toBe('the account can sign in but cannot write in that folder');
+  }, 60_000);
 
   it('should_say_what_is_wrong_rather_than_just_failing', () => {
     // same account, a folder it cannot write to: the member needs to know it is
