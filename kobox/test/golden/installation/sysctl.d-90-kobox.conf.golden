@@ -4,6 +4,5 @@ net.core.rmem_max = 16777216
 net.core.wmem_max = 16777216
 net.ipv4.tcp_fin_timeout = 15
 net.ipv4.tcp_tw_reuse = 1
-net.ipv4.ip_local_reserved_ports = 45000-45999,51101-52100
 fs.inotify.max_user_watches = 524288
 fs.inotify.max_user_instances = 1024

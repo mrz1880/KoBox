@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { NFS_MOUNTD_PORT } from '../../../../src/domain/installation/rendering.js';
+import {
+  MEMBER_PORT_RESERVATION_PATH,
+  NFS_MOUNTD_PORT,
+  renderMemberPortReservation,
+} from '../../../../src/domain/installation/rendering.js';
 import {
   InstallGuardError,
   buildInstallers,
@@ -1316,6 +1320,15 @@ describe('tweaks installer', () => {
 
     expect(world.host.contentAt('/etc/sysctl.d/90-kobox.conf')).toBeUndefined();
     expect(world.host.sysctlApplies).toBe(2);
+  });
+
+  it('should_take_the_members_port_reservation_away_with_the_other_kernel_settings', async () => {
+    await installer(world, 'tweaks').install();
+    await world.host.apply([renderMemberPortReservation([])]);
+
+    await installer(world, 'tweaks').uninstall();
+
+    expect(world.host.contentAt(MEMBER_PORT_RESERVATION_PATH)).toBeUndefined();
   });
 });
 
