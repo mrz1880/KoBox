@@ -25,4 +25,15 @@ describe('translatorFor', () => {
     expect(translatorFor(Language.fr)('{name} may now add torrents from public trackers.', { name: 'alice' }))
       .toBe('alice peut désormais ajouter des torrents depuis des trackers publics.');
   });
+
+  // a flash is no page the catalogue test renders: its sentences are pinned here
+  it.each([
+    ['Back in the queue. It goes out now.', 'De retour dans la file d’attente. Il part maintenant.'],
+    [
+      'Back in the queue. It goes out at your send hour.',
+      'De retour dans la file d’attente. Il partira à votre heure d’envoi.',
+    ],
+  ])('should_tell_a_french_member_when_a_transfer_put_back_leaves: %s', (english, french) => {
+    expect(translatorFor(Language.fr)(english)).toBe(french);
+  });
 });
