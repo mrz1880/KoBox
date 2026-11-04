@@ -344,10 +344,17 @@ describe('RequeueTransfer', () => {
     return { transfers, id: queued.id };
   }
 
+  async function requeueWith(
+    mode: SyncMode,
+    transfers: InMemorySyncTransferRepository,
+  ): Promise<RequeueTransfer> {
+    return new RequeueTransfer({ transfers, instances: await instancesWith(mode), clock: () => NOW });
+  }
+
   it('should_put_a_failed_transfer_back_in_the_queue', async () => {
     const { transfers, id } = await aFailedTransfer();
 
-    await new RequeueTransfer({ transfers, clock: () => NOW }).execute(alice, id);
+    await (await requeueWith(SyncMode.scheduled, transfers)).execute(alice, id);
 
     expect(await transfers.countByState(alice, 'waiting')).toBe(1);
   });
@@ -355,9 +362,22 @@ describe('RequeueTransfer', () => {
   it('should_refuse_to_touch_another_members_transfer', async () => {
     const { transfers, id } = await aFailedTransfer();
 
-    await new RequeueTransfer({ transfers, clock: () => NOW }).execute(Username.parse('boss'), id);
+    const outcome = await (await requeueWith(SyncMode.immediate, transfers)).execute(
+      Username.parse('boss'),
+      id,
+    );
 
     expect(await transfers.countByState(alice, 'failed')).toBe(1);
+    // nothing was put back, so nothing is to be sent either
+    expect(outcome).toBe('not-requeued');
+  });
+
+  it('should_say_it_goes_out_at_once_from_a_folder_that_sends_straight_away', async () => {
+    const { transfers, id } = await aFailedTransfer();
+
+    const outcome = await (await requeueWith(SyncMode.immediate, transfers)).execute(alice, id);
+
+    expect(outcome).toBe('straight-away');
   });
 });
 

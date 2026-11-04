@@ -589,6 +589,10 @@ export function buildSyncUseCases(deps: SyncUseCaseDeps): SyncUseCases {
       clock: deps.clock,
       hour: deps.hour,
     }),
-    requeue: new RequeueTransfer({ transfers: deps.transfers, clock: deps.clock }),
+    requeue: new RequeueTransfer({
+      transfers: deps.transfers,
+      instances: deps.instances,
+      clock: deps.clock,
+    }),
   };
 }

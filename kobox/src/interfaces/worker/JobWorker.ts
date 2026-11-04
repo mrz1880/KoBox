@@ -43,7 +43,8 @@ interface ChainHints {
   readonly fail2banDirty?: boolean;
   readonly openVpnDirty?: boolean;
   readonly nfsDirty?: boolean;
-  // a member asked this folder to go out straight away rather than at their hour
+  // a member asked this folder, or a transfer put back from it, to go out
+  // straight away rather than at their hour
   readonly sendNowFor?: string;
   // a member's rTorrent config changed: render it (and restart) once per burst
   readonly renderConfigFor?: string;
@@ -316,9 +317,13 @@ export class JobWorker {
         });
         return report.sendNow ? { sendNowFor: job.payload.username } : undefined;
       }
-      case 'requeue-transfer':
-        await this.deps.sync.requeue.execute(Username.parse(job.payload.username), job.payload.id);
-        return;
+      case 'requeue-transfer': {
+        const outcome = await this.deps.sync.requeue.execute(
+          Username.parse(job.payload.username),
+          job.payload.id,
+        );
+        return outcome === 'straight-away' ? { sendNowFor: job.payload.username } : undefined;
+      }
       case 'check-sync-destination':
         await this.deps.sync.checkDestination.execute(Username.parse(job.payload.username));
         return;

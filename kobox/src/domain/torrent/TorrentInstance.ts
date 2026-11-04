@@ -185,6 +185,14 @@ export class TorrentInstance {
     return this.watchDirs.some((dir) => dir.label?.equals(label) === true && dir.syncMode.sends);
   }
 
+  // whether that folder sends what it holds the moment it is ready, rather
+  // than at the member's hour
+  sendsStraightAway(label: Label): boolean {
+    return this.watchDirs.some(
+      (dir) => dir.label?.equals(label) === true && dir.syncMode.isImmediate,
+    );
+  }
+
   hasFolder(label: Label): boolean {
     return this.watchDirs.some((dir) => dir.label?.equals(label) === true);
   }
