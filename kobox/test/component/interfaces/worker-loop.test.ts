@@ -84,6 +84,7 @@ import { FakeNetworkServices } from '../../../src/infrastructure/system/fakes/Fa
 import { FakeUserIdentity } from '../../../src/infrastructure/system/fakes/FakeUserIdentity.js';
 import { FakeVpnPki } from '../../../src/infrastructure/system/fakes/FakeVpnPki.js';
 import { buildJob } from '../../../src/interfaces/cli/buildJob.js';
+import { DirectJobRunner } from '../../../src/interfaces/worker/DirectJobRunner.js';
 import { JobWorker } from '../../../src/interfaces/worker/JobWorker.js';
 import {
   buildMaintenanceUseCases,
@@ -212,6 +213,8 @@ interface World {
   // what the worker logged at warn level, context and message
   warnings: { context: unknown; message: string | undefined }[];
   worker: JobWorker;
+  // what `kobox --direct` runs: the same deps, no shared queue
+  direct: DirectJobRunner;
   passwords: FakePasswordCipher;
   samba: FakeServiceLogin;
   credentials: InMemoryPortalCredentialsRepository;
@@ -511,6 +514,19 @@ beforeEach(() => {
     clock: () => '2026-07-25 10:00:00',
   });
   const warnings: World['warnings'] = [];
+  const workerDeps = {
+    useCases,
+    torrents: torrentUseCases,
+    trackers: trackerUseCases,
+    security: securityUseCases,
+    maintenance: maintenanceUseCases,
+    sync: syncUseCases,
+    space: spaceUseCases,
+    passwords,
+    logger: {
+      warn: (context: unknown, message?: string) => warnings.push({ context, message }),
+    },
+  };
   world = {
     kernel,
     kernelFiles,
@@ -551,25 +567,13 @@ beforeEach(() => {
     seedRule,
     quota,
     warnings,
-    worker: new JobWorker({
-      queue,
-      useCases,
-      torrents: torrentUseCases,
-      trackers: trackerUseCases,
-      security: securityUseCases,
-      maintenance: maintenanceUseCases,
-      sync: syncUseCases,
-      space: spaceUseCases,
-      passwords,
-      logger: {
-        warn: (context: unknown, message?: string) => warnings.push({ context, message }),
-      },
-    }),
+    worker: new JobWorker({ ...workerDeps, queue }),
+    direct: new DirectJobRunner(workerDeps),
   };
 });
 
-async function enqueueCreateAlice(): Promise<number> {
-  const job = await buildJob.createUser(
+function createAliceJob(): Promise<Job> {
+  return buildJob.createUser(
     {
       username: 'alice',
       email: 'alice@example.org',
@@ -579,7 +583,10 @@ async function enqueueCreateAlice(): Promise<number> {
     Password.parse('s3cretpw'),
     world.passwords,
   );
-  return world.queue.enqueue(job);
+}
+
+async function enqueueCreateAlice(): Promise<number> {
+  return world.queue.enqueue(await createAliceJob());
 }
 
 describe('CLI enqueue -> root worker loop (the privilege seam)', () => {
@@ -867,6 +874,41 @@ describe('CLI enqueue -> root worker loop (the privilege seam)', () => {
 
   it('should_report_nothing_to_do_on_an_empty_queue', async () => {
     expect(await world.worker.processNext()).toBe(false);
+  });
+});
+
+// `kobox --direct` runs a job as root without the worker: what the worker
+// would have chained after it must still happen, or the member is left half made
+describe('direct mode (the CLI without the worker)', () => {
+  it('should_provision_rtorrent_and_reserve_the_ports_of_a_member_created_directly', async () => {
+    await world.direct.run(await createAliceJob());
+
+    expect(await world.accounts.accountExists(alice)).toBe(true);
+    expect(await world.services.isUserServiceRunning(alice)).toBe(true);
+    expect(world.kernelFiles.contentAt(MEMBER_PORT_RESERVATION_PATH)).toContain(
+      'net.ipv4.ip_local_reserved_ports = 45000,51101',
+    );
+    // nothing left behind for a worker that may not be running
+    expect(world.queue.pendingTypes()).toEqual([]);
+  });
+
+  it('should_deprovision_rtorrent_and_free_the_ports_of_a_member_deleted_directly', async () => {
+    await world.direct.run(await createAliceJob());
+
+    await world.direct.run(buildJob.deleteUser({ username: 'alice' }));
+
+    expect(await world.instances.findByUsername(alice)).toBeUndefined();
+    expect(world.services.unitContentFor(alice)).toBeUndefined();
+    const lines = world.kernelFiles.contentAt(MEMBER_PORT_RESERVATION_PATH)?.split('\n');
+    expect(lines).toContain('net.ipv4.ip_local_reserved_ports =');
+  });
+
+  // the operator typed the command and waits for its verdict: a job that
+  // failed must fail the command, not vanish into a queue nobody reads
+  it('should_fail_with_the_error_of_a_job_that_failed', async () => {
+    await expect(world.direct.run(buildJob.suspendUser({ username: 'ghost' }))).rejects.toThrow(
+      /ghost not found/,
+    );
   });
 });
 

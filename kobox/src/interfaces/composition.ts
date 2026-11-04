@@ -167,6 +167,7 @@ import { SystemdServiceControlAdapter } from '../infrastructure/system/SystemdSe
 import { UserScriptRunnerAdapter } from '../infrastructure/system/UserScriptRunnerAdapter.js';
 import { WatchDirAdapter } from '../infrastructure/system/WatchDirAdapter.js';
 import { loadRtorrentTemplates } from '../infrastructure/templates/TemplateProvider.js';
+import { DirectJobRunner } from './worker/DirectJobRunner.js';
 import { JobWorker } from './worker/JobWorker.js';
 import {
   buildMaintenanceUseCases,
@@ -543,6 +544,8 @@ export interface Container {
   readonly mediaRepo: SqliteMediaRepository;
   readonly queue: SqliteJobQueue;
   readonly worker: JobWorker;
+  // `kobox --direct`: a job and what the worker would chain after it, run now
+  readonly direct: DirectJobRunner;
   // seals a password typed at the CLI for the worker, like the portal does
   readonly passwords: RsaPasswordCipher;
   readonly repo: SqliteUserRepository;
@@ -944,6 +947,17 @@ export function buildContainer(name: string): Container {
     probe: new SshRemoteProbe(runner),
     clock: nowStamp,
   });
+  const jobDeps = {
+    useCases,
+    torrents: torrentUseCases,
+    trackers: trackerUseCases,
+    security: securityUseCases,
+    maintenance: maintenanceUseCases,
+    sync: syncUseCases,
+    space: spaceUseCases,
+    passwords,
+    logger,
+  };
   return {
     db,
     logger,
@@ -963,18 +977,8 @@ export function buildContainer(name: string): Container {
     inviteMember: new InviteMember(passwordLinkDeps(db, { users: repo, credentials, outbox, queue })),
     outbox,
     queue,
-    worker: new JobWorker({
-      queue,
-      useCases,
-      torrents: torrentUseCases,
-      trackers: trackerUseCases,
-      security: securityUseCases,
-      maintenance: maintenanceUseCases,
-      sync: syncUseCases,
-      space: spaceUseCases,
-      passwords,
-      logger,
-    }),
+    worker: new JobWorker({ ...jobDeps, queue }),
+    direct: new DirectJobRunner(jobDeps),
     speedtestRepo,
     diagnosticsRepo,
     mediaRepo,
