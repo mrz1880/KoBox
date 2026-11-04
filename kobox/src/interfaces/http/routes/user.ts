@@ -31,6 +31,7 @@ import { formatRatioBound } from '../views/ratio.js';
 import type { TorrentInstanceRepository } from '../../../domain/torrent/ports.js';
 import type { SyncDestinationRepository, SyncTransferRepository } from '../../../domain/sync/ports.js';
 import type { SetSyncDestination } from '../../../application/sync/SetSyncDestination.js';
+import { departureOfRequeued, type Departure } from '../../../domain/sync/Departure.js';
 import { LoneFilePlacement } from '../../../domain/sync/LoneFilePlacement.js';
 import { RemoteAccount } from '../../../domain/sync/RemoteAccount.js';
 import { RemoteHost } from '../../../domain/sync/RemoteHost.js';
@@ -92,6 +93,11 @@ const categoryRenameSchema = z.object({
   to: z.string().min(1).max(64),
 });
 const retrySchema = z.object({ id: z.coerce.number().int().positive() });
+// what putting a transfer back in the queue tells the member, by when it leaves
+const REQUEUED: Readonly<Record<Departure, string>> = {
+  'straight-away': 'Back in the queue. It goes out now.',
+  'at-send-hour': 'Back in the queue. It goes out at your send hour.',
+};
 const destinationSchema = z.object({
   host: z.string().min(1).max(253),
   port: z.coerce.number().int().min(1).max(65535),
@@ -1000,7 +1006,14 @@ export function registerUserRoutes(
     const job = await deps.queue.enqueue(
       buildJob.requeueTransfer({ username: session.username.value, id: parsed.data.id }),
     );
-    return redirectOnceApplied(reply, deps.awaitJob, job, '/sync', 'Back in the queue.');
+    // the page must not promise the hour for a transfer leaving now, nor the
+    // reverse: the same rule the worker follows says which it is
+    const transfer = await deps.transfers.findById(parsed.data.id);
+    const departure: Departure =
+      transfer?.username.equals(session.username) === true
+        ? departureOfRequeued(await deps.instances.findByUsername(session.username), transfer.label)
+        : 'at-send-hour';
+    return redirectOnceApplied(reply, deps.awaitJob, job, '/sync', REQUEUED[departure]);
   });
 
   server.get('/media', async (request, reply) => {

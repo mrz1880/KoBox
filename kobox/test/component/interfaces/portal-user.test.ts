@@ -937,11 +937,11 @@ describe('where a member sends their files', () => {
 });
 
 describe('the queue a member can see', () => {
-  async function aFailedTransfer(): Promise<number> {
+  async function aFailedTransfer(folder = 'Films'): Promise<number> {
     const queued = await world.transfers.queue(
       SyncTransfer.queue({
         username: Username.parse('alice'),
-        label: Label.parse('Films'),
+        label: Label.parse(folder),
         source: LocalPath.parse('/home/alice/rtorrent/complete/Films/Some.Film.mkv'),
         queuedAt: '2026-08-15 10:00:00',
       }),
@@ -1007,13 +1007,36 @@ describe('the queue a member can see', () => {
     });
 
     expect(response.statusCode).toBe(303);
+    // its folder is not one that sends straight away: it waits for the hour
     expect(new URL(String(response.headers.location), 'https://box.example.org').searchParams.get('flash')).toBe(
-      'Back in the queue.',
+      'Back in the queue. It goes out at your send hour.',
     );
     expect(world.queue.jobs[0]).toEqual({
       type: 'requeue-transfer',
       payload: { username: 'alice', id },
     });
+  });
+
+  // seen on 2026-11-04: "back in the queue" read as "waiting for the hour"
+  it('should_say_a_transfer_put_back_from_a_straight_away_folder_goes_out_now', async () => {
+    const films = Label.parse('films');
+    const instance = await world.instances.findByUsername(Username.parse('alice'));
+    if (instance === undefined) {
+      throw new Error('the world should have provisioned alice');
+    }
+    await world.instances.save(instance.setSyncMode(films, SyncMode.immediate));
+    const id = await aFailedTransfer('films');
+
+    const response = await world.server.inject({
+      method: 'POST',
+      url: '/sync/transfers/retry',
+      headers: { cookie: user.cookie, 'content-type': 'application/x-www-form-urlencoded' },
+      payload: form({ _csrf: user.csrf, id: String(id) }),
+    });
+
+    expect(new URL(String(response.headers.location), 'https://box.example.org').searchParams.get('flash')).toBe(
+      'Back in the queue. It goes out now.',
+    );
   });
 
   it('should_carry_the_session_username_rather_than_one_from_the_form', async () => {

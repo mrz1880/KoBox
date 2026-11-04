@@ -146,8 +146,10 @@ const FR: Readonly<Record<string, string>> = {
     'Certificats renouvelés.',
   'Relay saved and applied.':
     'Relais enregistré et appliqué.',
-  'Back in the queue.':
-    'De retour dans la file d’attente.',
+  'Back in the queue. It goes out now.':
+    'De retour dans la file d’attente. Il part maintenant.',
+  'Back in the queue. It goes out at your send hour.':
+    'De retour dans la file d’attente. Il partira à votre heure d’envoi.',
   'Password changed.':
     'Mot de passe changé.',
   'Override applied.': 'Dérogation appliquée.',
