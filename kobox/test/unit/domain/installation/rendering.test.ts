@@ -38,11 +38,13 @@ import {
   renderRutorrentUserConfig,
   renderRutorrentUsersInclude,
   renderSshdDropin,
+  renderMemberPortReservation,
   renderSysctlTweaks,
   renderWorkerEnv,
   renderWorkerUnit,
 } from '../../../../src/domain/installation/rendering.js';
 import { PHP_SETTINGS } from '../../../../src/domain/installation/platform.js';
+import { RtorrentPort, ScgiPort } from '../../../../src/domain/user/Port.js';
 
 const GOLDEN_DIR = join(dirname(fileURLToPath(import.meta.url)), '../../../golden/installation');
 
@@ -393,6 +395,27 @@ describe('installation rendering', () => {
     expect(renderSysctlTweaks().content).toContain(
       'net.ipv4.ip_local_reserved_ports = 45000-45999,51101-52100',
     );
+  });
+
+  it('should_reserve_exactly_the_members_ports_in_a_drop_in_of_their_own', () => {
+    const file = renderMemberPortReservation([
+      RtorrentPort.parse(45000),
+      ScgiPort.parse(51101),
+      RtorrentPort.parse(45001),
+      ScgiPort.parse(51102),
+    ]);
+
+    expect(file.path).toBe('/etc/sysctl.d/91-kobox-member-ports.conf');
+    expect(file.mode).toBe('0644');
+    expectGolden('sysctl.d-91-kobox-member-ports.conf.golden', file.content);
+  });
+
+  it('should_clear_the_reservation_once_no_member_holds_a_port', () => {
+    // a missing key would leave the last value in the running kernel; an empty
+    // one empties it (sysctl -p and systemd-sysctl both accept it)
+    const lines = renderMemberPortReservation([]).content.split('\n');
+
+    expect(lines).toContain('net.ipv4.ip_local_reserved_ports =');
   });
 
   it('should_render_the_trixie_apt_sources_in_deb822', () => {

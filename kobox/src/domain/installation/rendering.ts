@@ -13,6 +13,7 @@ import { DomainError } from '../shared/DomainError.js';
 import type { RenderedFile } from '../shared/files.js';
 import { HOME_BASE, homeOf } from '../user/homeDirectory.js';
 import { MEMBER_PORT_POOLS } from '../user/memberPortPools.js';
+import { reservedPortsValue, type MemberPort } from '../user/memberPortReservation.js';
 import { WatchDir } from '../torrent/WatchDir.js';
 import type { AccountIds } from '../security/ports.js';
 import type { Username } from '../user/Username.js';
@@ -277,6 +278,25 @@ export function renderSshdDropin(sshPort: number): RenderedFile {
       '',
     ].join('\n'),
     mode: '0600',
+    owner: 'root',
+    group: 'root',
+  };
+}
+
+export const MEMBER_PORT_RESERVATION_PATH = '/etc/sysctl.d/91-kobox-member-ports.conf';
+
+// A drop-in of its own, rewritten whenever a member's ports come or go, so the
+// static tweaks above never need re-rendering for it.
+export function renderMemberPortReservation(ports: readonly MemberPort[]): RenderedFile {
+  return {
+    path: MEMBER_PORT_RESERVATION_PATH,
+    content: [
+      MANAGED_HEADER,
+      // no trailing blank after an empty '=': the line stays exactly the key
+      `net.ipv4.ip_local_reserved_ports = ${reservedPortsValue(ports)}`.trimEnd(),
+      '',
+    ].join('\n'),
+    mode: '0644',
     owner: 'root',
     group: 'root',
   };
