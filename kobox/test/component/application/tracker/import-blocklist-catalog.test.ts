@@ -15,12 +15,13 @@ const CURATED = [
   'malc0de',
   'zeus',
   'badpeers',
-  'level1',
-  'level2',
-  'microsoft',
   'rangetest',
   'pedophiles',
 ] as const;
+
+// The broad PeerGuardian lists block whole companies, hosts and universities:
+// on a real box they cut off seedboxes and ruTorrent's own port checker.
+const BROAD = ['level1', 'level2', 'microsoft'] as const;
 
 // MySB also enabled whole countries; on a real box they cut off most peers
 // (seedboxes in Germany, Finland, the United States, the United Kingdom).
@@ -81,6 +82,14 @@ describe('ImportBlocklistCatalog', () => {
     }
   });
 
+  it('should_leave_the_broad_lists_off_on_first_import', async () => {
+    await importCatalog(BROAD.map((name) => entry(name)));
+
+    for (const name of BROAD) {
+      expect({ name, enabled: (await stored(name))?.enabled }).toEqual({ name, enabled: false });
+    }
+  });
+
   it('should_enable_every_protective_list_on_first_import', async () => {
     await importCatalog(CURATED.map((name) => entry(name)));
 
@@ -90,16 +99,16 @@ describe('ImportBlocklistCatalog', () => {
   });
 
   it('should_recognise_a_curated_list_whatever_its_case', async () => {
-    await importCatalog([entry('Level1'), entry('BadPeers')]);
+    await importCatalog([entry('RangeTest'), entry('BadPeers')]);
 
-    expect((await stored('Level1'))?.enabled).toBe(true);
+    expect((await stored('RangeTest'))?.enabled).toBe(true);
     expect((await stored('BadPeers'))?.enabled).toBe(true);
   });
 
   it('should_never_enable_a_curated_list_that_needs_a_subscription', async () => {
-    await importCatalog([entry('level1', { subscription: true })]);
+    await importCatalog([entry('badpeers', { subscription: true })]);
 
-    expect((await stored('level1'))?.enabled).toBe(false);
+    expect((await stored('badpeers'))?.enabled).toBe(false);
   });
 
   it('should_skip_the_allow_list_whatever_its_case_and_count_it_in_the_total', async () => {
@@ -119,17 +128,17 @@ describe('ImportBlocklistCatalog', () => {
   });
 
   it('should_refresh_the_url_and_subscription_but_keep_the_update_history_on_reimport', async () => {
-    await importCatalog([entry('level1')]);
-    const first = await stored('level1');
+    await importCatalog([entry('badpeers')]);
+    const first = await stored('badpeers');
     await blocklists.save(first!.recordSuccess('2026-07-24 10:00:00', 'abc123'));
 
     const report = await importCatalog([
-      entry('level1', { url: 'https://mirror.example.org/level1', subscription: true }),
+      entry('badpeers', { url: 'https://mirror.example.org/badpeers', subscription: true }),
     ]);
 
-    const after = await stored('level1');
+    const after = await stored('badpeers');
     expect(report).toEqual({ imported: 1, total: 1 });
-    expect(after?.url.value).toBe('https://mirror.example.org/level1');
+    expect(after?.url.value).toBe('https://mirror.example.org/badpeers');
     expect(after?.subscription).toBe(true);
     expect(after?.enabled).toBe(true);
     expect(after?.lastUpdate).toEqual({ status: 'ok', at: '2026-07-24 10:00:00' });
