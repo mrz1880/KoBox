@@ -302,12 +302,14 @@ export function renderMemberPortReservation(ports: readonly MemberPort[]): Rende
   };
 }
 
+export const KERNEL_TUNING_PATH = '/etc/sysctl.d/90-kobox.conf';
+
 // The seedbox-relevant subset of the legacy install/Tweaks — conservative
 // keys that apply in a privileged container too. No GRUB, no governor, no
 // fstab (brick territory).
 export function renderSysctlTweaks(): RenderedFile {
   return {
-    path: '/etc/sysctl.d/90-kobox.conf',
+    path: KERNEL_TUNING_PATH,
     content: [
       MANAGED_HEADER,
       'net.core.somaxconn = 1024',
