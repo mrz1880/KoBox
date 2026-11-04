@@ -386,6 +386,15 @@ describe('installation rendering', () => {
     expectGolden('sysctl.d-90-kobox.conf.golden', file.content);
   });
 
+  it('should_keep_the_kernel_from_lending_member_ports_to_outgoing_connections', () => {
+    // A member's ports sit inside the ephemeral range: while their rtorrent was
+    // down, an outgoing connection borrowed the torrent port and its TIME_WAIT
+    // kept rtorrent from binding it again for a whole minute.
+    expect(renderSysctlTweaks().content).toContain(
+      'net.ipv4.ip_local_reserved_ports = 45000-45999,51101-52100',
+    );
+  });
+
   it('should_render_the_trixie_apt_sources_in_deb822', () => {
     const sources = renderAptSources().find(
       (file) => file.path === '/etc/apt/sources.list.d/debian.sources',
