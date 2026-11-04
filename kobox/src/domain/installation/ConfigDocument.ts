@@ -171,6 +171,6 @@ const CATALOG: readonly ConfigDocument[] = [
     'sysctl-dropin',
     'Kernel tuning',
     '/etc/sysctl.d/90-kobox.conf',
-    'Network buffers and limits sized for many simultaneous transfers.',
+    'Network buffers and limits sized for many simultaneous transfers, and each member\'s rTorrent ports kept free so a restart gets them back at once.',
   ),
 ];

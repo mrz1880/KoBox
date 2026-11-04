@@ -725,8 +725,8 @@ const FR: Readonly<Record<string, string>> = {
   'Which resolver the box uses, and how its answers are validated.':
     'Quel résolveur la box utilise, et comment ses réponses sont validées.',
   'Kernel tuning': 'Réglages du noyau',
-  'Network buffers and limits sized for many simultaneous transfers.':
-    'Tampons réseau et limites dimensionnés pour de nombreux transferts simultanés.',
+  'Network buffers and limits sized for many simultaneous transfers, and each member\'s rTorrent ports kept free so a restart gets them back at once.':
+    'Tampons réseau et limites dimensionnés pour de nombreux transferts simultanés, et ports rTorrent de chaque membre gardés libres pour qu’un redémarrage les retrouve aussitôt.',
 
   // logs and updates
   'never captured': 'jamais capturé',
