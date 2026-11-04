@@ -821,7 +821,7 @@ describe('installation rendering: files without a golden', () => {
     // a `#` line is a syntax error in a php ini file
     for (const file of [...renderNextcloudPhp(), renderRutorrentPhpPool('alice')]) {
       expect(file.content.split('\n')[0], file.path).toBe(
-        '; KoBox-managed \u2014 DO NOT EDIT (rendered declaratively).',
+        '; KoBox-managed, DO NOT EDIT (rendered declaratively).',
       );
     }
   });

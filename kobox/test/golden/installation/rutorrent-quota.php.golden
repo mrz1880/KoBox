@@ -1,5 +1,5 @@
 <?php
-// KoBox-managed — DO NOT EDIT (rendered declaratively).
+// KoBox-managed, DO NOT EDIT (rendered declaratively).
 chdir('/var/www/rutorrent/plugins/diskspace');
 require_once '/var/www/rutorrent/php/util.php';
 $gauge = FileUtil::getProfilePath() . '/kobox-quota.json';

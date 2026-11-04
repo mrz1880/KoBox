@@ -1,4 +1,4 @@
-// KoBox-managed — DO NOT EDIT (rendered declaratively).
+// KoBox-managed, DO NOT EDIT (rendered declaratively).
 options {
     directory "/var/cache/bind";
     listen-on { 127.0.0.1; };

@@ -1,5 +1,5 @@
 <?php
-// KoBox-managed — DO NOT EDIT (rendered declaratively).
+// KoBox-managed, DO NOT EDIT (rendered declaratively).
 $topDirectory = '/home';
 $profilePath = '/var/lib/rutorrent';
 $profileMask = 0770;

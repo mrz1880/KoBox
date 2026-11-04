@@ -1,4 +1,4 @@
-;; KoBox-managed — DO NOT EDIT (rendered declaratively).
+;; KoBox-managed, DO NOT EDIT (rendered declaratively).
 [default]
 enabled = user-defined
 canChangeToolbar = yes

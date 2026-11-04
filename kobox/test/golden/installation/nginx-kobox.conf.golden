@@ -1,4 +1,4 @@
-# KoBox-managed — DO NOT EDIT (rendered declaratively).
+# KoBox-managed, DO NOT EDIT (rendered declaratively).
 server {
     listen 80;
     server_name _;

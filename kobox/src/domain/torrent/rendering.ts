@@ -1,4 +1,5 @@
 import { DomainError } from '../shared/DomainError.js';
+import { managedHeader } from '../shared/managedHeader.js';
 import { EventHook } from './EventHook.js';
 import { SessionDir } from './SessionDir.js';
 import type { TorrentInstance } from './TorrentInstance.js';
@@ -74,7 +75,7 @@ function renderRtorrentRc(instance: TorrentInstance, templates: RtorrentTemplate
     )
     .join('\n');
   return renderTemplate(templates.rtorrentRc, {
-    username: instance.username.value,
+    managed_header: managedHeader('#', `file for ${instance.username.value}`),
     home,
     session_dir: SessionDir.forHome(home).value,
     scgi_port: String(instance.scgiPort.value),
@@ -101,7 +102,7 @@ function renderWatchRc(instance: TorrentInstance, templates: RtorrentTemplates):
     .map((dir, index) => watchSchedule(dir, index, home))
     .join('\n');
   return renderTemplate(templates.watchRc, {
-    username: instance.username.value,
+    managed_header: managedHeader('#', `file for ${instance.username.value}`),
     schedules,
   });
 }
@@ -112,6 +113,7 @@ function renderShim(
   settings: RenderSettings,
 ): string {
   return renderTemplate(templates.eventShim, {
+    managed_header: managedHeader('#', 'shim'),
     kobox_bin: settings.koboxBin,
     event_type: hook.type,
     cli_args: shimCliArgs(hook),
@@ -156,6 +158,7 @@ export function renderHomeFiles(
 
 export function renderUnit(instance: TorrentInstance, templates: RtorrentTemplates): string {
   return renderTemplate(templates.systemdUnit, {
+    managed_header: managedHeader('#', 'unit'),
     username: instance.username.value,
     home: homeOf(instance.username),
   });

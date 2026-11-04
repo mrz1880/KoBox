@@ -1,4 +1,4 @@
-# KoBox-managed — DO NOT EDIT (rendered declaratively).
+# KoBox-managed, DO NOT EDIT (rendered declaratively).
 location = /RPC-ALICE {
     auth_request /internal/auth/rpc;
     include scgi_params;

@@ -1,4 +1,5 @@
 #!/bin/sh
-# KoBox-managed shim — DO NOT EDIT. Zero logic here by design: behavior
-# flags live in the KoBox database, handling happens in the root worker.
+{{managed_header}}
+# Zero logic here by design: behavior flags live in the KoBox database,
+# handling happens in the root worker.
 exec {{kobox_bin}} torrent-event {{event_type}} {{cli_args}}

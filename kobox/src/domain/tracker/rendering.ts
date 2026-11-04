@@ -1,4 +1,5 @@
 import type { RenderedFile } from '../shared/files.js';
+import { managedHeader } from '../shared/managedHeader.js';
 import type { Username } from '../user/Username.js';
 import type { Tracker } from './Tracker.js';
 import { homeOf } from '../user/homeDirectory.js';
@@ -83,7 +84,7 @@ export function renderUserBlocklistDropin(username: Username, enabled: boolean):
   return {
     path: `${home}/${CONFIG_DROP_IN_TREE}/80-blocklist.rc`,
     content: [
-      `# KoBox-managed file for ${username.value} — DO NOT EDIT.`,
+      managedHeader('#', `file for ${username.value}`),
       ...body,
       '',
     ].join('\n'),
