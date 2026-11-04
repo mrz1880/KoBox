@@ -41,9 +41,9 @@ const BLOCKED_NAMES = '/etc/dnscrypt-proxy/blocked-names.txt';
 
 const CATALOG_XML = `<lists>
 <list>
- <name>level1</name>
+ <name>badpeers</name>
  <author>Example Org</author>
- <list>fixturelevel1id00000</list>
+ <list>fixturebadpeers00000</list>
  <subscription>false</subscription>
 </list>
 </lists>
@@ -135,7 +135,7 @@ describe.skipIf(!onDebianAsRoot)('E2E: tracker discovery, certs, whitelist and b
           response.end(CATALOG_XML);
           return;
         }
-        if (request.url?.startsWith('/?list=fixturelevel1id00000')) {
+        if (request.url?.startsWith('/?list=fixturebadpeers00000')) {
           response.writeHead(200);
           response.end(LIST_GZ);
           return;
@@ -242,20 +242,20 @@ describe.skipIf(!onDebianAsRoot)('E2E: tracker discovery, certs, whitelist and b
   it('should_flow_verified_blocklists_into_a_filter_a_real_rtorrent_parses', async () => {
     kobox(['import-blocklist-catalog']);
     await drainQueue();
-    const imported = dbRow('SELECT * FROM blocklists WHERE name = ?', 'level1');
+    const imported = dbRow('SELECT * FROM blocklists WHERE name = ?', 'badpeers');
     expect(imported?.enabled).toBe(1); // curated default
     expect(String(imported?.url)).toContain('list.iblocklist.com'); // catalog URL rewritten https
     // point the download at the local fixture (operator-editable URL in DB)
     dbRun(
       'UPDATE blocklists SET url = ? WHERE name = ?',
-      `https://${LISTS_HOST}:${String(LISTS_PORT)}/?list=fixturelevel1id00000&fileformat=p2p&archiveformat=gz`,
-      'level1',
+      `https://${LISTS_HOST}:${String(LISTS_PORT)}/?list=fixturebadpeers00000&fileformat=p2p&archiveformat=gz`,
+      'badpeers',
     );
 
     kobox(['update-blocklists']);
     await drainQueue(); // update + chained render-blocklist-filters
 
-    const updated = dbRow('SELECT * FROM blocklists WHERE name = ?', 'level1');
+    const updated = dbRow('SELECT * FROM blocklists WHERE name = ?', 'badpeers');
     expect(updated?.last_update_status).toBe('ok');
     expect(String(updated?.sha256)).toHaveLength(64);
     const filter = readFileSync(join(HOME, 'blocklist/blocklist_rtorrent.txt'), 'utf8');
@@ -284,7 +284,7 @@ describe.skipIf(!onDebianAsRoot)('E2E: tracker discovery, certs, whitelist and b
     kobox(['update-blocklists']);
     await drainQueue(); // must stay green: failure is isolated, not fatal
 
-    const row = dbRow('SELECT * FROM blocklists WHERE name = ?', 'level1');
+    const row = dbRow('SELECT * FROM blocklists WHERE name = ?', 'badpeers');
     expect(row?.last_update_status).toBe('failed');
     expect(String(row?.sha256)).toHaveLength(64); // last good hash kept
     expect(readFileSync(join(HOME, 'blocklist/blocklist_rtorrent.txt'), 'utf8')).toBe(
