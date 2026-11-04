@@ -1,4 +1,5 @@
-# KoBox-managed unit — DO NOT EDIT: rendered declaratively, re-applied idempotently.
+# KoBox-managed unit, DO NOT EDIT (rendered declaratively).
+# Re-applied idempotently: manual edits are overwritten.
 [Unit]
 Description=KoBox rTorrent instance for alice
 After=network-online.target

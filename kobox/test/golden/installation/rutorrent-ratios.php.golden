@@ -1,5 +1,5 @@
 <?php
-// KoBox-managed — DO NOT EDIT (rendered declaratively).
+// KoBox-managed, DO NOT EDIT (rendered declaratively).
 if (!is_file('/var/www/rutorrent/plugins/ratio/ratio.php')) {
   exit(0);
 }

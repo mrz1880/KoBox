@@ -1,4 +1,4 @@
-# KoBox-managed OpenVPN client profile for alice (tun-gw) — DO NOT EDIT.
+# KoBox-managed OpenVPN client profile for alice (tun-gw), DO NOT EDIT (rendered declaratively).
 client
 remote seedbox.example.org 8193
 proto udp4

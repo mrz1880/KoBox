@@ -1,4 +1,4 @@
-# KoBox-managed OpenVPN server (tap) — DO NOT EDIT (rendered declaratively).
+# KoBox-managed OpenVPN server (tap), DO NOT EDIT (rendered declaratively).
 port 8195
 proto udp4
 dev tap

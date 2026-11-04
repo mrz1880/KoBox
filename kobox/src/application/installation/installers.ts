@@ -69,6 +69,7 @@ import {
   vpnClientAddressDir,
 } from '../../domain/security/vpn.js';
 import type { ManagedFilesPort, RenderedFile } from '../../domain/shared/files.js';
+import { MANAGED_MARK } from '../../domain/shared/managedHeader.js';
 import type { SecuritySettings } from '../security/settings.js';
 
 export interface InstallSettings {
@@ -495,7 +496,7 @@ class RutorrentInstaller implements ComponentInstaller {
     const marker = await host.readFile(RUTORRENT_MARKER);
     // earlier KoBox versions replaced ruTorrent's own config.php: put it back
     const ownConfig = await host.readFile(RUTORRENT_OWN_CONFIG);
-    const overwritten = ownConfig?.includes('KoBox-managed') === true;
+    const overwritten = ownConfig?.includes(MANAGED_MARK) === true;
     if (marker?.trim() !== install.rutorrentSha256 || overwritten) {
       await artifacts.fetchVerified(install.rutorrentUrl, install.rutorrentSha256, RUTORRENT_ARCHIVE);
       await host.ensureDir(RUTORRENT_DIR, '0755');

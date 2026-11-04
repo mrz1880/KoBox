@@ -879,24 +879,30 @@ describe('rutorrent installer', () => {
     expect(world.systemd.log).toContain('enable-now php8.4-fpm');
   });
 
-  it('should_restore_rutorrents_own_config_where_kobox_once_overwrote_it', async () => {
-    // earlier versions replaced config.php with a few lines of their own, and
-    // the throttle plugin died on a default that file no longer held
-    await installer(world, 'rutorrent').install();
-    await world.host.ensureFile({
-      path: '/var/www/rutorrent/conf/config.php',
-      content: '<?php\n// KoBox-managed: DO NOT EDIT\n$scgi_port = 5000;\n',
-      mode: '0640',
-      owner: 'root',
-      group: 'www-data',
-    });
+  it.each([
+    ['an em dash', '// KoBox-managed \u2014 DO NOT EDIT (rendered declaratively).'],
+    ['a comma', '// KoBox-managed, DO NOT EDIT (rendered declaratively).'],
+  ])(
+    'should_restore_rutorrents_own_config_where_kobox_once_overwrote_it_with_%s_in_its_header',
+    async (_wording, header) => {
+      // earlier versions replaced config.php with a few lines of their own, and
+      // the throttle plugin died on a default that file no longer held
+      await installer(world, 'rutorrent').install();
+      await world.host.ensureFile({
+        path: '/var/www/rutorrent/conf/config.php',
+        content: `<?php\n${header}\n$scgi_port = 5000;\n`,
+        mode: '0640',
+        owner: 'root',
+        group: 'www-data',
+      });
 
-    await installer(world, 'rutorrent').install();
+      await installer(world, 'rutorrent').install();
 
-    // fetched and extracted again, though the pinned release did not change
-    expect(world.host.fetched).toHaveLength(2);
-    expect(world.host.extracted).toHaveLength(2);
-  });
+      // fetched and extracted again, though the pinned release did not change
+      expect(world.host.fetched).toHaveLength(2);
+      expect(world.host.extracted).toHaveLength(2);
+    },
+  );
 
   it('should_fetch_verify_extract_once_and_render_the_global_config', async () => {
     await installer(world, 'rutorrent').install();

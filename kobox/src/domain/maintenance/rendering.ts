@@ -1,4 +1,5 @@
 import type { RenderedFile } from '../shared/files.js';
+import { managedHeader } from '../shared/managedHeader.js';
 import { SCHEDULED_JOBS } from './schedule.js';
 
 export interface CronRenderSettings {
@@ -26,7 +27,7 @@ export function renderKoboxCommand(settings: {
     path: settings.koboxBin,
     content: [
       '#!/bin/sh',
-      '# KoBox-managed file, DO NOT EDIT (rendered declaratively).',
+      managedHeader('#', 'file'),
       `exec ${settings.nodeBin} ${settings.currentLink}/dist/interfaces/cli/main.js "$@"`,
       '',
     ].join('\n'),

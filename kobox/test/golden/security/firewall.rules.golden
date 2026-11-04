@@ -1,4 +1,4 @@
-# KoBox-managed firewall — DO NOT EDIT (rendered declaratively).
+# KoBox-managed firewall, DO NOT EDIT (rendered declaratively).
 # Applied atomically via iptables-restore; blocklist lives in the kobox-bl ipset.
 *filter
 :INPUT DROP [0:0]

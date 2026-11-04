@@ -1,4 +1,4 @@
-# KoBox-managed — DO NOT EDIT (rendered declaratively).
+# KoBox-managed, DO NOT EDIT (rendered declaratively).
 [Unit]
 Description=KoBox SSR portal (non-privileged web interface)
 After=network.target kobox-worker.service

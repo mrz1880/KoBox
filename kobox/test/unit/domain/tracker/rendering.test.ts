@@ -231,7 +231,7 @@ describe('tracker rendering boundaries', () => {
     const file = renderUserBlocklistDropin(Username.parse('alice'), false);
     expect(file.content).toBe(
       [
-        '# KoBox-managed file for alice \u2014 DO NOT EDIT.',
+        '# KoBox-managed file for alice, DO NOT EDIT (rendered declaratively).',
         '# No blocklist enabled \u2014 this drop-in is intentionally inert.',
         '',
       ].join('\n'),

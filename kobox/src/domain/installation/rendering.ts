@@ -11,13 +11,14 @@ import {
 import { PORTAL_USER_VARIABLE } from './NextcloudPort.js';
 import { DomainError } from '../shared/DomainError.js';
 import type { RenderedFile } from '../shared/files.js';
+import { managedHeader } from '../shared/managedHeader.js';
 import { HOME_BASE, homeOf } from '../user/homeDirectory.js';
 import { reservedPortsValue, type MemberPort } from '../user/memberPortReservation.js';
 import { WatchDir } from '../torrent/WatchDir.js';
 import type { AccountIds } from '../security/ports.js';
 import type { Username } from '../user/Username.js';
 
-const MANAGED_HEADER = '# KoBox-managed — DO NOT EDIT (rendered declaratively).';
+const MANAGED_HEADER = managedHeader('#');
 
 export interface WorkerUnitSettings {
   readonly nodeBin: string;
@@ -688,7 +689,7 @@ export function renderRutorrentUserConfig(user: RutorrentUserWiring): RenderedFi
     path: `${rutorrentUserConfigDir(user.username)}/config.php`,
     content: [
       '<?php',
-      '// KoBox-managed — DO NOT EDIT (rendered declaratively).',
+      managedHeader('//'),
       `$scgi_port = ${String(user.scgiPort)};`,
       "$scgi_host = '127.0.0.1';",
       `$XMLRPCMountPoint = '/RPC-${user.username.toUpperCase()}';`,
@@ -723,7 +724,7 @@ export function renderRutorrentUserConfig(user: RutorrentUserWiring): RenderedFi
 export function renderNextcloudPhp(): readonly RenderedFile[] {
   const file = (path: string, lines: readonly string[]): RenderedFile => ({
     path,
-    content: [`;${MANAGED_HEADER.slice(1)}`, ...lines, ''].join('\n'),
+    content: [managedHeader(';'), ...lines, ''].join('\n'),
     mode: '0644',
     owner: 'root',
     group: 'root',
@@ -742,7 +743,7 @@ export function renderRutorrentPhpPool(member: string): RenderedFile {
   return {
     path: `${RUTORRENT_POOL_DIR}/${pool}.conf`,
     content: [
-      `;${MANAGED_HEADER.slice(1)}`,
+      managedHeader(';'),
       `[${pool}]`,
       `user = ${member}`,
       `group = ${member}`,
@@ -847,7 +848,7 @@ export function renderNextcloudSite(): RenderedFile {
 export function renderCertbotDeployHook(): RenderedFile {
   return {
     path: '/etc/letsencrypt/renewal-hooks/deploy/kobox-nginx',
-    content: ['#!/bin/sh', '# KoBox-managed — DO NOT EDIT (rendered declaratively).', 'systemctl reload nginx', ''].join('\n'),
+    content: ['#!/bin/sh', MANAGED_HEADER, 'systemctl reload nginx', ''].join('\n'),
     mode: '0755',
     owner: 'root',
     group: 'root',
@@ -886,7 +887,7 @@ export function renderRutorrentQuotaAnswer(): RenderedFile {
     path: RUTORRENT_QUOTA_ANSWER,
     content: [
       '<?php',
-      '// KoBox-managed — DO NOT EDIT (rendered declaratively).',
+      managedHeader('//'),
       `chdir('${RUTORRENT_DIR}/plugins/diskspace');`,
       `require_once '${RUTORRENT_DIR}/php/util.php';`,
       "$gauge = FileUtil::getProfilePath() . '/kobox-quota.json';",
@@ -911,7 +912,7 @@ export function renderRutorrentConfig(): RenderedFile {
     path: `${RUTORRENT_DIR}/conf/config.local.php`,
     content: [
       '<?php',
-      '// KoBox-managed — DO NOT EDIT (rendered declaratively).',
+      managedHeader('//'),
       `$topDirectory = '${HOME_BASE}';`,
       `$profilePath = '${RUTORRENT_PROFILE_DIR}';`,
       // a member's profile folders: them and the web server, nobody else
@@ -957,7 +958,7 @@ export function renderRutorrentRatioOffer(): RenderedFile {
     path: '/usr/local/share/kobox/rutorrent-ratios.php',
     content: [
       '<?php',
-      '// KoBox-managed — DO NOT EDIT (rendered declaratively).',
+      managedHeader('//'),
       // a ruTorrent release without its ratio plugin: nothing to offer
       `if (!is_file('${RUTORRENT_DIR}/plugins/ratio/ratio.php')) {`,
       '  exit(0);',
@@ -995,7 +996,7 @@ export function renderRutorrentDefaultTheme(): RenderedFile {
     path: `${RUTORRENT_DIR}/plugins/theme/conf.local.php`,
     content: [
       '<?php',
-      '// KoBox-managed — DO NOT EDIT (rendered declaratively).',
+      managedHeader('//'),
       `$defaultTheme = "${DEFAULT_RUTORRENT_THEME}";`,
       '',
     ].join('\n'),
@@ -1017,7 +1018,7 @@ export function renderRutorrentPortCheck(): RenderedFile {
     path: `${RUTORRENT_DIR}/plugins/check_port/conf.local.php`,
     content: [
       '<?php',
-      '// KoBox-managed, DO NOT EDIT (rendered declaratively).',
+      managedHeader('//'),
       `$useWebsiteIPv4 = "${first}";`,
       `$failoverProvidersIPv4 = [${failover.map((name) => `"${name}"`).join(', ')}];`,
       '',
@@ -1042,7 +1043,7 @@ export function renderRutorrentPlugins(): RenderedFile {
   return {
     path: `${RUTORRENT_DIR}/conf/plugins.ini`,
     content: [
-      ';; KoBox-managed — DO NOT EDIT (rendered declaratively).',
+      managedHeader(';;'),
       '[default]',
       'enabled = user-defined',
       'canChangeToolbar = yes',
@@ -1068,7 +1069,7 @@ export function renderBindLocal(): RenderedFile {
   return {
     path: '/etc/bind/named.conf.local',
     content: [
-      '// KoBox-managed — DO NOT EDIT (rendered declaratively).',
+      managedHeader('//'),
       'include "/etc/bind/kobox.zones.blacklists";',
       '',
     ].join('\n'),
@@ -1100,7 +1101,7 @@ export function renderBindOptions(settings: BindOptionsSettings): RenderedFile {
   return {
     path: '/etc/bind/named.conf.options',
     content: [
-      '// KoBox-managed — DO NOT EDIT (rendered declaratively).',
+      managedHeader('//'),
       'options {',
       '    directory "/var/cache/bind";',
       '    listen-on { 127.0.0.1; };',
@@ -1124,7 +1125,7 @@ export function renderDnscryptSocketDropIn(): RenderedFile {
   return {
     path: '/etc/systemd/system/dnscrypt-proxy.socket.d/90-kobox.conf',
     content: [
-      '# KoBox-managed — DO NOT EDIT (rendered declaratively).',
+      MANAGED_HEADER,
       '[Socket]',
       'ListenStream=',
       'ListenDatagram=',
@@ -1144,7 +1145,7 @@ export function renderDnscryptConfig(): RenderedFile {
   return {
     path: '/etc/dnscrypt-proxy/dnscrypt-proxy.toml',
     content: [
-      '# KoBox-managed — DO NOT EDIT (rendered declaratively).',
+      MANAGED_HEADER,
       // socket activation: systemd binds the port and hands it over
       'listen_addresses = []',
       "server_names = ['cloudflare']",

@@ -1,2 +1,2 @@
-# KoBox-managed — DO NOT EDIT (rendered declaratively).
+# KoBox-managed, DO NOT EDIT (rendered declaratively).
 net.ipv4.ip_local_reserved_ports = 45000-45001,51101-51102

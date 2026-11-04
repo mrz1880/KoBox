@@ -1,6 +1,7 @@
 import { NGINX_ACCESS_LOG } from '../installation/platform.js';
 import { HTTPS_PORT, NFS_MOUNTD_PORT, SAMBA_PORT } from '../installation/rendering.js';
 import type { RenderedFile } from '../shared/files.js';
+import { managedHeader } from '../shared/managedHeader.js';
 import type { IpAddress } from '../shared/IpAddress.js';
 import type { FirewallPolicy, FirewallUser } from './FirewallPolicy.js';
 
@@ -109,7 +110,7 @@ export function renderFirewallRules(policy: FirewallPolicy): RenderedFile {
   return {
     path: '/etc/kobox/firewall.rules',
     content: [
-      '# KoBox-managed firewall — DO NOT EDIT (rendered declaratively).',
+      managedHeader('#', 'firewall'),
       '# Applied atomically via iptables-restore; blocklist lives in the kobox-bl ipset.',
       ...filter,
       '',
@@ -141,7 +142,7 @@ export function renderFail2banJails(
   return {
     path: '/etc/fail2ban/jail.d/kobox.local',
     content: [
-      '# KoBox-managed fail2ban jails — DO NOT EDIT (rendered declaratively).',
+      managedHeader('#', 'fail2ban jails'),
       '# backend is set per-jail (not in DEFAULT): the journald backend fits',
       '# the ssh jails only — nginx jails keep their file-based default.',
       '[DEFAULT]',

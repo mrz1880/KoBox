@@ -1,4 +1,4 @@
-# KoBox-managed — DO NOT EDIT (rendered declaratively).
+# KoBox-managed, DO NOT EDIT (rendered declaratively).
 [Unit]
 Description=KoBox firewall restore at boot
 ConditionPathExists=/etc/kobox/firewall.rules

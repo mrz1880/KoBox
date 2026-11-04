@@ -1,4 +1,4 @@
-# KoBox-managed fail2ban jails — DO NOT EDIT (rendered declaratively).
+# KoBox-managed fail2ban jails, DO NOT EDIT (rendered declaratively).
 # backend is set per-jail (not in DEFAULT): the journald backend fits
 # the ssh jails only — nginx jails keep their file-based default.
 [DEFAULT]

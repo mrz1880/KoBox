@@ -1,4 +1,4 @@
-# KoBox-managed — DO NOT EDIT (rendered declaratively).
+# KoBox-managed, DO NOT EDIT (rendered declaratively).
 location = /.well-known/carddav { return 301 /nextcloud/remote.php/dav/; }
 location = /.well-known/caldav { return 301 /nextcloud/remote.php/dav/; }
 location ^~ /.well-known/ { return 301 /nextcloud/index.php$request_uri; }

@@ -1,4 +1,5 @@
 import type { RenderedFile } from '../shared/files.js';
+import { managedHeader } from '../shared/managedHeader.js';
 import type { Username } from '../user/Username.js';
 import type { VpnHost } from '../user/VpnHost.js';
 import type { Cidr } from './Cidr.js';
@@ -89,7 +90,7 @@ export function renderOpenVpnServer(
   return {
     path: `/etc/openvpn/server/kobox-${variant}.conf`,
     content: [
-      `# KoBox-managed OpenVPN server (${variant}) — DO NOT EDIT (rendered declaratively).`,
+      managedHeader('#', `OpenVPN server (${variant})`),
       `port ${String(portOf(variant, vpn))}`,
       'proto udp4',
       `dev ${shape.dev}`,
@@ -131,7 +132,7 @@ export function renderOpenVpnClientAddress(
   return {
     path: `${vpnClientAddressDir(variant)}/${username.value}`,
     content: [
-      `# KoBox-managed address of ${username.value} in the ${variant} tunnel. DO NOT EDIT.`,
+      managedHeader('#', `address of ${username.value} in the ${variant} tunnel`),
       `ifconfig-push ${subnet.addressOf(host)} ${subnet.netmask}`,
       '',
     ].join('\n'),
@@ -153,7 +154,7 @@ export function renderOpenVpnClientProfile(
   return {
     path: `${VPN_PROFILES_BASE}/${username.value}/kobox-${variant}.ovpn`,
     content: [
-      `# KoBox-managed OpenVPN client profile for ${username.value} (${variant}) — DO NOT EDIT.`,
+      managedHeader('#', `OpenVPN client profile for ${username.value} (${variant})`),
       'client',
       `remote ${remote.value} ${String(portOf(variant, vpn))}`,
       'proto udp4',

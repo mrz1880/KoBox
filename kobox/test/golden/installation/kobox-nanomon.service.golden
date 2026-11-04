@@ -1,4 +1,4 @@
-# KoBox-managed — DO NOT EDIT (rendered declaratively).
+# KoBox-managed, DO NOT EDIT (rendered declaratively).
 [Unit]
 Description=KoBox host monitoring (NanoMon)
 After=network.target
