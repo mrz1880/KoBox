@@ -9,7 +9,7 @@ import { FakeIblocklistCatalog } from '../../../../src/infrastructure/system/fak
 const AUTHOR = 'Example Org';
 const iblocklist = BlocklistSource.parse('iblocklist');
 
-// The legacy funcs_PeerGuardian enable set, as the catalog spells the names.
+// The protective lists enabled on a first import, as the catalog spells the names.
 const CURATED = [
   'cruzit',
   'malc0de',
@@ -20,6 +20,11 @@ const CURATED = [
   'microsoft',
   'rangetest',
   'pedophiles',
+] as const;
+
+// MySB also enabled whole countries; on a real box they cut off most peers
+// (seedboxes in Germany, Finland, the United States, the United Kingdom).
+const COUNTRIES = [
   'china',
   'russia',
   'australia',
@@ -68,7 +73,15 @@ async function stored(name: string): Promise<Blocklist | undefined> {
 }
 
 describe('ImportBlocklistCatalog', () => {
-  it('should_enable_every_list_of_the_legacy_curated_set_on_first_import', async () => {
+  it('should_leave_every_country_list_off_on_first_import', async () => {
+    await importCatalog(COUNTRIES.map((name) => entry(name)));
+
+    for (const name of COUNTRIES) {
+      expect({ name, enabled: (await stored(name))?.enabled }).toEqual({ name, enabled: false });
+    }
+  });
+
+  it('should_enable_every_protective_list_on_first_import', async () => {
     await importCatalog(CURATED.map((name) => entry(name)));
 
     for (const name of CURATED) {
@@ -77,10 +90,10 @@ describe('ImportBlocklistCatalog', () => {
   });
 
   it('should_recognise_a_curated_list_whatever_its_case', async () => {
-    await importCatalog([entry('Level1'), entry('United States')]);
+    await importCatalog([entry('Level1'), entry('BadPeers')]);
 
     expect((await stored('Level1'))?.enabled).toBe(true);
-    expect((await stored('United States'))?.enabled).toBe(true);
+    expect((await stored('BadPeers'))?.enabled).toBe(true);
   });
 
   it('should_never_enable_a_curated_list_that_needs_a_subscription', async () => {
