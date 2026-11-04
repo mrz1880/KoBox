@@ -12,7 +12,6 @@ import { PORTAL_USER_VARIABLE } from './NextcloudPort.js';
 import { DomainError } from '../shared/DomainError.js';
 import type { RenderedFile } from '../shared/files.js';
 import { HOME_BASE, homeOf } from '../user/homeDirectory.js';
-import { MEMBER_PORT_POOLS } from '../user/memberPortPools.js';
 import { reservedPortsValue, type MemberPort } from '../user/memberPortReservation.js';
 import { WatchDir } from '../torrent/WatchDir.js';
 import type { AccountIds } from '../security/ports.js';
@@ -315,10 +314,6 @@ export function renderSysctlTweaks(): RenderedFile {
       'net.core.wmem_max = 16777216',
       'net.ipv4.tcp_fin_timeout = 15',
       'net.ipv4.tcp_tw_reuse = 1',
-      // never hand a member's port out as the source of an outgoing connection
-      `net.ipv4.ip_local_reserved_ports = ${MEMBER_PORT_POOLS.map(
-        (pool) => `${String(pool.first)}-${String(pool.last)}`,
-      ).join(',')}`,
       'fs.inotify.max_user_watches = 524288',
       'fs.inotify.max_user_instances = 1024',
       '',

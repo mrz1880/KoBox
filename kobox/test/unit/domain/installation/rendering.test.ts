@@ -388,13 +388,11 @@ describe('installation rendering', () => {
     expectGolden('sysctl.d-90-kobox.conf.golden', file.content);
   });
 
-  it('should_keep_the_kernel_from_lending_member_ports_to_outgoing_connections', () => {
-    // A member's ports sit inside the ephemeral range: while their rtorrent was
-    // down, an outgoing connection borrowed the torrent port and its TIME_WAIT
-    // kept rtorrent from binding it again for a whole minute.
-    expect(renderSysctlTweaks().content).toContain(
-      'net.ipv4.ip_local_reserved_ports = 45000-45999,51101-52100',
-    );
+  it('should_leave_the_port_reservation_to_the_members_own_drop_in', () => {
+    // v1.0.62 reserved two fixed blocks here, which missed ports kept from a
+    // MySB import; the reservation now lives in one file, rendered from the
+    // ports ledger. The file is rewritten whole, so an upgrade drops the line.
+    expect(renderSysctlTweaks().content).not.toContain('ip_local_reserved_ports');
   });
 
   it('should_reserve_exactly_the_members_ports_in_a_drop_in_of_their_own', () => {

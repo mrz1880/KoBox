@@ -50,6 +50,7 @@ import {
   renderSmbConf,
   renderSshdDropin,
   renderSysctlTweaks,
+  MEMBER_PORT_RESERVATION_PATH,
   renderWorkerEnv,
   renderWorkerUnit,
   type NginxVhostSettings,
@@ -359,6 +360,8 @@ class TweaksInstaller implements ComponentInstaller {
 
   async uninstall(): Promise<void> {
     await this.ctx.host.removeFile(SYSCTL_DROPIN);
+    // rendered by the reserve-member-ports job, but kernel tuning all the same
+    await this.ctx.host.removeFile(MEMBER_PORT_RESERVATION_PATH);
     await this.ctx.host.applySysctl();
   }
 }
