@@ -104,6 +104,8 @@ import { FakeRutorrentProfiles } from '../../../src/infrastructure/system/fakes/
 import { FakeNextcloud } from '../../../src/infrastructure/system/fakes/FakeNextcloud.js';
 import { InMemoryComponentRegistry } from '../../../src/infrastructure/persistence/InMemoryComponentRegistry.js';
 import { ComponentName } from '../../../src/domain/installation/ComponentName.js';
+import { MEMBER_PORT_RESERVATION_PATH } from '../../../src/domain/installation/rendering.js';
+import { FakeKernelSettings } from '../../../src/infrastructure/system/fakes/FakeKernelSettings.js';
 
 class InMemoryJobQueue implements JobQueuePort {
   private readonly rows: { id: number; job: Job; status: string; error?: string }[] = [];
@@ -125,6 +127,10 @@ class InMemoryJobQueue implements JobQueuePort {
     );
     if (existing) return Promise.resolve(undefined);
     return this.enqueue(job);
+  }
+
+  pendingTypes(): readonly string[] {
+    return this.rows.filter((r) => r.status === 'pending').map((r) => r.job.type);
   }
 
   claimNextPending(): Promise<ClaimedJob | undefined> {
@@ -209,6 +215,8 @@ interface World {
   passwords: FakePasswordCipher;
   samba: FakeServiceLogin;
   credentials: InMemoryPortalCredentialsRepository;
+  kernel: FakeKernelSettings;
+  kernelFiles: FakeRtorrentConfig;
 }
 
 class RecordingMailTransport {
@@ -288,6 +296,8 @@ beforeEach(() => {
   const spacePreferences = new InMemorySpacePreferenceRepository();
   const seedRule = new InMemorySeedRuleRepository();
   const quotaGauges = new FakeQuotaGauges();
+  const kernel = new FakeKernelSettings();
+  const kernelFiles = new FakeRtorrentConfig();
   const spaceUseCases = buildSpaceUseCases({
     instances,
     torrents: memberTorrents,
@@ -341,6 +351,13 @@ beforeEach(() => {
     credentials,
     sessions,
     clock: () => '2026-07-25 10:00:00',
+    // the ledger holds exactly the ports of the members the repository knows
+    portLedger: {
+      listAllocated: async () =>
+        (await repo.listAll()).flatMap((user) => [user.scgiPort, user.rtorrentPort]),
+    },
+    files: kernelFiles,
+    kernel,
     allocator: {
       allocateScgiPort: () =>
         import('../../../src/domain/user/Port.js').then((m) => m.ScgiPort.parse(nextScgi++)),
@@ -495,6 +512,8 @@ beforeEach(() => {
   });
   const warnings: World['warnings'] = [];
   world = {
+    kernel,
+    kernelFiles,
     nextcloud,
     components,
     credentials,
@@ -653,6 +672,31 @@ describe('CLI enqueue -> root worker loop (the privilege seam)', () => {
     await world.worker.drain();
 
     expect(world.nextcloud.deleted).toContain('alice');
+  });
+
+  it('should_reserve_a_new_members_ports_before_their_rtorrent_first_starts', async () => {
+    await enqueueCreateAlice();
+
+    await world.worker.processNext();
+
+    expect(world.queue.pendingTypes()[0]).toBe('reserve-member-ports');
+    await world.worker.drain();
+    expect(world.kernelFiles.contentAt(MEMBER_PORT_RESERVATION_PATH)).toContain(
+      'net.ipv4.ip_local_reserved_ports = 45000,51101',
+    );
+    expect(world.kernel.loaded).toEqual([MEMBER_PORT_RESERVATION_PATH]);
+  });
+
+  it('should_hand_a_deleted_members_ports_back_to_the_kernel', async () => {
+    await enqueueCreateAlice();
+    await world.worker.drain();
+    await world.queue.enqueue(buildJob.deleteUser({ username: 'alice' }));
+
+    await world.worker.drain();
+
+    const lines = world.kernelFiles.contentAt(MEMBER_PORT_RESERVATION_PATH)?.split('\n');
+    expect(lines).toContain('net.ipv4.ip_local_reserved_ports =');
+    expect(world.kernel.loaded).toHaveLength(2);
   });
 
   it('should_chain_deprovisioning_after_delete_user', async () => {

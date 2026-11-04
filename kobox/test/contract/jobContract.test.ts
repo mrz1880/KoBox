@@ -71,6 +71,7 @@ describe('job contract', () => {
       'set-automatic-cleanup',
       'set-seed-rule',
       'set-own-seed-rule',
+      'reserve-member-ports',
     ]);
   });
 
@@ -124,6 +125,11 @@ describe('job contract', () => {
     expect(parseJob('render-rutorrent-users', {}).type).toBe('render-rutorrent-users');
     expect(parseJob('render-nfs-exports', {}).type).toBe('render-nfs-exports');
     expect(() => parseJob('render-rutorrent-users', { extra: 1 })).toThrow();
+  });
+
+  it('should_parse_the_member_port_reservation_job_without_payload', () => {
+    expect(parseJob('reserve-member-ports', {}).type).toBe('reserve-member-ports');
+    expect(() => parseJob('reserve-member-ports', { port: 45000 })).toThrow();
   });
 
   it('should_parse_maintenance_jobs', () => {

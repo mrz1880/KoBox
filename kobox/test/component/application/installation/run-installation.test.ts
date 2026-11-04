@@ -144,6 +144,8 @@ describe('RunInstallation', () => {
       'render-nfs-exports',
       // and each member's ruTorrent wiring, profile folder included
       'render-rutorrent-users',
+      // and the kernel's hold on their ports, which earlier releases did not render
+      'reserve-member-ports',
     ]);
     expect(world.drained).toBe(1);
     expect((await world.registry.get(ComponentName.parse('sshd')))?.state.value).toBe('installed');
@@ -272,6 +274,8 @@ describe('RunInstallation', () => {
       'render-nfs-exports',
       // and each member's ruTorrent wiring, profile folder included
       'render-rutorrent-users',
+      // and the kernel's hold on their ports, which earlier releases did not render
+      'reserve-member-ports',
     ]);
   });
 });

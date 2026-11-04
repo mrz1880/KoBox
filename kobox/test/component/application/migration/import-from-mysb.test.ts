@@ -288,6 +288,21 @@ describe('ImportFromMysb', () => {
       expect(mails[0]?.body).toContain('temp-secret-9x');
     });
 
+    it('should_reserve_an_imported_members_kept_ports_before_their_rtorrent_starts', async () => {
+      // the ports a member keeps from MySB may lie anywhere, not only in the pools
+      world = buildWorld(
+        new FakeMysbSource({ users: [{ ...aliceDto, scgiPort: 36001, rtorrentPort: 36000 }] }),
+      );
+
+      await world.importer.execute({ apply: true });
+
+      const jobTypes = world.queue.jobs.map((job) => job.type);
+      expect(jobTypes).toContain('reserve-member-ports');
+      expect(jobTypes.indexOf('reserve-member-ports')).toBeLessThan(
+        jobTypes.indexOf('provision-rtorrent'),
+      );
+    });
+
     it('should_import_trackers_and_blocklists', async () => {
       world = buildWorld(new FakeMysbSource({ trackers: [trackerDto], blocklists: [blocklistDto] }));
 

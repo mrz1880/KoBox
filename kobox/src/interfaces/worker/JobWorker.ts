@@ -108,6 +108,11 @@ export class JobWorker {
   // Cross-context coupling lives HERE, as chained jobs: User Management ->
   // Torrent Lifecycle, and Torrent/Tracker reports -> cert/whitelist/filters.
   private async chainAfter(job: Job, hints: ChainHints | undefined): Promise<void> {
+    // the ledger just gained or lost a member's ports: the kernel must keep
+    // exactly those, and has them before the new member's rtorrent first binds
+    if (job.type === 'create-user' || job.type === 'delete-user') {
+      await this.deps.queue.enqueueUnique(parseJob('reserve-member-ports', {}));
+    }
     if (job.type === 'create-user') {
       await this.deps.queue.enqueue(
         parseJob('provision-rtorrent', { username: job.payload.username }),
@@ -527,6 +532,9 @@ export class JobWorker {
         return;
       case 'render-nfs-exports':
         await this.deps.security.renderNfsExports.execute();
+        return;
+      case 'reserve-member-ports':
+        await this.deps.useCases.reserveMemberPorts.execute();
         return;
       case 'clean-up-space': {
         const username = Username.parse(job.payload.username);
