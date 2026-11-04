@@ -10,6 +10,7 @@ import { promisify } from 'node:util';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { ConfigDocument } from '../../src/domain/installation/ConfigDocument.js';
 import { renderNextcloudSite } from '../../src/domain/installation/rendering.js';
+import { waitForScgi } from './support/scgi.js';
 
 // The Phase 4 product: a fresh Debian 13 container becomes a full KoBox box
 // through bootstrap/install.sh alone, then `create user -> everything works`
@@ -26,6 +27,8 @@ const USER = 'inste2e';
 const FIXTURE_IP = '127.0.0.2';
 const ARTIFACT_HOST = 'lists.example.net';
 const ARTIFACT_PORT = 8446;
+// stands for the remote peer of an outgoing connection
+const PEER_FIXTURE_PORT = 8447;
 const INSTALL_TIMEOUT_MS = 900_000;
 // marker secret: must reach the root worker's env and NEVER the portal's
 const PORTAL_FORBIDDEN_SECRET = 'worker-only-secret-marker';
@@ -321,6 +324,74 @@ describe.skipIf(!onDebianAsRoot)('E2E: fresh Debian 13 -> bootstrap -> full stac
       expect(profile).toContain('BEGIN CERTIFICATE');
     },
     240_000,
+  );
+
+  it(
+    'should_bring_a_members_rtorrent_straight_back_after_an_outgoing_connection_used_its_port',
+    async () => {
+      // 2026-11-04, production: a member's rtorrent failed to restart for a
+      // minute with "Could not open/bind port for listening: Address already in
+      // use". While it was down, the kernel had lent its torrent port to an
+      // outgoing connection as an ephemeral source port, and that socket's
+      // TIME_WAIT blocked the bind. Narrowing the ephemeral range to the
+      // member's port alone makes the kernel pick it here too, unless the host
+      // keeps it reserved: then it has no port to lend and refuses the connect.
+      // (A wider range would not do: connect() prefers odd ports, and the
+      // member's may be even.)
+      const unit = `rtorrent-${USER}`;
+      const rc = readFileSync(`/home/${USER}/.rtorrent.rc`, 'utf8');
+      const torrentPort = Number(/network\.port_range\.set = (\d+)-/.exec(rc)?.[1]);
+      const scgiPort = Number(/network\.scgi\.open_port = 127\.0\.0\.1:(\d+)/.exec(rc)?.[1]);
+      const socketsOn = (port: number, state: string): string =>
+        sh('ss', ['-Htan', 'state', state, `( sport = :${String(port)} )`]).trim();
+
+      sh('systemctl', ['stop', unit]);
+      // sockets the old listener left keep the port bound, and the kernel
+      // never lends a bound port: start from a port nothing holds any more
+      await waitFor('a quiet torrent port', () => socketsOn(torrentPort, 'all') === '', 90_000);
+      const ephemeralRange = sh('sysctl', ['-n', 'net.ipv4.ip_local_port_range']).trim();
+      try {
+        sh('sysctl', [
+          '-qw',
+          `net.ipv4.ip_local_port_range=${String(torrentPort)} ${String(torrentPort)}`,
+        ]);
+        // the client closes first, so the TIME_WAIT lands on its source port
+        sh('python3', [
+          '-c',
+          [
+            'import socket',
+            // a fixed port: one taken from the narrowed range would starve the client
+            `server = socket.create_server(("${FIXTURE_IP}", ${String(PEER_FIXTURE_PORT)}))`,
+            'try:',
+            '    client = socket.create_connection(server.getsockname())',
+            'except OSError as refused:',
+            // EADDRNOTAVAIL: no port left to lend; anything else is a real failure
+            '    if refused.errno != 99:',
+            '        raise',
+            '    raise SystemExit(0)',
+            'peer, _ = server.accept()',
+            'client.close()',
+            'peer.recv(1)',
+            'peer.close()',
+            'server.close()',
+          ].join('\n'),
+        ]);
+      } finally {
+        sh('sysctl', ['-qw', `net.ipv4.ip_local_port_range=${ephemeralRange}`]);
+      }
+      sh('systemctl', ['start', unit]);
+
+      // rtorrent opens SCGI before it binds the torrent port, and a failed bind
+      // leaves SCGI up for an instant: wait on the torrent port itself
+      await waitFor(
+        'rtorrent listening for peers',
+        () => socketsOn(torrentPort, 'listening') !== '',
+        5_000,
+      );
+      await waitForScgi(scgiPort, 5_000);
+      expect(isActive(unit)).toBe(true);
+    },
+    120_000,
   );
 
   it('should_open_the_members_network_share_with_their_portal_password', async () => {
