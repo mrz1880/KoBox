@@ -17,7 +17,6 @@ import { TransferBatchSize } from '../../domain/sync/TransferBatchSize.js';
 import { ROLES, parseRole } from '../../domain/portal/Role.js';
 import { EmailAddress } from '../../domain/user/EmailAddress.js';
 import { Password } from '../../domain/user/Password.js';
-import { ProxyPort } from '../../domain/user/Port.js';
 import { Quota } from '../../domain/user/Quota.js';
 import { Username } from '../../domain/user/Username.js';
 import { RestoreBackup } from '../../application/maintenance/RestoreBackup.js';
@@ -99,18 +98,6 @@ program
     const { direct } = program.opts<GlobalOptions>();
     const password = await readPassword();
     const c = container();
-    if (direct) {
-      await c.useCases.createUser.execute({
-        username: Username.parse(username),
-        email: EmailAddress.parse(options.email ?? ''),
-        quota: Quota.gib(Number(options.quotaGib ?? '500')),
-        proxyPort: ProxyPort.parse(Number(options.proxyPort ?? '8080')),
-        password,
-        role: options.admin === undefined ? 'user' : 'admin',
-      });
-      await done(c, `user ${username} created`);
-      return;
-    }
     const job = await buildJob.createUser(
       {
         username,
@@ -122,6 +109,11 @@ program
       password,
       c.passwords,
     );
+    if (direct) {
+      await c.direct.run(job);
+      await done(c, `user ${username} created`);
+      return;
+    }
     const id = await c.queue.enqueue(job);
     await done(c, `job ${String(id)} enqueued: create-user ${username}`);
   });
@@ -174,11 +166,7 @@ const USERNAME_JOB_BUILDERS = {
   'render-rtorrent-config': (input: { username: string }) => buildJob.renderRtorrentConfig(input),
 } as const;
 
-function usernameCommand(
-  name: keyof typeof USERNAME_JOB_BUILDERS,
-  description: string,
-  run: (c: Container, username: Username) => Promise<void>,
-): void {
+function usernameCommand(name: keyof typeof USERNAME_JOB_BUILDERS, description: string): void {
   program
     .command(name)
     .argument('<username>')
@@ -187,41 +175,28 @@ function usernameCommand(
       const { direct } = program.opts<GlobalOptions>();
       const username = Username.parse(raw);
       const c = container();
+      const job = USERNAME_JOB_BUILDERS[name]({ username: username.value });
       if (direct) {
-        await run(c, username);
+        await c.direct.run(job);
         await done(c, `${name} ${username.value}: done`);
         return;
       }
-      const id = await c.queue.enqueue(USERNAME_JOB_BUILDERS[name]({ username: username.value }));
+      const id = await c.queue.enqueue(job);
       await done(c, `job ${String(id)} enqueued: ${name} ${username.value}`);
     });
 }
 
-usernameCommand('delete-user', 'delete a seedbox user and its resources', (c, username) =>
-  c.useCases.deleteUser.execute({ username }),
-);
-usernameCommand('restart-rtorrent', 'restart a user rtorrent instance', (c, username) =>
-  c.torrentUseCases.restart.execute({ username }),
-);
-usernameCommand('suspend-user', 'reversibly cut SSH/SFTP/rtorrent for a user', (c, username) =>
-  c.useCases.suspendUser.execute({ username }),
-);
-usernameCommand('resume-user', 'restore a suspended user to full service', (c, username) =>
-  c.useCases.resumeUser.execute({ username }),
-);
+usernameCommand('delete-user', 'delete a seedbox user and its resources');
+usernameCommand('restart-rtorrent', 'restart a user rtorrent instance');
+usernameCommand('suspend-user', 'reversibly cut SSH/SFTP/rtorrent for a user');
+usernameCommand('resume-user', 'restore a suspended user to full service');
 usernameCommand(
   'provision-rtorrent',
   'provision the per-user rtorrent instance (config, dirs, systemd unit)',
-  async (c, username) => {
-    await c.torrentUseCases.provision.execute({ username });
-  },
 );
 usernameCommand(
   'render-rtorrent-config',
   're-render managed rtorrent files, restart only if changed and running',
-  async (c, username) => {
-    await c.torrentUseCases.render.execute({ username });
-  },
 );
 
 program
@@ -287,14 +262,13 @@ program
     const { direct } = program.opts<GlobalOptions>();
     const username = Username.parse(rawUser);
     const c = container();
+    const job = buildJob.checkSyncDestination({ username: username.value });
     if (direct) {
-      await c.syncUseCases.checkDestination.execute(username);
+      await c.direct.run(job);
       await done(c, `destination checked for ${username.value}`);
       return;
     }
-    const id = await c.queue.enqueueUnique(
-      buildJob.checkSyncDestination({ username: username.value }),
-    );
+    const id = await c.queue.enqueueUnique(job);
     await done(
       c,
       id === undefined
@@ -315,18 +289,17 @@ program
     const label = Label.parse(rawLabel);
     const mode = SyncMode.parse(rawMode);
     const c = container();
+    const job = buildJob.setCategorySyncMode({
+      username: username.value,
+      label: label.value,
+      mode: mode.value,
+    });
     if (direct) {
-      await c.torrentUseCases.setCategorySyncMode.execute({ username, label, mode });
+      await c.direct.run(job);
       await done(c, `${label.value} set to ${mode.value} for ${username.value}`);
       return;
     }
-    const id = await c.queue.enqueue(
-      buildJob.setCategorySyncMode({
-        username: username.value,
-        label: label.value,
-        mode: mode.value,
-      }),
-    );
+    const id = await c.queue.enqueue(job);
     await done(
       c,
       `job ${String(id)} enqueued: set-category-sync-mode ${username.value} ${label.value}`,
@@ -343,18 +316,13 @@ program
     const username = Username.parse(rawUser);
     const label = Label.parse(rawLabel);
     const c = container();
+    const job = buildJob.addWatchDir({ username: username.value, label: label.value });
     if (direct) {
-      // no worker to chain the render: do it here, once
-      const { added } = await c.torrentUseCases.addWatchDir.execute({ username, label });
-      if (added) {
-        await c.torrentUseCases.render.execute({ username });
-      }
+      await c.direct.run(job);
       await done(c, `watch dir ${label.value} added for ${username.value}`);
       return;
     }
-    const id = await c.queue.enqueue(
-      buildJob.addWatchDir({ username: username.value, label: label.value }),
-    );
+    const id = await c.queue.enqueue(job);
     await done(c, `job ${String(id)} enqueued: add-watch-dir ${username.value} ${label.value}`);
   });
 
@@ -375,19 +343,15 @@ function flagCommand(
       const username = Username.parse(rawUser);
       const value = rawState === 'on';
       const c = container();
-      if (direct) {
-        if (name === 'set-sync-disabled') {
-          await c.torrentUseCases.setSyncDisabled.execute({ username, disabled: value });
-        } else {
-          await c.torrentUseCases.setAllowPublicTracker.execute({ username, allowed: value });
-        }
-        await done(c, `${name} ${username.value}: ${rawState}`);
-        return;
-      }
       const job =
         name === 'set-sync-disabled'
           ? buildJob.setSyncDisabled({ username: username.value, disabled: value })
           : buildJob.setAllowPublicTracker({ username: username.value, allowed: value });
+      if (direct) {
+        await c.direct.run(job);
+        await done(c, `${name} ${username.value}: ${rawState}`);
+        return;
+      }
       const id = await c.queue.enqueue(job);
       await done(c, `job ${String(id)} enqueued: ${name} ${username.value} ${rawState}`);
     });
@@ -845,12 +809,12 @@ program
     const username = Username.parse(raw);
     const password = await readPassword();
     const c = container();
+    const job = await buildJob.changePassword({ username: username.value }, password, c.passwords);
     if (direct) {
-      await c.useCases.changePassword.execute({ username, password });
+      await c.direct.run(job);
       await done(c, `password changed for ${username.value}`);
       return;
     }
-    const job = await buildJob.changePassword({ username: username.value }, password, c.passwords);
     const id = await c.queue.enqueue(job);
     await done(c, `job ${String(id)} enqueued: change-password ${username.value}`);
   });
@@ -865,12 +829,13 @@ program
     const username = Username.parse(rawUser);
     const role = parseRole(rawRole);
     const c = container();
+    const job = buildJob.setUserRole({ username: username.value, role });
     if (direct) {
-      await c.useCases.changeRole.execute({ username, role });
+      await c.direct.run(job);
       await done(c, `${username.value} is now ${role}`);
       return;
     }
-    const id = await c.queue.enqueue(buildJob.setUserRole({ username: username.value, role }));
+    const id = await c.queue.enqueue(job);
     await done(c, `job ${String(id)} enqueued: set-user-role ${username.value} ${role}`);
   });
 
