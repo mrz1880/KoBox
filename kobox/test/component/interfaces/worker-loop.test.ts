@@ -58,6 +58,8 @@ import { FakeQuotaGauges } from '../../../src/infrastructure/system/fakes/FakeQu
 import { InMemoryMailRelayRepository } from '../../../src/infrastructure/persistence/InMemoryMailRelayRepository.js';
 import type { RemotePasswordOpenerPort } from '../../../src/domain/sync/ports.js';
 import { RemotePassword } from '../../../src/domain/sync/RemotePassword.js';
+import { LocalPath } from '../../../src/domain/sync/LocalPath.js';
+import { SyncTransfer } from '../../../src/domain/sync/SyncTransfer.js';
 import { FakeRtorrentConfig } from '../../../src/infrastructure/system/fakes/FakeRtorrentConfig.js';
 import { FakeRtorrentControl } from '../../../src/infrastructure/system/fakes/FakeRtorrentControl.js';
 import { FakeServiceControl } from '../../../src/infrastructure/system/fakes/FakeServiceControl.js';
@@ -840,6 +842,42 @@ describe('CLI enqueue -> root worker loop (the privilege seam)', () => {
     expect(waiting.map((transfer) => transfer.source.value)).toEqual([
       '/home/alice/rtorrent/complete/Films/Old.Film.mkv',
     ]);
+  });
+
+  async function aFailedTransferInFilms(mode: 'scheduled' | 'immediate'): Promise<number> {
+    await enqueueCreateAlice();
+    await world.worker.drain();
+    await world.queue.enqueue(parseJob('add-watch-dir', { username: 'alice', label: 'Films' }));
+    await world.queue.enqueue(
+      parseJob('set-category-sync-mode', { username: 'alice', label: 'Films', mode }),
+    );
+    await world.worker.drain();
+    const queued = await world.syncTransfers.queue(
+      SyncTransfer.queue({
+        username: alice,
+        label: Label.parse('Films'),
+        source: LocalPath.parse('/home/alice/rtorrent/complete/Films/Some.Film.mkv'),
+        queuedAt: '2026-11-04 09:00:00',
+      }),
+    );
+    if (queued?.id === undefined) {
+      throw new Error('the fixture failed to queue a transfer');
+    }
+    await world.syncTransfers.save(
+      queued.start('2026-11-04 09:01:00').fail('permission denied', '2026-11-04 09:02:00'),
+    );
+    return queued.id;
+  }
+
+  // seen on 2026-11-04: transfers put back from a folder that sends straight
+  // away sat waiting for the member's hour
+  it('should_send_a_transfer_put_back_from_a_straight_away_folder_at_once', async () => {
+    const id = await aFailedTransferInFilms('immediate');
+    await world.queue.enqueue(parseJob('requeue-transfer', { username: 'alice', id }));
+
+    await world.worker.processNext();
+
+    expect(world.queue.pendingTypes()).toEqual(['send-pending-transfers']);
   });
 
   it('should_suspend_then_resume_via_jobs', async () => {
