@@ -2,7 +2,7 @@
 # This file is rendered declaratively and re-applied idempotently; manual
 # edits are overwritten. Per-user behavior (public trackers, sync) lives in
 # the KoBox database. Personal additions belong in
-# /home/alice/rtorrent/config.d/99-*.rc — KoBox never touches those.
+# /home/alice/rtorrent/config.d/99-*.rc: KoBox never touches those.
 
 ## Layout
 method.insert = cfg.homedir, private|const|string, (cat, "/home/alice/")
@@ -20,7 +20,7 @@ method.insert = d.data_path, simple,\
         (cat, (d.directory), /, (d.name))"
 
 ## Bootstrap the layout FIRST: later sections (logs, session) expect the
-## directories to exist at parse time — rtorrent executes this file top-down.
+## directories to exist at parse time: rtorrent executes this file top-down.
 execute.throw = sh, -c, (cat, "mkdir -p ", (cfg.logdir))
 execute.throw = sh, -c, (cat, "mkdir -p ", (cfg.config))
 execute.throw = sh, -c, (cat, "mkdir -p ", (cfg.complete))

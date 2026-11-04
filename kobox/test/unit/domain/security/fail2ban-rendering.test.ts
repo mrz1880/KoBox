@@ -116,6 +116,12 @@ describe('renderNextcloudAuthFilter', () => {
     return new RegExp(raw.replace('<HOST>', '(?<host>[0-9.]+)'));
   };
 
+  it('should_say_what_the_filter_bans_in_its_first_line', () => {
+    expect(renderNextcloudAuthFilter().content.split('\n')[0]).toBe(
+      '# KoBox: bans repeated refused Nextcloud passwords (apps, WebDAV, OCS).',
+    );
+  });
+
   it('should_count_a_refused_password_on_webdav_ocs_or_a_public_link', () => {
     expect(renderNextcloudAuthFilter().path).toBe('/etc/fail2ban/filter.d/kobox-nextcloud.conf');
     for (const request of [
