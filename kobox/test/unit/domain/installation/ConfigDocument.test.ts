@@ -159,6 +159,7 @@ describe('ConfigDocument', () => {
       ['apt-sources', '/etc/apt/sources.list'],
       ['dnscrypt', '/etc/dnscrypt-proxy/dnscrypt-proxy.toml'],
       ['sysctl-dropin', '/etc/sysctl.d/90-kobox.conf'],
+      ['member-port-reservation', '/etc/sysctl.d/91-kobox-member-ports.conf'],
     ]);
   });
 
