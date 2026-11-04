@@ -42,6 +42,7 @@ import {
   renderRutorrentQuotaAnswer,
   renderRutorrentRatioOffer,
   renderRutorrentDefaultTheme,
+  renderRutorrentPortCheck,
   RUTORRENT_OWN_CONFIG,
   RUTORRENT_PROFILE_DIR,
   rutorrentProfilesDir,
@@ -520,7 +521,9 @@ class RutorrentInstaller implements ComponentInstaller {
       renderRutorrentConfig(),
       renderRutorrentPlugins(),
       renderRutorrentRatioOffer(),
-      renderRutorrentDefaultTheme(), renderRutorrentQuotaAnswer()]);
+      renderRutorrentDefaultTheme(),
+      renderRutorrentPortCheck(),
+      renderRutorrentQuotaAnswer()]);
     return installed(undefined, unrar);
   }
 

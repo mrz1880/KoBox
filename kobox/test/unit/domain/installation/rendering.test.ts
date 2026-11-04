@@ -32,6 +32,7 @@ import {
   renderRutorrentQuotaAnswer,
   renderRutorrentRatioOffer,
   renderRutorrentDefaultTheme,
+  renderRutorrentPortCheck,
   renderShellinaboxDefault,
   renderSmbConf,
   renderRutorrentUserConfig,
@@ -545,6 +546,17 @@ describe('installation rendering', () => {
     expectGolden('rutorrent-theme.conf.local.php.golden', file.content);
   });
 
+  // yougetsignal probes from an address Bluetack level1 blocks: ruTorrent said
+  // closed for a port every other checker saw open
+  it('should_check_the_rtorrent_port_with_checkers_the_blocklist_lets_through', () => {
+    const file = renderRutorrentPortCheck();
+
+    expect(file.path).toBe('/var/www/rutorrent/plugins/check_port/conf.local.php');
+    expect(file.content).toContain('$useWebsiteIPv4 = "portchecker";');
+    expect(file.content).toContain('$failoverProvidersIPv4 = ["globalping"];');
+    expect(file.content).not.toContain('yougetsignal');
+  });
+
   // ruTorrent's disk meter showed the whole disk: it reads, for each member,
   // their quota in its own format, total and free, from their profile folder
   it('should_hand_the_disk_meter_a_members_quota_in_its_own_format', () => {
@@ -709,6 +721,7 @@ describe('installation rendering: who may read and run each file', () => {
     ['rutorrent config', () => renderRutorrentConfig(), '0644', 'root', 'root'],
     ['ratio offer', () => renderRutorrentRatioOffer(), '0644', 'root', 'root'],
     ['default theme', () => renderRutorrentDefaultTheme(), '0644', 'root', 'root'],
+    ['port check', () => renderRutorrentPortCheck(), '0644', 'root', 'root'],
     ['plugins', () => renderRutorrentPlugins(), '0644', 'root', 'root'],
     ['bind local', () => renderBindLocal(), '0644', 'root', 'bind'],
     ['bind options', () => renderBindOptions({ dnscryptForwarder: true }), '0644', 'root', 'bind'],
