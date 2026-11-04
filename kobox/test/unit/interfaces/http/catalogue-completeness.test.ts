@@ -329,7 +329,12 @@ function keysSentToTheCatalogue(): ReadonlySet<string> {
   syncPage({ categories: [], holding: new Set() }, undefined, [], member);
   syncPage(
     { categories: [WatchDir.labeled(films, SyncMode.scheduled), WatchDir.labeled(Label.parse('series'))], holding: new Set(['films']) },
-    destination({ ok: true, at: NOW, detail: 'connected', fingerprint: 'SHA256:abc' }),
+    destination({
+      ok: true,
+      at: NOW,
+      detail: 'the machine answered, and the account can write in that folder',
+      fingerprint: 'SHA256:abc',
+    }),
     (['waiting', 'sending', 'sent', 'failed'] as const).map(transfer),
     member,
   );

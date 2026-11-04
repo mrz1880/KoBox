@@ -43,7 +43,7 @@ export class CheckSyncDestination {
       // be opened. Never echo the sealed blob back.
       return {
         ok: false,
-        detail: 'the stored password could not be read on this box — type it in again',
+        detail: 'the stored password could not be read on this box: type it in again',
       };
     }
     try {
@@ -51,7 +51,7 @@ export class CheckSyncDestination {
     } catch {
       // the check machinery itself is broken (a missing binary, a refused
       // spawn). That is ours to fix, not theirs.
-      return { ok: false, detail: 'the test could not run on this box — tell your admin' };
+      return { ok: false, detail: 'the test could not run on this box: tell your admin' };
     }
   }
 }
