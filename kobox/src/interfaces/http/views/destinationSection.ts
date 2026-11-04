@@ -22,7 +22,7 @@ function verdict(destination: SyncDestination | undefined, viewer: Viewer): RawH
   }
   return html`<p class="eyebrow">
   ${check.ok ? html`<span class="chip ok">${viewer.t('it works')}</span>` : html`<span class="chip bad">${viewer.t('it does not work')}</span>`}
-  <span class="muted">${check.detail ?? ''}</span>
+  <span class="muted">${check.detail === undefined ? '' : viewer.t(check.detail)}</span>
 </p>
 <p class="muted">${viewer.t('Last tried {at}.', { at: check.at })}${
     check.fingerprint === undefined

@@ -422,6 +422,27 @@ const FR: Readonly<Record<string, string>> = {
     'Pas encore essayée. Testez-la avant de compter dessus.',
   'it works': 'ça marche',
   'it does not work': 'ça ne marche pas',
+  // what the destination check found, as the worker recorded it
+  'the machine answered, and the account can write in that folder':
+    'la machine a répondu, et le compte peut écrire dans ce dossier',
+  'the account can sign in but cannot write in that folder':
+    'le compte peut se connecter mais ne peut pas écrire dans ce dossier',
+  'the account works, but that folder does not exist or cannot be read':
+    'le compte fonctionne, mais ce dossier n’existe pas ou ne peut pas être lu',
+  'the machine answered, but with a different identity than last time: if you did not just reinstall it, stop and check why':
+    'la machine a répondu, mais avec une autre identité que la dernière fois : si vous ne venez pas de la réinstaller, arrêtez-vous et cherchez pourquoi',
+  'the machine answered but refused the account or the password':
+    'la machine a répondu mais a refusé le compte ou le mot de passe',
+  'nothing is listening on that port': 'rien n’écoute sur ce port',
+  'that address does not resolve from here': 'cette adresse ne se résout pas depuis ici',
+  'the machine did not answer in time: check the address, the port and any firewall in between':
+    'la machine n’a pas répondu à temps : vérifiez l’adresse, le port et tout pare-feu entre les deux',
+  'no route from the box to that address': 'aucune route de la box vers cette adresse',
+  'the connection did not go through': 'la connexion n’a pas abouti',
+  'the stored password could not be read on this box: type it in again':
+    'le mot de passe enregistré ne peut pas être lu sur cette box : saisissez-le à nouveau',
+  'the test could not run on this box: tell your admin':
+    'le test n’a pas pu tourner sur cette box : prévenez votre administrateur',
   'Last tried {at}.': 'Dernier essai le {at}.',
   'The machine identified itself as {fingerprint}: if that ever changes without you reinstalling it, KoBox will refuse to connect and say so.':
     'La machine s’est présentée comme {fingerprint} : si cela change un jour sans que vous l’ayez réinstallée, KoBox refusera de s’y connecter et le dira.',
