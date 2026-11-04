@@ -1,22 +1,20 @@
 import { and, eq, gte } from 'drizzle-orm';
+import { FIRST_RTORRENT_PORT, FIRST_SCGI_PORT } from '../../domain/user/memberPortPools.js';
 import { RtorrentPort, ScgiPort } from '../../domain/user/Port.js';
 import type { PortAllocatorPort } from '../../domain/user/PortAllocatorPort.js';
 import { PortAlreadyClaimedError } from '../../domain/user/PortAllocatorPort.js';
 import type { KoboxDatabase } from './db.js';
 import { allocatedPorts } from './schema.js';
 
-const SCGI_BASE = 51101; // SCGI listeners for per-user rtorrent instances
-const RTORRENT_BASE = 45000;
-
 export class SqlitePortAllocator implements PortAllocatorPort {
   constructor(private readonly db: KoboxDatabase) {}
 
   allocateScgiPort(): Promise<ScgiPort> {
-    return Promise.resolve(ScgiPort.parse(this.claim('scgi', SCGI_BASE)));
+    return Promise.resolve(ScgiPort.parse(this.claim('scgi', FIRST_SCGI_PORT)));
   }
 
   allocateRtorrentPort(): Promise<RtorrentPort> {
-    return Promise.resolve(RtorrentPort.parse(this.claim('rtorrent', RTORRENT_BASE)));
+    return Promise.resolve(RtorrentPort.parse(this.claim('rtorrent', FIRST_RTORRENT_PORT)));
   }
 
   releaseScgiPort(port: ScgiPort): Promise<void> {
