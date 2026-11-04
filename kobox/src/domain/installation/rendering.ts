@@ -985,6 +985,29 @@ export function renderRutorrentDefaultTheme(): RenderedFile {
   };
 }
 
+// ruTorrent's port check asks yougetsignal first, which probes from an address
+// Bluetack level1 blocks: the port read closed while every other checker saw it
+// open. portchecker answers first, globalping when it does not. The plugin
+// loads this file after its own conf.php, so its release stays as it ships.
+const PORT_CHECKERS_IPV4 = ['portchecker', 'globalping'] as const;
+
+export function renderRutorrentPortCheck(): RenderedFile {
+  const [first, ...failover] = PORT_CHECKERS_IPV4;
+  return {
+    path: `${RUTORRENT_DIR}/plugins/check_port/conf.local.php`,
+    content: [
+      '<?php',
+      '// KoBox-managed, DO NOT EDIT (rendered declaratively).',
+      `$useWebsiteIPv4 = "${first}";`,
+      `$failoverProvidersIPv4 = [${failover.map((name) => `"${name}"`).join(', ')}];`,
+      '',
+    ].join('\n'),
+    mode: '0644',
+    owner: 'root',
+    group: 'root',
+  };
+}
+
 // Plugins switched off for every member:
 // - dump needs dumptorrent, which no Debian release packages: an error at every
 //   load otherwise;

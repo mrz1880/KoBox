@@ -840,6 +840,14 @@ describe('rutorrent installer', () => {
     );
   });
 
+  it('should_lay_down_the_port_checkers_the_blocklist_lets_through', async () => {
+    await installer(world, 'rutorrent').install();
+
+    expect(world.host.contentAt('/var/www/rutorrent/plugins/check_port/conf.local.php')).toContain(
+      '$useWebsiteIPv4 = "portchecker";',
+    );
+  });
+
   it('should_lay_down_the_answer_the_disk_meter_gets_its_quota_from', async () => {
     await installer(world, 'rutorrent').install();
 
