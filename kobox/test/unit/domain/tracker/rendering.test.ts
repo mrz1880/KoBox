@@ -232,7 +232,7 @@ describe('tracker rendering boundaries', () => {
     expect(file.content).toBe(
       [
         '# KoBox-managed file for alice, DO NOT EDIT (rendered declaratively).',
-        '# No blocklist enabled \u2014 this drop-in is intentionally inert.',
+        '# No blocklist enabled: this drop-in is intentionally inert.',
         '',
       ].join('\n'),
     );

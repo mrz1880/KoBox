@@ -144,7 +144,7 @@ export function renderFail2banJails(
     content: [
       managedHeader('#', 'fail2ban jails'),
       '# backend is set per-jail (not in DEFAULT): the journald backend fits',
-      '# the ssh jails only — nginx jails keep their file-based default.',
+      '# the ssh jails only; nginx jails keep their file-based default.',
       '[DEFAULT]',
       `ignoreip = ${ignoreLine}`,
       '',
@@ -200,7 +200,7 @@ export function renderPortalLoginFilter(): RenderedFile {
   return {
     path: '/etc/fail2ban/filter.d/kobox-portal.conf',
     content: [
-      '# KoBox — bans repeated failed portal logins (application auth, Phase 6).',
+      '# KoBox: bans repeated failed portal logins (application auth, Phase 6).',
       '[Definition]',
       'journalmatch = SYSLOG_IDENTIFIER=kobox-portal',
       String.raw`failregex = portal login failed for .* from <HOST>`,
@@ -218,7 +218,7 @@ export function renderNextcloudAuthFilter(): RenderedFile {
   return {
     path: '/etc/fail2ban/filter.d/kobox-nextcloud.conf',
     content: [
-      '# KoBox — bans repeated refused Nextcloud passwords (apps, WebDAV, OCS).',
+      '# KoBox: bans repeated refused Nextcloud passwords (apps, WebDAV, OCS).',
       '[Definition]',
       String.raw`failregex = ^<HOST> - (?!- )\S+ \[[^\]]*\] "[A-Z]+ /nextcloud/(?:remote\.php|public\.php|ocs)/\S* HTTP/[^"]*" 401 `,
       'ignoreregex =',
@@ -232,7 +232,7 @@ export function renderPublickeyFloodFilter(): RenderedFile {
   return {
     path: '/etc/fail2ban/filter.d/kobox-publickey-flood.conf',
     content: [
-      '# KoBox — bans a flood of *successful* publickey logins (abnormal auth',
+      '# KoBox: bans a flood of *successful* publickey logins (abnormal auth',
       '# frequency with a valid key, invisible to failure-based jails).',
       '[Definition]',
       'journalmatch = _SYSTEMD_UNIT=ssh.service + _COMM=sshd',

@@ -80,7 +80,7 @@ export function renderUserBlocklistDropin(username: Username, enabled: boolean):
         `schedule2 = load_filter,0,24:00:00,"ipv4_filter.load = ${listPath}, unwanted"`,
         'print = "IPv4 filter list size data:",(to_kb,(ipv4_filter.size_data))," kb."',
       ]
-    : ['# No blocklist enabled — this drop-in is intentionally inert.'];
+    : ['# No blocklist enabled: this drop-in is intentionally inert.'];
   return {
     path: `${home}/${CONFIG_DROP_IN_TREE}/80-blocklist.rc`,
     content: [
