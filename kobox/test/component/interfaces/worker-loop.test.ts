@@ -483,7 +483,7 @@ beforeEach(() => {
     torrents,
     wallClock: () => WallClockHour.parse('2026-08-15 02'),
     // the sealed blob is opaque here: this suite proves the worker asks, not
-    // that RSA works — that is the cipher's own test
+    // that RSA works: that is the cipher's own test
     opener: { open: () => Promise.resolve(RemotePassword.parse('from-the-seal')) },
     probe: { probe: () => Promise.resolve({ ok: true, detail: 'the machine answered' }) },
     clock: () => '2026-07-25 10:00:00',
