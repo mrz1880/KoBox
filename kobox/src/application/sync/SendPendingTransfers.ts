@@ -11,6 +11,13 @@ import type { MailOutboxPort } from '../maintenance/MailOutboxPort.js';
 import type { UserRepository } from '../../domain/user/ports.js';
 import type { Username } from '../../domain/user/Username.js';
 
+// What this pass records on a transfer that did not arrive, when the transport
+// did not say why. Shown through the French catalogue, like the transport's own.
+export const SEND_FAILURES = {
+  sourceGone: 'the file is no longer on the box',
+  unexplained: 'it did not go through',
+} as const;
+
 interface Deps {
   readonly users: UserRepository;
   readonly destinations: SyncDestinationRepository;
@@ -34,7 +41,7 @@ interface Deps {
 export class SendPendingTransfers {
   constructor(private readonly deps: Deps) {}
 
-  // `only` sends one member's queue immediately, whatever hour it is — that is
+  // `only` sends one member's queue immediately, whatever hour it is: that is
   // the "send it straight away" folders. Without it, the pass is the scheduled
   // one and takes on whoever's hour has come.
   async execute(only?: Username): Promise<void> {
@@ -84,7 +91,7 @@ export class SendPendingTransfers {
     if (!(await this.deps.facts.exists(transfer.source))) {
       // the member deleted it between the download finishing and the pass
       await this.finish(
-        sending.fail('the file is no longer on the box', this.deps.clock()),
+        sending.fail(SEND_FAILURES.sourceGone, this.deps.clock()),
         destination,
       );
       return;
@@ -102,7 +109,7 @@ export class SendPendingTransfers {
     await this.finish(
       outcome.ok
         ? sending.succeed(this.deps.clock())
-        : sending.fail(outcome.detail ?? 'it did not go through', this.deps.clock()),
+        : sending.fail(outcome.detail ?? SEND_FAILURES.unexplained, this.deps.clock()),
       destination,
     );
   }
@@ -143,7 +150,7 @@ function transferMail(transfer: SyncTransfer): { subject: string; body: string }
     subject: `${transfer.name} did not arrive`,
     body: [
       `${transfer.name}, from your ${transfer.label.value} folder, could not be sent to your own machine:`,
-      `${transfer.lastError ?? 'it did not go through'}.`,
+      `${transfer.lastError ?? SEND_FAILURES.unexplained}.`,
       '',
       'It stays under Folders on your seedbox, where you can try it again.',
       '',

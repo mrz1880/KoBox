@@ -158,6 +158,15 @@ describe('RsyncOverSshTransfer', () => {
     expect(outcome.detail).toContain('connection');
   });
 
+  it('should_say_a_dropped_connection_resumes_in_a_sentence_without_a_dash', async () => {
+    const runner = new ScriptedRunner();
+    runner.onCommand('rsync', {}, { exitCode: 12, stderr: 'rsync: connection unexpectedly closed' });
+
+    const outcome = await transfer(runner);
+
+    expect(outcome.detail).toBe('the connection dropped part way through: it will resume where it stopped');
+  });
+
   it('should_not_copy_at_all_when_the_remote_folder_could_not_be_made', async () => {
     // copying into a folder that does not exist scatters files at the root of
     // the member's NAS, which is worse than not copying
