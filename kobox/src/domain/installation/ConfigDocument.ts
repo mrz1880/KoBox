@@ -1,4 +1,9 @@
 import { DomainError } from '../shared/DomainError.js';
+import {
+  FAIL2BAN_JAILS_PATH,
+  PORTAL_LOGIN_FILTER_PATH,
+  PUBLICKEY_FLOOD_FILTER_PATH,
+} from '../security/rendering.js';
 import { KERNEL_TUNING_PATH, MEMBER_PORT_RESERVATION_PATH } from './rendering.js';
 
 export class UnknownConfigDocumentError extends DomainError {
@@ -129,19 +134,19 @@ const CATALOG: readonly ConfigDocument[] = [
   ConfigDocument.of(
     'fail2ban-jails',
     'Ban rules',
-    '/etc/fail2ban/jail.d/kobox.local',
+    FAIL2BAN_JAILS_PATH,
     'How many failures, over what window, earn how long a ban.',
   ),
   ConfigDocument.of(
     'fail2ban-portal-filter',
     'Ban filter: portal logins',
-    '/etc/fail2ban/filter.d/kobox-portal.conf',
+    PORTAL_LOGIN_FILTER_PATH,
     'The pattern that recognises a failed portal login in the journal.',
   ),
   ConfigDocument.of(
     'fail2ban-publickey-filter',
     'Ban filter: SSH key flooding',
-    '/etc/fail2ban/filter.d/kobox-publickey-flood.conf',
+    PUBLICKEY_FLOOD_FILTER_PATH,
     'The pattern that recognises a client trying key after key.',
   ),
   ConfigDocument.of(
