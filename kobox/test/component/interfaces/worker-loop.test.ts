@@ -176,10 +176,59 @@ class InMemoryJobQueue implements JobQueuePort {
   }
 }
 
+// One job the worker queued after the one it ran, and through which door:
+// `enqueueUnique` joins a same job already pending instead of adding another.
+interface QueuedByWorker {
+  readonly via: 'enqueue' | 'enqueueUnique';
+  readonly job: Job;
+}
+
+// The queue as the worker sees it: the same jobs, plus a record of what the
+// worker itself asked for, in order. The scheduler, the portal and the tests
+// enqueue straight into the inner queue, so only the worker's chains land here.
+class WorkerQueueRecorder implements JobQueuePort {
+  private readonly queued: QueuedByWorker[] = [];
+
+  constructor(private readonly inner: JobQueuePort) {}
+
+  enqueue(job: Job): Promise<number> {
+    this.queued.push({ via: 'enqueue', job });
+    return this.inner.enqueue(job);
+  }
+
+  enqueueUnique(job: Job): Promise<number | undefined> {
+    this.queued.push({ via: 'enqueueUnique', job });
+    return this.inner.enqueueUnique(job);
+  }
+
+  claimNextPending(): Promise<ClaimedJob | undefined> {
+    return this.inner.claimNextPending();
+  }
+
+  markDone(id: number): Promise<void> {
+    return this.inner.markDone(id);
+  }
+
+  markFailed(id: number, error: string): Promise<void> {
+    return this.inner.markFailed(id, error);
+  }
+
+  recoverStale(): Promise<number> {
+    return this.inner.recoverStale();
+  }
+
+  // what the worker queued since the last call, emptied as it is read
+  take(): readonly QueuedByWorker[] {
+    return this.queued.splice(0, this.queued.length);
+  }
+}
+
 const alice = Username.parse('alice');
 
 interface World {
   queue: InMemoryJobQueue;
+  // what the worker chained, recorded on its way into `queue`
+  workerQueue: WorkerQueueRecorder;
   nextcloud: FakeNextcloud;
   components: InMemoryComponentRegistry;
   accounts: FakeSystemAccounts;
@@ -516,6 +565,7 @@ beforeEach(() => {
     clock: () => '2026-07-25 10:00:00',
   });
   const warnings: World['warnings'] = [];
+  const workerQueue = new WorkerQueueRecorder(queue);
   const workerDeps = {
     useCases,
     torrents: torrentUseCases,
@@ -569,7 +619,8 @@ beforeEach(() => {
     seedRule,
     quota,
     warnings,
-    worker: new JobWorker({ ...workerDeps, queue }),
+    workerQueue,
+    worker: new JobWorker({ ...workerDeps, queue: workerQueue }),
     direct: new DirectJobRunner(workerDeps),
   };
 });
@@ -589,6 +640,31 @@ function createAliceJob(): Promise<Job> {
 
 async function enqueueCreateAlice(): Promise<number> {
   return world.queue.enqueue(await createAliceJob());
+}
+
+async function aFailedTransferInFilms(mode: 'scheduled' | 'immediate'): Promise<number> {
+  await enqueueCreateAlice();
+  await world.worker.drain();
+  await world.queue.enqueue(parseJob('add-watch-dir', { username: 'alice', label: 'Films' }));
+  await world.queue.enqueue(
+    parseJob('set-category-sync-mode', { username: 'alice', label: 'Films', mode }),
+  );
+  await world.worker.drain();
+  const queued = await world.syncTransfers.queue(
+    SyncTransfer.queue({
+      username: alice,
+      label: Label.parse('Films'),
+      source: LocalPath.parse('/home/alice/rtorrent/complete/Films/Some.Film.mkv'),
+      queuedAt: '2026-11-04 09:00:00',
+    }),
+  );
+  if (queued?.id === undefined) {
+    throw new Error('the fixture failed to queue a transfer');
+  }
+  await world.syncTransfers.save(
+    queued.start('2026-11-04 09:01:00').fail('permission denied', '2026-11-04 09:02:00'),
+  );
+  return queued.id;
 }
 
 describe('CLI enqueue -> root worker loop (the privilege seam)', () => {
@@ -843,31 +919,6 @@ describe('CLI enqueue -> root worker loop (the privilege seam)', () => {
       '/home/alice/rtorrent/complete/Films/Old.Film.mkv',
     ]);
   });
-
-  async function aFailedTransferInFilms(mode: 'scheduled' | 'immediate'): Promise<number> {
-    await enqueueCreateAlice();
-    await world.worker.drain();
-    await world.queue.enqueue(parseJob('add-watch-dir', { username: 'alice', label: 'Films' }));
-    await world.queue.enqueue(
-      parseJob('set-category-sync-mode', { username: 'alice', label: 'Films', mode }),
-    );
-    await world.worker.drain();
-    const queued = await world.syncTransfers.queue(
-      SyncTransfer.queue({
-        username: alice,
-        label: Label.parse('Films'),
-        source: LocalPath.parse('/home/alice/rtorrent/complete/Films/Some.Film.mkv'),
-        queuedAt: '2026-11-04 09:00:00',
-      }),
-    );
-    if (queued?.id === undefined) {
-      throw new Error('the fixture failed to queue a transfer');
-    }
-    await world.syncTransfers.save(
-      queued.start('2026-11-04 09:01:00').fail('permission denied', '2026-11-04 09:02:00'),
-    );
-    return queued.id;
-  }
 
   // seen on 2026-11-04: transfers put back from a folder that sends straight
   // away sat waiting for the member's hour
@@ -1494,5 +1545,393 @@ describe('the daily backup', () => {
       context: { username: 'alice', reason: 'tar: write error' },
       message: 'backup: restart kit not archived',
     });
+  });
+});
+
+// What the worker queues after each job, exactly: which jobs, in which order,
+// and which ones join a same job already pending. The tests above prove the
+// chains reach their effect; these pin the chains themselves.
+describe('what the worker queues after a job', () => {
+  // runs `job` alone, once what the setup queued has settled
+  async function followUpsOf(job: Job): Promise<readonly QueuedByWorker[]> {
+    await world.worker.drain();
+    world.workerQueue.take();
+    await world.queue.enqueue(job);
+    await world.worker.processNext();
+    return world.workerQueue.take();
+  }
+
+  function queued(job: Job): QueuedByWorker {
+    return { via: 'enqueue', job };
+  }
+
+  function joined(job: Job): QueuedByWorker {
+    return { via: 'enqueueUnique', job };
+  }
+
+  async function aliceWithFilms(mode: 'scheduled' | 'immediate'): Promise<void> {
+    await enqueueCreateAlice();
+    await world.worker.drain();
+    await world.queue.enqueue(parseJob('add-watch-dir', { username: 'alice', label: 'Films' }));
+    await world.queue.enqueue(
+      parseJob('set-category-sync-mode', { username: 'alice', label: 'Films', mode }),
+    );
+  }
+
+  function filmFinishedInFilms(): Job {
+    return parseJob('torrent-event', {
+      username: 'alice',
+      event: 'finished',
+      infoHash: 'f'.repeat(40),
+      name: 'Some.Film.mkv',
+      label: 'Films',
+      basePath: '/home/alice/rtorrent/complete/Films/Some.Film.mkv',
+      directory: '/home/alice/rtorrent/complete/Films',
+    });
+  }
+
+  async function anOldFilmInFilms(): Promise<void> {
+    await world.worker.drain();
+    await world.torrents.upsert(
+      alice,
+      Torrent.load({
+        infoHash: InfoHash.parse('e'.repeat(40)),
+        name: 'Old.Film.mkv',
+        label: Label.parse('Films'),
+      }).complete('/home/alice/rtorrent/complete/Films/Old.Film.mkv'),
+    );
+  }
+
+  async function aDiscoveredSslTracker(): Promise<void> {
+    world.dns.givenAddresses('tracker.example.org', [IpAddress.parse('192.0.2.10')]);
+    world.certPort.givenCert('tracker.example.org', { pem: 'PEM', expiresOn: '2026-09-15' });
+    await world.queue.enqueue(
+      parseJob('discover-tracker', {
+        url: 'https://tracker.example.org/announce',
+        privacy: 'private',
+      }),
+    );
+  }
+
+  async function anEnabledBlocklist(): Promise<void> {
+    await world.blocklists.save(
+      Blocklist.create({
+        source: BlocklistSource.parse('personal'),
+        author: 'me',
+        name: 'mine',
+        url: BlocklistUrl.parse('https://lists.example.net/mine.txt'),
+        subscription: false,
+        enabled: true,
+      }),
+    );
+    world.download.givenList('https://lists.example.net/mine.txt', {
+      ranges: ['192.0.2.0/24'],
+      sha256: 'bb',
+    });
+  }
+
+  it('should_reserve_ports_then_provision_rtorrent_vpn_and_nfs_after_creating_a_member', async () => {
+    expect(await followUpsOf(await createAliceJob())).toEqual([
+      joined(parseJob('reserve-member-ports', {})),
+      queued(parseJob('provision-rtorrent', { username: 'alice' })),
+      queued(parseJob('provision-vpn-user', { username: 'alice' })),
+      queued(parseJob('render-nfs-exports', {})),
+    ]);
+  });
+
+  it('should_free_ports_then_deprovision_rtorrent_vpn_and_nfs_after_deleting_a_member', async () => {
+    await enqueueCreateAlice();
+
+    expect(await followUpsOf(buildJob.deleteUser({ username: 'alice' }))).toEqual([
+      joined(parseJob('reserve-member-ports', {})),
+      queued(parseJob('deprovision-rtorrent', { username: 'alice' })),
+      queued(parseJob('deprovision-vpn-user', { username: 'alice' })),
+      queued(parseJob('render-nfs-exports', {})),
+    ]);
+  });
+
+  it('should_render_the_members_filter_then_the_firewall_and_rpc_mounts_after_provisioning', async () => {
+    await enqueueCreateAlice();
+
+    expect(await followUpsOf(parseJob('provision-rtorrent', { username: 'alice' }))).toEqual([
+      queued(parseJob('render-blocklist-filters', { username: 'alice' })),
+      queued(parseJob('apply-firewall', {})),
+      queued(parseJob('render-rutorrent-users', {})),
+    ]);
+  });
+
+  it('should_reapply_the_firewall_and_rpc_mounts_after_deprovisioning', async () => {
+    await enqueueCreateAlice();
+
+    expect(await followUpsOf(parseJob('deprovision-rtorrent', { username: 'alice' }))).toEqual([
+      queued(parseJob('apply-firewall', {})),
+      queued(parseJob('render-rutorrent-users', {})),
+    ]);
+  });
+
+  it('should_render_openvpn_after_issuing_or_removing_a_members_vpn_material', async () => {
+    await enqueueCreateAlice();
+
+    expect(await followUpsOf(parseJob('provision-vpn-user', { username: 'alice' }))).toEqual([
+      queued(parseJob('render-openvpn', {})),
+    ]);
+    expect(await followUpsOf(parseJob('deprovision-vpn-user', { username: 'alice' }))).toEqual([
+      queued(parseJob('render-openvpn', {})),
+    ]);
+  });
+
+  it('should_refresh_the_media_listing_after_a_torrent_event', async () => {
+    await enqueueCreateAlice();
+
+    expect(
+      await followUpsOf(
+        parseJob('torrent-event', {
+          username: 'alice',
+          event: 'inserted_new',
+          infoHash: 'a'.repeat(40),
+        }),
+      ),
+    ).toEqual([joined(parseJob('index-media', {}))]);
+  });
+
+  it('should_send_a_download_finished_in_a_straight_away_folder_at_once', async () => {
+    await aliceWithFilms('immediate');
+
+    expect(await followUpsOf(filmFinishedInFilms())).toEqual([
+      joined(parseJob('index-media', {})),
+      joined(parseJob('send-pending-transfers', { username: 'alice' })),
+    ]);
+  });
+
+  it('should_leave_a_download_finished_in_a_scheduled_folder_to_the_members_hour', async () => {
+    await aliceWithFilms('scheduled');
+
+    expect(await followUpsOf(filmFinishedInFilms())).toEqual([
+      joined(parseJob('index-media', {})),
+    ]);
+  });
+
+  it('should_send_a_straight_away_folders_backlog_at_once', async () => {
+    await aliceWithFilms('immediate');
+    await anOldFilmInFilms();
+
+    expect(
+      await followUpsOf(parseJob('queue-folder-backlog', { username: 'alice', label: 'Films' })),
+    ).toEqual([joined(parseJob('send-pending-transfers', { username: 'alice' }))]);
+  });
+
+  it('should_leave_a_scheduled_folders_backlog_to_the_members_hour', async () => {
+    await aliceWithFilms('scheduled');
+    await anOldFilmInFilms();
+
+    expect(
+      await followUpsOf(parseJob('queue-folder-backlog', { username: 'alice', label: 'Films' })),
+    ).toEqual([]);
+  });
+
+  it('should_send_a_transfer_put_back_in_a_straight_away_folder_at_once', async () => {
+    const id = await aFailedTransferInFilms('immediate');
+
+    expect(await followUpsOf(parseJob('requeue-transfer', { username: 'alice', id }))).toEqual([
+      joined(parseJob('send-pending-transfers', { username: 'alice' })),
+    ]);
+  });
+
+  it('should_leave_a_transfer_put_back_in_a_scheduled_folder_to_the_members_hour', async () => {
+    const id = await aFailedTransferInFilms('scheduled');
+
+    expect(await followUpsOf(parseJob('requeue-transfer', { username: 'alice', id }))).toEqual(
+      [],
+    );
+  });
+
+  it('should_render_a_members_rtorrent_config_once_their_folders_changed', async () => {
+    await enqueueCreateAlice();
+    const render = joined(parseJob('render-rtorrent-config', { username: 'alice' }));
+
+    expect(
+      await followUpsOf(parseJob('add-watch-dir', { username: 'alice', label: 'Films' })),
+    ).toEqual([render]);
+    expect(
+      await followUpsOf(
+        parseJob('rename-watch-dir', { username: 'alice', label: 'Films', to: 'Docs' }),
+      ),
+    ).toEqual([render]);
+    expect(
+      await followUpsOf(parseJob('remove-watch-dir', { username: 'alice', label: 'Docs' })),
+    ).toEqual([render]);
+  });
+
+  it('should_render_nothing_when_a_folder_change_changed_nothing', async () => {
+    await enqueueCreateAlice();
+    await world.worker.drain();
+    await world.queue.enqueue(parseJob('add-watch-dir', { username: 'alice', label: 'Films' }));
+
+    expect(
+      await followUpsOf(parseJob('add-watch-dir', { username: 'alice', label: 'Films' })),
+    ).toEqual([]);
+    expect(
+      await followUpsOf(
+        // renamed already: the job run twice
+        parseJob('rename-watch-dir', { username: 'alice', label: 'Series', to: 'Films' }),
+      ),
+    ).toEqual([]);
+    expect(
+      await followUpsOf(parseJob('remove-watch-dir', { username: 'alice', label: 'Series' })),
+    ).toEqual([]);
+  });
+
+  it('should_fetch_the_cert_then_render_the_whitelist_after_discovering_an_ssl_tracker', async () => {
+    world.dns.givenAddresses('tracker.example.org', [IpAddress.parse('192.0.2.10')]);
+
+    expect(
+      await followUpsOf(
+        parseJob('discover-tracker', {
+          url: 'https://tracker.example.org/announce',
+          privacy: 'private',
+        }),
+      ),
+    ).toEqual([
+      queued(parseJob('fetch-tracker-cert', { host: 'tracker.example.org' })),
+      queued(parseJob('render-whitelist', {})),
+    ]);
+  });
+
+  it('should_queue_nothing_after_discovering_an_unresolvable_tracker', async () => {
+    expect(
+      await followUpsOf(
+        parseJob('discover-tracker', {
+          url: 'https://gone.example.net/announce',
+          privacy: 'private',
+        }),
+      ),
+    ).toEqual([]);
+  });
+
+  it('should_render_the_whitelist_after_a_cert_promotes_a_tracker', async () => {
+    await aDiscoveredSslTracker();
+    await world.worker.processNext();
+    world.workerQueue.take();
+
+    // the fetch the discovery queued, run now
+    await world.worker.processNext();
+
+    expect(world.workerQueue.take()).toEqual([queued(parseJob('render-whitelist', {}))]);
+  });
+
+  it('should_render_the_whitelist_after_a_renewal_that_promoted_a_tracker', async () => {
+    await aDiscoveredSslTracker();
+
+    expect(await followUpsOf(parseJob('renew-tracker-certs', { today: '2026-12-01' }))).toEqual(
+      [queued(parseJob('render-whitelist', {}))],
+    );
+  });
+
+  it('should_queue_nothing_after_a_renewal_that_promoted_nothing', async () => {
+    expect(await followUpsOf(parseJob('renew-tracker-certs', { today: '2026-12-01' }))).toEqual(
+      [],
+    );
+  });
+
+  it('should_render_the_whitelist_after_marking_a_tracker_dead', async () => {
+    await aDiscoveredSslTracker();
+
+    expect(
+      await followUpsOf(parseJob('mark-tracker-dead', { host: 'tracker.example.org' })),
+    ).toEqual([queued(parseJob('render-whitelist', {}))]);
+  });
+
+  it('should_download_the_lists_after_importing_the_catalog', async () => {
+    expect(await followUpsOf(parseJob('import-blocklist-catalog', {}))).toEqual([
+      queued(parseJob('update-blocklists', {})),
+    ]);
+  });
+
+  it('should_render_the_filters_then_load_the_kernel_set_after_a_blocklist_update', async () => {
+    await anEnabledBlocklist();
+
+    expect(await followUpsOf(parseJob('update-blocklists', {}))).toEqual([
+      queued(parseJob('render-blocklist-filters', {})),
+      queued(parseJob('apply-ipset', {})),
+    ]);
+  });
+
+  it('should_queue_nothing_after_a_blocklist_update_that_downloaded_nothing', async () => {
+    await world.blocklists.save(
+      Blocklist.create({
+        source: BlocklistSource.parse('personal'),
+        author: 'me',
+        name: 'mine',
+        url: BlocklistUrl.parse('https://lists.example.net/unreachable.txt'),
+        subscription: false,
+        enabled: true,
+      }),
+    );
+
+    expect(await followUpsOf(parseJob('update-blocklists', {}))).toEqual([]);
+  });
+
+  it('should_queue_nothing_after_toggling_a_blocklist_which_renders_its_own_filters', async () => {
+    await anEnabledBlocklist();
+
+    expect(
+      await followUpsOf(
+        parseJob('set-blocklist-enabled', {
+          source: 'personal',
+          author: 'me',
+          name: 'mine',
+          enabled: false,
+        }),
+      ),
+    ).toEqual([]);
+  });
+
+  it('should_render_the_four_places_a_member_address_lives_after_it_changes', async () => {
+    await enqueueCreateAlice();
+    const refreshes = [
+      queued(parseJob('render-whitelist', {})),
+      queued(parseJob('apply-firewall', {})),
+      queued(parseJob('render-fail2ban', {})),
+      queued(parseJob('render-nfs-exports', {})),
+    ];
+
+    expect(
+      await followUpsOf(parseJob('add-user-address', { username: 'alice', ipv4: '198.51.100.7' })),
+    ).toEqual(refreshes);
+    expect(
+      await followUpsOf(
+        parseJob('remove-user-address', { username: 'alice', ipv4: '198.51.100.7' }),
+      ),
+    ).toEqual(refreshes);
+  });
+
+  it('should_refresh_whitelist_firewall_and_fail2ban_once_a_dyndns_address_moves', async () => {
+    await enqueueCreateAlice();
+    world.dyndns.setAnswer('dyn.example.org', IpAddress.parse('203.0.113.9'));
+    const refreshes = [
+      queued(parseJob('render-whitelist', {})),
+      queued(parseJob('apply-firewall', {})),
+      queued(parseJob('render-fail2ban', {})),
+    ];
+
+    expect(
+      await followUpsOf(
+        parseJob('add-user-hostname', { username: 'alice', hostname: 'dyn.example.org' }),
+      ),
+    ).toEqual([]);
+    expect(await followUpsOf(parseJob('resolve-dyndns', {}))).toEqual(refreshes);
+    expect(
+      await followUpsOf(
+        parseJob('remove-user-hostname', { username: 'alice', hostname: 'dyn.example.org' }),
+      ),
+    ).toEqual(refreshes);
+  });
+
+  it('should_queue_nothing_after_a_job_without_follow_ups', async () => {
+    expect(await followUpsOf(parseJob('apply-firewall', {}))).toEqual([]);
+  });
+
+  it('should_queue_nothing_after_a_job_that_failed', async () => {
+    expect(await followUpsOf(buildJob.deleteUser({ username: 'ghost' }))).toEqual([]);
   });
 });
