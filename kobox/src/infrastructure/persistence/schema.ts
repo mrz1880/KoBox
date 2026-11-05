@@ -413,9 +413,8 @@ export const syncDestinations = sqliteTable('sync_destinations', {
   lastCheckDetail: text('last_check_detail'),
   // the identity the machine presented on the last contact, a check or a
   // transfer: a copy, for the page, of what the member's known_hosts file
-  // (authoritative, see KnownHosts) recorded. The name predates transfers
-  // recording it too.
-  lastCheckFingerprint: text('last_check_fingerprint'),
+  // (authoritative, see KnownHosts) recorded
+  knownHostFingerprint: text('known_host_fingerprint'),
 });
 
 // One finished download on its way to a member's own machine. The legacy kept

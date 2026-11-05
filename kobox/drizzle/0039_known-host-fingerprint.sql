@@ -1,0 +1,1 @@
+ALTER TABLE `sync_destinations` RENAME COLUMN "last_check_fingerprint" TO "known_host_fingerprint";
