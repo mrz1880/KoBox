@@ -16,7 +16,9 @@ import { TransferBatchSize } from '../../../../src/domain/sync/TransferBatchSize
 import type { TransferOutcome } from '../../../../src/domain/sync/ports.js';
 import { Label } from '../../../../src/domain/torrent/Label.js';
 import { Username } from '../../../../src/domain/user/Username.js';
+import { Language } from '../../../../src/domain/portal/Language.js';
 import { InMemoryMailOutbox } from '../../../../src/infrastructure/persistence/InMemoryMailOutbox.js';
+import { InMemoryPortalCredentialsRepository } from '../../../../src/infrastructure/persistence/InMemoryPortalCredentialsRepository.js';
 import { InMemorySyncDestinationRepository } from '../../../../src/infrastructure/persistence/InMemorySyncDestinationRepository.js';
 import { InMemorySyncTransferRepository } from '../../../../src/infrastructure/persistence/InMemorySyncTransferRepository.js';
 import { InMemoryUserRepository } from '../../../../src/infrastructure/persistence/InMemoryUserRepository.js';
@@ -25,9 +27,15 @@ import { UserBuilder } from '../../../builders/UserBuilder.js';
 const NOW = '2026-08-15 10:00:00';
 const alice = Username.parse('alice');
 
-async function world(outcome: TransferOutcome) {
+// `language` is the member's own choice; absent, they never made one
+async function world(outcome: TransferOutcome, language?: Language) {
   const users = new InMemoryUserRepository();
   await users.save(new UserBuilder().build());
+  const credentials = new InMemoryPortalCredentialsRepository();
+  await credentials.save(
+    { username: alice, role: 'user', ...(language !== undefined && { language }) },
+    NOW,
+  );
   const destinations = new InMemorySyncDestinationRepository();
   await destinations.save(
     SyncDestination.define({
@@ -47,6 +55,7 @@ async function world(outcome: TransferOutcome) {
   const opened: string[] = [];
   const useCase = new SendPendingTransfers({
     users,
+    credentials,
     destinations,
     transfers,
     outbox,
@@ -76,8 +85,58 @@ async function queueEpisode(transfers: InMemorySyncTransferRepository): Promise<
 }
 
 describe('SendPendingTransfers mails', () => {
-  it('should_tell_the_member_which_folder_the_arrived_file_came_from', async () => {
+  it('should_tell_a_member_who_never_chose_a_language_in_french', async () => {
     const { transfers, outbox, useCase } = await world({ ok: true });
+    await queueEpisode(transfers);
+
+    await useCase.execute();
+
+    const [mail] = await outbox.listDue(NOW, 10);
+    expect(mail?.subject).toBe('Some.Episode.mkv est arrivé');
+    expect(mail?.body).toBe(
+      'Some.Episode.mkv, de ton dossier Series, est arrivé sur ta machine.\n',
+    );
+  });
+
+  it('should_tell_a_member_who_never_chose_a_language_in_french_why_a_file_did_not_arrive', async () => {
+    const { transfers, outbox, useCase } = await world({
+      ok: false,
+      failure: TransferFailure.explained('no-room'),
+    });
+    await queueEpisode(transfers);
+
+    await useCase.execute();
+
+    const [mail] = await outbox.listDue(NOW, 10);
+    expect(mail?.subject).toBe('Some.Episode.mkv n’est pas arrivé');
+    expect(mail?.body).toBe(
+      [
+        'Some.Episode.mkv, de ton dossier Series, n’a pas pu être envoyé sur ta machine :',
+        'l’autre machine n’a plus de place.',
+        '',
+        'Il reste dans Dossiers sur ta seedbox, d’où tu peux le réessayer.',
+        '',
+      ].join('\n'),
+    );
+  });
+
+  // rsync's own words have no translation: they follow a sentence that does
+  it('should_lead_what_rsync_said_with_a_sentence_in_the_members_language', async () => {
+    const { transfers, outbox, useCase } = await world({
+      ok: false,
+      failure: TransferFailure.reported('rsync: [sender] write error: Broken pipe (32)'),
+    });
+    await queueEpisode(transfers);
+
+    await useCase.execute();
+
+    expect((await outbox.listDue(NOW, 10))[0]?.body).toContain(
+      '\nrsync s’est arrêté sur une erreur que KoBox ne sait pas expliquer : rsync: [sender] write error: Broken pipe (32).\n',
+    );
+  });
+
+  it('should_tell_the_member_which_folder_the_arrived_file_came_from', async () => {
+    const { transfers, outbox, useCase } = await world({ ok: true }, Language.en);
     await queueEpisode(transfers);
 
     await useCase.execute();
@@ -92,7 +151,7 @@ describe('SendPendingTransfers mails', () => {
     const { transfers, outbox, useCase } = await world({
       ok: false,
       failure: TransferFailure.explained('no-room'),
-    });
+    }, Language.en);
     await queueEpisode(transfers);
 
     await useCase.execute();
@@ -110,7 +169,7 @@ describe('SendPendingTransfers mails', () => {
   });
 
   it('should_still_give_a_reason_when_the_transport_gave_none', async () => {
-    const { transfers, outbox, useCase } = await world({ ok: false });
+    const { transfers, outbox, useCase } = await world({ ok: false }, Language.en);
     await queueEpisode(transfers);
 
     await useCase.execute();

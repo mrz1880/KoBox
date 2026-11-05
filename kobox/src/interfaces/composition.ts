@@ -934,6 +934,7 @@ export function buildContainer(name: string): Container {
   const syncDestinationRepo = new SqliteSyncDestinationRepository(db);
   const syncUseCases = buildSyncUseCases({
     users: repo,
+    credentials,
     instances: new SqliteTorrentInstanceRepository(db),
     destinations: syncDestinationRepo,
     transfers: syncTransferRepo,

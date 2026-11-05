@@ -464,6 +464,7 @@ beforeEach(() => {
   const syncDestinations = new InMemorySyncDestinationRepository();
   const syncUseCases = buildSyncUseCases({
     users: repo,
+    credentials,
     instances,
     destinations: syncDestinations,
     transfers: syncTransfers,
