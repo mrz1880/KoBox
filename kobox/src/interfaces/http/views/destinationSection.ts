@@ -1,4 +1,5 @@
 import { LoneFilePlacement } from '../../../domain/sync/LoneFilePlacement.js';
+import { SendHour } from '../../../domain/sync/SendHour.js';
 import type { SyncDestination } from '../../../domain/sync/SyncDestination.js';
 import { html, type RawHtml } from '../html.js';
 import { sentence, type Viewer } from './layout.js';
@@ -8,6 +9,11 @@ const PLACEMENT_WORDS: Readonly<Record<string, string>> = {
   'beside-the-others': 'Put the file straight in the folder',
   'in-its-own-folder': 'Give each file a folder of its own',
 };
+
+// An hour of the day the way the hour list spells it, "02:00"
+export function hourOfDay(hour: SendHour): string {
+  return `${String(hour.value).padStart(2, '0')}:00`;
+}
 
 // The verdict of the last "test it now", stated as an outcome rather than as an
 // exit code. A member who cannot fix what they cannot understand will simply
@@ -57,11 +63,11 @@ export function destinationSection(
   // A member on a slow link picks the middle of the night on purpose. The
   // legacy gave them the same choice through their own crontab; here one hourly
   // system pass takes on whoever's hour has come.
-  const chosenHour = destination?.sendHour.value ?? 2;
-  const hours = Array.from({ length: 24 }, (_, hour) =>
-    html`<option value="${String(hour)}"${hour === chosenHour ? html` selected` : html``}>${
-      `${String(hour).padStart(2, '0')}:00`
-    }</option>`,
+  const chosenHour = destination?.sendHour ?? SendHour.default();
+  const hours = Array.from({ length: 24 }, (_, value) => SendHour.parse(value)).map(
+    (hour) => html`<option value="${String(hour.value)}"${
+      hour.equals(chosenHour) ? html` selected` : html``
+    }>${hourOfDay(hour)}</option>`,
   );
   const chosenMails = destination?.transferMails ?? DEFAULT_TRANSFER_MAILS;
   const mails = TRANSFER_MAILS.map(

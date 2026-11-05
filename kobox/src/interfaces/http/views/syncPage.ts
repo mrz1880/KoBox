@@ -1,15 +1,18 @@
+import { SendHour } from '../../../domain/sync/SendHour.js';
 import type { SyncDestination } from '../../../domain/sync/SyncDestination.js';
 import type { SyncTransfer } from '../../../domain/sync/SyncTransfer.js';
 import { SyncMode } from '../../../domain/torrent/SyncMode.js';
 import type { WatchDir } from '../../../domain/torrent/WatchDir.js';
 import { html, type RawHtml } from '../html.js';
-import { destinationSection } from './destinationSection.js';
+import { destinationSection, hourOfDay } from './destinationSection.js';
 import { transferQueueSection } from './transferQueueSection.js';
 import { flash, page, type Viewer } from './layout.js';
 
 // The three modes in the words a member would use about their own files. The
 // legacy offered "Ignore les scripts (Pas de synchro)" — accurate about the
 // implementation, silent about what actually happens to your download.
+// A "bit later" folder waits for the member's send hour: the hint names it,
+// filled in from {hour}.
 const MODE_WORDS: Readonly<Record<string, { readonly label: string; readonly hint: string }>> = {
   off: {
     label: 'Keep it here',
@@ -17,7 +20,7 @@ const MODE_WORDS: Readonly<Record<string, { readonly label: string; readonly hin
   },
   scheduled: {
     label: 'Send it a bit later',
-    hint: 'It goes out on the next pass, a few minutes after it finishes.',
+    hint: 'It waits for {hour}, the hour set below for these folders, and goes out then.',
   },
   immediate: {
     label: 'Send it straight away',
@@ -86,11 +89,12 @@ export function syncPage(
   viewer: Viewer,
   message?: string,
 ): string {
+  const hour = hourOfDay(destination?.sendHour ?? SendHour.default());
   const rows = categories.map(
     (dir) => html`<tr>
   <td>${dir.label?.value ?? ''}</td>
   <td>${modeChoice(dir, viewer)}</td>
-  <td class="muted">${viewer.t(MODE_WORDS[dir.syncMode.value]?.hint ?? '')}${backlogChoice(dir, viewer)}</td>
+  <td class="muted">${viewer.t(MODE_WORDS[dir.syncMode.value]?.hint ?? '', { hour })}${backlogChoice(dir, viewer)}</td>
   <td>${reshapeChoice(dir, holding, viewer)}</td>
 </tr>`,
   );
