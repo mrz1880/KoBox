@@ -109,72 +109,8 @@ import { InMemoryComponentRegistry } from '../../../src/infrastructure/persisten
 import { ComponentName } from '../../../src/domain/installation/ComponentName.js';
 import { MEMBER_PORT_RESERVATION_PATH } from '../../../src/domain/installation/rendering.js';
 import { FakeKernelSettings } from '../../../src/infrastructure/system/fakes/FakeKernelSettings.js';
-
-class InMemoryJobQueue implements JobQueuePort {
-  private readonly rows: { id: number; job: Job; status: string; error?: string }[] = [];
-  private nextId = 1;
-
-  enqueue(job: Job): Promise<number> {
-    const id = this.nextId++;
-    this.rows.push({ id, job, status: 'pending' });
-    return Promise.resolve(id);
-  }
-
-  enqueueUnique(job: Job): Promise<number | undefined> {
-    const payloadJson = JSON.stringify(job.payload);
-    const existing = this.rows.find(
-      (r) =>
-        r.status === 'pending' &&
-        r.job.type === job.type &&
-        JSON.stringify(r.job.payload) === payloadJson,
-    );
-    if (existing) return Promise.resolve(undefined);
-    return this.enqueue(job);
-  }
-
-  pendingTypes(): readonly string[] {
-    return this.rows.filter((r) => r.status === 'pending').map((r) => r.job.type);
-  }
-
-  claimNextPending(): Promise<ClaimedJob | undefined> {
-    const row = this.rows.find((r) => r.status === 'pending');
-    if (!row) return Promise.resolve(undefined);
-    row.status = 'running';
-    return Promise.resolve({ id: row.id, job: row.job });
-  }
-
-  markDone(id: number): Promise<void> {
-    const row = this.rows.find((r) => r.id === id);
-    if (row) row.status = 'done';
-    return Promise.resolve();
-  }
-
-  markFailed(id: number, error: string): Promise<void> {
-    const row = this.rows.find((r) => r.id === id);
-    if (row) {
-      row.status = 'failed';
-      row.error = error;
-    }
-    return Promise.resolve();
-  }
-
-  statusOf(id: number): string | undefined {
-    return this.rows.find((r) => r.id === id)?.status;
-  }
-
-  errorOf(id: number): string | undefined {
-    return this.rows.find((r) => r.id === id)?.error;
-  }
-
-  recoverStale(): Promise<number> {
-    const stale = this.rows.filter((r) => r.status === 'running');
-    for (const row of stale) {
-      row.status = 'failed';
-      row.error = 'interrupted: worker restarted';
-    }
-    return Promise.resolve(stale.length);
-  }
-}
+import { InMemoryJobQueue } from '../../../src/infrastructure/persistence/InMemoryJobQueue.js';
+import { errorOf, pendingTypesOf } from '../../builders/jobQueueQueries.js';
 
 // One job the worker queued after the one it ran, and through which door:
 // `enqueueUnique` joins a same job already pending instead of adding another.
@@ -674,7 +610,7 @@ describe('CLI enqueue -> root worker loop (the privilege seam)', () => {
     const processed = await world.worker.processNext();
 
     expect(processed).toBe(true);
-    expect(world.queue.statusOf(id)).toBe('done');
+    expect(await world.queue.stateOf(id)).toBe('done');
     expect(await world.accounts.accountExists(alice)).toBe(true);
     // provisioning is a separate chained job: not yet executed after one step
     expect(await world.services.isUserServiceRunning(alice)).toBe(false);
@@ -764,7 +700,7 @@ describe('CLI enqueue -> root worker loop (the privilege seam)', () => {
 
     await world.worker.processNext();
 
-    expect(world.queue.pendingTypes()[0]).toBe('reserve-member-ports');
+    expect(pendingTypesOf(world.queue)[0]).toBe('reserve-member-ports');
     await world.worker.drain();
     expect(world.kernelFiles.contentAt(MEMBER_PORT_RESERVATION_PATH)).toContain(
       'net.ipv4.ip_local_reserved_ports = 45000,51101',
@@ -912,7 +848,7 @@ describe('CLI enqueue -> root worker loop (the privilege seam)', () => {
     );
 
     await world.worker.drain();
-    expect(world.queue.errorOf(id)).toBeUndefined();
+    expect(errorOf(world.queue, id)).toBeUndefined();
 
     const waiting = await world.syncTransfers.listWaiting(alice);
     expect(waiting.map((transfer) => transfer.source.value)).toEqual([
@@ -928,7 +864,7 @@ describe('CLI enqueue -> root worker loop (the privilege seam)', () => {
 
     await world.worker.processNext();
 
-    expect(world.queue.pendingTypes()).toEqual(['send-pending-transfers']);
+    expect(pendingTypesOf(world.queue)).toEqual(['send-pending-transfers']);
   });
 
   it('should_suspend_then_resume_via_jobs', async () => {
@@ -957,8 +893,8 @@ describe('CLI enqueue -> root worker loop (the privilege seam)', () => {
     const processed = await world.worker.processNext();
 
     expect(processed).toBe(true);
-    expect(world.queue.statusOf(id)).toBe('failed');
-    expect(world.queue.errorOf(id)).toMatch(/ghost not found/);
+    expect(await world.queue.stateOf(id)).toBe('failed');
+    expect(errorOf(world.queue, id)).toMatch(/ghost not found/);
   });
 
   it('should_report_nothing_to_do_on_an_empty_queue', async () => {
@@ -978,7 +914,7 @@ describe('direct mode (the CLI without the worker)', () => {
       'net.ipv4.ip_local_reserved_ports = 45000,51101',
     );
     // nothing left behind for a worker that may not be running
-    expect(world.queue.pendingTypes()).toEqual([]);
+    expect(pendingTypesOf(world.queue)).toEqual([]);
   });
 
   it('should_deprovision_rtorrent_and_free_the_ports_of_a_member_deleted_directly', async () => {
@@ -1055,7 +991,7 @@ describe('security job chains (provision -> firewall)', () => {
 
     await world.worker.drain();
 
-    expect(world.queue.statusOf(id)).toBe('done');
+    expect(await world.queue.stateOf(id)).toBe('done');
     expect(world.firewall.applied).toHaveLength(1);
   });
 
@@ -1296,7 +1232,7 @@ describe('ipset chain (blocklists -> kernel set)', () => {
 
     await world.worker.drain();
 
-    expect(world.queue.statusOf(id)).toBe('done'); // honest skip, not a failure
+    expect(await world.queue.stateOf(id)).toBe('done'); // honest skip, not a failure
     expect(world.ipset.restored).toEqual([]);
     expect(world.networkFiles.contentAt('/etc/kobox/blocklist.ipset')).toContain('flush kobox-bl-next');
   });
@@ -1355,7 +1291,7 @@ describe('space jobs', () => {
 
     await world.worker.processNext();
 
-    expect(world.queue.statusOf(id)).toBe('done');
+    expect(await world.queue.stateOf(id)).toBe('done');
     expect(world.warnings).toEqual([
       {
         context: {
@@ -1392,7 +1328,7 @@ describe('space jobs', () => {
 
     await world.worker.processNext();
 
-    expect(world.queue.statusOf(id)).toBe('done');
+    expect(await world.queue.stateOf(id)).toBe('done');
     expect(world.warnings).toContainEqual({
       context: { username: 'alice', error: 'database is locked' },
       message: 'space watch: member not watched',
@@ -1425,7 +1361,7 @@ describe('space jobs', () => {
 
     await world.worker.processNext();
 
-    expect(world.queue.statusOf(id)).toBe('done');
+    expect(await world.queue.stateOf(id)).toBe('done');
     expect(world.memberTorrents.erased).toEqual([film.value]);
     expect((await world.cleanupReports.find(alice))?.freed.toGib()).toBe(12);
   });
@@ -1437,7 +1373,7 @@ describe('space jobs', () => {
 
     await world.worker.processNext();
 
-    expect(world.queue.statusOf(id)).toBe('done');
+    expect(await world.queue.stateOf(id)).toBe('done');
     expect((await world.spacePreferences.find(alice)).automatic).toBe('sentOnly');
   });
 
@@ -1446,7 +1382,7 @@ describe('space jobs', () => {
 
     await world.worker.processNext();
 
-    expect(world.queue.statusOf(id)).toBe('done');
+    expect(await world.queue.stateOf(id)).toBe('done');
     expect(await world.seedRule.get()).toEqual(SeedRule.of({ ratio: 1.5, days: 14 }));
   });
 
@@ -1457,7 +1393,7 @@ describe('space jobs', () => {
 
     await world.worker.processNext();
 
-    expect(world.queue.statusOf(id)).toBe('done');
+    expect(await world.queue.stateOf(id)).toBe('done');
     expect(await world.spacePreferences.findSeedRule(alice)).toEqual({
       kind: 'own',
       rule: SeedRule.of({ days: 14 }),
@@ -1473,7 +1409,7 @@ describe('space jobs', () => {
 
     await world.worker.processNext();
 
-    expect(world.queue.statusOf(id)).toBe('done');
+    expect(await world.queue.stateOf(id)).toBe('done');
     expect(await world.spacePreferences.findSeedRule(alice)).toEqual({ kind: 'box' });
   });
 
@@ -1488,7 +1424,7 @@ describe('space jobs', () => {
 
     await world.worker.processNext();
 
-    expect(world.queue.statusOf(id)).toBe('done');
+    expect(await world.queue.stateOf(id)).toBe('done');
     expect((await world.cleanupReports.find(alice))?.trigger).toBe('automatic');
   });
 
