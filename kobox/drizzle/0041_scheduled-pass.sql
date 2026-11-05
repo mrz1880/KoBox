@@ -1,0 +1,1 @@
+ALTER TABLE `sync_destinations` ADD `last_scheduled_pass` text;

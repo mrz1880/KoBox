@@ -9,6 +9,7 @@ import { SendHour } from '../../domain/sync/SendHour.js';
 import { parseTransferMails } from '../../domain/sync/TransferMails.js';
 import { SyncDestination, type ConnectionCheck } from '../../domain/sync/SyncDestination.js';
 import { TransferBatchSize } from '../../domain/sync/TransferBatchSize.js';
+import { WallClockHour } from '../../domain/sync/WallClockHour.js';
 import type { SyncDestinationRepository } from '../../domain/sync/ports.js';
 import { Username } from '../../domain/user/Username.js';
 import type { KoboxDatabase } from './db.js';
@@ -57,6 +58,9 @@ export class SqliteSyncDestinationRepository implements SyncDestinationRepositor
         ...(row.knownHostFingerprint !== null && {
           identity: HostKeyFingerprint.parse(row.knownHostFingerprint),
         }),
+        ...(row.lastScheduledPass !== null && {
+          lastScheduledPass: WallClockHour.parse(row.lastScheduledPass),
+        }),
       }),
     );
   }
@@ -78,6 +82,7 @@ export class SqliteSyncDestinationRepository implements SyncDestinationRepositor
       lastCheckDetail: destination.lastCheck?.detail ?? null,
       lastCheckRequeued: destination.lastCheck?.requeued ?? null,
       knownHostFingerprint: destination.identity?.value ?? null,
+      lastScheduledPass: destination.lastScheduledPass?.value ?? null,
     };
     this.db.orm
       .insert(syncDestinations)

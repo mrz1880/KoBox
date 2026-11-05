@@ -12,6 +12,7 @@ import { SendHour } from '../../../src/domain/sync/SendHour.js';
 import { SyncDestination } from '../../../src/domain/sync/SyncDestination.js';
 import { TransferBatchSize } from '../../../src/domain/sync/TransferBatchSize.js';
 import { Username } from '../../../src/domain/user/Username.js';
+import { WallClockHour } from '../../../src/domain/sync/WallClockHour.js';
 import { KoboxDatabase } from '../../../src/infrastructure/persistence/db.js';
 import { SqliteSyncDestinationRepository } from '../../../src/infrastructure/persistence/SqliteSyncDestinationRepository.js';
 
@@ -60,6 +61,15 @@ describe('SqliteSyncDestinationRepository', () => {
     await repo.save(destination.recordCheck(check, destination));
 
     expect((await repo.findByUsername(alice))?.lastCheck).toEqual(check);
+  });
+
+  // the next scheduled pass reads it back to know which hours it missed
+  it('should_keep_when_the_scheduled_pass_last_took_the_member_on', async () => {
+    const pass = WallClockHour.parse('2026-11-05 02');
+
+    await repo.save(aDestination().recordScheduledPass(pass));
+
+    expect((await repo.findByUsername(alice))?.lastScheduledPass).toEqual(pass);
   });
 
   // a transfer to a machine never tested records its identity with no verdict

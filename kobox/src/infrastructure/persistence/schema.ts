@@ -417,6 +417,9 @@ export const syncDestinations = sqliteTable('sync_destinations', {
   // transfer: a copy, for the page, of what the member's known_hosts file
   // (authoritative, see KnownHosts) recorded
   knownHostFingerprint: text('known_host_fingerprint'),
+  // when the hourly scheduled pass last took the member on, on the box's own
+  // clock: "YYYY-MM-DD HH" (see WallClockHour)
+  lastScheduledPass: text('last_scheduled_pass'),
 });
 
 // One finished download on its way to a member's own machine. The legacy kept

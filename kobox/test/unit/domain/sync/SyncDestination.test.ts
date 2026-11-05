@@ -9,6 +9,7 @@ import { TransferBatchSize } from '../../../../src/domain/sync/TransferBatchSize
 import { SendHour } from '../../../../src/domain/sync/SendHour.js';
 import { RemotePort } from '../../../../src/domain/sync/RemotePort.js';
 import { Username } from '../../../../src/domain/user/Username.js';
+import { WallClockHour } from '../../../../src/domain/sync/WallClockHour.js';
 
 function aDestination(): SyncDestination {
   return SyncDestination.define({
@@ -133,6 +134,47 @@ describe('SyncDestination', () => {
     expect([quiet.wantsMailAbout('sent'), quiet.wantsMailAbout('failed')]).toEqual([false, false]);
     expect([failuresOnly.wantsMailAbout('sent'), failuresOnly.wantsMailAbout('failed')]).toEqual([false, true]);
     expect([everything.wantsMailAbout('sent'), everything.wantsMailAbout('failed')]).toEqual([true, true]);
+  });
+
+  // aDestination sends at 02:00
+  describe('the scheduled pass', () => {
+    const at = (raw: string): WallClockHour => WallClockHour.parse(raw);
+
+    it('should_not_be_due_again_once_a_pass_took_it_on', () => {
+      const passed = aDestination().recordScheduledPass(at('2026-11-05 02'));
+
+      expect(passed.isDueForScheduledPassAt(at('2026-11-05 03'))).toBe(false);
+    });
+
+    it('should_catch_up_on_its_hour_when_no_pass_ran_then', () => {
+      const passed = aDestination().recordScheduledPass(at('2026-11-05 01'));
+
+      expect(passed.isDueForScheduledPassAt(at('2026-11-05 04'))).toBe(true);
+    });
+
+    // an hour moved to one already gone today must not send at once: the
+    // passes since it was moved took the member on
+    it('should_keep_its_last_pass_whatever_the_member_changes', () => {
+      const passed = aDestination().recordScheduledPass(at('2026-11-05 09'));
+      const changed = [
+        passed.withSendHour(SendHour.parse(5)),
+        passed.withPassword('another-sealed-blob'),
+        checkedOk(passed),
+        passed.withConnection({
+          host: RemoteHost.parse('nas2.example.org'),
+          port: passed.port,
+          account: passed.account,
+          path: passed.path,
+        }),
+      ];
+
+      expect(changed.map((each) => each.isDueForScheduledPassAt(at('2026-11-05 10')))).toEqual([
+        false,
+        false,
+        false,
+        false,
+      ]);
+    });
   });
 
   describe('the identity of the machine', () => {

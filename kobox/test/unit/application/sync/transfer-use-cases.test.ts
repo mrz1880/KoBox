@@ -35,6 +35,7 @@ import { InMemoryUserRepository } from '../../../../src/infrastructure/persisten
 import { RtorrentPort, ScgiPort } from '../../../../src/domain/user/Port.js';
 import { Username } from '../../../../src/domain/user/Username.js';
 import { UserBuilder } from '../../../builders/UserBuilder.js';
+import { WallClockHour } from '../../../../src/domain/sync/WallClockHour.js';
 import { Language } from '../../../../src/domain/portal/Language.js';
 import type { PortalCredentialsPort } from '../../../../src/domain/portal/ports.js';
 
@@ -83,6 +84,15 @@ class RecordingTransport implements FileTransferPort {
 const readsEnglish: Pick<PortalCredentialsPort, 'find'> = {
   find: () => Promise.resolve({ username: alice, role: 'user', language: Language.en }),
 };
+
+// the hour aDestination sends at, on the day of these tests
+const AT_SEND_HOUR = '2026-08-15 02';
+
+function withLastPass(destination: SyncDestination, lastPass: string | undefined) {
+  return lastPass === undefined
+    ? destination
+    : destination.recordScheduledPass(WallClockHour.parse(lastPass));
+}
 
 const everythingIsAFile: LocalFileFactsPort = {
   isDirectory: () => Promise.resolve(false),
@@ -144,7 +154,10 @@ describe('QueueFinishedDownload', () => {
 describe('SendPendingTransfers', () => {
   async function world(
     options: {
-      hour?: number;
+      // the box's clock at this pass; aDestination sends at 02:00
+      now?: string;
+      // when the scheduled pass last took the member on
+      lastPass?: string;
       batchSize?: TransferBatchSize;
       mails?: TransferMails;
       outcome?: TransferOutcome;
@@ -154,12 +167,16 @@ describe('SendPendingTransfers', () => {
     await users.save(new UserBuilder().build());
     const destinations = new InMemorySyncDestinationRepository();
     await destinations.save(
-      aDestination({
-        ...(options.batchSize !== undefined && { batchSize: options.batchSize }),
-      }).withTransferMails(options.mails ?? 'never'),
+      withLastPass(
+        aDestination({
+          ...(options.batchSize !== undefined && { batchSize: options.batchSize }),
+        }).withTransferMails(options.mails ?? 'never'),
+        options.lastPass,
+      ),
     );
     const transfers = new InMemorySyncTransferRepository();
     const transport = new RecordingTransport(options.outcome);
+    let now = options.now ?? AT_SEND_HOUR;
     const outbox = new InMemoryMailOutbox();
     const useCase = new SendPendingTransfers({
       users,
@@ -171,9 +188,13 @@ describe('SendPendingTransfers', () => {
       transport,
       facts: everythingIsAFile,
       clock: () => NOW,
-      hour: () => options.hour ?? 2,
+      wallClock: () => WallClockHour.parse(now),
     });
-    return { transfers, transport, outbox, useCase };
+    // the clock moves on to the next pass
+    const passAt = (raw: string): void => {
+      now = raw;
+    };
+    return { transfers, transport, outbox, useCase, passAt };
   }
 
   async function queueOne(
@@ -212,7 +233,7 @@ describe('SendPendingTransfers', () => {
   });
 
   it('should_send_what_is_waiting_when_the_members_hour_has_come', async () => {
-    const { transfers, transport, useCase } = await world({ hour: 2 });
+    const { transfers, transport, useCase } = await world({ now: AT_SEND_HOUR });
     await queueOne(transfers, 'a.mkv');
 
     await useCase.execute();
@@ -223,7 +244,7 @@ describe('SendPendingTransfers', () => {
 
   it('should_wait_for_their_hour_rather_than_sending_at_any_time', async () => {
     // a member on a slow link picked the middle of the night on purpose
-    const { transfers, transport, useCase } = await world({ hour: 14 });
+    const { transfers, transport, useCase } = await world({ now: '2026-08-15 14' });
     await queueOne(transfers, 'a.mkv');
 
     await useCase.execute();
@@ -232,8 +253,45 @@ describe('SendPendingTransfers', () => {
     expect(await transfers.countByState(alice, 'waiting')).toBe(1);
   });
 
+  // the worker was down at 02:00: the member must not lose a day
+  it('should_catch_up_on_the_members_hour_when_no_pass_ran_then', async () => {
+    const { transfers, transport, useCase } = await world({
+      lastPass: '2026-08-15 01',
+      now: '2026-08-15 05',
+    });
+    await queueOne(transfers, 'a.mkv');
+
+    await useCase.execute();
+
+    expect(transport.sent).toHaveLength(1);
+  });
+
+  // the pass at 01:00 ran, the ones from 02:00 to 04:00 did not
+  it('should_remember_each_pass_so_the_next_one_knows_what_it_missed', async () => {
+    const { transfers, transport, useCase, passAt } = await world({ now: '2026-08-15 01' });
+    await useCase.execute();
+    await queueOne(transfers, 'a.mkv');
+
+    passAt('2026-08-15 05');
+    await useCase.execute();
+
+    expect(transport.sent).toHaveLength(1);
+  });
+
+  // what is queued after the member's hour went waits for the next one
+  it('should_not_send_again_after_the_pass_that_took_the_member_on_at_their_hour', async () => {
+    const { transfers, transport, useCase, passAt } = await world({ now: AT_SEND_HOUR });
+    await useCase.execute();
+    await queueOne(transfers, 'a.mkv');
+
+    passAt('2026-08-15 03');
+    await useCase.execute();
+
+    expect(transport.sent).toHaveLength(0);
+  });
+
   it('should_send_one_members_queue_straight_away_when_asked_whatever_the_hour', async () => {
-    const { transfers, transport, useCase } = await world({ hour: 14 });
+    const { transfers, transport, useCase } = await world({ now: '2026-08-15 14' });
     await queueOne(transfers, 'a.mkv');
 
     await useCase.execute(alice);
@@ -243,7 +301,7 @@ describe('SendPendingTransfers', () => {
 
   it('should_take_on_no_more_than_the_member_allowed_in_one_pass', async () => {
     const { transfers, transport, useCase } = await world({
-      hour: 2,
+      now: AT_SEND_HOUR,
       batchSize: TransferBatchSize.parse(2),
     });
     for (const name of ['a.mkv', 'b.mkv', 'c.mkv']) {
@@ -275,7 +333,7 @@ describe('SendPendingTransfers', () => {
       transport,
       facts: everythingIsAFile,
       clock: () => NOW,
-      hour: () => 2,
+      wallClock: () => WallClockHour.parse(AT_SEND_HOUR),
     }).execute();
 
     expect(transport.sent[0]?.remoteFolder).toBe('/volume1/torrents/Films/Some.Film.2024');
@@ -299,7 +357,7 @@ describe('SendPendingTransfers', () => {
       transport: new RecordingTransport({ ok: false, failure: TransferFailure.explained('no-room') }),
       facts: everythingIsAFile,
       clock: () => NOW,
-      hour: () => 2,
+      wallClock: () => WallClockHour.parse(AT_SEND_HOUR),
     }).execute();
 
     const recent = await transfers.listRecent(alice, 10);
@@ -326,7 +384,7 @@ describe('SendPendingTransfers', () => {
       transport,
       facts: { isDirectory: () => Promise.resolve(false), exists: () => Promise.resolve(false) },
       clock: () => NOW,
-      hour: () => 2,
+      wallClock: () => WallClockHour.parse(AT_SEND_HOUR),
     }).execute();
 
     const recent = await transfers.listRecent(alice, 10);

@@ -514,9 +514,10 @@ its way*, *arrived*, *did not arrive* — with the reason attached when it did n
 and a **Try again** button that puts it back in the queue.
 
 - **One hourly pass**, `send-pending-transfers`, takes on only the members whose
-  chosen hour has come. MySB wrote a cron line into every member's own crontab so
-  they could pick their hour; the hour is still theirs, and nothing writes into
-  anybody's crontab.
+  chosen hour has come round since the pass last took them on: an hour the worker
+  missed (down, or a clock that skipped it) is caught up by the next pass, once.
+  MySB wrote a cron line into every member's own crontab so they could pick their
+  hour; the hour is still theirs, and nothing writes into anybody's crontab.
 - **"Send it straight away"** does not wait for that: the finished event chains a
   pass for that member alone, deduplicated so several downloads finishing at once
   do not stack several passes over the same queue.

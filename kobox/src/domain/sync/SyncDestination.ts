@@ -9,6 +9,7 @@ import type { SendHour } from './SendHour.js';
 import type { TransferBatchSize } from './TransferBatchSize.js';
 import type { TransferState } from './SyncTransfer.js';
 import { DEFAULT_TRANSFER_MAILS, mailsAbout, type TransferMails } from './TransferMails.js';
+import type { WallClockHour } from './WallClockHour.js';
 
 // What the last "test it now" concluded, in words the page can show as they are.
 export interface ConnectionCheck {
@@ -35,6 +36,8 @@ interface SyncDestinationProps {
   readonly lastCheck?: ConnectionCheck;
   // the identity the machine presented on the last contact, check or transfer
   readonly identity?: HostKeyFingerprint;
+  // when the hourly scheduled pass last took this member on
+  readonly lastScheduledPass?: WallClockHour;
 }
 
 export interface ConnectionSettings {
@@ -68,6 +71,7 @@ export class SyncDestination {
   readonly transferMails: TransferMails;
   readonly lastCheck?: ConnectionCheck;
   readonly identity?: HostKeyFingerprint;
+  readonly lastScheduledPass?: WallClockHour;
 
   private constructor(props: SyncDestinationProps) {
     this.username = props.username;
@@ -86,9 +90,14 @@ export class SyncDestination {
     if (props.identity !== undefined) {
       this.identity = props.identity;
     }
+    if (props.lastScheduledPass !== undefined) {
+      this.lastScheduledPass = props.lastScheduledPass;
+    }
   }
 
-  static define(props: Omit<SyncDestinationProps, 'lastCheck' | 'identity'>): SyncDestination {
+  static define(
+    props: Omit<SyncDestinationProps, 'lastCheck' | 'identity' | 'lastScheduledPass'>,
+  ): SyncDestination {
     return new SyncDestination(props);
   }
 
@@ -152,6 +161,20 @@ export class SyncDestination {
     return new SyncDestination({ ...this.props(), transferMails });
   }
 
+  // Whether the hourly pass running now sends this member's "a bit later"
+  // folders: their hour came round since the pass last took them on (see
+  // SendHour.isDueAt).
+  isDueForScheduledPassAt(now: WallClockHour): boolean {
+    return this.sendHour.isDueAt(now, this.lastScheduledPass);
+  }
+
+  // Every scheduled pass records that it took this member on, due or not: the
+  // hour a member moves to one already gone today waits for tomorrow, rather
+  // than reading as a pass missed.
+  recordScheduledPass(at: WallClockHour): SyncDestination {
+    return new SyncDestination({ ...this.props(), lastScheduledPass: at });
+  }
+
   wantsMailAbout(state: TransferState): boolean {
     return mailsAbout(this.transferMails, state);
   }
@@ -195,6 +218,7 @@ export class SyncDestination {
   private connection(): Omit<SyncDestinationProps, 'lastCheck'> {
     return {
       ...(this.identity !== undefined && { identity: this.identity }),
+      ...(this.lastScheduledPass !== undefined && { lastScheduledPass: this.lastScheduledPass }),
       username: this.username,
       host: this.host,
       port: this.port,
