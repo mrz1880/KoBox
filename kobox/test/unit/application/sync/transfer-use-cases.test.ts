@@ -7,6 +7,7 @@ import { Torrent } from '../../../../src/domain/torrent/Torrent.js';
 import { InMemoryTorrentRepository } from '../../../../src/infrastructure/persistence/InMemoryTorrentRepository.js';
 import { RequeueTransfer } from '../../../../src/application/sync/RequeueTransfer.js';
 import { SendPendingTransfers } from '../../../../src/application/sync/SendPendingTransfers.js';
+import { immediatePassFor, SCHEDULED_PASS } from '../../../../src/domain/sync/SendPass.js';
 import { LocalPath } from '../../../../src/domain/sync/LocalPath.js';
 import { SyncTransfer } from '../../../../src/domain/sync/SyncTransfer.js';
 import { LoneFilePlacement } from '../../../../src/domain/sync/LoneFilePlacement.js';
@@ -217,7 +218,7 @@ describe('SendPendingTransfers', () => {
     const mailsFor = async (mails: TransferMails, outcome: TransferOutcome) => {
       const { transfers, outbox, useCase } = await world({ mails, outcome });
       await queueOne(transfers, 'Some.Episode.mkv');
-      await useCase.execute();
+      await useCase.execute(SCHEDULED_PASS);
       return (await outbox.listDue(NOW, 10)).map((mail) => `${mail.recipient}: ${mail.subject}`);
     };
     const failed: TransferOutcome = { ok: false, failure: TransferFailure.explained('no-room') };
@@ -236,7 +237,7 @@ describe('SendPendingTransfers', () => {
     const { transfers, transport, useCase } = await world({ now: AT_SEND_HOUR });
     await queueOne(transfers, 'a.mkv');
 
-    await useCase.execute();
+    await useCase.execute(SCHEDULED_PASS);
 
     expect(transport.sent).toHaveLength(1);
     expect(await transfers.countByState(alice, 'sent')).toBe(1);
@@ -247,7 +248,7 @@ describe('SendPendingTransfers', () => {
     const { transfers, transport, useCase } = await world({ now: '2026-08-15 14' });
     await queueOne(transfers, 'a.mkv');
 
-    await useCase.execute();
+    await useCase.execute(SCHEDULED_PASS);
 
     expect(transport.sent).toHaveLength(0);
     expect(await transfers.countByState(alice, 'waiting')).toBe(1);
@@ -261,7 +262,7 @@ describe('SendPendingTransfers', () => {
     });
     await queueOne(transfers, 'a.mkv');
 
-    await useCase.execute();
+    await useCase.execute(SCHEDULED_PASS);
 
     expect(transport.sent).toHaveLength(1);
   });
@@ -269,11 +270,11 @@ describe('SendPendingTransfers', () => {
   // the pass at 01:00 ran, the ones from 02:00 to 04:00 did not
   it('should_remember_each_pass_so_the_next_one_knows_what_it_missed', async () => {
     const { transfers, transport, useCase, passAt } = await world({ now: '2026-08-15 01' });
-    await useCase.execute();
+    await useCase.execute(SCHEDULED_PASS);
     await queueOne(transfers, 'a.mkv');
 
     passAt('2026-08-15 05');
-    await useCase.execute();
+    await useCase.execute(SCHEDULED_PASS);
 
     expect(transport.sent).toHaveLength(1);
   });
@@ -281,11 +282,11 @@ describe('SendPendingTransfers', () => {
   // what is queued after the member's hour went waits for the next one
   it('should_not_send_again_after_the_pass_that_took_the_member_on_at_their_hour', async () => {
     const { transfers, transport, useCase, passAt } = await world({ now: AT_SEND_HOUR });
-    await useCase.execute();
+    await useCase.execute(SCHEDULED_PASS);
     await queueOne(transfers, 'a.mkv');
 
     passAt('2026-08-15 03');
-    await useCase.execute();
+    await useCase.execute(SCHEDULED_PASS);
 
     expect(transport.sent).toHaveLength(0);
   });
@@ -294,7 +295,7 @@ describe('SendPendingTransfers', () => {
     const { transfers, transport, useCase } = await world({ now: '2026-08-15 14' });
     await queueOne(transfers, 'a.mkv');
 
-    await useCase.execute(alice);
+    await useCase.execute(immediatePassFor(alice));
 
     expect(transport.sent).toHaveLength(1);
   });
@@ -308,7 +309,7 @@ describe('SendPendingTransfers', () => {
       await queueOne(transfers, name);
     }
 
-    await useCase.execute();
+    await useCase.execute(SCHEDULED_PASS);
 
     expect(transport.sent).toHaveLength(2);
     expect(await transfers.countByState(alice, 'waiting')).toBe(1);
@@ -334,7 +335,7 @@ describe('SendPendingTransfers', () => {
       facts: everythingIsAFile,
       clock: () => NOW,
       wallClock: () => WallClockHour.parse(AT_SEND_HOUR),
-    }).execute();
+    }).execute(SCHEDULED_PASS);
 
     expect(transport.sent[0]?.remoteFolder).toBe('/volume1/torrents/Films/Some.Film.2024');
   });
@@ -358,7 +359,7 @@ describe('SendPendingTransfers', () => {
       facts: everythingIsAFile,
       clock: () => NOW,
       wallClock: () => WallClockHour.parse(AT_SEND_HOUR),
-    }).execute();
+    }).execute(SCHEDULED_PASS);
 
     const recent = await transfers.listRecent(alice, 10);
     expect(recent[0]?.state).toBe('failed');
@@ -385,7 +386,7 @@ describe('SendPendingTransfers', () => {
       facts: { isDirectory: () => Promise.resolve(false), exists: () => Promise.resolve(false) },
       clock: () => NOW,
       wallClock: () => WallClockHour.parse(AT_SEND_HOUR),
-    }).execute();
+    }).execute(SCHEDULED_PASS);
 
     const recent = await transfers.listRecent(alice, 10);
     expect(recent[0]?.failure).toEqual(TransferFailure.explained('source-gone'));

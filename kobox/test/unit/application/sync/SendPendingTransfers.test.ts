@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { WallClockHour } from '../../../../src/domain/sync/WallClockHour.js';
 import { TransferFailure } from '../../../../src/domain/sync/TransferFailure.js';
 import { SendPendingTransfers } from '../../../../src/application/sync/SendPendingTransfers.js';
+import { SCHEDULED_PASS } from '../../../../src/domain/sync/SendPass.js';
 import { HostKeyFingerprint } from '../../../../src/domain/sync/HostKeyFingerprint.js';
 import { LocalPath } from '../../../../src/domain/sync/LocalPath.js';
 import { LoneFilePlacement } from '../../../../src/domain/sync/LoneFilePlacement.js';
@@ -90,7 +91,7 @@ describe('SendPendingTransfers mails', () => {
     const { transfers, outbox, useCase } = await world({ ok: true });
     await queueEpisode(transfers);
 
-    await useCase.execute();
+    await useCase.execute(SCHEDULED_PASS);
 
     const [mail] = await outbox.listDue(NOW, 10);
     expect(mail?.subject).toBe('Some.Episode.mkv est arrivé');
@@ -106,7 +107,7 @@ describe('SendPendingTransfers mails', () => {
     });
     await queueEpisode(transfers);
 
-    await useCase.execute();
+    await useCase.execute(SCHEDULED_PASS);
 
     const [mail] = await outbox.listDue(NOW, 10);
     expect(mail?.subject).toBe('Some.Episode.mkv n’est pas arrivé');
@@ -129,7 +130,7 @@ describe('SendPendingTransfers mails', () => {
     });
     await queueEpisode(transfers);
 
-    await useCase.execute();
+    await useCase.execute(SCHEDULED_PASS);
 
     expect((await outbox.listDue(NOW, 10))[0]?.body).toContain(
       '\nrsync s’est arrêté sur une erreur que KoBox ne sait pas expliquer : rsync: [sender] write error: Broken pipe (32).\n',
@@ -140,7 +141,7 @@ describe('SendPendingTransfers mails', () => {
     const { transfers, outbox, useCase } = await world({ ok: true }, Language.en);
     await queueEpisode(transfers);
 
-    await useCase.execute();
+    await useCase.execute(SCHEDULED_PASS);
 
     const [mail] = await outbox.listDue(NOW, 10);
     expect(mail?.body).toBe(
@@ -155,7 +156,7 @@ describe('SendPendingTransfers mails', () => {
     }, Language.en);
     await queueEpisode(transfers);
 
-    await useCase.execute();
+    await useCase.execute(SCHEDULED_PASS);
 
     const [mail] = await outbox.listDue(NOW, 10);
     expect(mail?.body).toBe(
@@ -173,7 +174,7 @@ describe('SendPendingTransfers mails', () => {
     const { transfers, outbox, useCase } = await world({ ok: false }, Language.en);
     await queueEpisode(transfers);
 
-    await useCase.execute();
+    await useCase.execute(SCHEDULED_PASS);
 
     expect((await transfers.listRecent(alice, 10))[0]?.failure).toEqual(
       TransferFailure.explained('unexplained'),
@@ -187,7 +188,7 @@ describe('SendPendingTransfers with nothing waiting', () => {
     // the root worker opens a member's secret only when it has something to send
     const { opened, useCase } = await world({ ok: true });
 
-    await useCase.execute();
+    await useCase.execute(SCHEDULED_PASS);
 
     expect(opened).toEqual([]);
   });
@@ -201,7 +202,7 @@ describe('SendPendingTransfers on a contact with the machine', () => {
     const { destinations, transfers, useCase } = await world({ ok: true, identity });
     await queueEpisode(transfers);
 
-    await useCase.execute();
+    await useCase.execute(SCHEDULED_PASS);
 
     expect((await destinations.findByUsername(alice))?.identity).toEqual(identity);
   });

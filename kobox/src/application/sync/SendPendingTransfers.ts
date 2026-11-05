@@ -1,4 +1,5 @@
 import type { HostKeyFingerprint } from '../../domain/sync/HostKeyFingerprint.js';
+import type { SendPass } from '../../domain/sync/SendPass.js';
 import type { SyncDestination } from '../../domain/sync/SyncDestination.js';
 import type { SyncTransfer } from '../../domain/sync/SyncTransfer.js';
 import { TransferFailure } from '../../domain/sync/TransferFailure.js';
@@ -42,30 +43,34 @@ interface Deps {
 export class SendPendingTransfers {
   constructor(private readonly deps: Deps) {}
 
-  // `only` sends one member's queue immediately, whatever hour it is: that is
-  // the "send it straight away" folders. Without it, the pass is the scheduled
-  // one and takes on whoever's hour has come.
-  async execute(only?: Username): Promise<void> {
-    const members =
-      only === undefined
-        ? (await this.deps.users.listAll()).map((user) => user.username)
-        : [only];
-    for (const username of members) {
+  // The scheduled pass takes on whoever's hour has come; an immediate one sends
+  // its member's queue whatever hour it is (see SendPass).
+  async execute(pass: SendPass): Promise<void> {
+    for (const username of await this.membersOf(pass)) {
       // one member's broken destination must never stop the others' transfers
       try {
-        await this.forMember(username, only !== undefined);
+        await this.forMember(username, pass);
       } catch {
         continue;
       }
     }
   }
 
-  private async forMember(username: Username, immediate: boolean): Promise<void> {
+  private async membersOf(pass: SendPass): Promise<readonly Username[]> {
+    switch (pass.kind) {
+      case 'scheduled':
+        return (await this.deps.users.listAll()).map((user) => user.username);
+      case 'immediate':
+        return [pass.member];
+    }
+  }
+
+  private async forMember(username: Username, pass: SendPass): Promise<void> {
     const destination = await this.deps.destinations.findByUsername(username);
     if (destination === undefined) {
       return; // nothing configured: nothing to send, and not an error
     }
-    if (!immediate && !(await this.takeOnInScheduledPass(destination))) {
+    if (pass.kind === 'scheduled' && !(await this.takeOnInScheduledPass(destination))) {
       return; // not their hour yet
     }
     const limit = destination.batchSize.isUnlimited ? undefined : destination.batchSize.value;

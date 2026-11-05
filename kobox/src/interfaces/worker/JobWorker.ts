@@ -24,6 +24,7 @@ import type { PasswordOpenerPort } from '../../domain/user/ports.js';
 import type { Logger } from '../../infrastructure/logging/logger.js';
 import { diskUsagePassWarnings } from '../diskUsagePassWarnings.js';
 import { Username } from '../../domain/user/Username.js';
+import { immediatePassFor, SCHEDULED_PASS } from '../../domain/sync/SendPass.js';
 import type {
   MaintenanceUseCases,
   SecurityUseCases,
@@ -201,8 +202,8 @@ export class JobWorker {
       case 'send-pending-transfers':
         await this.deps.sync.sendPending.execute(
           job.payload.username === undefined
-            ? undefined
-            : Username.parse(job.payload.username),
+            ? SCHEDULED_PASS
+            : immediatePassFor(Username.parse(job.payload.username)),
         );
         return job;
       case 'queue-folder-backlog': {
