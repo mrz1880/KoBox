@@ -9,7 +9,7 @@ import { transferQueueSection } from './transferQueueSection.js';
 import { flash, page, type Viewer } from './layout.js';
 
 // The three modes in the words a member would use about their own files. The
-// legacy offered "Ignore les scripts (Pas de synchro)" — accurate about the
+// legacy offered "Ignore les scripts (Pas de synchro)", accurate about the
 // implementation, silent about what actually happens to your download.
 // A "bit later" folder waits for the member's send hour: the hint names it,
 // filled in from {hour}.

@@ -16,7 +16,7 @@ interface RemoteTarget {
 }
 
 // Where each member's pinned host keys live. Per member, because it is their
-// machine and their trust decision — one shared file would let one member's
+// machine and their trust decision: one shared file would let one member's
 // answer decide another's.
 export const KNOWN_HOSTS_DIR = '/var/lib/kobox/sync';
 
