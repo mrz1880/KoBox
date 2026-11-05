@@ -2,6 +2,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { TransferFailure } from '../../../src/domain/sync/TransferFailure.js';
 import { LocalPath } from '../../../src/domain/sync/LocalPath.js';
 import { SyncTransfer } from '../../../src/domain/sync/SyncTransfer.js';
 import { Label } from '../../../src/domain/torrent/Label.js';
@@ -44,7 +45,7 @@ describe('SqliteSyncTransferRepository', () => {
     const sent = await queued(alice, '/home/alice/rtorrent/complete/Films/Example Film');
     await repo.save(sent.start(AT).succeed(AT));
     const failed = await queued(alice, '/home/alice/rtorrent/complete/Films/Example Show');
-    await repo.save(failed.start(AT).fail('connection refused', AT));
+    await repo.save(failed.start(AT).fail(TransferFailure.explained('no-answer'), AT));
     await queued(alice, '/home/alice/rtorrent/complete/Films/Example Clip');
     const bobs = await queued(bob, '/home/bob/rtorrent/complete/Films/Example Film');
     await repo.save(bobs.start(AT).succeed(AT));
@@ -60,7 +61,7 @@ describe('SqliteSyncTransferRepository', () => {
     const sent = await queued(alice, '/home/alice/rtorrent/complete/Films/Example Film');
     await repo.save(sent.start(AT).succeed(AT));
     const failed = await queued(alice, '/home/alice/rtorrent/complete/Films/Example Show');
-    await repo.save(failed.start(AT).fail('connection refused', AT));
+    await repo.save(failed.start(AT).fail(TransferFailure.explained('no-answer'), AT));
     const sending = await queued(alice, '/home/alice/rtorrent/complete/Films/Example Album');
     await repo.save(sending.start(AT));
     await queued(alice, '/home/alice/rtorrent/complete/Films/Example Clip');

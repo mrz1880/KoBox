@@ -2,6 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { FileTransferPort, TransferOutcome } from '../../domain/sync/ports.js';
+import { TransferFailure } from '../../domain/sync/TransferFailure.js';
 import type { CommandResult, CommandRunner } from './CommandRunner.js';
 import { KNOWN_HOSTS_DIR, KnownHosts, presentsAnotherIdentity } from './KnownHosts.js';
 
@@ -9,39 +10,26 @@ import { KNOWN_HOSTS_DIR, KnownHosts, presentsAnotherIdentity } from './KnownHos
 // hangs forever would hold the pass open behind it.
 const TRANSFER_TIMEOUT_MS = 6 * 60 * 60 * 1000;
 
-// What a transfer that did not arrive records, in words a member can act on.
-// The page shows them through the French catalogue, keyed by these sentences:
-// a test holds every one of them to having a French line.
-export const TRANSFER_FAILURES = {
-  refused: 'the machine refused the account, the password, or that folder',
-  identityChanged:
-    'the machine presented another identity than the one recorded for it, so nothing was sent: if you reinstalled it, test the connection again to accept its new identity, otherwise stop and check why',
-  noRoom: 'the other machine has no room left',
-  dropped: 'the connection dropped part way through: it will resume where it stopped',
-  noAnswer: 'the machine did not answer',
-} as const;
-
-// Turning rsync's and ssh's diagnostics into a sentence a member can act on.
-function explain(stderr: string, exitCode: number): string {
+// Turning rsync's and ssh's diagnostics into a failure a member can act on.
+function explain(stderr: string, exitCode: number): TransferFailure {
   const text = stderr.toLowerCase();
   if (text.includes('permission denied')) {
-    return TRANSFER_FAILURES.refused;
+    return TransferFailure.explained('refused');
   }
   if (presentsAnotherIdentity(stderr)) {
-    return TRANSFER_FAILURES.identityChanged;
+    return TransferFailure.explained('identity-changed');
   }
   if (text.includes('no space left')) {
-    return TRANSFER_FAILURES.noRoom;
+    return TransferFailure.explained('no-room');
   }
   if (text.includes('connection unexpectedly closed') || text.includes('connection reset')) {
-    return TRANSFER_FAILURES.dropped;
+    return TransferFailure.explained('dropped');
   }
   if (text.includes('connection refused') || text.includes('timed out')) {
-    return TRANSFER_FAILURES.noAnswer;
+    return TransferFailure.explained('no-answer');
   }
-  // what rsync said in its own words has no French line: it shows as it came
-  const trimmed = stderr.trim();
-  return trimmed === '' ? `rsync stopped with code ${String(exitCode)}` : trimmed.split('\n')[0] ?? '';
+  const firstLine = stderr.trim().split('\n')[0] ?? '';
+  return firstLine === '' ? TransferFailure.stopped(exitCode) : TransferFailure.reported(firstLine);
 }
 
 type SendRequest = Parameters<FileTransferPort['send']>[0];
@@ -106,7 +94,7 @@ export class RsyncOverSshTransfer implements FileTransferPort {
       rmSync(tree, { recursive: true, force: true });
     }
     if (made.exitCode !== 0) {
-      return { ok: false, detail: explain(made.stderr, made.exitCode) };
+      return { ok: false, failure: explain(made.stderr, made.exitCode) };
     }
     // ONE call. The legacy looped three times with its `break` commented out,
     // so every file crossed the link three times on every pass. Retry belongs to
@@ -130,6 +118,6 @@ export class RsyncOverSshTransfer implements FileTransferPort {
     });
     return result.exitCode === 0
       ? { ok: true }
-      : { ok: false, detail: explain(result.stderr, result.exitCode) };
+      : { ok: false, failure: explain(result.stderr, result.exitCode) };
   }
 }

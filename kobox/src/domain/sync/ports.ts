@@ -3,6 +3,7 @@ import type { HostKeyFingerprint } from './HostKeyFingerprint.js';
 import type { HostKeyTrust } from './HostKeyTrust.js';
 import type { LocalPath } from './LocalPath.js';
 import type { SyncTransfer, TransferState } from './SyncTransfer.js';
+import type { TransferFailure } from './TransferFailure.js';
 import type { RemotePassword } from './RemotePassword.js';
 import type { SyncDestination } from './SyncDestination.js';
 
@@ -70,7 +71,8 @@ export interface LocalFileFactsPort {
 
 export interface TransferOutcome {
   readonly ok: boolean;
-  readonly detail?: string;
+  // why it did not arrive, when the transport could tell
+  readonly failure?: TransferFailure;
   // the identity the machine presented, when the contact got that far
   readonly identity?: HostKeyFingerprint;
 }

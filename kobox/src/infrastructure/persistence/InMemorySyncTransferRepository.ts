@@ -24,7 +24,7 @@ export class InMemorySyncTransferRepository implements SyncTransferRepository {
       source: transfer.source,
       state: transfer.state,
       attempts: transfer.attempts,
-      ...(transfer.lastError !== undefined && { lastError: transfer.lastError }),
+      ...(transfer.failure !== undefined && { failure: transfer.failure }),
       queuedAt: transfer.queuedAt,
       updatedAt: transfer.updatedAt,
     });

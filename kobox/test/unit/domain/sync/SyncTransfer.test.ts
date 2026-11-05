@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { TransferFailure } from '../../../../src/domain/sync/TransferFailure.js';
 import { Label } from '../../../../src/domain/torrent/Label.js';
 import { LocalPath } from '../../../../src/domain/sync/LocalPath.js';
 import { SyncTransfer } from '../../../../src/domain/sync/SyncTransfer.js';
@@ -38,16 +39,16 @@ describe('SyncTransfer', () => {
     const sent = aTransfer().start('2026-08-15 10:01:00').succeed('2026-08-15 10:05:00');
 
     expect(sent.state).toBe('sent');
-    expect(sent.lastError).toBeUndefined();
+    expect(sent.failure).toBeUndefined();
   });
 
   it('should_keep_why_it_failed_so_a_member_is_not_left_guessing', () => {
     const failed = aTransfer()
       .start('2026-08-15 10:01:00')
-      .fail('the machine did not answer in time', '2026-08-15 10:02:00');
+      .fail(TransferFailure.explained('no-answer'), '2026-08-15 10:02:00');
 
     expect(failed.state).toBe('failed');
-    expect(failed.lastError).toBe('the machine did not answer in time');
+    expect(failed.failure).toEqual(TransferFailure.explained('no-answer'));
   });
 
   it('should_go_back_to_waiting_when_a_member_puts_it_back_in_the_queue', () => {
@@ -55,7 +56,7 @@ describe('SyncTransfer', () => {
     // difference between a failure you can fix and one you have to re-download
     const retried = aTransfer()
       .start('2026-08-15 10:01:00')
-      .fail('nothing is listening on that port', '2026-08-15 10:02:00')
+      .fail(TransferFailure.explained('no-answer'), '2026-08-15 10:02:00')
       .requeue('2026-08-15 11:00:00');
 
     expect(retried.state).toBe('waiting');

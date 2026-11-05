@@ -24,7 +24,7 @@ function row(transfer: SyncTransfer, viewer: Viewer): RawHtml {
   <td class="path">${transfer.name}</td>
   <td>${transfer.label.value}</td>
   <td><span class="chip ${words.chip}">${viewer.t(words.text)}</span></td>
-  <td class="reason">${transfer.lastError === undefined ? '' : viewer.t(transfer.lastError)}</td>
+  <td class="reason">${transfer.failure === undefined ? '' : viewer.t(transfer.failure.record)}</td>
   <td class="when">${transfer.updatedAt}</td>
   <td>${
     again === undefined

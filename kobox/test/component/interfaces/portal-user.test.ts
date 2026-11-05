@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
+import { TransferFailure } from '../../../src/domain/sync/TransferFailure.js';
 import { Username } from '../../../src/domain/user/Username.js';
 import { IpAddress } from '../../../src/domain/shared/IpAddress.js';
 import { DynDnsHost } from '../../../src/domain/security/DynDnsHost.js';
@@ -992,7 +993,7 @@ describe('the queue a member can see', () => {
       throw new Error('the fixture failed to queue a transfer');
     }
     await world.transfers.save(
-      queued.start('2026-08-15 10:01:00').fail('the other machine has no room left', '2026-08-15 10:02:00'),
+      queued.start('2026-08-15 10:01:00').fail(TransferFailure.explained('no-room'), '2026-08-15 10:02:00'),
     );
     return queued.id;
   }

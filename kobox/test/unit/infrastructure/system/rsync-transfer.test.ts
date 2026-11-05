@@ -2,6 +2,7 @@ import { mkdtempSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { TransferFailure } from '../../../../src/domain/sync/TransferFailure.js';
 import { HostKeyFingerprint } from '../../../../src/domain/sync/HostKeyFingerprint.js';
 import { LocalPath } from '../../../../src/domain/sync/LocalPath.js';
 import { LoneFilePlacement } from '../../../../src/domain/sync/LoneFilePlacement.js';
@@ -171,9 +172,7 @@ describe('RsyncOverSshTransfer', () => {
 
     const outcome = await transfer(runner);
 
-    expect(outcome.detail).toBe(
-      'the machine presented another identity than the one recorded for it, so nothing was sent: if you reinstalled it, test the connection again to accept its new identity, otherwise stop and check why',
-    );
+    expect(outcome.failure).toEqual(TransferFailure.explained('identity-changed'));
   });
 
   // the send pass records it, as the check does, so the page can show it
@@ -197,16 +196,7 @@ describe('RsyncOverSshTransfer', () => {
     const outcome = await transfer(runner);
 
     expect(outcome.ok).toBe(false);
-    expect(outcome.detail).toContain('connection');
-  });
-
-  it('should_say_a_dropped_connection_resumes_in_a_sentence_without_a_dash', async () => {
-    const runner = new ScriptedRunner();
-    runner.onCommand('rsync', {}, { exitCode: 12, stderr: 'rsync: connection unexpectedly closed' });
-
-    const outcome = await transfer(runner);
-
-    expect(outcome.detail).toBe('the connection dropped part way through: it will resume where it stopped');
+    expect(outcome.failure).toEqual(TransferFailure.explained('dropped'));
   });
 
   it('should_not_copy_at_all_when_the_remote_folder_could_not_be_made', async () => {

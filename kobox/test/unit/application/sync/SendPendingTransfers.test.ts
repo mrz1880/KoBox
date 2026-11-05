@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { TransferFailure } from '../../../../src/domain/sync/TransferFailure.js';
 import { SendPendingTransfers } from '../../../../src/application/sync/SendPendingTransfers.js';
 import { HostKeyFingerprint } from '../../../../src/domain/sync/HostKeyFingerprint.js';
 import { LocalPath } from '../../../../src/domain/sync/LocalPath.js';
@@ -88,7 +89,10 @@ describe('SendPendingTransfers mails', () => {
   });
 
   it('should_tell_the_member_why_the_file_did_not_arrive_and_where_it_still_is', async () => {
-    const { transfers, outbox, useCase } = await world({ ok: false, detail: 'no room left' });
+    const { transfers, outbox, useCase } = await world({
+      ok: false,
+      failure: TransferFailure.explained('no-room'),
+    });
     await queueEpisode(transfers);
 
     await useCase.execute();
@@ -97,7 +101,7 @@ describe('SendPendingTransfers mails', () => {
     expect(mail?.body).toBe(
       [
         'Some.Episode.mkv, from your Series folder, could not be sent to your own machine:',
-        'no room left.',
+        'the other machine has no room left.',
         '',
         'It stays under Folders on your seedbox, where you can try it again.',
         '',
@@ -111,7 +115,9 @@ describe('SendPendingTransfers mails', () => {
 
     await useCase.execute();
 
-    expect((await transfers.listRecent(alice, 10))[0]?.lastError).toBe('it did not go through');
+    expect((await transfers.listRecent(alice, 10))[0]?.failure).toEqual(
+      TransferFailure.explained('unexplained'),
+    );
     expect((await outbox.listDue(NOW, 10))[0]?.body).toContain('\nit did not go through.\n');
   });
 });
