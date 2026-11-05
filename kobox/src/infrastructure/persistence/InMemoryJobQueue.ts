@@ -1,23 +1,23 @@
 import type { Job } from '../../application/jobs/contract.js';
+import type { JobProgressPort, JobState } from '../../application/jobs/JobProgressPort.js';
 import type { ClaimedJob, JobQueuePort } from '../../application/jobs/JobQueuePort.js';
-
-type JobStatus = 'pending' | 'running' | 'done' | 'failed';
 
 interface QueuedJob {
   readonly id: number;
   readonly job: Job;
-  status: JobStatus;
+  status: JobState;
   error?: string;
 }
 
 export interface FailedJob {
+  readonly id: number;
   readonly job: Job;
   readonly error: string;
 }
 
 // A queue that lives as long as the process: what `kobox --direct` drains on
 // the spot, so the jobs the worker would chain run in-process instead.
-export class InMemoryJobQueue implements JobQueuePort {
+export class InMemoryJobQueue implements JobQueuePort, JobProgressPort {
   private readonly rows: QueuedJob[] = [];
   private nextId = 1;
 
@@ -57,6 +57,10 @@ export class InMemoryJobQueue implements JobQueuePort {
     return Promise.resolve();
   }
 
+  stateOf(id: number): Promise<JobState | undefined> {
+    return Promise.resolve(this.rows.find((row) => row.id === id)?.status);
+  }
+
   recoverStale(): Promise<number> {
     const stale = this.rows.filter((row) => row.status === 'running');
     for (const row of stale) {
@@ -66,14 +70,19 @@ export class InMemoryJobQueue implements JobQueuePort {
     return Promise.resolve(stale.length);
   }
 
+  // what still waits for a worker, in the order the jobs were enqueued
+  pending(): readonly Job[] {
+    return this.rows.flatMap((row) => (row.status === 'pending' ? [row.job] : []));
+  }
+
   // what was marked failed, in the order the jobs were enqueued
   failures(): readonly FailedJob[] {
     return this.rows.flatMap((row) =>
-      row.status === 'failed' ? [{ job: row.job, error: row.error ?? '' }] : [],
+      row.status === 'failed' ? [{ id: row.id, job: row.job, error: row.error ?? '' }] : [],
     );
   }
 
-  private settle(id: number, status: JobStatus, error?: string): void {
+  private settle(id: number, status: JobState, error?: string): void {
     const row = this.rows.find((candidate) => candidate.id === id);
     if (row === undefined) {
       return;
