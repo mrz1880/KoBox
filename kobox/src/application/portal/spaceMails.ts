@@ -1,9 +1,10 @@
 import type { OutboxMailDraft } from '../maintenance/MailOutboxPort.js';
-import type { Language } from '../../domain/portal/Language.js';
+import type { Language, LanguageValue } from '../../domain/portal/Language.js';
 import type { CleanupReport } from '../../domain/space/CleanupReport.js';
 import type { Quota } from '../../domain/user/Quota.js';
+import { mailLanguageOf } from './mailLanguage.js';
 
-type MailLanguage = 'fr' | 'en';
+type MailLanguage = LanguageValue;
 
 const GIB_UNIT: Record<MailLanguage, string> = { fr: 'Gio', en: 'GiB' };
 const WHOLE_PERCENT = 100;
@@ -89,12 +90,6 @@ const RUNNING_OUT: Record<MailLanguage, MailText> = {
   },
 };
 
-// The members are French speakers: a member who never chose a language reads
-// French, as in every other member mail.
-function languageOf(language: Language | undefined): MailLanguage {
-  return language?.value ?? 'fr';
-}
-
 // Told once per climb past the critical line: how full the member is, what
 // they could free and where.
 export function spaceRunningOutMail(input: {
@@ -102,7 +97,7 @@ export function spaceRunningOutMail(input: {
   readonly language: Language | undefined;
   readonly facts: RunningOutFacts;
 }): OutboxMailDraft {
-  const language = languageOf(input.language);
+  const language = mailLanguageOf(input.language);
   const text = RUNNING_OUT[language];
   return {
     recipient: input.recipient,
@@ -183,7 +178,7 @@ export function automaticCleanupMail(input: {
   readonly report: CleanupReport;
   readonly url: string;
 }): OutboxMailDraft {
-  const language = languageOf(input.language);
+  const language = mailLanguageOf(input.language);
   const text = AUTOMATIC_CLEANUP[language];
   return {
     recipient: input.recipient,
