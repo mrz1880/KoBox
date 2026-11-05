@@ -526,11 +526,17 @@ and a **Try again** button that puts it back in the queue.
   missed (down, or a clock that skipped it) is caught up by the next pass, once.
   MySB wrote a cron line into every member's own crontab so they could pick their
   hour; the hour is still theirs, and nothing writes into anybody's crontab.
-- **"Send it straight away"** does not wait for that: the finished event chains a
+- **"Send it straight away"** does not wait for that: a download finishing in
+  such a folder, the member sending what one already holds, a **Try again** on
+  one of its transfers, or a working connection check putting one back chains a
   pass for that member alone, deduplicated so several downloads finishing at once
-  do not stack several passes over the same queue.
+  do not stack several passes over the same queue. That pass carries only the
+  transfers of folders that send straight away: what a "bit later" folder holds
+  still waits for the member's hour, whatever started the pass.
 - **Files per pass** caps how many a single pass takes on, for a member who does
   not want one big evening to monopolise their link. 0 means everything waiting.
+  The cap counts what the pass carries, so what waits for the hour never takes
+  the place of what leaves at once.
 - **The same download is queued once.** rTorrent can fire `finished` more than
   once for one torrent; a unique index on (member, source) is what makes the
   second one a no-op rather than a duplicate transfer.
