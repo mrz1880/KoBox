@@ -311,4 +311,22 @@ describe('KoboxDatabase', () => {
 
     expect(alice?.lastCheck).toEqual({ ok: true, at: '2026-11-04 10:00:00' });
   });
+
+  // no pass known yet: the member's hour itself is the next one due, as it
+  // was before passes were recorded, rather than a send at once
+  it('should_start_a_destination_from_before_recorded_passes_with_none', async () => {
+    const old = boxBefore('0041_scheduled-pass');
+    old
+      .prepare(
+        "INSERT INTO sync_destinations (username, host, port, account, sealed_password, path) VALUES ('alice', 'nas.example.org', 22, 'seedbox', 'sealed', '/volume1/torrents')",
+      )
+      .run();
+    old.close();
+
+    const db = KoboxDatabase.open(join(dir, 'kobox.db'));
+    const alice = await new SqliteSyncDestinationRepository(db).findByUsername(Username.parse('alice'));
+    db.close();
+
+    expect(alice?.lastScheduledPass).toBeUndefined();
+  });
 });

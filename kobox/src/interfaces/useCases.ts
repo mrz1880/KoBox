@@ -153,6 +153,7 @@ import type {
 } from '../domain/security/ports.js';
 import type { RenderSettings, RtorrentTemplates } from '../domain/torrent/rendering.js';
 import type { PortalCredentialsPort, SessionStorePort } from '../domain/portal/ports.js';
+import type { WallClockHour } from '../domain/sync/WallClockHour.js';
 import type { PortAllocatorPort } from '../domain/user/PortAllocatorPort.js';
 import type { NextcloudPort } from '../domain/installation/NextcloudPort.js';
 import type { ComponentRegistry } from '../domain/installation/ports.js';
@@ -547,7 +548,8 @@ export interface SyncUseCaseDeps {
   readonly facts: LocalFileFactsPort;
   readonly torrents: TorrentRepository;
   readonly clock: () => string;
-  readonly hour: () => number;
+  // the box's clock, the one a member's send hour is read on
+  readonly wallClock: () => WallClockHour;
 }
 
 // Root-side only. Sealing lives in the portal container: it needs the public
@@ -592,7 +594,7 @@ export function buildSyncUseCases(deps: SyncUseCaseDeps): SyncUseCases {
       transport: deps.transport,
       facts: deps.facts,
       clock: deps.clock,
-      hour: deps.hour,
+      wallClock: deps.wallClock,
     }),
     requeue: new RequeueTransfer({
       transfers: deps.transfers,

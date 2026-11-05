@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { WallClockHour } from '../../../src/domain/sync/WallClockHour.js';
 import { TransferFailure } from '../../../src/domain/sync/TransferFailure.js';
 import { parseJob, type Job } from '../../../src/application/jobs/contract.js';
 import type { BackupHostPort } from '../../../src/application/maintenance/BackupHostPort.js';
@@ -472,7 +473,7 @@ beforeEach(() => {
     transport: { send: () => Promise.resolve({ ok: true }) },
     facts: { isDirectory: () => Promise.resolve(false), exists: () => Promise.resolve(true) },
     torrents,
-    hour: () => 2,
+    wallClock: () => WallClockHour.parse('2026-08-15 02'),
     // the sealed blob is opaque here: this suite proves the worker asks, not
     // that RSA works — that is the cipher's own test
     opener: { open: () => Promise.resolve(RemotePassword.parse('from-the-seal')) },

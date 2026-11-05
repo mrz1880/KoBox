@@ -15,6 +15,7 @@ import { RETIRED_SERVICES } from '../domain/installation/retired.js';
 import { UninstallComponents } from '../application/installation/UninstallComponents.js';
 import { COMPONENT_CATALOG } from '../domain/installation/catalog.js';
 import { stampOf } from '../domain/shared/stamp.js';
+import { WallClockHour } from '../domain/sync/WallClockHour.js';
 import { EmailAddress } from '../domain/user/EmailAddress.js';
 import { SqliteComponentRegistry } from '../infrastructure/persistence/SqliteComponentRegistry.js';
 import { AptPackageAdapter } from '../infrastructure/system/AptPackageAdapter.js';
@@ -253,6 +254,16 @@ function portalAddress(db: KoboxDatabase): PortalAddressPort {
 
 export function nowStamp(): string {
   return stampOf(new Date());
+}
+
+// The hour the box's own clock shows, in its own zone: the one a member picks
+// their send hour on.
+function boxWallClockHour(): WallClockHour {
+  const now = new Date();
+  const twoDigits = (value: number): string => String(value).padStart(2, '0');
+  return WallClockHour.parse(
+    `${String(now.getFullYear())}-${twoDigits(now.getMonth() + 1)}-${twoDigits(now.getDate())} ${twoDigits(now.getHours())}`,
+  );
 }
 
 // The operator's alert address as an address, when it is one: an admin with
@@ -942,7 +953,7 @@ export function buildContainer(name: string): Container {
     transport: new RsyncOverSshTransfer(runner),
     facts: new FsLocalFileFacts(),
     torrents: new SqliteTorrentRepository(db),
-    hour: () => new Date().getHours(),
+    wallClock: boxWallClockHour,
     // the private half of the host key: root only, which is why this lives in
     // the worker container and not in the portal's
     opener: remotePasswordCipher(),

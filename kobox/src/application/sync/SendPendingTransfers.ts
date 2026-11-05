@@ -2,6 +2,7 @@ import type { HostKeyFingerprint } from '../../domain/sync/HostKeyFingerprint.js
 import type { SyncDestination } from '../../domain/sync/SyncDestination.js';
 import type { SyncTransfer } from '../../domain/sync/SyncTransfer.js';
 import { TransferFailure } from '../../domain/sync/TransferFailure.js';
+import type { WallClockHour } from '../../domain/sync/WallClockHour.js';
 import type {
   FileTransferPort,
   LocalFileFactsPort,
@@ -28,8 +29,8 @@ interface Deps {
   readonly transport: FileTransferPort;
   readonly facts: LocalFileFactsPort;
   readonly clock: () => string;
-  // the hour it is right now, so the pass can tell whose turn it is
-  readonly hour: () => number;
+  // the box's clock right now, so the pass can tell whose turn it is
+  readonly wallClock: () => WallClockHour;
 }
 
 // The pass that carries waiting downloads across. Runs in the ROOT WORKER: it
@@ -64,7 +65,7 @@ export class SendPendingTransfers {
     if (destination === undefined) {
       return; // nothing configured: nothing to send, and not an error
     }
-    if (!immediate && !destination.sendHour.hasCome(this.deps.hour())) {
+    if (!immediate && !(await this.takeOnInScheduledPass(destination))) {
       return; // not their hour yet
     }
     const limit = destination.batchSize.isUnlimited ? undefined : destination.batchSize.value;
@@ -80,6 +81,15 @@ export class SendPendingTransfers {
     if (identity !== undefined) {
       await this.recordIdentity(destination, identity);
     }
+  }
+
+  // Whether this scheduled pass sends the member's queue. It records that it
+  // took them on, due or not, before anything is sent: the next pass then
+  // knows which hours it missed (see SendHour.isDueAt).
+  private async takeOnInScheduledPass(destination: SyncDestination): Promise<boolean> {
+    const now = this.deps.wallClock();
+    await this.deps.destinations.save(destination.recordScheduledPass(now));
+    return destination.isDueForScheduledPassAt(now);
   }
 
   // The machine's identity, as this pass met it, goes where the check puts it.

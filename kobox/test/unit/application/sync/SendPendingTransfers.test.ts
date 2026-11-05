@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { WallClockHour } from '../../../../src/domain/sync/WallClockHour.js';
 import { TransferFailure } from '../../../../src/domain/sync/TransferFailure.js';
 import { SendPendingTransfers } from '../../../../src/application/sync/SendPendingTransfers.js';
 import { HostKeyFingerprint } from '../../../../src/domain/sync/HostKeyFingerprint.js';
@@ -68,7 +69,7 @@ async function world(outcome: TransferOutcome, language?: Language) {
     transport: { send: () => Promise.resolve(outcome) },
     facts: { isDirectory: () => Promise.resolve(false), exists: () => Promise.resolve(true) },
     clock: () => NOW,
-    hour: () => 2,
+    wallClock: () => WallClockHour.parse('2026-08-15 02'),
   });
   return { destinations, transfers, outbox, opened, useCase };
 }
