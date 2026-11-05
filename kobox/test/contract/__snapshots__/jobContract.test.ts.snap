@@ -130,6 +130,14 @@ exports[`job contract > should_keep_the_wire_contract_stable 1`] = `
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "additionalProperties": false,
     "properties": {
+      "trust": {
+        "default": "keep-recorded",
+        "enum": [
+          "keep-recorded",
+          "accept-presented",
+        ],
+        "type": "string",
+      },
       "username": {
         "pattern": "^[a-z][a-z0-9]{0,31}$",
         "type": "string",
@@ -137,6 +145,7 @@ exports[`job contract > should_keep_the_wire_contract_stable 1`] = `
     },
     "required": [
       "username",
+      "trust",
     ],
     "type": "object",
   },

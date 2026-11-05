@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Language } from '../../../../src/domain/portal/Language.js';
+import { HostKeyFingerprint } from '../../../../src/domain/sync/HostKeyFingerprint.js';
 import { LoneFilePlacement } from '../../../../src/domain/sync/LoneFilePlacement.js';
 import { RemoteAccount } from '../../../../src/domain/sync/RemoteAccount.js';
 import { RemoteHost } from '../../../../src/domain/sync/RemoteHost.js';
@@ -22,7 +23,7 @@ const frenchMember: Viewer = {
   csrfToken: 'csrf',
 };
 
-function checkedWith(detail: string): SyncDestination {
+function aDestination(): SyncDestination {
   return SyncDestination.define({
     username: Username.parse('alice'),
     host: RemoteHost.parse('nas.example.org'),
@@ -33,7 +34,11 @@ function checkedWith(detail: string): SyncDestination {
     batchSize: TransferBatchSize.unlimited(),
     placement: LoneFilePlacement.besideTheOthers,
     sendHour: SendHour.default(),
-  }).recordCheck({ ok: false, at: '2026-11-04 10:00:00', detail });
+  });
+}
+
+function checkedWith(detail: string): SyncDestination {
+  return aDestination().recordCheck({ ok: false, at: '2026-11-04 10:00:00', detail });
 }
 
 describe('the verdict of the destination check', () => {
@@ -48,6 +53,22 @@ describe('the verdict of the destination check', () => {
 
     expect(section).toContain(
       'le compte peut se connecter mais ne peut pas écrire dans ce dossier',
+    );
+  });
+
+  // a transfer to a machine never tested is its first contact: the page shows
+  // what it presented itself as, though no check ran
+  it('should_show_the_identity_a_transfer_recorded_before_any_check', () => {
+    const destination = aDestination();
+    const known = destination.recognise(HostKeyFingerprint.parse('SHA256:abc'), destination);
+
+    expect(destinationSection(known, frenchMember).value).toContain('SHA256:abc');
+  });
+
+  // the sentence a refused transfer shows sends the member here
+  it('should_say_testing_is_how_a_reinstalled_machine_is_trusted_again', () => {
+    expect(destinationSection(aDestination(), frenchMember).value).toContain(
+      'Si vous avez réinstallé votre machine, c’est aussi ce qui fait accepter sa nouvelle identité à KoBox.',
     );
   });
 });

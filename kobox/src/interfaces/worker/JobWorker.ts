@@ -325,7 +325,10 @@ export class JobWorker {
         return outcome === 'straight-away' ? { sendNowFor: job.payload.username } : undefined;
       }
       case 'check-sync-destination':
-        await this.deps.sync.checkDestination.execute(Username.parse(job.payload.username));
+        await this.deps.sync.checkDestination.execute(
+          Username.parse(job.payload.username),
+          job.payload.trust,
+        );
         return;
       case 'set-category-sync-mode':
         await this.deps.torrents.setCategorySyncMode.execute({

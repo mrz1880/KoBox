@@ -1,3 +1,4 @@
+import type { HostKeyTrust } from '../../domain/sync/HostKeyTrust.js';
 import type { ProbeOutcome } from '../../domain/sync/ports.js';
 import type {
   RemotePasswordOpenerPort,
@@ -20,18 +21,25 @@ interface Deps {
 export class CheckSyncDestination {
   constructor(private readonly deps: Deps) {}
 
-  async execute(username: Username): Promise<void> {
+  // `trust` says whether this check may accept a new identity of the machine:
+  // the member testing the connection may, the check following a save may not
+  // (see HostKeyTrust)
+  async execute(username: Username, trust: HostKeyTrust): Promise<void> {
     const destination = await this.deps.destinations.findByUsername(username);
     if (destination === undefined) {
       return; // nothing configured: nothing to check, and not an error
     }
-    const outcome = await this.probeOrExplain(destination);
+    const { identity, ...verdict } = await this.probeOrExplain(destination, trust);
+    const checked = destination.recordCheck({ ...verdict, at: this.deps.clock() });
     await this.deps.destinations.save(
-      destination.recordCheck({ ...outcome, at: this.deps.clock() }),
+      identity === undefined ? checked : checked.recognise(identity, destination),
     );
   }
 
-  private async probeOrExplain(destination: SyncDestination): Promise<ProbeOutcome> {
+  private async probeOrExplain(
+    destination: SyncDestination,
+    trust: HostKeyTrust,
+  ): Promise<ProbeOutcome> {
     // Two failures, two different things to do about them — so two catches. One
     // catch around both would tell a member to retype a password that is
     // perfectly fine, and send them chasing the wrong thing.
@@ -47,7 +55,7 @@ export class CheckSyncDestination {
       };
     }
     try {
-      return await this.deps.probe.probe(destination, password);
+      return await this.deps.probe.probe(destination, password, trust);
     } catch {
       // the check machinery itself is broken (a missing binary, a refused
       // spawn). That is ours to fix, not theirs.

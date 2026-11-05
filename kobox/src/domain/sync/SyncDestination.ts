@@ -1,4 +1,5 @@
 import type { Username } from '../user/Username.js';
+import type { HostKeyFingerprint } from './HostKeyFingerprint.js';
 import { LoneFilePlacement } from './LoneFilePlacement.js';
 import type { RemoteAccount } from './RemoteAccount.js';
 import type { RemoteHost } from './RemoteHost.js';
@@ -14,8 +15,6 @@ export interface ConnectionCheck {
   readonly ok: boolean;
   readonly at: string;
   readonly detail?: string;
-  // the host key we saw, so a change can be reported rather than accepted
-  readonly fingerprint?: string;
 }
 
 interface SyncDestinationProps {
@@ -32,6 +31,8 @@ interface SyncDestinationProps {
   // absent on a destination set before the choice existed: the default holds
   readonly transferMails?: TransferMails;
   readonly lastCheck?: ConnectionCheck;
+  // the identity the machine presented on the last contact, check or transfer
+  readonly identity?: HostKeyFingerprint;
 }
 
 export interface ConnectionSettings {
@@ -40,6 +41,9 @@ export interface ConnectionSettings {
   readonly account: RemoteAccount;
   readonly path: RemotePath;
 }
+
+// Where a contact reached: the machine, whatever account and folder on it
+export type MachineAddress = Pick<ConnectionSettings, 'host' | 'port'>;
 
 // Where one member's finished downloads go. One per member, identified by the
 // username — the legacy stored the same thing in a single-row `ident` table.
@@ -58,6 +62,7 @@ export class SyncDestination {
   readonly sendHour: SendHour;
   readonly transferMails: TransferMails;
   readonly lastCheck?: ConnectionCheck;
+  readonly identity?: HostKeyFingerprint;
 
   private constructor(props: SyncDestinationProps) {
     this.username = props.username;
@@ -73,9 +78,12 @@ export class SyncDestination {
     if (props.lastCheck !== undefined) {
       this.lastCheck = props.lastCheck;
     }
+    if (props.identity !== undefined) {
+      this.identity = props.identity;
+    }
   }
 
-  static define(props: Omit<SyncDestinationProps, 'lastCheck'>): SyncDestination {
+  static define(props: Omit<SyncDestinationProps, 'lastCheck' | 'identity'>): SyncDestination {
     return new SyncDestination(props);
   }
 
@@ -104,8 +112,16 @@ export class SyncDestination {
   //
   // Built from connection() rather than props(): any earlier verdict was earned
   // against the old host, account or path and says nothing about the new one.
+  //
+  // The machine's identity stays as long as it is the same machine: another
+  // host or port is another machine, whose identity is still to be seen.
   withConnection(settings: ConnectionSettings): SyncDestination {
-    return new SyncDestination({ ...this.connection(), ...settings });
+    const { identity, ...rest } = this.connection();
+    return new SyncDestination({
+      ...rest,
+      ...settings,
+      ...(identity !== undefined && this.isAt(settings) && { identity }),
+    });
   }
 
   // Same reasoning: a different password is a different question.
@@ -139,9 +155,23 @@ export class SyncDestination {
     return new SyncDestination({ ...this.connection(), lastCheck: check });
   }
 
+  // What the machine presented on a contact. KoBox's own record of its host key
+  // is what trusts or refuses it; this is what the page shows of it.
+  recognise(identity: HostKeyFingerprint, contacted: MachineAddress): SyncDestination {
+    if (!this.isAt(contacted)) {
+      return this;
+    }
+    return new SyncDestination({ ...this.props(), identity });
+  }
+
+  private isAt(machine: MachineAddress): boolean {
+    return this.host.equals(machine.host) && this.port.equals(machine.port);
+  }
+
   // everything except the verdict
   private connection(): Omit<SyncDestinationProps, 'lastCheck'> {
     return {
+      ...(this.identity !== undefined && { identity: this.identity }),
       username: this.username,
       host: this.host,
       port: this.port,

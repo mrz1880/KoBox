@@ -411,6 +411,10 @@ export const syncDestinations = sqliteTable('sync_destinations', {
   lastCheckOk: integer('last_check_ok'),
   lastCheckAt: text('last_check_at'),
   lastCheckDetail: text('last_check_detail'),
+  // the identity the machine presented on the last contact, a check or a
+  // transfer: a copy, for the page, of what the member's known_hosts file
+  // (authoritative, see KnownHosts) recorded. The name predates transfers
+  // recording it too.
   lastCheckFingerprint: text('last_check_fingerprint'),
 });
 

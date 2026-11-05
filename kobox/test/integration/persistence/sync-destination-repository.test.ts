@@ -2,6 +2,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { HostKeyFingerprint } from '../../../src/domain/sync/HostKeyFingerprint.js';
 import { LoneFilePlacement } from '../../../src/domain/sync/LoneFilePlacement.js';
 import { RemoteAccount } from '../../../src/domain/sync/RemoteAccount.js';
 import { RemoteHost } from '../../../src/domain/sync/RemoteHost.js';
@@ -31,22 +32,36 @@ afterEach(() => {
   rmSync(dir, { recursive: true, force: true });
 });
 
+function aDestination(): SyncDestination {
+  return SyncDestination.define({
+    username: alice,
+    host: RemoteHost.parse('nas.example.org'),
+    port: RemotePort.parse(22),
+    account: RemoteAccount.parse('seedbox'),
+    sealedPassword: 'sealed-blob',
+    path: RemotePath.parse('/volume1/torrents'),
+    batchSize: TransferBatchSize.unlimited(),
+    placement: LoneFilePlacement.besideTheOthers,
+    sendHour: SendHour.default(),
+  });
+}
+
 describe('SqliteSyncDestinationRepository', () => {
   it('should_keep_the_members_choice_of_transfer_mails', async () => {
-    const destination = SyncDestination.define({
-      username: alice,
-      host: RemoteHost.parse('nas.example.org'),
-      port: RemotePort.parse(22),
-      account: RemoteAccount.parse('seedbox'),
-      sealedPassword: 'sealed-blob',
-      path: RemotePath.parse('/volume1/torrents'),
-      batchSize: TransferBatchSize.unlimited(),
-      placement: LoneFilePlacement.besideTheOthers,
-      sendHour: SendHour.default(),
-    });
-
-    await repo.save(destination.withTransferMails('failures'));
+    await repo.save(aDestination().withTransferMails('failures'));
 
     expect((await repo.findByUsername(alice))?.transferMails).toBe('failures');
+  });
+
+  // a transfer to a machine never tested records its identity with no verdict
+  it('should_keep_the_identity_of_a_machine_that_was_never_checked', async () => {
+    const destination = aDestination();
+    const identity = HostKeyFingerprint.parse('SHA256:abc');
+
+    await repo.save(destination.recognise(identity, destination));
+
+    const found = await repo.findByUsername(alice);
+    expect(found?.identity).toEqual(identity);
+    expect(found?.lastCheck).toBeUndefined();
   });
 });

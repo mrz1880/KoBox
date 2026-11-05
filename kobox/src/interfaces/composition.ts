@@ -733,6 +733,7 @@ export function buildPortalContainer(name: string): PortalContainer {
     setDestination: new SetSyncDestination({
       destinations: syncDestinations,
       sealer: remotePasswordCipher(),
+      queue,
     }),
     outbox,
     media: new SqliteMediaRepository(db),
@@ -967,6 +968,7 @@ export function buildContainer(name: string): Container {
     setDestination: new SetSyncDestination({
       destinations: syncDestinationRepo,
       sealer: remotePasswordCipher(),
+      queue,
     }),
     torrentUseCases,
     trackerUseCases,

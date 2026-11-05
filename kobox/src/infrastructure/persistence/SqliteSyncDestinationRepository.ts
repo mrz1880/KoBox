@@ -1,4 +1,5 @@
 import { eq } from 'drizzle-orm';
+import { HostKeyFingerprint } from '../../domain/sync/HostKeyFingerprint.js';
 import { LoneFilePlacement } from '../../domain/sync/LoneFilePlacement.js';
 import { RemoteAccount } from '../../domain/sync/RemoteAccount.js';
 import { RemoteHost } from '../../domain/sync/RemoteHost.js';
@@ -23,7 +24,6 @@ function checkOf(row: DestinationRow): ConnectionCheck | undefined {
     ok: row.lastCheckOk === 1,
     at: row.lastCheckAt,
     ...(row.lastCheckDetail !== null && { detail: row.lastCheckDetail }),
-    ...(row.lastCheckFingerprint !== null && { fingerprint: row.lastCheckFingerprint }),
   };
 }
 
@@ -53,6 +53,9 @@ export class SqliteSyncDestinationRepository implements SyncDestinationRepositor
         sendHour: SendHour.parse(row.sendHour),
         transferMails: parseTransferMails(row.transferMails),
         ...(check !== undefined && { lastCheck: check }),
+        ...(row.lastCheckFingerprint !== null && {
+          identity: HostKeyFingerprint.parse(row.lastCheckFingerprint),
+        }),
       }),
     );
   }
@@ -72,7 +75,7 @@ export class SqliteSyncDestinationRepository implements SyncDestinationRepositor
       lastCheckOk: destination.lastCheck === undefined ? null : destination.lastCheck.ok ? 1 : 0,
       lastCheckAt: destination.lastCheck?.at ?? null,
       lastCheckDetail: destination.lastCheck?.detail ?? null,
-      lastCheckFingerprint: destination.lastCheck?.fingerprint ?? null,
+      lastCheckFingerprint: destination.identity?.value ?? null,
     };
     this.db.orm
       .insert(syncDestinations)

@@ -1,5 +1,5 @@
 import { execFileSync, type ExecFileSyncOptions } from 'node:child_process';
-import { chmodSync, existsSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import Database from 'better-sqlite3';
@@ -82,6 +82,24 @@ function markerCount(): number {
   } catch {
     return 0;
   }
+}
+
+// A real file where a real finished download of the films folder would have
+// left one, announced by rTorrent's own shim, then the spool sweep, the event
+// that queues the transfer and the immediate pass it chains: one drain per step
+function finishDownload(name: string, infoHash: string): void {
+  const completed = join(HOME, 'rtorrent/complete/films');
+  sh('install', ['-d', '-o', USER, '-g', USER, completed]);
+  const payload = join(completed, name);
+  writeFileSync(payload, 'x'.repeat(4096));
+  sh('chown', [`${USER}:${USER}`, payload]);
+  sh('runuser', [
+    '-u', USER, '--', 'sh', join(HOME, '.rTorrent_finished.sh'),
+    infoHash, payload, completed, name, '', 'films',
+  ]);
+  drainQueue();
+  drainQueue();
+  drainQueue();
 }
 
 const FINISHED_HASH = 'A1B2C3D4E5F6A7B8C9D0A1B2C3D4E5F6A7B8C9D0';
@@ -303,31 +321,7 @@ describe.skipIf(!onDebianAsRoot)('E2E: torrent lifecycle with a real rtorrent', 
     kobox(['set-category-sync-mode', USER, 'films', 'immediate']);
     drainQueue();
 
-    // a real file where a real finished download would have left one
-    const completed = join(HOME, 'rtorrent/complete/films');
-    sh('install', ['-d', '-o', USER, '-g', USER, completed]);
-    const payload = join(completed, 'Some.Release.2026.mkv');
-    writeFileSync(payload, 'x'.repeat(4096));
-    sh('chown', [`${USER}:${USER}`, payload]);
-
-    sh('runuser', [
-      '-u',
-      USER,
-      '--',
-      'sh',
-      join(HOME, '.rTorrent_finished.sh'),
-      'c'.repeat(40),
-      payload,
-      completed,
-      'Some.Release.2026.mkv',
-      '',
-      'films',
-    ]);
-    // the spool sweep runs the event, which queues the transfer and chains the
-    // immediate pass: one drain per step
-    drainQueue();
-    drainQueue();
-    drainQueue();
+    finishDownload('Some.Release.2026.mkv', 'c'.repeat(40));
 
     const row = dbRow('SELECT state, last_error FROM sync_transfers WHERE username = ?', USER);
     expect(row?.state, String(row?.last_error)).toBe('sent');
@@ -337,6 +331,91 @@ describe.skipIf(!onDebianAsRoot)('E2E: torrent lifecycle with a real rtorrent', 
     expect(existsSync(landed)).toBe(true);
     expect(readFileSync(landed, 'utf8')).toHaveLength(4096);
   }, 120_000);
+
+  // Seen on 2026-11-05: a member who never ran the check had every transfer
+  // refused for five days, the machine having no recorded identity. A second
+  // sshd of this test's own, on a port of its own, stands for a member's
+  // machine that is reinstalled half way.
+  it('should_record_a_machine_on_first_contact_by_a_transfer_and_accept_a_new_identity_only_on_a_test', () => {
+    const TARGET = 'e2esynctarget';
+    const inbox = `/home/${TARGET}/incoming`;
+    const PORT = '2222';
+    const entry = `[127.0.0.1]:${PORT}`;
+    const knownHosts = `/var/lib/kobox/sync/${USER}.known_hosts`;
+    const keys = mkdtempSync(join(tmpdir(), 'kobox-sshd-e2e-'));
+    const pidFile = join(keys, 'sshd.pid');
+    const identityOf = (key: string): string =>
+      /SHA256:\S+/.exec(sh('ssh-keygen', ['-lf', `${key}.pub`]))?.[0] ?? '';
+    const startSshd = (key: string): void => {
+      sh('/usr/sbin/sshd', [
+        '-p', PORT, '-h', key, '-o', 'ListenAddress=127.0.0.1', '-o', `PidFile=${pidFile}`,
+      ]);
+    };
+    const stopSshd = (): void => {
+      if (existsSync(pidFile)) {
+        const pid = readFileSync(pidFile, 'utf8').trim();
+        sh('kill', [pid]);
+        sh('sh', ['-c', `while kill -0 ${pid} 2>/dev/null; do sleep 0.1; done`]);
+        rmSync(pidFile, { force: true });
+      }
+    };
+    const transferOf = (name: string): Record<string, unknown> | undefined =>
+      dbRow('SELECT state, last_error FROM sync_transfers WHERE username = ? AND source LIKE ?', USER, `%/${name}`);
+    const recordedIdentity = (): unknown =>
+      dbRow('SELECT last_check_fingerprint FROM sync_destinations WHERE username = ?', USER)
+        ?.last_check_fingerprint;
+    for (const key of ['before', 'after']) {
+      sh('ssh-keygen', ['-q', '-t', 'ed25519', '-N', '', '-f', join(keys, key)]);
+    }
+    try {
+      // saved while the machine is off: the check that follows the save meets
+      // nothing, so nothing is recorded of the machine
+      kobox(['set-sync-destination', USER, '127.0.0.1', PORT, TARGET, inbox], 'nas-password-42\n');
+      drainQueue();
+      expect(dbRow('SELECT last_check_ok FROM sync_destinations WHERE username = ?', USER)?.last_check_ok).toBe(0);
+      expect(recordedIdentity()).toBeNull();
+
+      // first contact is a transfer: it goes through and records the machine
+      startSshd(join(keys, 'before'));
+      finishDownload('First.Contact.mkv', 'd'.repeat(40));
+      expect(transferOf('First.Contact.mkv')?.state, String(transferOf('First.Contact.mkv')?.last_error)).toBe('sent');
+      expect(existsSync(`${inbox}/films/First.Contact.mkv`)).toBe(true);
+      expect(sh('ssh-keygen', ['-F', entry, '-f', knownHosts])).toContain('found');
+      expect(recordedIdentity()).toBe(identityOf(join(keys, 'before')));
+
+      // reinstalled: a transfer never accepts the new identity, and says what to do
+      stopSshd();
+      startSshd(join(keys, 'after'));
+      finishDownload('After.Reinstall.mkv', 'e'.repeat(40));
+      expect(transferOf('After.Reinstall.mkv')).toEqual({
+        state: 'failed',
+        last_error:
+          'the machine presented another identity than the one recorded for it, so nothing was sent: if you reinstalled it, test the connection again to accept its new identity, otherwise stop and check why',
+      });
+      expect(existsSync(`${inbox}/films/After.Reinstall.mkv`)).toBe(false);
+      expect(recordedIdentity()).toBe(identityOf(join(keys, 'before')));
+
+      // the member tests the connection: that accepts the new identity
+      kobox(['check-sync-destination', USER, '--trust', 'accept-presented']);
+      drainQueue();
+      const checked = dbRow('SELECT last_check_ok, last_check_detail FROM sync_destinations WHERE username = ?', USER);
+      expect(checked?.last_check_ok, String(checked?.last_check_detail)).toBe(1);
+      expect(recordedIdentity()).toBe(identityOf(join(keys, 'after')));
+      finishDownload('Once.Accepted.mkv', 'f'.repeat(40));
+      expect(transferOf('Once.Accepted.mkv')?.state).toBe('sent');
+    } finally {
+      stopSshd();
+      try {
+        sh('ssh-keygen', ['-R', entry, '-f', knownHosts], { stdio: 'ignore' });
+      } catch {
+        /* never recorded */
+      }
+      rmSync(keys, { recursive: true, force: true });
+      // the suite's other tests send to the box's own sshd
+      kobox(['set-sync-destination', USER, '127.0.0.1', '22', TARGET, inbox], 'nas-password-42\n');
+      drainQueue();
+    }
+  }, 180_000);
 
   it('should_process_a_finished_event_from_the_real_shim_and_fan_out_user_scripts', () => {
     sh('install', ['-d', '-o', USER, '-g', 'kobox-users', join(HOME, 'scripts')]);

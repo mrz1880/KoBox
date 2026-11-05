@@ -135,7 +135,8 @@ const FR: Readonly<Record<string, string>> = {
   'Testing the connection.': 'Test de la connexion.',
   'Test message queued. It goes out on the next send pass, within five minutes.':
     'Message de test en file. Il part au prochain envoi, d’ici cinq minutes.',
-  'Saved. Test it before you rely on it.': 'Enregistré. Testez-le avant de compter dessus.',
+  'Saved, and the connection tested.': 'Enregistré, et la connexion testée.',
+  'Saved. A test is already running.': 'Enregistré. Un test est déjà en cours.',
   'Saved. Run kobox install on the box to request the certificate.':
     'Enregistré. Lancez kobox install sur la box pour demander le certificat.',
   'Saved. It applies to what they add from now on, and changes nothing already on disk.':
@@ -429,8 +430,8 @@ const FR: Readonly<Record<string, string>> = {
     'le compte peut se connecter mais ne peut pas écrire dans ce dossier',
   'the account works, but that folder does not exist or cannot be read':
     'le compte fonctionne, mais ce dossier n’existe pas ou ne peut pas être lu',
-  'the machine answered, but with a different identity than last time: if you did not just reinstall it, stop and check why':
-    'la machine a répondu, mais avec une autre identité que la dernière fois : si vous ne venez pas de la réinstaller, arrêtez-vous et cherchez pourquoi',
+  'the machine presented another identity than the one recorded for it: if you reinstalled it, test the connection again to accept its new identity, otherwise stop and check why':
+    'la machine s’est présentée avec une autre identité que celle enregistrée pour elle : si vous l’avez réinstallée, testez à nouveau la connexion pour accepter sa nouvelle identité, sinon arrêtez-vous et cherchez pourquoi',
   'the machine answered but refused the account or the password':
     'la machine a répondu mais a refusé le compte ou le mot de passe',
   'nothing is listening on that port': 'rien n’écoute sur ce port',
@@ -464,6 +465,8 @@ const FR: Readonly<Record<string, string>> = {
   'Test it now': 'La tester maintenant',
   'Connects, then checks the folder can be written to. Takes a few seconds: reload the page for the answer.':
     'Se connecte, puis vérifie qu’on peut écrire dans le dossier. Cela prend quelques secondes : rechargez la page pour la réponse.',
+  'If you reinstalled your machine, this is also how KoBox accepts its new identity.':
+    'Si vous avez réinstallé votre machine, c’est aussi ce qui fait accepter sa nouvelle identité à KoBox.',
   'What has been sent': 'Ce qui a été envoyé',
   'Nothing yet. Once a folder set to send finishes a download, it turns up here.':
     'Rien pour l’instant. Dès qu’un dossier réglé pour envoyer termine un téléchargement, il apparaît ici.',
@@ -472,8 +475,8 @@ const FR: Readonly<Record<string, string>> = {
   // why a transfer did not arrive, as the worker recorded it
   'the machine refused the account, the password, or that folder':
     'la machine a refusé le compte, le mot de passe ou ce dossier',
-  'the machine answered with a different identity than the one you tested: nothing was sent':
-    'la machine a répondu avec une autre identité que celle que vous avez testée : rien n’a été envoyé',
+  'the machine presented another identity than the one recorded for it, so nothing was sent: if you reinstalled it, test the connection again to accept its new identity, otherwise stop and check why':
+    'la machine s’est présentée avec une autre identité que celle enregistrée pour elle, donc rien n’a été envoyé : si vous l’avez réinstallée, testez à nouveau la connexion pour accepter sa nouvelle identité, sinon arrêtez-vous et cherchez pourquoi',
   'the other machine has no room left': 'l’autre machine n’a plus de place',
   'the connection dropped part way through: it will resume where it stopped':
     'la connexion a coupé en cours de route : elle reprendra là où elle s’est arrêtée',

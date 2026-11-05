@@ -1,4 +1,6 @@
 import type { Username } from '../user/Username.js';
+import type { HostKeyFingerprint } from './HostKeyFingerprint.js';
+import type { HostKeyTrust } from './HostKeyTrust.js';
 import type { LocalPath } from './LocalPath.js';
 import type { SyncTransfer, TransferState } from './SyncTransfer.js';
 import type { RemotePassword } from './RemotePassword.js';
@@ -26,13 +28,18 @@ export interface RemotePasswordOpenerPort {
 export interface ProbeOutcome {
   readonly ok: boolean;
   readonly detail?: string;
-  readonly fingerprint?: string;
+  // the identity the machine presented, when the contact got that far
+  readonly identity?: HostKeyFingerprint;
 }
 
 // Reaches the member's own machine and comes back with an answer. Root-side:
 // it opens a password the portal cannot read.
 export interface RemoteProbePort {
-  probe(destination: SyncDestination, password: RemotePassword): Promise<ProbeOutcome>;
+  probe(
+    destination: SyncDestination,
+    password: RemotePassword,
+    trust: HostKeyTrust,
+  ): Promise<ProbeOutcome>;
 }
 
 export interface SyncTransferRepository {
@@ -64,6 +71,8 @@ export interface LocalFileFactsPort {
 export interface TransferOutcome {
   readonly ok: boolean;
   readonly detail?: string;
+  // the identity the machine presented, when the contact got that far
+  readonly identity?: HostKeyFingerprint;
 }
 
 // Carries one finished download across. Root-side: it opens a password the

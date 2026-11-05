@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { SendPendingTransfers } from '../../../../src/application/sync/SendPendingTransfers.js';
+import { HostKeyFingerprint } from '../../../../src/domain/sync/HostKeyFingerprint.js';
 import { LocalPath } from '../../../../src/domain/sync/LocalPath.js';
 import { LoneFilePlacement } from '../../../../src/domain/sync/LoneFilePlacement.js';
 import { RemoteAccount } from '../../../../src/domain/sync/RemoteAccount.js';
@@ -59,7 +60,7 @@ async function world(outcome: TransferOutcome) {
     clock: () => NOW,
     hour: () => 2,
   });
-  return { transfers, outbox, opened, useCase };
+  return { destinations, transfers, outbox, opened, useCase };
 }
 
 async function queueEpisode(transfers: InMemorySyncTransferRepository): Promise<void> {
@@ -123,5 +124,19 @@ describe('SendPendingTransfers with nothing waiting', () => {
     await useCase.execute();
 
     expect(opened).toEqual([]);
+  });
+});
+
+// seen on 2026-11-05: a member who never tested the connection had nothing
+// recorded of their machine; the first transfer is that first contact
+describe('SendPendingTransfers on a contact with the machine', () => {
+  it('should_record_the_identity_the_machine_presented', async () => {
+    const identity = HostKeyFingerprint.parse('SHA256:abc');
+    const { destinations, transfers, useCase } = await world({ ok: true, identity });
+    await queueEpisode(transfers);
+
+    await useCase.execute();
+
+    expect((await destinations.findByUsername(alice))?.identity).toEqual(identity);
   });
 });

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { HostKeyFingerprint } from '../../../../src/domain/sync/HostKeyFingerprint.js';
 import { LoneFilePlacement } from '../../../../src/domain/sync/LoneFilePlacement.js';
 import { RemoteAccount } from '../../../../src/domain/sync/RemoteAccount.js';
 import { RemoteHost } from '../../../../src/domain/sync/RemoteHost.js';
@@ -106,5 +107,57 @@ describe('SyncDestination', () => {
     expect([quiet.wantsMailAbout('sent'), quiet.wantsMailAbout('failed')]).toEqual([false, false]);
     expect([failuresOnly.wantsMailAbout('sent'), failuresOnly.wantsMailAbout('failed')]).toEqual([false, true]);
     expect([everything.wantsMailAbout('sent'), everything.wantsMailAbout('failed')]).toEqual([true, true]);
+  });
+
+  describe('the identity of the machine', () => {
+    const presented = HostKeyFingerprint.parse('SHA256:abc');
+    const settings = {
+      host: RemoteHost.parse('nas.example.org'),
+      port: RemotePort.parse(22),
+      account: RemoteAccount.parse('seedbox'),
+      path: RemotePath.parse('/volume1/torrents'),
+    };
+
+    it('should_remember_the_identity_the_machine_presented', () => {
+      const destination = aDestination();
+
+      expect(destination.recognise(presented, destination).identity).toEqual(presented);
+    });
+
+    // a transfer that went out before the member moved the destination must not
+    // pin the old machine's identity on the new one
+    it('should_ignore_an_identity_presented_by_a_machine_it_no_longer_points_at', () => {
+      const destination = aDestination();
+      const moved = destination.withConnection({ ...settings, host: RemoteHost.parse('nas2.example.org') });
+
+      expect(moved.recognise(presented, destination).identity).toBeUndefined();
+    });
+
+    // the identity belongs to the machine at that address, not to the account,
+    // the folder, the password or the last verdict
+    it('should_keep_the_identity_while_it_still_points_at_the_same_machine', () => {
+      const destination = aDestination();
+      const known = destination.recognise(presented, destination);
+
+      const kept = [
+        known.recordCheck({ ok: true, at: '2026-11-05 10:00:00' }),
+        known.withPassword('another-sealed-blob'),
+        known.withConnection({ ...settings, account: RemoteAccount.parse('other'), path: RemotePath.parse('/volume2') }),
+      ];
+
+      expect(kept.map((each) => each.identity)).toEqual([presented, presented, presented]);
+    });
+
+    it('should_forget_the_identity_once_it_points_at_another_machine', () => {
+      const destination = aDestination();
+      const known = destination.recognise(presented, destination);
+
+      const moved = [
+        known.withConnection({ ...settings, host: RemoteHost.parse('nas2.example.org') }),
+        known.withConnection({ ...settings, port: RemotePort.parse(2222) }),
+      ];
+
+      expect(moved.map((each) => each.identity)).toEqual([undefined, undefined]);
+    });
   });
 });

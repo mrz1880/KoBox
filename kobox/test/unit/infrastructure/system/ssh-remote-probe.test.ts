@@ -2,6 +2,7 @@ import { existsSync, mkdtempSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { HostKeyFingerprint } from '../../../../src/domain/sync/HostKeyFingerprint.js';
 import { LoneFilePlacement } from '../../../../src/domain/sync/LoneFilePlacement.js';
 import { RemoteAccount } from '../../../../src/domain/sync/RemoteAccount.js';
 import { RemoteHost } from '../../../../src/domain/sync/RemoteHost.js';
@@ -89,7 +90,7 @@ describe('SshRemoteProbe', () => {
     // trust-on-first-use argument quietly stops holding
     const runner = new ScriptedRunner();
 
-    await new SshRemoteProbe(runner, '/var/lib/kobox/sync').probe(destination, password);
+    await new SshRemoteProbe(runner, '/var/lib/kobox/sync').probe(destination, password, 'keep-recorded');
 
     expect(runner.calls[0]?.command).toBe('mkdir');
     expect(runner.calls[0]?.args).toEqual(['-p', '-m', '0700', '/var/lib/kobox/sync']);
@@ -98,7 +99,7 @@ describe('SshRemoteProbe', () => {
   it('should_pass_the_password_through_the_environment_and_never_through_argv', async () => {
     const runner = new ScriptedRunner();
 
-    await new SshRemoteProbe(runner, '/var/lib/kobox/sync').probe(destination, password);
+    await new SshRemoteProbe(runner, '/var/lib/kobox/sync').probe(destination, password, 'keep-recorded');
 
     const rsync = runner.calls.find((call) => call.command === 'rsync');
     // `sshpass -p <password>` would put it in `ps` for every other member
@@ -112,7 +113,7 @@ describe('SshRemoteProbe', () => {
     // read as a refused password for an ordinary account that rsync lets in
     const runner = new ScriptedRunner();
 
-    await new SshRemoteProbe(runner, '/var/lib/kobox/sync').probe(destination, password);
+    await new SshRemoteProbe(runner, '/var/lib/kobox/sync').probe(destination, password, 'keep-recorded');
 
     const remote = runner.calls.filter((call) => ['sshpass', 'ssh', 'rsync'].includes(call.command));
     expect(new Set(remote.map((call) => call.command))).toEqual(new Set(['rsync']));
@@ -123,7 +124,7 @@ describe('SshRemoteProbe', () => {
   it('should_pin_the_host_key_on_first_sight_and_refuse_a_change_afterwards', async () => {
     const runner = new ScriptedRunner();
 
-    await new SshRemoteProbe(runner, '/var/lib/kobox/sync').probe(destination, password);
+    await new SshRemoteProbe(runner, '/var/lib/kobox/sync').probe(destination, password, 'keep-recorded');
 
     const argv = runner.calls.find((call) => call.command === 'rsync')?.args.join(' ') ?? '';
     expect(argv).toContain('StrictHostKeyChecking=accept-new');
@@ -141,7 +142,7 @@ describe('SshRemoteProbe', () => {
       stderr: 'rsync: [sender] change_dir "/volume1/torrents" failed: No such file or directory (2)',
     });
 
-    const outcome = await new SshRemoteProbe(runner, '/tmp/kh').probe(destination, password);
+    const outcome = await new SshRemoteProbe(runner, '/tmp/kh').probe(destination, password, 'keep-recorded');
 
     expect(outcome.ok).toBe(false);
     expect(outcome.detail).toContain('folder');
@@ -151,7 +152,7 @@ describe('SshRemoteProbe', () => {
     const runner = new ScriptedRunner();
     runner.onCommand('rsync', { exitCode: 255, stderr: 'Permission denied, please try again.' });
 
-    const outcome = await new SshRemoteProbe(runner, '/tmp/kh').probe(destination, password);
+    const outcome = await new SshRemoteProbe(runner, '/tmp/kh').probe(destination, password, 'keep-recorded');
 
     expect(outcome.detail).toContain('refused the account or the password');
   });
@@ -163,10 +164,13 @@ describe('SshRemoteProbe', () => {
       stderr: 'WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED!',
     });
 
-    const outcome = await new SshRemoteProbe(runner, '/tmp/kh').probe(destination, password);
+    const outcome = await new SshRemoteProbe(runner, '/tmp/kh').probe(destination, password, 'keep-recorded');
 
     expect(outcome.ok).toBe(false);
-    expect(outcome.detail).toContain('different identity');
+    // a check that may not accept a new identity says how to accept one
+    expect(outcome.detail).toBe(
+      'the machine presented another identity than the one recorded for it: if you reinstalled it, test the connection again to accept its new identity, otherwise stop and check why',
+    );
   });
 
   // seen on 2026-11-04: an account that could list the folder but not write in
@@ -174,7 +178,7 @@ describe('SshRemoteProbe', () => {
   it('should_prove_the_account_can_write_by_making_a_probe_folder_there', async () => {
     const runner = new ScriptedRunner();
 
-    await aProbe(runner).probe(destination, password);
+    await aProbe(runner).probe(destination, password, 'keep-recorded');
 
     const write = runner.rsyncs()[1];
     expect(write?.args.at(-1)).toBe('seedbox@nas.example.org:/volume1/torrents/');
@@ -192,7 +196,7 @@ describe('SshRemoteProbe', () => {
       },
     );
 
-    const outcome = await aProbe(runner).probe(destination, password);
+    const outcome = await aProbe(runner).probe(destination, password, 'keep-recorded');
 
     expect(outcome).toMatchObject({
       ok: false,
@@ -201,7 +205,7 @@ describe('SshRemoteProbe', () => {
   });
 
   it('should_say_the_account_can_write_there_once_it_has', async () => {
-    const outcome = await aProbe(new ScriptedRunner()).probe(destination, password);
+    const outcome = await aProbe(new ScriptedRunner()).probe(destination, password, 'keep-recorded');
 
     expect(outcome).toMatchObject({
       ok: true,
@@ -212,7 +216,7 @@ describe('SshRemoteProbe', () => {
   it('should_remove_the_probe_folder_and_nothing_else', async () => {
     const runner = new ScriptedRunner();
 
-    await aProbe(runner).probe(destination, password);
+    await aProbe(runner).probe(destination, password, 'keep-recorded');
 
     const removal = runner.rsyncs()[2];
     // an empty folder sent with --delete would empty the member's whole folder:
@@ -233,4 +237,85 @@ describe('SshRemoteProbe', () => {
     expect(runner.sentTrees[2]).toEqual([]);
     expect(removal?.args.at(-1)).toBe('seedbox@nas.example.org:/volume1/torrents/');
   });
+
+  // after a reinstall the machine has a new identity: a check the member runs
+  // replaces the recorded one, and nothing else ever does
+  const IDENTITY_CHANGED = {
+    exitCode: 255,
+    stderr: '@@@ WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED! @@@\nHost key verification failed.',
+  };
+
+  it('should_replace_the_recorded_identity_when_the_member_accepts_the_one_presented', async () => {
+    const runner = new ScriptedRunner();
+    runner.onCommand('rsync', IDENTITY_CHANGED, { exitCode: 0 });
+
+    const outcome = await aProbe(runner).probe(destination, password, 'accept-presented');
+
+    const forget = runner.calls.findIndex((call) => call.args.includes('-R'));
+    expect(runner.calls[forget]).toMatchObject({
+      command: 'ssh-keygen',
+      args: ['-R', '[nas.example.org]:2222', '-f', '/var/lib/kobox/sync/alice.known_hosts'],
+    });
+    // then the machine is asked again, as a first contact
+    expect(runner.calls.slice(forget + 1).some((call) => call.args.includes('--list-only'))).toBe(true);
+    expect(outcome.ok).toBe(true);
+  });
+
+  // a test run while the machine is off must not drop what is recorded: the
+  // next transfer would then take whatever answers as a first contact
+  it('should_keep_the_recorded_identity_while_the_machine_presents_no_other', async () => {
+    const runner = new ScriptedRunner();
+    runner.onCommand('rsync', { exitCode: 255, stderr: 'ssh: connect to host nas.example.org port 2222: Connection refused' });
+
+    await aProbe(runner).probe(destination, password, 'accept-presented');
+
+    expect(runner.calls.some((call) => call.args.includes('-R'))).toBe(false);
+  });
+
+  it('should_never_replace_the_recorded_identity_in_a_check_that_follows_a_save', async () => {
+    const runner = new ScriptedRunner();
+    runner.onCommand('rsync', IDENTITY_CHANGED);
+
+    const outcome = await aProbe(runner).probe(destination, password, 'keep-recorded');
+
+    expect(runner.calls.some((call) => call.args.includes('-R'))).toBe(false);
+    expect(outcome.ok).toBe(false);
+  });
+
+  // the identity shown to the member is the one ssh recorded and checks, read
+  // back from the member's known_hosts, not a second scan that may pick
+  // another of the machine's keys
+  it('should_report_the_identity_recorded_for_the_machine_after_the_contact', async () => {
+    const runner = new ScriptedRunner();
+    runner.onCommand('ssh-keygen', {
+      stdout: '# Host [nas.example.org]:2222 found: line 1 \n[nas.example.org]:2222 ED25519 SHA256:abc\n',
+    });
+
+    const outcome = await aProbe(runner).probe(destination, password, 'keep-recorded');
+
+    expect(outcome.identity).toEqual(HostKeyFingerprint.parse('SHA256:abc'));
+    expect(runner.calls.find((call) => call.command === 'ssh-keygen')?.args).toEqual([
+      '-l',
+      '-F',
+      '[nas.example.org]:2222',
+      '-f',
+      '/var/lib/kobox/sync/alice.known_hosts',
+    ]);
+    expect(runner.calls.some((call) => call.command === 'ssh-keyscan')).toBe(false);
+  });
+
+  // ssh files a machine on the default port under its bare name
+  it('should_forget_a_machine_on_the_default_port_under_its_bare_name', async () => {
+    const runner = new ScriptedRunner();
+    runner.onCommand('rsync', IDENTITY_CHANGED, { exitCode: 0 });
+    const onDefaultPort = destination.withConnection({ ...connectionOf(destination), port: RemotePort.parse(22) });
+
+    await aProbe(runner).probe(onDefaultPort, password, 'accept-presented');
+
+    expect(runner.calls.find((call) => call.args.includes('-R'))?.args[1]).toBe('nas.example.org');
+  });
 });
+
+function connectionOf(of: SyncDestination): Parameters<SyncDestination['withConnection']>[0] {
+  return { host: of.host, port: of.port, account: of.account, path: of.path };
+}

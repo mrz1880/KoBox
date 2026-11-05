@@ -19,10 +19,14 @@ export function hourOfDay(hour: SendHour): string {
 // exit code. A member who cannot fix what they cannot understand will simply
 // turn sync off and stop trusting the screen.
 function verdict(destination: SyncDestination | undefined, viewer: Viewer): RawHtml {
-  const check = destination?.lastCheck;
   if (destination === undefined) {
     return html``;
   }
+  return html`${checkOutcome(destination, viewer)}${identityLine(destination, viewer)}`;
+}
+
+function checkOutcome(destination: SyncDestination, viewer: Viewer): RawHtml {
+  const check = destination.lastCheck;
   if (check === undefined) {
     return html`<p class="muted">${viewer.t('Not tried yet. Test it before you rely on it.')}</p>`;
   }
@@ -30,13 +34,18 @@ function verdict(destination: SyncDestination | undefined, viewer: Viewer): RawH
   ${check.ok ? html`<span class="chip ok">${viewer.t('it works')}</span>` : html`<span class="chip bad">${viewer.t('it does not work')}</span>`}
   <span class="muted">${check.detail === undefined ? '' : viewer.t(check.detail)}</span>
 </p>
-<p class="muted">${viewer.t('Last tried {at}.', { at: check.at })}${
-    check.fingerprint === undefined
-      ? html``
-      : html` ${sentence(viewer.t, 'The machine identified itself as {fingerprint}: if that ever changes without you reinstalling it, KoBox will refuse to connect and say so.', {
-        fingerprint: html`<span class="mono">${check.fingerprint}</span>`,
-      })}`
-  }</p>`;
+<p class="muted">${viewer.t('Last tried {at}.', { at: check.at })}</p>`;
+}
+
+// What the machine presented itself as on the last contact, a check or a
+// transfer: the first contact records it, whichever came first.
+function identityLine(destination: SyncDestination, viewer: Viewer): RawHtml {
+  if (destination.identity === undefined) {
+    return html``;
+  }
+  return html`<p class="muted">${sentence(viewer.t, 'The machine identified itself as {fingerprint}: if that ever changes without you reinstalling it, KoBox will refuse to connect and say so.', {
+    fingerprint: html`<span class="mono">${destination.identity.value}</span>`,
+  })}</p>`;
 }
 
 // Everything a member needs to describe their own machine. The password field
@@ -118,5 +127,5 @@ ${destination === undefined
   <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
   <button class="ghost" type="submit">${viewer.t('Test it now')}</button>
 </form>
-<p class="muted">${viewer.t('Connects, then checks the folder can be written to. Takes a few seconds: reload the page for the answer.')}</p>`}`;
+<p class="muted">${viewer.t('Connects, then checks the folder can be written to. Takes a few seconds: reload the page for the answer.')} ${viewer.t('If you reinstalled your machine, this is also how KoBox accepts its new identity.')}</p>`}`;
 }
