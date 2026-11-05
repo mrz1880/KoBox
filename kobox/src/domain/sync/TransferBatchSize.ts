@@ -6,8 +6,8 @@ export class InvalidBatchSizeError extends DomainError {
   }
 }
 
-// How many waiting transfers one pass takes on. Zero means "everything waiting"
-// — the legacy stored that same 0 and its screen read "0 (Tout)". A member with
+// How many waiting transfers one pass takes on. Zero means "everything waiting":
+// the legacy stored that same 0 and its screen read "0 (Tout)". A member with
 // a slow link caps it so one huge evening does not monopolise the connection.
 export class TransferBatchSize {
   private constructor(readonly value: number) {}
