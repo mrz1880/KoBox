@@ -46,7 +46,7 @@ export interface ConnectionSettings {
 export type MachineAddress = Pick<ConnectionSettings, 'host' | 'port'>;
 
 // Where one member's finished downloads go. One per member, identified by the
-// username — the legacy stored the same thing in a single-row `ident` table.
+// username. The legacy stored the same thing in a single-row `ident` table.
 //
 // The password is only ever held sealed. Nothing on this aggregate can open it:
 // that takes the private half of the host key, which only the root worker reads.

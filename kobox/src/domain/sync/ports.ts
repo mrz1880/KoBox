@@ -43,7 +43,7 @@ export interface RemoteProbePort {
 }
 
 export interface SyncTransferRepository {
-  // undefined when this download is already queued — rTorrent can fire
+  // undefined when this download is already queued: rTorrent can fire
   // `finished` more than once for one torrent
   queue(transfer: SyncTransfer): Promise<SyncTransfer | undefined>;
   save(transfer: SyncTransfer): Promise<void>;
