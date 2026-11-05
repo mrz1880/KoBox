@@ -469,6 +469,17 @@ const FR: Readonly<Record<string, string>> = {
     'Rien pour l’instant. Dès qu’un dossier réglé pour envoyer termine un téléchargement, il apparaît ici.',
   State: 'État',
   'What happened': 'Ce qui s’est passé',
+  // why a transfer did not arrive, as the worker recorded it
+  'the machine refused the account, the password, or that folder':
+    'la machine a refusé le compte, le mot de passe ou ce dossier',
+  'the machine answered with a different identity than the one you tested: nothing was sent':
+    'la machine a répondu avec une autre identité que celle que vous avez testée : rien n’a été envoyé',
+  'the other machine has no room left': 'l’autre machine n’a plus de place',
+  'the connection dropped part way through: it will resume where it stopped':
+    'la connexion a coupé en cours de route : elle reprendra là où elle s’est arrêtée',
+  'the machine did not answer': 'la machine n’a pas répondu',
+  'the file is no longer on the box': 'le fichier n’est plus sur la box',
+  'it did not go through': 'il n’est pas passé',
   'Last change': 'Dernier changement',
   'waiting its turn': 'attend son tour',
   'on its way': 'en route',

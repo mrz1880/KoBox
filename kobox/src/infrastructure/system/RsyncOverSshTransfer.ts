@@ -12,24 +12,37 @@ import { KNOWN_HOSTS_DIR } from './SshRemoteProbe.js';
 // hangs forever would hold the pass open behind it.
 const TRANSFER_TIMEOUT_MS = 6 * 60 * 60 * 1000;
 
+// What a transfer that did not arrive records, in words a member can act on.
+// The page shows them through the French catalogue, keyed by these sentences:
+// a test holds every one of them to having a French line.
+export const TRANSFER_FAILURES = {
+  refused: 'the machine refused the account, the password, or that folder',
+  identityChanged:
+    'the machine answered with a different identity than the one you tested: nothing was sent',
+  noRoom: 'the other machine has no room left',
+  dropped: 'the connection dropped part way through: it will resume where it stopped',
+  noAnswer: 'the machine did not answer',
+} as const;
+
 // Turning rsync's and ssh's diagnostics into a sentence a member can act on.
 function explain(stderr: string, exitCode: number): string {
   const text = stderr.toLowerCase();
   if (text.includes('permission denied')) {
-    return 'the machine refused the account, the password, or that folder';
+    return TRANSFER_FAILURES.refused;
   }
   if (text.includes('host key verification failed') || text.includes('identification has changed')) {
-    return 'the machine answered with a different identity than the one you tested — nothing was sent';
+    return TRANSFER_FAILURES.identityChanged;
   }
   if (text.includes('no space left')) {
-    return 'the other machine has no room left';
+    return TRANSFER_FAILURES.noRoom;
   }
   if (text.includes('connection unexpectedly closed') || text.includes('connection reset')) {
-    return 'the connection dropped part way through — it will resume where it stopped';
+    return TRANSFER_FAILURES.dropped;
   }
   if (text.includes('connection refused') || text.includes('timed out')) {
-    return 'the machine did not answer';
+    return TRANSFER_FAILURES.noAnswer;
   }
+  // what rsync said in its own words has no French line: it shows as it came
   const trimmed = stderr.trim();
   return trimmed === '' ? `rsync stopped with code ${String(exitCode)}` : trimmed.split('\n')[0] ?? '';
 }
