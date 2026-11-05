@@ -1,13 +1,14 @@
 import type { OutboxMailDraft } from '../maintenance/MailOutboxPort.js';
-import type { Language } from '../../domain/portal/Language.js';
+import type { Language, LanguageValue } from '../../domain/portal/Language.js';
 import type { PasswordLinkPurpose } from '../../domain/portal/PasswordLink.js';
+import { mailLanguageOf } from './mailLanguage.js';
 
 interface MailText {
   readonly subject: string;
   readonly lines: (username: string, url: string) => readonly string[];
 }
 
-const TEXTS: Record<'fr' | 'en', Record<PasswordLinkPurpose, MailText>> = {
+const TEXTS: Record<LanguageValue, Record<PasswordLinkPurpose, MailText>> = {
   fr: {
     invitation: {
       subject: 'Bienvenue sur la seedbox',
@@ -74,8 +75,7 @@ const TEXTS: Record<'fr' | 'en', Record<PasswordLinkPurpose, MailText>> = {
   },
 };
 
-// The members are French speakers: a member who never chose a language reads
-// French. The mail carries the link and how long it lasts, never a password.
+// The mail carries the link and how long it lasts, never a password.
 export function passwordLinkMail(input: {
   readonly recipient: string;
   readonly username: string;
@@ -83,7 +83,7 @@ export function passwordLinkMail(input: {
   readonly language: Language | undefined;
   readonly url: string;
 }): OutboxMailDraft {
-  const text = TEXTS[input.language?.value ?? 'fr'][input.purpose];
+  const text = TEXTS[mailLanguageOf(input.language)][input.purpose];
   return {
     recipient: input.recipient,
     subject: text.subject,
