@@ -479,12 +479,20 @@ the legacy did and what members' NAS layouts already assume.
 
 ### Testing it
 
-**Test it now** enqueues `check-sync-destination`; the root worker opens the
-password and lists the remote folder with `rsync --list-only`. The verdict is
-stored and shown back in words: whether the machine answered, whether the
-account was accepted, whether the folder is there, and the fingerprint it
-identified itself with. Whether it can be written to shows on the first
-transfer.
+**Test it now** enqueues `check-sync-destination`, and saving the destination
+queues the same check; the page waits for its verdict either way. The root
+worker opens the password, lists the remote folder with `rsync --list-only`, then
+proves it can write there by making a folder of its own and removing it. The
+verdict is stored and shown back in words: whether the machine answered, whether
+the account was accepted, whether the folder is there and can be written to, and
+the fingerprint it identified itself with.
+
+A check that finds the connection working puts back in the queue the member's
+transfers that failed for want of it: a refused account, password or folder, an
+identity to accept, a machine that did not answer or dropped the line. It leaves
+alone what a check proves nothing about (no room left over there, a file gone
+from the box, an rsync error KoBox does not recognise). What it puts back leaves
+the way its folder sends, and the page says how many went back.
 
 Nothing runs a shell on the member's machine, only rsync: a Synology gives an
 ssh shell to administrators alone, and an ordinary account allowed rsync and
