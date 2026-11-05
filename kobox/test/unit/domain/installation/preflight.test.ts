@@ -67,6 +67,35 @@ describe('evaluatePreflight', () => {
     expect(evaluatePreflight(overlay, { allowNonExt4: true })).toEqual([]);
   });
 
+  it('should_tell_the_operator_how_to_proceed_on_a_non_ext4_root', () => {
+    const failures = evaluatePreflight(
+      { ...healthyBox, rootFsType: 'btrfs' },
+      { allowNonExt4: false },
+    );
+
+    expect(failures).toEqual([
+      {
+        check: 'filesystem',
+        message:
+          'root filesystem is btrfs, quotas need ext4: re-run with --allow-non-ext4 to proceed anyway (containers/VMs)',
+      },
+    ]);
+  });
+
+  it('should_say_why_a_missing_default_route_blocks_the_install', () => {
+    const failures = evaluatePreflight(
+      { ...healthyBox, hasDefaultRoute: false },
+      { allowNonExt4: false },
+    );
+
+    expect(failures).toEqual([
+      {
+        check: 'network',
+        message: 'no default route: apt needs outbound network before installing anything',
+      },
+    ]);
+  });
+
   it('should_fail_without_a_default_route', () => {
     const failures = evaluatePreflight(
       { ...healthyBox, hasDefaultRoute: false },

@@ -43,13 +43,13 @@ export function evaluatePreflight(
   if (facts.rootFsType !== 'ext4' && !options.allowNonExt4) {
     failures.push({
       check: 'filesystem',
-      message: `root filesystem is ${facts.rootFsType}, quotas need ext4 — re-run with --allow-non-ext4 to proceed anyway (containers/VMs)`,
+      message: `root filesystem is ${facts.rootFsType}, quotas need ext4: re-run with --allow-non-ext4 to proceed anyway (containers/VMs)`,
     });
   }
   if (!facts.hasDefaultRoute) {
     failures.push({
       check: 'network',
-      message: 'no default route — apt needs outbound network before installing anything',
+      message: 'no default route: apt needs outbound network before installing anything',
     });
   }
   return failures;

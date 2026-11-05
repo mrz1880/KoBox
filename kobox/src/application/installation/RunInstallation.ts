@@ -125,7 +125,7 @@ export class RunInstallation {
           } else {
             await deps.registry.markSkipped(spec.name, outcome.reason, deps.now());
             skipped.push(name);
-            this.deps.onProgress?.(`${name}: skipped — ${outcome.reason}`);
+            this.deps.onProgress?.(`${name}: skipped (${outcome.reason})`);
           }
         } else {
           await deps.registry.markInstalled(
@@ -140,7 +140,7 @@ export class RunInstallation {
             installed.push(name);
           }
           this.deps.onProgress?.(
-            `${name}: installed${outcome.detail === undefined ? '' : ` — ${outcome.detail}`}`,
+            `${name}: installed${outcome.detail === undefined ? '' : ` (${outcome.detail})`}`,
           );
         }
       } catch (error) {

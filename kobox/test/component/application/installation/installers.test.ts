@@ -675,7 +675,9 @@ describe('ipset installer', () => {
     const outcome = await installer(world, 'ipset').install();
 
     expect(outcome).toMatchObject({ state: 'skipped' });
-    expect(outcome.state === 'skipped' && outcome.reason).toContain('kernel');
+    expect(outcome.state === 'skipped' && outcome.reason).toBe(
+      'kernel lacks ip_set support (container?), rtorrent ipv4_filter enforcement continues; re-run kobox install on a host with the module',
+    );
   });
 });
 
@@ -810,7 +812,9 @@ describe('rutorrent installer', () => {
     const outcome = await installer(unpinned, 'rutorrent').install();
 
     expect(outcome).toMatchObject({ state: 'skipped' });
-    expect(outcome.state === 'skipped' && outcome.reason).toContain('KOBOX_RUTORRENT_URL');
+    expect(outcome.state === 'skipped' && outcome.reason).toBe(
+      'no ruTorrent release pinned: set KOBOX_RUTORRENT_URL and KOBOX_RUTORRENT_SHA256, then re-run kobox install',
+    );
     expect(unpinned.host.fetched).toHaveLength(0);
   });
 
@@ -950,7 +954,9 @@ describe('nanomon installer', () => {
     const outcome = await installer(unpinned, 'nanomon').install();
 
     expect(outcome).toMatchObject({ state: 'skipped' });
-    expect(outcome.state === 'skipped' && outcome.reason).toContain('KOBOX_NANOMON_URL');
+    expect(outcome.state === 'skipped' && outcome.reason).toBe(
+      'no NanoMon release pinned: set KOBOX_NANOMON_URL and KOBOX_NANOMON_SHA256, then re-run kobox install',
+    );
     expect(unpinned.host.fetched).toHaveLength(0);
   });
 
@@ -989,7 +995,9 @@ describe('speedtest installer', () => {
     const outcome = await installer(unpinned, 'speedtest').install();
 
     expect(outcome).toMatchObject({ state: 'skipped' });
-    expect(outcome.state === 'skipped' && outcome.reason).toContain('KOBOX_SPEEDTEST_URL');
+    expect(outcome.state === 'skipped' && outcome.reason).toBe(
+      'no speedtest binary pinned: set KOBOX_SPEEDTEST_URL and KOBOX_SPEEDTEST_SHA256',
+    );
   });
 
   it('should_vendor_the_verified_binary_and_remember_its_sum', async () => {
@@ -1220,7 +1228,9 @@ describe('the config check guard', () => {
     const failure = installer(world, 'sshd').install();
 
     await expect(failure).rejects.toThrow('sshd: config check failed, changes rolled back');
-    await expect(failure).rejects.toThrow(/rolled back \S+ Bad configuration option: Foo$/);
+    await expect(failure).rejects.toThrow(
+      /^sshd: config check failed, changes rolled back: Bad configuration option: Foo$/,
+    );
     await expect(failure).rejects.toHaveProperty('name', 'InstallGuardError');
   });
 
@@ -1951,7 +1961,7 @@ describe('openvpn installer: outcome and uninstall', () => {
 
     expect(outcome).toMatchObject({ state: 'installed', version: '1.0-1' });
     expect(outcome.state === 'installed' && outcome.detail).toMatch(
-      /^no \/dev\/net\/tun here \S+ units enabled, tunnels validated on the VM$/,
+      /^no \/dev\/net\/tun here: units enabled, tunnels validated on the VM$/,
     );
     expect(container.systemd.log).toEqual([
       'enable openvpn-server@kobox-tun-gw',

@@ -651,7 +651,7 @@ program
 
 program
   .command('run-speedtest')
-  .description('measure what the link can carry (saturates it — admin action, never scheduled)')
+  .description('measure what the link can carry (saturates it: an admin action, never scheduled)')
   .action(async () => {
     const c = container();
     const id = await c.queue.enqueueUnique(buildJob.runSpeedtest());

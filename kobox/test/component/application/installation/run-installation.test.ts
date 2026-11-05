@@ -404,14 +404,14 @@ describe('RunInstallation: what it records and tells the operator', () => {
 
     await reportingRunner(progress).execute({ allowNonExt4: false });
 
-    // the progress lines separate the component's note with a dash
-    expect(progress.map((line) => line.replace(/ \S /, ' - '))).toEqual([
+    // the component's note follows in parentheses, as for "left installed"
+    expect(progress).toEqual([
       'installing kobox-core…',
       'kobox-core: installed',
       'installing sshd…',
-      'sshd: installed - hard quotas active on /home',
+      'sshd: installed (hard quotas active on /home)',
       'installing bind…',
-      'bind: skipped - not packaged here',
+      'bind: skipped (not packaged here)',
       'installing fail2ban…',
       'fail2ban: installed',
     ]);

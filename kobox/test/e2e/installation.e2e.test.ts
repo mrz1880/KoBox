@@ -692,6 +692,12 @@ describe.skipIf(!onDebianAsRoot)('E2E: fresh Debian 13 -> bootstrap -> full stac
     expect(sh(command ?? '', ['--help']).length).toBeGreaterThan(0);
   }, 30_000);
 
+  it('should_warn_in_the_speedtest_help_that_it_saturates_the_link', () => {
+    expect(kobox(['run-speedtest', '--help'])).toContain(
+      'measure what the link can carry (saturates it: an admin action, never scheduled)',
+    );
+  });
+
   it('should_uninstall_reversibly_without_touching_user_data', () => {
     const output = kobox(['uninstall', '--yes']);
     expect(output).toContain('kobox-core');
