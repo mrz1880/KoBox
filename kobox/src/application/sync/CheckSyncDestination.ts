@@ -30,7 +30,14 @@ export class CheckSyncDestination {
       return; // nothing configured: nothing to check, and not an error
     }
     const { identity, ...verdict } = await this.probeOrExplain(destination, trust);
-    const checked = destination.recordCheck({ ...verdict, at: this.deps.clock() });
+    // Read again: the probe takes seconds, and the member may have saved their
+    // destination meanwhile. The aggregate keeps what they saved and drops a
+    // verdict about what was there before.
+    const current = await this.deps.destinations.findByUsername(username);
+    if (current === undefined) {
+      return; // removed during the probe: nothing left to record it on
+    }
+    const checked = current.recordCheck({ ...verdict, at: this.deps.clock() }, destination);
     await this.deps.destinations.save(
       identity === undefined ? checked : checked.recognise(identity, destination),
     );

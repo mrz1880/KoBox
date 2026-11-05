@@ -45,6 +45,9 @@ export interface ConnectionSettings {
 // Where a contact reached: the machine, whatever account and folder on it
 export type MachineAddress = Pick<ConnectionSettings, 'host' | 'port'>;
 
+// What a check tried: the connection, and the password it signed in with
+export type CheckedConnection = ConnectionSettings & { readonly sealedPassword: string };
+
 // Where one member's finished downloads go. One per member, identified by the
 // username. The legacy stored the same thing in a single-row `ident` table.
 //
@@ -151,7 +154,13 @@ export class SyncDestination {
     return mailsAbout(this.transferMails, state);
   }
 
-  recordCheck(check: ConnectionCheck): SyncDestination {
+  // A verdict is about the connection the check contacted. The member may have
+  // saved another one while it was out: the verdict then says nothing about
+  // what is there now, and is dropped.
+  recordCheck(check: ConnectionCheck, contacted: CheckedConnection): SyncDestination {
+    if (!this.connectsAs(contacted)) {
+      return this;
+    }
     return new SyncDestination({ ...this.connection(), lastCheck: check });
   }
 
@@ -166,6 +175,17 @@ export class SyncDestination {
 
   private isAt(machine: MachineAddress): boolean {
     return this.host.equals(machine.host) && this.port.equals(machine.port);
+  }
+
+  // the same machine, account, folder and password: what a verdict is about,
+  // the very things withConnection and withPassword drop it for
+  private connectsAs(other: CheckedConnection): boolean {
+    return (
+      this.isAt(other) &&
+      this.account.equals(other.account) &&
+      this.path.equals(other.path) &&
+      this.sealedPassword === other.sealedPassword
+    );
   }
 
   // everything except the verdict
