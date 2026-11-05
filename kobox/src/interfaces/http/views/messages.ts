@@ -132,7 +132,7 @@ const FR: Readonly<Record<string, string>> = {
     'Ce n’est pas un nom d’hôte, comme myhome.duckdns.org. Pour une adresse fixe, utilisez le champ au-dessus.',
   'That address only exists inside a home or office network. Declare the one that place shows to the internet.':
     'Cette adresse n’existe qu’à l’intérieur d’un réseau domestique ou de bureau. Déclarez celle que ce lieu montre à internet.',
-  'Testing the connection.': 'Test de la connexion.',
+  'Connection tested.': 'Connexion testée.',
   'Test message queued. It goes out on the next send pass, within five minutes.':
     'Message de test en file. Il part au prochain envoi, d’ici cinq minutes.',
   'Saved, and the connection tested.': 'Enregistré, et la connexion testée.',
@@ -463,8 +463,8 @@ const FR: Readonly<Record<string, string>> = {
   '0 files per pass means "everything waiting". Your password is sealed with this box\'s key the moment you save it: it is never stored in a form you can read back, and never appears in a command line.':
     '0 fichier par passage veut dire « tout ce qui attend ». Votre mot de passe est scellé avec la clé de cette box dès l’enregistrement : il n’est jamais stocké sous une forme relisible, et n’apparaît jamais dans une ligne de commande.',
   'Test it now': 'La tester maintenant',
-  'Connects, then checks the folder can be written to. Takes a few seconds: reload the page for the answer.':
-    'Se connecte, puis vérifie qu’on peut écrire dans le dossier. Cela prend quelques secondes : rechargez la page pour la réponse.',
+  'Connects, then checks the folder can be written to. Takes a few seconds, and the page shows the answer.':
+    'Se connecte, puis vérifie qu’on peut écrire dans le dossier. Cela prend quelques secondes, et la page affiche la réponse.',
   'If you reinstalled your machine, this is also how KoBox accepts its new identity.':
     'Si vous avez réinstallé votre machine, c’est aussi ce qui fait accepter sa nouvelle identité à KoBox.',
   'What has been sent': 'Ce qui a été envoyé',

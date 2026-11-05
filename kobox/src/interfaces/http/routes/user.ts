@@ -992,11 +992,11 @@ export function registerUserRoutes(
     const id = await deps.queue.enqueueUnique(
       buildJob.checkSyncDestination({ username: session.username.value, trust: 'accept-presented' }),
     );
-    return redirectWithFlash(
-      reply,
-      '/sync',
-      id === undefined ? 'A test is already running.' : 'Testing the connection.',
-    );
+    // like saving, the page waits for what the test found
+    if (id === undefined) {
+      return redirectWithFlash(reply, '/sync', 'A test is already running.');
+    }
+    return redirectOnceApplied(reply, deps.awaitJob, id, '/sync', 'Connection tested.');
   });
 
   server.post('/sync/transfers/retry', async (request, reply) => {

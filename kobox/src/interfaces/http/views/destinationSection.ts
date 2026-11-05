@@ -127,5 +127,5 @@ ${destination === undefined
   <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
   <button class="ghost" type="submit">${viewer.t('Test it now')}</button>
 </form>
-<p class="muted">${viewer.t('Connects, then checks the folder can be written to. Takes a few seconds: reload the page for the answer.')} ${viewer.t('If you reinstalled your machine, this is also how KoBox accepts its new identity.')}</p>`}`;
+<p class="muted">${viewer.t('Connects, then checks the folder can be written to. Takes a few seconds, and the page shows the answer.')} ${viewer.t('If you reinstalled your machine, this is also how KoBox accepts its new identity.')}</p>`}`;
 }
