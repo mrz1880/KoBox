@@ -570,6 +570,8 @@ export function buildSyncUseCases(deps: SyncUseCaseDeps): SyncUseCases {
   return {
     checkDestination: new CheckSyncDestination({
       destinations: deps.destinations,
+      transfers: deps.transfers,
+      instances: deps.instances,
       opener: deps.opener,
       probe: deps.probe,
       clock: deps.clock,

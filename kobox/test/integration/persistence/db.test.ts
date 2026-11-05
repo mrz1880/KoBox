@@ -15,6 +15,7 @@ import { Username } from '../../../src/domain/user/Username.js';
 import { SqliteCleanupReportRepository } from '../../../src/infrastructure/persistence/SqliteCleanupReportRepository.js';
 import { SqliteCleanupSnapshotRepository } from '../../../src/infrastructure/persistence/SqliteCleanupSnapshotRepository.js';
 import { SqliteSeedRuleRepository } from '../../../src/infrastructure/persistence/SqliteSeedRuleRepository.js';
+import { SqliteSyncDestinationRepository } from '../../../src/infrastructure/persistence/SqliteSyncDestinationRepository.js';
 import { SqliteSpacePreferenceRepository } from '../../../src/infrastructure/persistence/SqliteSpacePreferenceRepository.js';
 
 let dir: string;
@@ -293,5 +294,21 @@ describe('KoboxDatabase', () => {
     db.close();
 
     expect(row).toEqual({ known_host_fingerprint: 'SHA256:abc' });
+  });
+
+  it('should_read_a_verdict_from_before_checks_put_transfers_back_as_having_put_none', async () => {
+    const old = boxBefore('0040_check-requeued');
+    old
+      .prepare(
+        "INSERT INTO sync_destinations (username, host, port, account, sealed_password, path, last_check_ok, last_check_at) VALUES ('alice', 'nas.example.org', 22, 'seedbox', 'sealed', '/volume1/torrents', 1, '2026-11-04 10:00:00')",
+      )
+      .run();
+    old.close();
+
+    const db = KoboxDatabase.open(join(dir, 'kobox.db'));
+    const alice = await new SqliteSyncDestinationRepository(db).findByUsername(Username.parse('alice'));
+    db.close();
+
+    expect(alice?.lastCheck).toEqual({ ok: true, at: '2026-11-04 10:00:00' });
   });
 });

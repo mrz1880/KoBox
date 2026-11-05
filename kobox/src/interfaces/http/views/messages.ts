@@ -472,6 +472,10 @@ const FR: Readonly<Record<string, string>> = {
     'Rien pour l’instant. Dès qu’un dossier réglé pour envoyer termine un téléchargement, il apparaît ici.',
   State: 'État',
   'What happened': 'Ce qui s’est passé',
+  'One transfer that had failed is back in the queue.':
+    'Un transfert qui avait échoué est de nouveau dans la file.',
+  '{count} transfers that had failed are back in the queue.':
+    '{count} transferts qui avaient échoué sont de nouveau dans la file.',
   // why a transfer did not arrive is worded in application/sync/transferFailureWords.ts,
   // shared with the mails
   'Last change': 'Dernier changement',

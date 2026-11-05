@@ -23,6 +23,21 @@ export type FailureCause =
   | { readonly kind: 'stopped'; readonly exitCode: number }
   | { readonly kind: 'reported'; readonly line: string };
 
+// What a check that works proves: the machine answers and holds the line, it
+// presents the identity KoBox trusts, it takes the account and the password,
+// and the account can write in the folder. A transfer that failed on one of
+// these goes through now. Room left over there, or a file gone from the box,
+// is nothing a check looks at.
+const FIXED_BY_A_WORKING_CONNECTION: Readonly<Record<ExplainedFailure, boolean>> = {
+  refused: true,
+  'identity-changed': true,
+  'no-room': false,
+  dropped: true,
+  'no-answer': true,
+  'source-gone': false,
+  unexplained: false,
+};
+
 const STOPPED_PREFIX = 'rsync stopped with code ';
 const STOPPED_RECORD = /^rsync stopped with code (\d+)$/;
 
@@ -30,11 +45,30 @@ function isExplained(reason: string): reason is ExplainedFailure {
   return Object.hasOwn(TRANSFER_FAILURE_REASONS, reason);
 }
 
-const EXPLAINED_BY_RECORD: ReadonlyMap<string, ExplainedFailure> = new Map(
-  Object.entries(TRANSFER_FAILURE_REASONS).flatMap(([reason, sentence]) =>
+// Older rows hold the wording of the version that recorded them, the em dash
+// spelled by its code point so this source holds none. Read back, each one is
+// the failure it described: the page and the mails word it as of today, and a
+// working check clears what it proves fixed.
+const EM_DASH = String.fromCodePoint(0x2014);
+const OLDER_WORDINGS: ReadonlyMap<string, ExplainedFailure> = new Map([
+  // the wordings before v1.0.69
+  [
+    `the machine answered with a different identity than the one you tested ${EM_DASH} nothing was sent`,
+    'identity-changed',
+  ],
+  [
+    'the machine answered with a different identity than the one you tested: nothing was sent',
+    'identity-changed',
+  ],
+  [`the connection dropped part way through ${EM_DASH} it will resume where it stopped`, 'dropped'],
+]);
+
+const EXPLAINED_BY_RECORD: ReadonlyMap<string, ExplainedFailure> = new Map([
+  ...OLDER_WORDINGS,
+  ...Object.entries(TRANSFER_FAILURE_REASONS).flatMap(([reason, sentence]) =>
     isExplained(reason) ? [[sentence, reason] as const] : [],
   ),
-);
+]);
 
 /**
  * Why one transfer did not arrive. Immutable, compared by value.
@@ -95,6 +129,17 @@ export class TransferFailure {
       case 'reported':
         return this.cause.line;
     }
+  }
+
+  /**
+   * Whether a check that found the connection working proves this failure
+   * gone. rsync stopping on its own words or a bare code proves nothing
+   * either way, so it stays failed.
+   *
+   * @returns true when the transfer would go through now
+   */
+  isFixedByAWorkingConnection(): boolean {
+    return this.cause.kind === 'explained' && FIXED_BY_A_WORKING_CONNECTION[this.cause.reason];
   }
 
   equals(other: TransferFailure): boolean {

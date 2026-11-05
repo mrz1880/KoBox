@@ -60,6 +60,14 @@ export class InMemorySyncTransferRepository implements SyncTransferRepository {
     );
   }
 
+  listFailed(username: Username): Promise<readonly SyncTransfer[]> {
+    return Promise.resolve(
+      this.ordered().filter(
+        (row) => row.username.value === username.value && row.state === 'failed',
+      ),
+    );
+  }
+
   countByState(username: Username, state: TransferState): Promise<number> {
     return Promise.resolve(
       this.ordered().filter(

@@ -24,6 +24,7 @@ function checkOf(row: DestinationRow): ConnectionCheck | undefined {
     ok: row.lastCheckOk === 1,
     at: row.lastCheckAt,
     ...(row.lastCheckDetail !== null && { detail: row.lastCheckDetail }),
+    ...(row.lastCheckRequeued !== null && { requeued: row.lastCheckRequeued }),
   };
 }
 
@@ -75,6 +76,7 @@ export class SqliteSyncDestinationRepository implements SyncDestinationRepositor
       lastCheckOk: destination.lastCheck === undefined ? null : destination.lastCheck.ok ? 1 : 0,
       lastCheckAt: destination.lastCheck?.at ?? null,
       lastCheckDetail: destination.lastCheck?.detail ?? null,
+      lastCheckRequeued: destination.lastCheck?.requeued ?? null,
       knownHostFingerprint: destination.identity?.value ?? null,
     };
     this.db.orm

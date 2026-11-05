@@ -1,6 +1,7 @@
 import type { HostnameDirtyReport } from '../security/ManageUserHostname.js';
 import type { VpnUserReport } from '../security/ProvisionVpnUser.js';
 import type { ResolveDynDnsReport } from '../security/ResolveDynDns.js';
+import type { CheckReport } from '../sync/CheckSyncDestination.js';
 import type { QueueVerdict } from '../sync/QueueFinishedDownload.js';
 import type { QueueFolderBacklogReport } from '../sync/QueueFolderBacklog.js';
 import type { RequeueOutcome } from '../sync/RequeueTransfer.js';
@@ -22,6 +23,7 @@ interface JobReports {
   readonly 'rename-watch-dir': ReshapeWatchDirReport;
   readonly 'queue-folder-backlog': QueueFolderBacklogReport;
   readonly 'requeue-transfer': RequeueOutcome;
+  readonly 'check-sync-destination': CheckReport;
   // the verdict on a finished download in a folder; none for any other event
   readonly 'torrent-event': QueueVerdict | undefined;
   readonly 'discover-tracker': DiscoveryReport;
@@ -180,6 +182,9 @@ export function followUpsOf(completed: CompletedJob): readonly FollowUp[] {
         completed.report === 'straight-away',
         sendTransfersOf(completed.payload.username),
       );
+    // a working check put back what failed for want of it
+    case 'check-sync-destination':
+      return onlyIf(completed.report.sendNow, sendTransfersOf(completed.payload.username));
     case 'add-watch-dir':
       return onlyIf(completed.report.added, renderConfigOf(completed.payload.username));
     case 'remove-watch-dir':
@@ -249,7 +254,6 @@ export function followUpsOf(completed: CompletedJob): readonly FollowUp[] {
     case 'restart-rtorrent':
     case 'render-rtorrent-config':
     case 'set-category-sync-mode':
-    case 'check-sync-destination':
     case 'send-pending-transfers':
     case 'set-sync-disabled':
     case 'set-allow-public-tracker':

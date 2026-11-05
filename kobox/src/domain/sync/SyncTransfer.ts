@@ -98,6 +98,12 @@ export class SyncTransfer {
     return this.next({ state: 'failed', failure, updatedAt: at });
   }
 
+  // A failed transfer that a check finding the connection working proves would
+  // go through now (see TransferFailure)
+  isFixedByAWorkingConnection(): boolean {
+    return this.failure?.isFixedByAWorkingConnection() === true;
+  }
+
   // a failed transfer tried again, or one that arrived sent home once more
   requeue(at: string): SyncTransfer {
     // the attempt count is kept: it is the history, not the state
