@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import type { Job } from '../../../../src/application/jobs/contract.js';
-import type { JobQueuePort } from '../../../../src/application/jobs/JobQueuePort.js';
+import { InMemoryJobQueue } from '../../../../src/infrastructure/persistence/InMemoryJobQueue.js';
 import { UserNotFoundError } from '../../../../src/application/user/errors.js';
 import {
   InviteMember,
@@ -26,15 +25,6 @@ import { FakePasswordHasher } from '../../../../src/infrastructure/system/fakes/
 import { FakeSessionTokens } from '../../../../src/infrastructure/system/fakes/FakeSessionTokens.js';
 import { UserBuilder } from '../../../builders/UserBuilder.js';
 
-class RecordingQueue implements Pick<JobQueuePort, 'enqueue'> {
-  readonly jobs: Job[] = [];
-
-  enqueue(job: Job): Promise<number> {
-    this.jobs.push(job);
-    return Promise.resolve(this.jobs.length);
-  }
-}
-
 const alice = Username.parse('alice');
 const BASE = 'https://box.example.org';
 let now = '2026-10-24 10:00:00';
@@ -43,7 +33,7 @@ let users: InMemoryUserRepository;
 let credentials: InMemoryPortalCredentialsRepository;
 let links: InMemoryPasswordLinkRepository;
 let outbox: InMemoryMailOutbox;
-let queue: RecordingQueue;
+let queue: InMemoryJobQueue;
 let passwords: FakePasswordCipher;
 let deps: ConstructorParameters<typeof SendPasswordLink>[0];
 
@@ -53,7 +43,7 @@ beforeEach(() => {
   credentials = new InMemoryPortalCredentialsRepository();
   links = new InMemoryPasswordLinkRepository();
   outbox = new InMemoryMailOutbox();
-  queue = new RecordingQueue();
+  queue = new InMemoryJobQueue();
   passwords = new FakePasswordCipher();
   deps = {
     users,
@@ -85,7 +75,7 @@ describe('InviteMember', () => {
       role: 'admin',
     });
 
-    const job = queue.jobs[0];
+    const job = queue.pending()[0];
     expect(job?.type).toBe('create-user');
     if (job?.type === 'create-user') {
       expect(job.payload).toMatchObject({ username: 'alice', role: 'admin', quotaBytes: 400 * 1024 ** 3 });
@@ -113,7 +103,7 @@ describe('InviteMember', () => {
         role: 'user',
       }),
     ).rejects.toThrow(/alice/);
-    expect(queue.jobs).toHaveLength(0);
+    expect(queue.pending()).toHaveLength(0);
   });
 });
 
@@ -131,7 +121,7 @@ describe('SetPasswordFromLink', () => {
     const username = await set.execute({ token: tokenOf(url), password: Password.parse('chosen-by-alice') });
 
     expect(username.value).toBe('alice');
-    const job = queue.jobs.at(-1);
+    const job = queue.pending().at(-1);
     expect(job?.type).toBe('change-password');
     if (job?.type === 'change-password') {
       expect((await passwords.open(job.payload.sealedPassword)).reveal()).toBe('chosen-by-alice');
@@ -291,7 +281,7 @@ describe('InviteMember account', () => {
       role: 'user',
     });
 
-    const job = queue.jobs[0];
+    const job = queue.pending()[0];
     expect(job?.type).toBe('create-user');
     if (job?.type === 'create-user') {
       expect(job.payload).toMatchObject({ email: 'alice@example.org', proxyPort: 8080 });
