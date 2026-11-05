@@ -1,10 +1,5 @@
 import type { NetworkServicePort } from '../../domain/security/ports.js';
-import {
-  renderFail2banJails,
-  renderNextcloudAuthFilter,
-  renderPortalLoginFilter,
-  renderPublickeyFloodFilter,
-} from '../../domain/security/rendering.js';
+import { renderFail2banFilters, renderFail2banJails } from '../../domain/security/rendering.js';
 import type { ManagedFilesPort } from '../../domain/shared/files.js';
 import type { UserAddressRepository } from '../../domain/tracker/ports.js';
 import type { SecuritySettings } from './settings.js';
@@ -35,9 +30,7 @@ export class RenderFail2ban {
         sshPort: settings.sshPort,
         portalPort: settings.portalPort,
       }),
-      renderPublickeyFloodFilter(),
-      renderPortalLoginFilter(),
-      renderNextcloudAuthFilter(),
+      ...renderFail2banFilters(),
     ]);
 
     if (changedFiles.length > 0) {

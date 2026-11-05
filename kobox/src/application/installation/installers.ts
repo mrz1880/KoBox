@@ -63,6 +63,7 @@ import type {
   VpnPkiPort,
   VpnPkiProvisionPort,
 } from '../../domain/security/ports.js';
+import { fail2banManagedPaths } from '../../domain/security/rendering.js';
 import {
   PORTAL_GROUP,
   VPN_VARIANTS,
@@ -913,9 +914,9 @@ class Fail2banInstaller implements ComponentInstaller {
 
   async uninstall(): Promise<void> {
     await this.ctx.systemd.disable('fail2ban', { now: true });
-    await this.ctx.host.removeFile('/etc/fail2ban/jail.d/kobox.local');
-    await this.ctx.host.removeFile('/etc/fail2ban/filter.d/kobox-publickey-flood.conf');
-    await this.ctx.host.removeFile('/etc/fail2ban/filter.d/kobox-portal.conf');
+    for (const path of fail2banManagedPaths()) {
+      await this.ctx.host.removeFile(path);
+    }
   }
 }
 

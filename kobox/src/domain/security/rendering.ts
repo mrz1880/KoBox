@@ -123,6 +123,8 @@ export function renderFirewallRules(policy: FirewallPolicy): RenderedFile {
 
 const ROOT_FILE = { mode: '0644', owner: 'root', group: 'root' } as const;
 
+const FAIL2BAN_JAILS_PATH = '/etc/fail2ban/jail.d/kobox.local';
+
 // The jail no stock fail2ban setup has: it counts *accepted* publickey logins.
 // A valid key makes a flood invisible to every failure-based jail (the user-h
 // vector: 1979 connections/day) — abnormal success frequency IS the signal.
@@ -140,7 +142,7 @@ export function renderFail2banJails(
   const sorted = [...ignoreIps].sort((a, b) => ipSortKey(a.value) - ipSortKey(b.value));
   const ignoreLine = ['127.0.0.1/8', '::1', ...sorted.map((ip) => ip.value)].join(' ');
   return {
-    path: '/etc/fail2ban/jail.d/kobox.local',
+    path: FAIL2BAN_JAILS_PATH,
     content: [
       managedHeader('#', 'fail2ban jails'),
       '# backend is set per-jail (not in DEFAULT): the journald backend fits',
@@ -242,4 +244,15 @@ export function renderPublickeyFloodFilter(): RenderedFile {
     ].join('\n'),
     ...ROOT_FILE,
   };
+}
+
+// Every filter the jails name. The render job writes exactly these and the
+// uninstall removes exactly these, so a new filter cannot be left behind.
+export function renderFail2banFilters(): readonly RenderedFile[] {
+  return [renderPublickeyFloodFilter(), renderPortalLoginFilter(), renderNextcloudAuthFilter()];
+}
+
+// Every fail2ban file KoBox owns on the host: the jails and their filters.
+export function fail2banManagedPaths(): readonly string[] {
+  return [FAIL2BAN_JAILS_PATH, ...renderFail2banFilters().map((filter) => filter.path)];
 }
