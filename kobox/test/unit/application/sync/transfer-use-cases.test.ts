@@ -162,6 +162,8 @@ describe('SendPendingTransfers', () => {
       batchSize?: TransferBatchSize;
       mails?: TransferMails;
       outcome?: TransferOutcome;
+      // how alice's Films folder sends; "a bit later" unless a test says
+      filmsMode?: SyncMode;
     } = {},
   ) {
     const users = new InMemoryUserRepository();
@@ -184,6 +186,7 @@ describe('SendPendingTransfers', () => {
       credentials: readsEnglish,
       destinations,
       transfers,
+      instances: await instancesWith(options.filmsMode ?? SyncMode.scheduled),
       outbox,
       opener: { open: () => Promise.resolve(RemotePassword.parse('opened')) },
       transport,
@@ -291,13 +294,55 @@ describe('SendPendingTransfers', () => {
     expect(transport.sent).toHaveLength(0);
   });
 
-  it('should_send_one_members_queue_straight_away_when_asked_whatever_the_hour', async () => {
-    const { transfers, transport, useCase } = await world({ now: '2026-08-15 14' });
+  it('should_send_a_straight_away_folders_transfers_on_an_immediate_pass_whatever_the_hour', async () => {
+    const { transfers, transport, useCase } = await world({
+      now: '2026-08-15 14',
+      filmsMode: SyncMode.immediate,
+    });
     await queueOne(transfers, 'a.mkv');
 
     await useCase.execute(immediatePassFor(alice));
 
     expect(transport.sent).toHaveLength(1);
+  });
+
+  // a member's immediate pass is for what they asked to go out at once, not
+  // for what they chose to keep for their hour
+  it('should_leave_a_bit_later_folders_transfers_to_the_members_hour_on_an_immediate_pass', async () => {
+    const { transfers, transport, useCase } = await world({
+      now: '2026-08-15 14',
+      filmsMode: SyncMode.scheduled,
+    });
+    await queueOne(transfers, 'a.mkv');
+
+    await useCase.execute(immediatePassFor(alice));
+
+    expect(transport.sent).toHaveLength(0);
+    expect(await transfers.countByState(alice, 'waiting')).toBe(1);
+  });
+
+  // what waits for the hour must not use up the files an immediate pass may send
+  it('should_count_only_what_leaves_at_once_against_the_files_per_pass', async () => {
+    const { transfers, transport, useCase } = await world({
+      now: '2026-08-15 14',
+      filmsMode: SyncMode.immediate,
+      batchSize: TransferBatchSize.parse(1),
+    });
+    await transfers.queue(
+      SyncTransfer.queue({
+        username: alice,
+        label: Label.parse('Series'),
+        source: LocalPath.parse('/home/alice/rtorrent/complete/Series/Some.Episode.mkv'),
+        queuedAt: NOW,
+      }),
+    );
+    await queueOne(transfers, 'a.mkv');
+
+    await useCase.execute(immediatePassFor(alice));
+
+    expect(transport.sent.map((sent) => sent.source)).toEqual([
+      '/home/alice/rtorrent/complete/Films/a.mkv',
+    ]);
   });
 
   it('should_take_on_no_more_than_the_member_allowed_in_one_pass', async () => {
@@ -329,6 +374,7 @@ describe('SendPendingTransfers', () => {
       credentials: readsEnglish,
       destinations,
       transfers,
+      instances: new InMemoryTorrentInstanceRepository(),
       outbox: new InMemoryMailOutbox(),
       opener: { open: () => Promise.resolve(RemotePassword.parse('opened')) },
       transport,
@@ -353,6 +399,7 @@ describe('SendPendingTransfers', () => {
       credentials: readsEnglish,
       destinations,
       transfers,
+      instances: new InMemoryTorrentInstanceRepository(),
       outbox: new InMemoryMailOutbox(),
       opener: { open: () => Promise.resolve(RemotePassword.parse('opened')) },
       transport: new RecordingTransport({ ok: false, failure: TransferFailure.explained('no-room') }),
@@ -380,6 +427,7 @@ describe('SendPendingTransfers', () => {
       credentials: readsEnglish,
       destinations,
       transfers,
+      instances: new InMemoryTorrentInstanceRepository(),
       outbox: new InMemoryMailOutbox(),
       opener: { open: () => Promise.resolve(RemotePassword.parse('opened')) },
       transport,

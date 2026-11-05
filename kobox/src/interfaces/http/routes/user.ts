@@ -31,7 +31,7 @@ import { formatRatioBound } from '../views/ratio.js';
 import type { TorrentInstanceRepository } from '../../../domain/torrent/ports.js';
 import type { SyncDestinationRepository, SyncTransferRepository } from '../../../domain/sync/ports.js';
 import type { SetSyncDestination } from '../../../application/sync/SetSyncDestination.js';
-import { departureOfRequeued, type Departure } from '../../../domain/sync/Departure.js';
+import { departureOf, type Departure } from '../../../domain/sync/Departure.js';
 import { LoneFilePlacement } from '../../../domain/sync/LoneFilePlacement.js';
 import { RemoteAccount } from '../../../domain/sync/RemoteAccount.js';
 import { RemoteHost } from '../../../domain/sync/RemoteHost.js';
@@ -1018,7 +1018,7 @@ export function registerUserRoutes(
     const transfer = await deps.transfers.findById(parsed.data.id);
     const departure: Departure =
       transfer?.username.equals(session.username) === true
-        ? departureOfRequeued(await deps.instances.findByUsername(session.username), transfer.label)
+        ? departureOf(await deps.instances.findByUsername(session.username), transfer.label)
         : 'at-send-hour';
     return redirectOnceApplied(reply, deps.awaitJob, job, '/sync', REQUEUED[departure]);
   });

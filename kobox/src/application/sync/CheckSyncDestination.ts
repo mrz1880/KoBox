@@ -1,4 +1,4 @@
-import { departureOfRequeued } from '../../domain/sync/Departure.js';
+import { departureOf } from '../../domain/sync/Departure.js';
 import type { HostKeyTrust } from '../../domain/sync/HostKeyTrust.js';
 import type { ProbeOutcome } from '../../domain/sync/ports.js';
 import type {
@@ -84,7 +84,7 @@ export class CheckSyncDestination {
     let sendNow = false;
     for (const transfer of fixed) {
       await this.deps.transfers.save(transfer.requeue(this.deps.clock()));
-      sendNow ||= departureOfRequeued(folders, transfer.label) === 'straight-away';
+      sendNow ||= departureOf(folders, transfer.label) === 'straight-away';
     }
     return { requeued: fixed.length, sendNow };
   }

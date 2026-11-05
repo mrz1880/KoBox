@@ -1,4 +1,4 @@
-import { departureOfRequeued, type Departure } from '../../domain/sync/Departure.js';
+import { departureOf, type Departure } from '../../domain/sync/Departure.js';
 import type { SyncTransferRepository } from '../../domain/sync/ports.js';
 import type { TorrentInstanceRepository } from '../../domain/torrent/ports.js';
 import type { Username } from '../../domain/user/Username.js';
@@ -28,7 +28,7 @@ export class RequeueTransfer {
       return 'not-requeued';
     }
     await this.deps.transfers.save(transfer.requeue(this.deps.clock()));
-    return departureOfRequeued(
+    return departureOf(
       await this.deps.instances.findByUsername(username),
       transfer.label,
     );

@@ -23,6 +23,7 @@ import { InMemoryMailOutbox } from '../../../../src/infrastructure/persistence/I
 import { InMemoryPortalCredentialsRepository } from '../../../../src/infrastructure/persistence/InMemoryPortalCredentialsRepository.js';
 import { InMemorySyncDestinationRepository } from '../../../../src/infrastructure/persistence/InMemorySyncDestinationRepository.js';
 import { InMemorySyncTransferRepository } from '../../../../src/infrastructure/persistence/InMemorySyncTransferRepository.js';
+import { InMemoryTorrentInstanceRepository } from '../../../../src/infrastructure/persistence/InMemoryTorrentInstanceRepository.js';
 import { InMemoryUserRepository } from '../../../../src/infrastructure/persistence/InMemoryUserRepository.js';
 import { UserBuilder } from '../../../builders/UserBuilder.js';
 
@@ -60,6 +61,8 @@ async function world(outcome: TransferOutcome, language?: Language) {
     credentials,
     destinations,
     transfers,
+    // these passes are scheduled: what each folder does is not read
+    instances: new InMemoryTorrentInstanceRepository(),
     outbox,
     opener: {
       open: (sealed) => {
