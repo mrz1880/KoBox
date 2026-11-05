@@ -123,7 +123,12 @@ export function renderFirewallRules(policy: FirewallPolicy): RenderedFile {
 
 const ROOT_FILE = { mode: '0644', owner: 'root', group: 'root' } as const;
 
-const FAIL2BAN_JAILS_PATH = '/etc/fail2ban/jail.d/kobox.local';
+// Where each fail2ban file KoBox owns lives: its render and the configuration
+// files screen both read these.
+export const FAIL2BAN_JAILS_PATH = '/etc/fail2ban/jail.d/kobox.local';
+export const PORTAL_LOGIN_FILTER_PATH = '/etc/fail2ban/filter.d/kobox-portal.conf';
+export const NEXTCLOUD_AUTH_FILTER_PATH = '/etc/fail2ban/filter.d/kobox-nextcloud.conf';
+export const PUBLICKEY_FLOOD_FILTER_PATH = '/etc/fail2ban/filter.d/kobox-publickey-flood.conf';
 
 // The jail no stock fail2ban setup has: it counts *accepted* publickey logins.
 // A valid key makes a flood invisible to every failure-based jail (the user-h
@@ -200,7 +205,7 @@ export function renderFail2banJails(
 // IP is the client address the portal saw behind nginx.
 export function renderPortalLoginFilter(): RenderedFile {
   return {
-    path: '/etc/fail2ban/filter.d/kobox-portal.conf',
+    path: PORTAL_LOGIN_FILTER_PATH,
     content: [
       '# KoBox: bans repeated failed portal logins (application auth, Phase 6).',
       '[Definition]',
@@ -218,7 +223,7 @@ export function renderPortalLoginFilter(): RenderedFile {
 // credentials ("-") and gets its 401 challenge; that one is not counted.
 export function renderNextcloudAuthFilter(): RenderedFile {
   return {
-    path: '/etc/fail2ban/filter.d/kobox-nextcloud.conf',
+    path: NEXTCLOUD_AUTH_FILTER_PATH,
     content: [
       '# KoBox: bans repeated refused Nextcloud passwords (apps, WebDAV, OCS).',
       '[Definition]',
@@ -232,7 +237,7 @@ export function renderNextcloudAuthFilter(): RenderedFile {
 
 export function renderPublickeyFloodFilter(): RenderedFile {
   return {
-    path: '/etc/fail2ban/filter.d/kobox-publickey-flood.conf',
+    path: PUBLICKEY_FLOOD_FILTER_PATH,
     content: [
       '# KoBox: bans a flood of *successful* publickey logins (abnormal auth',
       '# frequency with a valid key, invisible to failure-based jails).',
