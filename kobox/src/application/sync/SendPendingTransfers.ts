@@ -1,5 +1,6 @@
 import type { HostKeyFingerprint } from '../../domain/sync/HostKeyFingerprint.js';
-import type { SendPass } from '../../domain/sync/SendPass.js';
+import { carriedBy, type SendPass } from '../../domain/sync/SendPass.js';
+import type { TorrentInstanceRepository } from '../../domain/torrent/ports.js';
 import type { SyncDestination } from '../../domain/sync/SyncDestination.js';
 import type { SyncTransfer } from '../../domain/sync/SyncTransfer.js';
 import { TransferFailure } from '../../domain/sync/TransferFailure.js';
@@ -24,6 +25,8 @@ interface Deps {
   readonly credentials: Pick<PortalCredentialsPort, 'find'>;
   readonly destinations: SyncDestinationRepository;
   readonly transfers: SyncTransferRepository;
+  // the folders and how each one sends: they decide what an immediate pass carries
+  readonly instances: Pick<TorrentInstanceRepository, 'findByUsername'>;
   // what the member chose to hear about goes out through the mail queue
   readonly outbox: MailOutboxPort;
   readonly opener: RemotePasswordOpenerPort;
@@ -43,8 +46,9 @@ interface Deps {
 export class SendPendingTransfers {
   constructor(private readonly deps: Deps) {}
 
-  // The scheduled pass takes on whoever's hour has come; an immediate one sends
-  // its member's queue whatever hour it is (see SendPass).
+  // The scheduled pass takes on whoever's hour has come; an immediate one
+  // sends, whatever the hour, what of its member's queue leaves straight away
+  // (see SendPass).
   async execute(pass: SendPass): Promise<void> {
     for (const username of await this.membersOf(pass)) {
       // one member's broken destination must never stop the others' transfers
@@ -73,8 +77,15 @@ export class SendPendingTransfers {
     if (pass.kind === 'scheduled' && !(await this.takeOnInScheduledPass(destination))) {
       return; // not their hour yet
     }
-    const limit = destination.batchSize.isUnlimited ? undefined : destination.batchSize.value;
-    const waiting = await this.deps.transfers.listWaiting(username, limit);
+    // the files per pass count what this pass carries, so what waits for the
+    // hour never takes the place of what leaves at once
+    const waiting = destination.batchSize.takeFrom(
+      carriedBy(
+        pass,
+        await this.deps.transfers.listWaiting(username),
+        await this.deps.instances.findByUsername(username),
+      ),
+    );
     if (waiting.length === 0) {
       return;
     }

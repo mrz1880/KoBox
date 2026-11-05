@@ -589,6 +589,7 @@ export function buildSyncUseCases(deps: SyncUseCaseDeps): SyncUseCases {
       credentials: deps.credentials,
       destinations: deps.destinations,
       transfers: deps.transfers,
+      instances: deps.instances,
       outbox: deps.outbox,
       opener: deps.opener,
       transport: deps.transport,

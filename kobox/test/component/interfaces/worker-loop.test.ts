@@ -597,11 +597,16 @@ async function aFailedTransferInFilms(mode: 'scheduled' | 'immediate'): Promise<
     parseJob('set-category-sync-mode', { username: 'alice', label: 'Films', mode }),
   );
   await world.worker.drain();
+  return aFailedTransferIn('Films', 'Some.Film.mkv');
+}
+
+// a transfer of alice's in that folder, which her machine refused
+async function aFailedTransferIn(folder: string, name: string): Promise<number> {
   const queued = await world.syncTransfers.queue(
     SyncTransfer.queue({
       username: alice,
-      label: Label.parse('Films'),
-      source: LocalPath.parse('/home/alice/rtorrent/complete/Films/Some.Film.mkv'),
+      label: Label.parse(folder),
+      source: LocalPath.parse(`/home/alice/rtorrent/complete/${folder}/${name}`),
       queuedAt: '2026-11-04 09:00:00',
     }),
   );
@@ -909,6 +914,27 @@ describe('CLI enqueue -> root worker loop (the privilege seam)', () => {
     expect(world.queue.pending()).toEqual([
       parseJob('send-pending-transfers', { username: 'alice' }),
     ]);
+  });
+
+  // Series sends "a bit later": what the check put back there waits for the
+  // member's hour, even though the Films send pass runs now
+  it('should_send_only_the_straight_away_folders_of_what_a_working_check_put_back', async () => {
+    const film = await aFailedTransferInFilms('immediate');
+    await world.queue.enqueue(parseJob('add-watch-dir', { username: 'alice', label: 'Series' }));
+    await world.queue.enqueue(
+      parseJob('set-category-sync-mode', { username: 'alice', label: 'Series', mode: 'scheduled' }),
+    );
+    await world.worker.drain();
+    const episode = await aFailedTransferIn('Series', 'Some.Episode.mkv');
+    await world.syncDestinations.save(aliceDestination());
+    await world.queue.enqueue(
+      parseJob('check-sync-destination', { username: 'alice', trust: 'keep-recorded' }),
+    );
+
+    await world.worker.drain();
+
+    expect((await world.syncTransfers.findById(film))?.state).toBe('sent');
+    expect((await world.syncTransfers.findById(episode))?.state).toBe('waiting');
   });
 
   it('should_suspend_then_resume_via_jobs', async () => {

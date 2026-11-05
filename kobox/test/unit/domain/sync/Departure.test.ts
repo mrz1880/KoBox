@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { departureOfRequeued } from '../../../../src/domain/sync/Departure.js';
+import { departureOf } from '../../../../src/domain/sync/Departure.js';
 import { Label } from '../../../../src/domain/torrent/Label.js';
 import { SyncMode } from '../../../../src/domain/torrent/SyncMode.js';
 import { TorrentInstance } from '../../../../src/domain/torrent/TorrentInstance.js';
@@ -17,9 +17,9 @@ function aliceWithFilms(mode: SyncMode): TorrentInstance {
   return provisioned.addWatchDir(films).instance.setSyncMode(films, mode);
 }
 
-describe('departureOfRequeued', () => {
+describe('departureOf', () => {
   it('should_send_a_transfer_put_back_from_a_folder_that_sends_straight_away_at_once', () => {
-    expect(departureOfRequeued(aliceWithFilms(SyncMode.immediate), films)).toBe('straight-away');
+    expect(departureOf(aliceWithFilms(SyncMode.immediate), films)).toBe('straight-away');
   });
 
   // the hourly pass always comes, so nothing is stranded; going out at once is
@@ -30,6 +30,6 @@ describe('departureOfRequeued', () => {
     ['a folder that no longer exists', aliceWithFilms(SyncMode.immediate), Label.parse('Docs')],
     ['a member without folders at all', undefined, films],
   ])('should_wait_for_the_members_hour_for_%s', (_case, folders, label) => {
-    expect(departureOfRequeued(folders, label)).toBe('at-send-hour');
+    expect(departureOf(folders, label)).toBe('at-send-hour');
   });
 });

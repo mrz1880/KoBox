@@ -27,6 +27,16 @@ export class TransferBatchSize {
     return this.value === 0;
   }
 
+  /**
+   * The transfers one pass takes on, out of those it could carry.
+   *
+   * @param carried what the pass could send, oldest first
+   * @returns the oldest of them, as many as this size allows
+   */
+  takeFrom<T>(carried: readonly T[]): readonly T[] {
+    return this.isUnlimited ? carried : carried.slice(0, this.value);
+  }
+
   equals(other: TransferBatchSize): boolean {
     return this.value === other.value;
   }
