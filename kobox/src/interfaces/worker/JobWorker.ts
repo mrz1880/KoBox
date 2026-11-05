@@ -219,12 +219,13 @@ export class JobWorker {
         );
         return { ...job, report };
       }
-      case 'check-sync-destination':
-        await this.deps.sync.checkDestination.execute(
+      case 'check-sync-destination': {
+        const report = await this.deps.sync.checkDestination.execute(
           Username.parse(job.payload.username),
           job.payload.trust,
         );
-        return job;
+        return { ...job, report };
+      }
       case 'set-category-sync-mode':
         await this.deps.torrents.setCategorySyncMode.execute({
           username: Username.parse(job.payload.username),

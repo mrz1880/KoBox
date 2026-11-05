@@ -15,6 +15,8 @@ export interface ConnectionCheck {
   readonly ok: boolean;
   readonly at: string;
   readonly detail?: string;
+  // how many failed transfers a working check put back in the queue, when any
+  readonly requeued?: number;
 }
 
 interface SyncDestinationProps {
@@ -177,9 +179,10 @@ export class SyncDestination {
     return this.host.equals(machine.host) && this.port.equals(machine.port);
   }
 
-  // the same machine, account, folder and password: what a verdict is about,
-  // the very things withConnection and withPassword drop it for
-  private connectsAs(other: CheckedConnection): boolean {
+  // The same machine, account, folder and password: what a verdict is about,
+  // the very things withConnection and withPassword drop it for. A check
+  // whose connection is no longer this one proves nothing about it.
+  connectsAs(other: CheckedConnection): boolean {
     return (
       this.isAt(other) &&
       this.account.equals(other.account) &&

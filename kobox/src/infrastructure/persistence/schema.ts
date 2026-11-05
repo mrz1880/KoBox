@@ -411,6 +411,8 @@ export const syncDestinations = sqliteTable('sync_destinations', {
   lastCheckOk: integer('last_check_ok'),
   lastCheckAt: text('last_check_at'),
   lastCheckDetail: text('last_check_detail'),
+  // how many failed transfers that check put back in the queue, when any
+  lastCheckRequeued: integer('last_check_requeued'),
   // the identity the machine presented on the last contact, a check or a
   // transfer: a copy, for the page, of what the member's known_hosts file
   // (authoritative, see KnownHosts) recorded

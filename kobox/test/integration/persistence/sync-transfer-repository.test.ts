@@ -41,6 +41,22 @@ async function queued(username: Username, source: string): Promise<SyncTransfer>
 }
 
 describe('SqliteSyncTransferRepository', () => {
+  it('should_list_only_what_failed_and_only_theirs_with_why', async () => {
+    const failed = await queued(alice, '/home/alice/rtorrent/complete/Films/Example Show');
+    await repo.save(failed.start(AT).fail(TransferFailure.explained('refused'), AT));
+    const sent = await queued(alice, '/home/alice/rtorrent/complete/Films/Example Film');
+    await repo.save(sent.start(AT).succeed(AT));
+    await queued(alice, '/home/alice/rtorrent/complete/Films/Example Clip');
+    const bobs = await queued(bob, '/home/bob/rtorrent/complete/Films/Example Film');
+    await repo.save(bobs.start(AT).fail(TransferFailure.explained('refused'), AT));
+
+    const listed = await repo.listFailed(alice);
+
+    expect(listed.map((transfer) => [transfer.name, transfer.failure])).toEqual([
+      ['Example Show', TransferFailure.explained('refused')],
+    ]);
+  });
+
   it('should_list_only_what_reached_the_members_machine_and_only_theirs', async () => {
     const sent = await queued(alice, '/home/alice/rtorrent/complete/Films/Example Film');
     await repo.save(sent.start(AT).succeed(AT));

@@ -22,6 +22,15 @@ import type {
 } from '../../../../src/domain/sync/ports.js';
 import { InMemoryJobQueue } from '../../../../src/infrastructure/persistence/InMemoryJobQueue.js';
 import { InMemorySyncDestinationRepository } from '../../../../src/infrastructure/persistence/InMemorySyncDestinationRepository.js';
+import { InMemorySyncTransferRepository } from '../../../../src/infrastructure/persistence/InMemorySyncTransferRepository.js';
+import { InMemoryTorrentInstanceRepository } from '../../../../src/infrastructure/persistence/InMemoryTorrentInstanceRepository.js';
+import { LocalPath } from '../../../../src/domain/sync/LocalPath.js';
+import { SyncTransfer } from '../../../../src/domain/sync/SyncTransfer.js';
+import { TransferFailure } from '../../../../src/domain/sync/TransferFailure.js';
+import { Label } from '../../../../src/domain/torrent/Label.js';
+import { SyncMode } from '../../../../src/domain/torrent/SyncMode.js';
+import { TorrentInstance } from '../../../../src/domain/torrent/TorrentInstance.js';
+import { RtorrentPort, ScgiPort } from '../../../../src/domain/user/Port.js';
 import { Username } from '../../../../src/domain/user/Username.js';
 
 const NOW = '2026-08-10 10:00:00';
@@ -138,6 +147,14 @@ describe('SetSyncDestination then the check', () => {
   });
 });
 
+// a member with nothing that failed and no folders
+function noTransfers() {
+  return {
+    transfers: new InMemorySyncTransferRepository(),
+    instances: new InMemoryTorrentInstanceRepository(),
+  };
+}
+
 describe('CheckSyncDestination', () => {
   async function withStoredDestination(): Promise<InMemorySyncDestinationRepository> {
     const destinations = new InMemorySyncDestinationRepository();
@@ -152,6 +169,7 @@ describe('CheckSyncDestination', () => {
 
     await new CheckSyncDestination({
       destinations,
+      ...noTransfers(),
       opener: new FakeOpener(),
       probe,
       clock: () => NOW,
@@ -170,6 +188,7 @@ describe('CheckSyncDestination', () => {
     const probe = new RecordingProbe({ ok: true });
     const check = new CheckSyncDestination({
       destinations,
+      ...noTransfers(),
       opener: new FakeOpener(),
       probe,
       clock: () => NOW,
@@ -192,6 +211,7 @@ describe('CheckSyncDestination', () => {
 
     await new CheckSyncDestination({
       destinations,
+      ...noTransfers(),
       opener: new FakeOpener(),
       probe: new RecordingProbe({ ok: true }),
       clock: () => NOW,
@@ -213,6 +233,7 @@ describe('CheckSyncDestination', () => {
 
     await new CheckSyncDestination({
       destinations,
+      ...noTransfers(),
       opener: new FakeOpener(),
       probe: brokenProbe,
       clock: () => NOW,
@@ -251,6 +272,7 @@ describe('CheckSyncDestination', () => {
 
       await new CheckSyncDestination({
         destinations,
+        ...noTransfers(),
         opener: new FakeOpener(),
         probe: probeDuring(
           destinations,
@@ -272,6 +294,7 @@ describe('CheckSyncDestination', () => {
 
       await new CheckSyncDestination({
         destinations,
+        ...noTransfers(),
         opener: new FakeOpener(),
         probe: probeDuring(
           destinations,
@@ -292,6 +315,7 @@ describe('CheckSyncDestination', () => {
 
     await new CheckSyncDestination({
       destinations,
+      ...noTransfers(),
       opener: new FakeOpener(),
       probe: {
         probe: async () => {
@@ -310,11 +334,145 @@ describe('CheckSyncDestination', () => {
 
     await new CheckSyncDestination({
       destinations,
+      ...noTransfers(),
       opener: new FakeOpener(),
       probe: new RecordingProbe({ ok: true }),
       clock: () => NOW,
     }).execute(alice, 'keep-recorded');
 
     expect(await destinations.findByUsername(alice)).toBeUndefined();
+  });
+});
+
+// A check that works proves the connection a failed transfer lacked: the
+// member, having fixed their machine, should not have to try each file again.
+describe('CheckSyncDestination on transfers that failed', () => {
+  const films = Label.parse('Films');
+
+  async function failedOn(
+    transfers: InMemorySyncTransferRepository,
+    name: string,
+    failure: TransferFailure,
+  ): Promise<number> {
+    const queued = await transfers.queue(
+      SyncTransfer.queue({
+        username: alice,
+        label: films,
+        source: LocalPath.parse(`/home/alice/rtorrent/complete/Films/${name}`),
+        queuedAt: NOW,
+      }),
+    );
+    if (queued?.id === undefined) {
+      throw new Error('the fixture failed to queue a transfer');
+    }
+    await transfers.save(queued.start(NOW).fail(failure, NOW));
+    return queued.id;
+  }
+
+  // alice's Films folder, sending the way `mode` says
+  async function filmsSending(mode: SyncMode): Promise<InMemoryTorrentInstanceRepository> {
+    const instances = new InMemoryTorrentInstanceRepository();
+    const provisioned = TorrentInstance.provision({
+      username: alice,
+      scgiPort: ScgiPort.parse(51101),
+      rtorrentPort: RtorrentPort.parse(45000),
+    }).instance;
+    await instances.save(provisioned.addWatchDir(films).instance.setSyncMode(films, mode));
+    return instances;
+  }
+
+  async function checked(
+    outcome: ProbeOutcome,
+    instances: InMemoryTorrentInstanceRepository = new InMemoryTorrentInstanceRepository(),
+  ) {
+    const destinations = new InMemorySyncDestinationRepository();
+    await new SetSyncDestination({
+      destinations,
+      sealer: new FakeSealer(),
+      queue: new InMemoryJobQueue(),
+    }).execute(aCommand());
+    const transfers = new InMemorySyncTransferRepository();
+    const refused = await failedOn(transfers, 'Refused.mkv', TransferFailure.explained('refused'));
+    const noRoom = await failedOn(transfers, 'No.Room.mkv', TransferFailure.explained('no-room'));
+    const check = new CheckSyncDestination({
+      destinations,
+      transfers,
+      instances,
+      opener: new FakeOpener(),
+      probe: new RecordingProbe(outcome),
+      clock: () => NOW,
+    });
+    return { destinations, transfers, check, refused, noRoom };
+  }
+
+  it('should_put_back_in_the_queue_what_a_working_connection_now_carries', async () => {
+    const { transfers, check, refused, noRoom } = await checked({ ok: true });
+
+    await check.execute(alice, 'keep-recorded');
+
+    expect((await transfers.findById(refused))?.state).toBe('waiting');
+    // a check says nothing about the room left over there
+    expect((await transfers.findById(noRoom))?.state).toBe('failed');
+  });
+
+  // what it put back leaves the way its folder sends, as one put back by hand
+  it('should_say_what_it_put_back_leaves_at_once_from_a_folder_that_sends_straight_away', async () => {
+    const straightAway = await checked({ ok: true }, await filmsSending(SyncMode.immediate));
+    const scheduled = await checked({ ok: true }, await filmsSending(SyncMode.scheduled));
+
+    expect(await straightAway.check.execute(alice, 'keep-recorded')).toEqual({ sendNow: true });
+    expect(await scheduled.check.execute(alice, 'keep-recorded')).toEqual({ sendNow: false });
+  });
+
+  // the page tells the member their files are on their way again
+  it('should_record_how_many_it_put_back_with_its_verdict', async () => {
+    const { destinations, check } = await checked({ ok: true, detail: 'it answered' });
+
+    await check.execute(alice, 'keep-recorded');
+
+    expect((await destinations.findByUsername(alice))?.lastCheck).toEqual({
+      ok: true,
+      at: NOW,
+      detail: 'it answered',
+      requeued: 1,
+    });
+  });
+
+  it('should_leave_every_failure_alone_when_the_connection_does_not_work', async () => {
+    const { transfers, check, refused } = await checked({ ok: false, detail: 'refused' });
+
+    await check.execute(alice, 'keep-recorded');
+
+    expect((await transfers.findById(refused))?.state).toBe('failed');
+  });
+
+  // the member saved another folder during the probe: that the old one works
+  // says nothing about the new one
+  it('should_leave_every_failure_alone_when_the_verdict_is_about_what_came_before', async () => {
+    const destinations = new InMemorySyncDestinationRepository();
+    const saving = new SetSyncDestination({
+      destinations,
+      sealer: new FakeSealer(),
+      queue: new InMemoryJobQueue(),
+    });
+    await saving.execute(aCommand());
+    const transfers = new InMemorySyncTransferRepository();
+    const refused = await failedOn(transfers, 'Refused.mkv', TransferFailure.explained('refused'));
+
+    await new CheckSyncDestination({
+      destinations,
+      transfers,
+      instances: new InMemoryTorrentInstanceRepository(),
+      opener: new FakeOpener(),
+      probe: {
+        probe: async () => {
+          await saving.execute(withoutPassword({ path: RemotePath.parse('/volume2/torrents') }));
+          return { ok: true };
+        },
+      },
+      clock: () => NOW,
+    }).execute(alice, 'keep-recorded');
+
+    expect((await transfers.findById(refused))?.state).toBe('failed');
   });
 });

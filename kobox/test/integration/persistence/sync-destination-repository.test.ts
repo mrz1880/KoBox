@@ -53,6 +53,15 @@ describe('SqliteSyncDestinationRepository', () => {
     expect((await repo.findByUsername(alice))?.transferMails).toBe('failures');
   });
 
+  it('should_keep_how_many_failed_transfers_a_working_check_put_back', async () => {
+    const destination = aDestination();
+    const check = { ok: true, at: '2026-11-05 10:00:00', detail: 'it answered', requeued: 3 };
+
+    await repo.save(destination.recordCheck(check, destination));
+
+    expect((await repo.findByUsername(alice))?.lastCheck).toEqual(check);
+  });
+
   // a transfer to a machine never tested records its identity with no verdict
   it('should_keep_the_identity_of_a_machine_that_was_never_checked', async () => {
     const destination = aDestination();

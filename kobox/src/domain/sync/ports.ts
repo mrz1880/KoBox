@@ -51,6 +51,8 @@ export interface SyncTransferRepository {
   findById(id: number): Promise<SyncTransfer | undefined>;
   listWaiting(username: Username, limit?: number): Promise<readonly SyncTransfer[]>;
   listRecent(username: Username, limit: number): Promise<readonly SyncTransfer[]>;
+  // every transfer of this member's that did not arrive, oldest first
+  listFailed(username: Username): Promise<readonly SyncTransfer[]>;
   countByState(username: Username, state: TransferState): Promise<number>;
   // where each download KoBox sync already put on the member's machine came
   // from: the space context does not propose to delete what has no copy yet

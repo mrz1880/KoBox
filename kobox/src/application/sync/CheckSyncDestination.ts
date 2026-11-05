@@ -1,16 +1,39 @@
+import { departureOfRequeued } from '../../domain/sync/Departure.js';
 import type { HostKeyTrust } from '../../domain/sync/HostKeyTrust.js';
 import type { ProbeOutcome } from '../../domain/sync/ports.js';
 import type {
   RemotePasswordOpenerPort,
   RemoteProbePort,
   SyncDestinationRepository,
+  SyncTransferRepository,
 } from '../../domain/sync/ports.js';
+import type { TorrentInstanceRepository } from '../../domain/torrent/ports.js';
 import type { RemotePassword } from '../../domain/sync/RemotePassword.js';
 import type { SyncDestination } from '../../domain/sync/SyncDestination.js';
 import type { Username } from '../../domain/user/Username.js';
 
+// What the check did beyond its verdict, for what follows it
+export interface CheckReport {
+  // true when a transfer it put back leaves at once, from a folder that sends
+  // straight away, rather than at the member's hour
+  readonly sendNow: boolean;
+}
+
+// what a working check put back, and whether any of it leaves at once
+interface PutBack {
+  readonly requeued: number;
+  readonly sendNow: boolean;
+}
+
+const NOTHING_PUT_BACK: PutBack = { requeued: 0, sendNow: false };
+const NOTHING_TO_SEND: CheckReport = { sendNow: false };
+
 interface Deps {
   readonly destinations: SyncDestinationRepository;
+  // the member's transfers that failed, some of which a working check clears
+  readonly transfers: Pick<SyncTransferRepository, 'listFailed' | 'save'>;
+  // the folders and how each one sends: they decide when a transfer leaves
+  readonly instances: Pick<TorrentInstanceRepository, 'findByUsername'>;
   readonly opener: RemotePasswordOpenerPort;
   readonly probe: RemoteProbePort;
   readonly clock: () => string;
@@ -24,10 +47,10 @@ export class CheckSyncDestination {
   // `trust` says whether this check may accept a new identity of the machine:
   // the member testing the connection may, the check following a save may not
   // (see HostKeyTrust)
-  async execute(username: Username, trust: HostKeyTrust): Promise<void> {
+  async execute(username: Username, trust: HostKeyTrust): Promise<CheckReport> {
     const destination = await this.deps.destinations.findByUsername(username);
     if (destination === undefined) {
-      return; // nothing configured: nothing to check, and not an error
+      return NOTHING_TO_SEND; // nothing configured: nothing to check, and not an error
     }
     const { identity, ...verdict } = await this.probeOrExplain(destination, trust);
     // Read again: the probe takes seconds, and the member may have saved their
@@ -35,12 +58,35 @@ export class CheckSyncDestination {
     // verdict about what was there before.
     const current = await this.deps.destinations.findByUsername(username);
     if (current === undefined) {
-      return; // removed during the probe: nothing left to record it on
+      return NOTHING_TO_SEND; // removed during the probe: nothing left to record it on
     }
-    const checked = current.recordCheck({ ...verdict, at: this.deps.clock() }, destination);
+    const { requeued, sendNow } =
+      verdict.ok && current.connectsAs(destination)
+        ? await this.requeueWhatItFixed(username)
+        : NOTHING_PUT_BACK;
+    const checked = current.recordCheck(
+      { ...verdict, at: this.deps.clock(), ...(requeued > 0 && { requeued }) },
+      destination,
+    );
     await this.deps.destinations.save(
       identity === undefined ? checked : checked.recognise(identity, destination),
     );
+    return { sendNow };
+  }
+
+  // What failed for want of the connection this check found working goes back
+  // in the queue, and leaves the way its folder sends (see Departure).
+  private async requeueWhatItFixed(username: Username): Promise<PutBack> {
+    const fixed = (await this.deps.transfers.listFailed(username)).filter((transfer) =>
+      transfer.isFixedByAWorkingConnection(),
+    );
+    const folders = await this.deps.instances.findByUsername(username);
+    let sendNow = false;
+    for (const transfer of fixed) {
+      await this.deps.transfers.save(transfer.requeue(this.deps.clock()));
+      sendNow ||= departureOfRequeued(folders, transfer.label) === 'straight-away';
+    }
+    return { requeued: fixed.length, sendNow };
   }
 
   private async probeOrExplain(

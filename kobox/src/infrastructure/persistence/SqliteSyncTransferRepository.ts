@@ -98,6 +98,16 @@ export class SqliteSyncTransferRepository implements SyncTransferRepository {
     return Promise.resolve(rows.map(toDomain));
   }
 
+  listFailed(username: Username): Promise<readonly SyncTransfer[]> {
+    const rows = this.db.orm
+      .select()
+      .from(syncTransfers)
+      .where(and(eq(syncTransfers.username, username.value), eq(syncTransfers.state, 'failed')))
+      .orderBy(syncTransfers.id)
+      .all();
+    return Promise.resolve(rows.map(toDomain));
+  }
+
   countByState(username: Username, state: TransferState): Promise<number> {
     const rows = this.db.orm
       .select({ id: syncTransfers.id })

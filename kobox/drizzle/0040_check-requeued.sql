@@ -1,0 +1,1 @@
+ALTER TABLE `sync_destinations` ADD `last_check_requeued` integer;

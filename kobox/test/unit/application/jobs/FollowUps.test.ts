@@ -125,6 +125,24 @@ const cases: readonly (readonly [string, CompletedJob, readonly FollowUp[]])[] =
     [],
   ],
   [
+    'a working check that put back a straight-away transfer: sent at once',
+    {
+      type: 'check-sync-destination',
+      payload: { username: 'alice', trust: 'keep-recorded' },
+      report: { sendNow: true },
+    },
+    [sendAlicesTransfers],
+  ],
+  [
+    'a check that put back nothing to send now: left to the member hour',
+    {
+      type: 'check-sync-destination',
+      payload: { username: 'alice', trust: 'accept-presented' },
+      report: { sendNow: false },
+    },
+    [],
+  ],
+  [
     'a folder added: the member config rendered',
     { type: 'add-watch-dir', payload: films, report: { added: true } },
     [renderAlicesConfig],

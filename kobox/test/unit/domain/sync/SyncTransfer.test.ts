@@ -75,6 +75,25 @@ describe('SyncTransfer', () => {
     expect(again.attempts).toBe(1);
   });
 
+  // a working check puts back what it proves would go through now, and only that
+  it('should_be_fixed_by_a_working_connection_when_it_failed_on_one', () => {
+    const failedOn = (failure: TransferFailure) =>
+      aTransfer().start('2026-08-15 10:01:00').fail(failure, '2026-08-15 10:02:00');
+    const transfers = [
+      failedOn(TransferFailure.explained('refused')),
+      failedOn(TransferFailure.explained('no-room')),
+      aTransfer(),
+      aTransfer().start('2026-08-15 10:01:00').succeed('2026-08-15 10:05:00'),
+    ];
+
+    expect(transfers.map((transfer) => transfer.isFixedByAWorkingConnection())).toEqual([
+      true,
+      false,
+      false,
+      false,
+    ]);
+  });
+
   it('should_refuse_to_start_something_that_is_already_on_its_way', () => {
     // two passes overlapping must not send the same file twice
     const sending = aTransfer().start('2026-08-15 10:01:00');

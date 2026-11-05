@@ -34,7 +34,18 @@ function checkOutcome(destination: SyncDestination, viewer: Viewer): RawHtml {
   ${check.ok ? html`<span class="chip ok">${viewer.t('it works')}</span>` : html`<span class="chip bad">${viewer.t('it does not work')}</span>`}
   <span class="muted">${check.detail === undefined ? '' : viewer.t(check.detail)}</span>
 </p>
-<p class="muted">${viewer.t('Last tried {at}.', { at: check.at })}</p>`;
+<p class="muted">${viewer.t('Last tried {at}.', { at: check.at })}</p>
+${putBack(check.requeued, viewer)}`;
+}
+
+// what a working check put back in the queue, failed for want of it
+function putBack(requeued: number | undefined, viewer: Viewer): RawHtml {
+  if (requeued === undefined) {
+    return html``;
+  }
+  return html`<p class="muted">${requeued === 1
+    ? viewer.t('One transfer that had failed is back in the queue.')
+    : viewer.t('{count} transfers that had failed are back in the queue.', { count: String(requeued) })}</p>`;
 }
 
 // What the machine presented itself as on the last contact, a check or a

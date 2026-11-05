@@ -57,6 +57,20 @@ describe('the verdict of the destination check', () => {
     );
   });
 
+  // a working check put back what failed for want of it: the member is told
+  // their files are on their way again, without trying each one
+  it('should_tell_how_many_failed_transfers_a_working_check_put_back', () => {
+    const destination = aDestination();
+    const putBack = (requeued: number) =>
+      destinationSection(
+        destination.recordCheck({ ok: true, at: '2026-11-05 10:00:00', requeued }, destination),
+        frenchMember,
+      ).value;
+
+    expect(putBack(1)).toContain('Un transfert qui avait échoué est de nouveau dans la file.');
+    expect(putBack(3)).toContain('3 transferts qui avaient échoué sont de nouveau dans la file.');
+  });
+
   // a transfer to a machine never tested is its first contact: the page shows
   // what it presented itself as, though no check ran
   it('should_show_the_identity_a_transfer_recorded_before_any_check', () => {
