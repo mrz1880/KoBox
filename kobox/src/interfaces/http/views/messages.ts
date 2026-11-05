@@ -402,8 +402,8 @@ const FR: Readonly<Record<string, string>> = {
   'Nothing leaves the box. Download it yourself whenever you like.':
     'Rien ne quitte la box. Téléchargez-le vous-même quand vous voulez.',
   'Send it a bit later': 'L’envoyer un peu plus tard',
-  'It goes out on the next pass, a few minutes after it finishes.':
-    'Il part au prochain passage, quelques minutes après la fin du téléchargement.',
+  'It waits for {hour}, the hour set below for these folders, and goes out then.':
+    'Il attend {hour}, l’heure réglée plus bas pour ces dossiers, et part à ce moment-là.',
   'Send it straight away': 'L’envoyer tout de suite',
   'It starts copying the moment the download is done.':
     'La copie démarre dès que le téléchargement est terminé.',
