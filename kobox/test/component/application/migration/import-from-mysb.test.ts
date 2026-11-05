@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
+import { parseJob } from '../../../../src/application/jobs/contract.js';
 import { ImportFromMysb } from '../../../../src/application/migration/ImportFromMysb.js';
 import type {
   MysbAddress,
@@ -381,6 +382,51 @@ describe('ImportFromMysb', () => {
       expect(world.queue.pending().map((job) => job.type)).toEqual([
         'render-whitelist',
         'apply-firewall',
+      ]);
+    });
+
+    // each imported member gets what follows a member created in KoBox: one
+    // port reservation joined by every member, then their own provisioning
+    it('should_queue_for_each_imported_member_what_follows_a_new_member', async () => {
+      const bobDto = {
+        ...aliceDto,
+        username: 'bob',
+        email: 'bob@example.org',
+        scgiPort: 51102,
+        rtorrentPort: 45001,
+        proxyPort: 8081,
+      };
+      world = buildWorld(new FakeMysbSource({ users: [aliceDto, bobDto] }));
+
+      await world.importer.execute({ apply: true });
+
+      expect(world.queue.pending()).toEqual([
+        parseJob('reserve-member-ports', {}),
+        parseJob('provision-rtorrent', { username: 'alice' }),
+        parseJob('provision-vpn-user', { username: 'alice' }),
+        parseJob('render-nfs-exports', {}),
+        parseJob('provision-rtorrent', { username: 'bob' }),
+        parseJob('provision-vpn-user', { username: 'bob' }),
+        parseJob('render-nfs-exports', {}),
+        parseJob('render-whitelist', {}),
+        parseJob('apply-firewall', {}),
+      ]);
+    });
+
+    it('should_queue_the_same_provisioning_again_when_a_rerun_repairs_a_member', async () => {
+      world = buildWorld(new FakeMysbSource({ users: [aliceDto] }));
+      await world.importer.execute({ apply: true });
+      const firstRun = world.queue.pending();
+
+      await world.importer.execute({ apply: true });
+
+      // the reservation still waiting is joined, every other job queued again
+      expect(world.queue.pending().slice(firstRun.length)).toEqual([
+        parseJob('provision-rtorrent', { username: 'alice' }),
+        parseJob('provision-vpn-user', { username: 'alice' }),
+        parseJob('render-nfs-exports', {}),
+        parseJob('render-whitelist', {}),
+        parseJob('apply-firewall', {}),
       ]);
     });
 
