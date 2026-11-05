@@ -1,6 +1,7 @@
 import { DomainError } from '../shared/DomainError.js';
 import {
   FAIL2BAN_JAILS_PATH,
+  NEXTCLOUD_AUTH_FILTER_PATH,
   PORTAL_LOGIN_FILTER_PATH,
   PUBLICKEY_FLOOD_FILTER_PATH,
 } from '../security/rendering.js';
@@ -142,6 +143,12 @@ const CATALOG: readonly ConfigDocument[] = [
     'Ban filter: portal logins',
     PORTAL_LOGIN_FILTER_PATH,
     'The pattern that recognises a failed portal login in the journal.',
+  ),
+  ConfigDocument.of(
+    'fail2ban-nextcloud-filter',
+    'Ban filter: Nextcloud passwords',
+    NEXTCLOUD_AUTH_FILTER_PATH,
+    'The pattern that recognises a refused Nextcloud password in the web server log.',
   ),
   ConfigDocument.of(
     'fail2ban-publickey-filter',

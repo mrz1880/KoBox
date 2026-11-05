@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { fail2banManagedPaths } from '../../../../src/domain/security/rendering.js';
 
 // The catalog is built and checked when the module loads: imported inside each
 // test, a load-time failure fails that test instead of the whole file.
@@ -153,6 +154,7 @@ describe('ConfigDocument', () => {
       ['firewall-unit', '/etc/systemd/system/kobox-firewall.service'],
       ['fail2ban-jails', '/etc/fail2ban/jail.d/kobox.local'],
       ['fail2ban-portal-filter', '/etc/fail2ban/filter.d/kobox-portal.conf'],
+      ['fail2ban-nextcloud-filter', '/etc/fail2ban/filter.d/kobox-nextcloud.conf'],
       ['fail2ban-publickey-filter', '/etc/fail2ban/filter.d/kobox-publickey-flood.conf'],
       ['nfs-exports', '/etc/exports.d/kobox.exports'],
       ['samba', '/etc/samba/smb.conf'],
@@ -161,6 +163,15 @@ describe('ConfigDocument', () => {
       ['sysctl-dropin', '/etc/sysctl.d/90-kobox.conf'],
       ['member-port-reservation', '/etc/sysctl.d/91-kobox-member-ports.conf'],
     ]);
+  });
+
+  // the Nextcloud ban filter was rendered onto the box and missing from the
+  // list: a filter added to fail2ban must show up here too
+  it('should_list_every_fail2ban_file_kobox_manages', async () => {
+    const { ConfigDocument } = await load();
+    const listed = ConfigDocument.all().map((document) => document.path);
+
+    expect(listed).toEqual(expect.arrayContaining([...fail2banManagedPaths()]));
   });
 
   it('should_tell_the_operator_what_every_catalogued_file_decides', async () => {

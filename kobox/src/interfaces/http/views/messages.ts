@@ -746,6 +746,9 @@ const FR: Readonly<Record<string, string>> = {
   'Ban filter: portal logins': 'Filtre de bannissement : connexions au portail',
   'The pattern that recognises a failed portal login in the journal.':
     'Le motif qui reconnaît une connexion ratée au portail dans le journal.',
+  'Ban filter: Nextcloud passwords': 'Filtre de bannissement : mots de passe Nextcloud',
+  'The pattern that recognises a refused Nextcloud password in the web server log.':
+    'Le motif qui reconnaît un mot de passe Nextcloud refusé dans le journal du serveur web.',
   'Ban filter: SSH key flooding': 'Filtre de bannissement : rafales de clés SSH',
   'The pattern that recognises a client trying key after key.':
     'Le motif qui reconnaît un client essayant clé après clé.',
