@@ -62,6 +62,14 @@ import type { RemotePasswordOpenerPort } from '../../../src/domain/sync/ports.js
 import { RemotePassword } from '../../../src/domain/sync/RemotePassword.js';
 import { LocalPath } from '../../../src/domain/sync/LocalPath.js';
 import { SyncTransfer } from '../../../src/domain/sync/SyncTransfer.js';
+import { LoneFilePlacement } from '../../../src/domain/sync/LoneFilePlacement.js';
+import { RemoteAccount } from '../../../src/domain/sync/RemoteAccount.js';
+import { RemoteHost } from '../../../src/domain/sync/RemoteHost.js';
+import { RemotePath } from '../../../src/domain/sync/RemotePath.js';
+import { RemotePort } from '../../../src/domain/sync/RemotePort.js';
+import { SendHour } from '../../../src/domain/sync/SendHour.js';
+import { SyncDestination } from '../../../src/domain/sync/SyncDestination.js';
+import { TransferBatchSize } from '../../../src/domain/sync/TransferBatchSize.js';
 import { FakeRtorrentConfig } from '../../../src/infrastructure/system/fakes/FakeRtorrentConfig.js';
 import { FakeRtorrentControl } from '../../../src/infrastructure/system/fakes/FakeRtorrentControl.js';
 import { FakeServiceControl } from '../../../src/infrastructure/system/fakes/FakeServiceControl.js';
@@ -606,6 +614,22 @@ async function aFailedTransferInFilms(mode: 'scheduled' | 'immediate'): Promise<
   return queued.id;
 }
 
+// alice's machine, set to take the "a bit later" folders at an hour that is
+// not the one the worker's clock reads
+function aliceDestination(): SyncDestination {
+  return SyncDestination.define({
+    username: alice,
+    host: RemoteHost.parse('nas.example.org'),
+    port: RemotePort.parse(22),
+    account: RemoteAccount.parse('seedbox'),
+    sealedPassword: 'sealed',
+    path: RemotePath.parse('/volume1/torrents'),
+    batchSize: TransferBatchSize.unlimited(),
+    placement: LoneFilePlacement.besideTheOthers,
+    sendHour: SendHour.parse(21),
+  });
+}
+
 describe('CLI enqueue -> root worker loop (the privilege seam)', () => {
   it('should_create_a_user_end_to_end_through_a_typed_job', async () => {
     const id = await enqueueCreateAlice();
@@ -868,6 +892,23 @@ describe('CLI enqueue -> root worker loop (the privilege seam)', () => {
     await world.worker.processNext();
 
     expect(pendingTypesOf(world.queue)).toEqual(['send-pending-transfers']);
+  });
+
+  // the machine refused the account, the member fixed it there, the check
+  // now works: what failed for want of it must not wait for a "Try again"
+  it('should_put_back_what_a_working_check_fixed_and_queue_the_members_send_pass', async () => {
+    const id = await aFailedTransferInFilms('immediate');
+    await world.syncDestinations.save(aliceDestination());
+    await world.queue.enqueue(
+      parseJob('check-sync-destination', { username: 'alice', trust: 'keep-recorded' }),
+    );
+
+    await world.worker.processNext();
+
+    expect((await world.syncTransfers.findById(id))?.state).toBe('waiting');
+    expect(world.queue.pending()).toEqual([
+      parseJob('send-pending-transfers', { username: 'alice' }),
+    ]);
   });
 
   it('should_suspend_then_resume_via_jobs', async () => {
