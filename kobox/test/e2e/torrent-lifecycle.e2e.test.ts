@@ -362,8 +362,8 @@ describe.skipIf(!onDebianAsRoot)('E2E: torrent lifecycle with a real rtorrent', 
     const transferOf = (name: string): Record<string, unknown> | undefined =>
       dbRow('SELECT state, last_error FROM sync_transfers WHERE username = ? AND source LIKE ?', USER, `%/${name}`);
     const recordedIdentity = (): unknown =>
-      dbRow('SELECT last_check_fingerprint FROM sync_destinations WHERE username = ?', USER)
-        ?.last_check_fingerprint;
+      dbRow('SELECT known_host_fingerprint FROM sync_destinations WHERE username = ?', USER)
+        ?.known_host_fingerprint;
     for (const key of ['before', 'after']) {
       sh('ssh-keygen', ['-q', '-t', 'ed25519', '-N', '', '-f', join(keys, key)]);
     }

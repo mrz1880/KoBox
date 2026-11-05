@@ -276,4 +276,22 @@ describe('KoboxDatabase', () => {
 
     expect(alice?.judgedBy).toEqual(SeedRule.DEFAULT);
   });
+
+  it('should_keep_the_identity_a_box_recorded_for_a_member_machine_under_its_new_name', () => {
+    const old = boxBefore('0039_known-host-fingerprint');
+    old
+      .prepare(
+        "INSERT INTO sync_destinations (username, host, port, account, sealed_password, path, last_check_fingerprint) VALUES ('alice', 'nas.example.org', 22, 'seedbox', 'sealed', '/volume1/torrents', 'SHA256:abc')",
+      )
+      .run();
+    old.close();
+
+    const db = KoboxDatabase.open(join(dir, 'kobox.db'));
+    const row = db.raw
+      .prepare("SELECT known_host_fingerprint FROM sync_destinations WHERE username = 'alice'")
+      .get();
+    db.close();
+
+    expect(row).toEqual({ known_host_fingerprint: 'SHA256:abc' });
+  });
 });

@@ -53,8 +53,8 @@ export class SqliteSyncDestinationRepository implements SyncDestinationRepositor
         sendHour: SendHour.parse(row.sendHour),
         transferMails: parseTransferMails(row.transferMails),
         ...(check !== undefined && { lastCheck: check }),
-        ...(row.lastCheckFingerprint !== null && {
-          identity: HostKeyFingerprint.parse(row.lastCheckFingerprint),
+        ...(row.knownHostFingerprint !== null && {
+          identity: HostKeyFingerprint.parse(row.knownHostFingerprint),
         }),
       }),
     );
@@ -75,7 +75,7 @@ export class SqliteSyncDestinationRepository implements SyncDestinationRepositor
       lastCheckOk: destination.lastCheck === undefined ? null : destination.lastCheck.ok ? 1 : 0,
       lastCheckAt: destination.lastCheck?.at ?? null,
       lastCheckDetail: destination.lastCheck?.detail ?? null,
-      lastCheckFingerprint: destination.identity?.value ?? null,
+      knownHostFingerprint: destination.identity?.value ?? null,
     };
     this.db.orm
       .insert(syncDestinations)
