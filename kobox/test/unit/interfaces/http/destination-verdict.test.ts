@@ -38,7 +38,8 @@ function aDestination(): SyncDestination {
 }
 
 function checkedWith(detail: string): SyncDestination {
-  return aDestination().recordCheck({ ok: false, at: '2026-11-04 10:00:00', detail });
+  const destination = aDestination();
+  return destination.recordCheck({ ok: false, at: '2026-11-04 10:00:00', detail }, destination);
 }
 
 describe('the verdict of the destination check', () => {

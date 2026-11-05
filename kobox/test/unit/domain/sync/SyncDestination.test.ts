@@ -24,6 +24,11 @@ function aDestination(): SyncDestination {
   });
 }
 
+// a check of this very destination that found it working
+function checkedOk(destination: SyncDestination): SyncDestination {
+  return destination.recordCheck({ ok: true, at: '2026-08-10 10:00:00' }, destination);
+}
+
 describe('SyncDestination', () => {
   it('should_put_a_category_in_a_folder_of_its_own_name', () => {
     expect(aDestination().folderFor('films')).toBe('/volume1/torrents/films');
@@ -60,7 +65,7 @@ describe('SyncDestination', () => {
 
   it('should_forget_every_earlier_verdict_when_the_connection_changes', () => {
     // a green tick earned against the old host says nothing about the new one
-    const checked = aDestination().recordCheck({ ok: true, at: '2026-08-10 10:00:00' });
+    const checked = checkedOk(aDestination());
 
     const moved = checked.withConnection({
       host: RemoteHost.parse('nas2.example.org'),
@@ -75,24 +80,45 @@ describe('SyncDestination', () => {
   it('should_keep_the_verdict_when_only_a_preference_changes', () => {
     // how many files a pass takes on, or where a lone file lands, says nothing
     // about whether the machine answers: re-testing for that would be noise
-    const checked = aDestination().recordCheck({ ok: true, at: '2026-08-10 10:00:00' });
+    const checked = checkedOk(aDestination());
 
     expect(checked.withBatchSize(TransferBatchSize.parse(3)).lastCheck?.ok).toBe(true);
     expect(checked.withPlacement(LoneFilePlacement.inItsOwnFolder).lastCheck?.ok).toBe(true);
   });
 
   it('should_forget_the_verdict_when_the_password_changes', () => {
-    const checked = aDestination().recordCheck({ ok: true, at: '2026-08-10 10:00:00' });
+    const checked = checkedOk(aDestination());
 
     expect(checked.withPassword('another-sealed-blob').lastCheck).toBeUndefined();
   });
 
+  // the member saved another folder, account or password while the check was
+  // out: its verdict was about what came before
+  it('should_drop_a_verdict_earned_against_a_connection_it_no_longer_has', () => {
+    const checked = aDestination();
+    const moved = [
+      checked.withConnection({
+        host: checked.host,
+        port: checked.port,
+        account: checked.account,
+        path: RemotePath.parse('/volume2/torrents'),
+      }),
+      checked.withPassword('another-sealed-blob'),
+    ];
+
+    const verdicts = moved.map(
+      (current) => current.recordCheck({ ok: true, at: '2026-08-10 10:00:00' }, checked).lastCheck,
+    );
+
+    expect(verdicts).toEqual([undefined, undefined]);
+  });
+
   it('should_remember_why_a_check_failed_so_the_page_can_say_it', () => {
-    const failed = aDestination().recordCheck({
-      ok: false,
-      at: '2026-08-10 10:00:00',
-      detail: 'the password was refused',
-    });
+    const destination = aDestination();
+    const failed = destination.recordCheck(
+      { ok: false, at: '2026-08-10 10:00:00', detail: 'the password was refused' },
+      destination,
+    );
 
     expect(failed.lastCheck?.ok).toBe(false);
     expect(failed.lastCheck?.detail).toBe('the password was refused');
@@ -140,7 +166,7 @@ describe('SyncDestination', () => {
       const known = destination.recognise(presented, destination);
 
       const kept = [
-        known.recordCheck({ ok: true, at: '2026-11-05 10:00:00' }),
+        checkedOk(known),
         known.withPassword('another-sealed-blob'),
         known.withConnection({ ...settings, account: RemoteAccount.parse('other'), path: RemotePath.parse('/volume2') }),
       ];

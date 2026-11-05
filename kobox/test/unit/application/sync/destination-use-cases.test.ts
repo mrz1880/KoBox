@@ -224,6 +224,87 @@ describe('CheckSyncDestination', () => {
     expect(after?.lastCheck?.detail).toContain('could not run');
   });
 
+  // A probe takes seconds. A member saving their destination meanwhile must
+  // keep what they saved: the verdict was earned against what came before.
+  describe('when the member saves during the probe', () => {
+    // a probe that lets the member save `change` while it is out on the network
+    function probeDuring(
+      destinations: InMemorySyncDestinationRepository,
+      change: Partial<Command>,
+      outcome: ProbeOutcome,
+    ): RemoteProbePort {
+      return {
+        probe: async () => {
+          await new SetSyncDestination({
+            destinations,
+            sealer: new FakeSealer(),
+            queue: new InMemoryJobQueue(),
+          }).execute(withoutPassword(change));
+          return outcome;
+        },
+      };
+    }
+
+    it('should_keep_the_new_folder_and_drop_the_verdict_about_the_old_one', async () => {
+      const destinations = await withStoredDestination();
+      const identity = HostKeyFingerprint.parse('SHA256:abc');
+
+      await new CheckSyncDestination({
+        destinations,
+        opener: new FakeOpener(),
+        probe: probeDuring(
+          destinations,
+          { path: RemotePath.parse('/volume2/torrents') },
+          { ok: true, detail: 'it answered', identity },
+        ),
+        clock: () => NOW,
+      }).execute(alice, 'keep-recorded');
+
+      const after = await destinations.findByUsername(alice);
+      expect(after?.path.value).toBe('/volume2/torrents');
+      expect(after?.lastCheck).toBeUndefined();
+      // the same machine all the same: what it presented still holds
+      expect(after?.identity).toEqual(identity);
+    });
+
+    it('should_record_the_verdict_and_keep_a_preference_changed_meanwhile', async () => {
+      const destinations = await withStoredDestination();
+
+      await new CheckSyncDestination({
+        destinations,
+        opener: new FakeOpener(),
+        probe: probeDuring(
+          destinations,
+          { sendHour: SendHour.parse(23) },
+          { ok: true, detail: 'it answered' },
+        ),
+        clock: () => NOW,
+      }).execute(alice, 'keep-recorded');
+
+      const after = await destinations.findByUsername(alice);
+      expect(after?.sendHour.value).toBe(23);
+      expect(after?.lastCheck).toEqual({ ok: true, at: NOW, detail: 'it answered' });
+    });
+  });
+
+  it('should_not_bring_back_a_destination_the_member_removed_during_the_probe', async () => {
+    const destinations = await withStoredDestination();
+
+    await new CheckSyncDestination({
+      destinations,
+      opener: new FakeOpener(),
+      probe: {
+        probe: async () => {
+          await destinations.delete(alice);
+          return { ok: true };
+        },
+      },
+      clock: () => NOW,
+    }).execute(alice, 'keep-recorded');
+
+    expect(await destinations.findByUsername(alice)).toBeUndefined();
+  });
+
   it('should_do_nothing_when_the_member_configured_no_destination', async () => {
     const destinations = new InMemorySyncDestinationRepository();
 
