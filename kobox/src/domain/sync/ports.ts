@@ -49,7 +49,9 @@ export interface SyncTransferRepository {
   queue(transfer: SyncTransfer): Promise<SyncTransfer | undefined>;
   save(transfer: SyncTransfer): Promise<void>;
   findById(id: number): Promise<SyncTransfer | undefined>;
-  listWaiting(username: Username, limit?: number): Promise<readonly SyncTransfer[]>;
+  // every transfer of this member's still waiting, oldest first: the pass
+  // picks what it carries and how many (see SendPass, TransferBatchSize)
+  listWaiting(username: Username): Promise<readonly SyncTransfer[]>;
   listRecent(username: Username, limit: number): Promise<readonly SyncTransfer[]>;
   // every transfer of this member's that did not arrive, oldest first
   listFailed(username: Username): Promise<readonly SyncTransfer[]>;

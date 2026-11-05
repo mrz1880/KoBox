@@ -44,11 +44,12 @@ export class InMemorySyncTransferRepository implements SyncTransferRepository {
     return Promise.resolve(this.rows.get(id));
   }
 
-  listWaiting(username: Username, limit?: number): Promise<readonly SyncTransfer[]> {
-    const waiting = this.ordered().filter(
-      (row) => row.username.value === username.value && row.state === 'waiting',
+  listWaiting(username: Username): Promise<readonly SyncTransfer[]> {
+    return Promise.resolve(
+      this.ordered().filter(
+        (row) => row.username.value === username.value && row.state === 'waiting',
+      ),
     );
-    return Promise.resolve(limit === undefined ? waiting : waiting.slice(0, limit));
   }
 
   listRecent(username: Username, limit: number): Promise<readonly SyncTransfer[]> {

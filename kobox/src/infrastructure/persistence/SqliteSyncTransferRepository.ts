@@ -77,13 +77,13 @@ export class SqliteSyncTransferRepository implements SyncTransferRepository {
 
   // Oldest first: a queue that serves the newest first starves the ones that
   // have been waiting since last night.
-  listWaiting(username: Username, limit?: number): Promise<readonly SyncTransfer[]> {
-    const query = this.db.orm
+  listWaiting(username: Username): Promise<readonly SyncTransfer[]> {
+    const rows = this.db.orm
       .select()
       .from(syncTransfers)
       .where(and(eq(syncTransfers.username, username.value), eq(syncTransfers.state, 'waiting')))
-      .orderBy(syncTransfers.id);
-    const rows = limit === undefined ? query.all() : query.limit(limit).all();
+      .orderBy(syncTransfers.id)
+      .all();
     return Promise.resolve(rows.map(toDomain));
   }
 
