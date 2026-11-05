@@ -29,7 +29,7 @@ interface SyncTransferProps {
 //
 // The state machine is small on purpose: waiting -> sending -> sent or failed,
 // and a member may push a failed one back to waiting. Nothing else is legal, and
-// the aggregate is what says so — a second pass starting a transfer that is
+// the aggregate is what says so: a second pass starting a transfer that is
 // already on its way would send the same file twice.
 export class SyncTransfer {
   readonly id?: number;

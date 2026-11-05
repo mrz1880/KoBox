@@ -48,7 +48,7 @@ export class SqliteSyncTransferRepository implements SyncTransferRepository {
       .returning()
       .get() as TransferRow | undefined;
     // The cast corrects drizzle: .get() is typed as always returning a row, but
-    // onConflictDoNothing returns none when the row was already there — which is
+    // onConflictDoNothing returns none when the row was already there, which is
     // exactly the case this method exists to report.
     return Promise.resolve(inserted === undefined ? undefined : toDomain(inserted));
   }

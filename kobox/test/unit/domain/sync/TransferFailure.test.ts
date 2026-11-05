@@ -5,6 +5,8 @@ import {
   type ExplainedFailure,
 } from '../../../../src/domain/sync/TransferFailure.js';
 
+// spelled by its code point: the source itself holds no dash
+const EM_DASH = String.fromCodePoint(0x2014);
 const EXPLAINED = Object.keys(TRANSFER_FAILURE_REASONS) as ExplainedFailure[];
 
 describe('TransferFailure', () => {
@@ -34,6 +36,8 @@ describe('TransferFailure', () => {
 
   // a member reads these sentences, in mails as on the page
   it('should_word_every_reason_without_a_dash', () => {
-    expect(Object.values(TRANSFER_FAILURE_REASONS).filter((reason) => reason.includes('—'))).toEqual([]);
+    expect(Object.values(TRANSFER_FAILURE_REASONS).filter((reason) => reason.includes(EM_DASH))).toEqual(
+      [],
+    );
   });
 });
