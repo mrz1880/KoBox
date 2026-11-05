@@ -35,6 +35,8 @@ import { InMemoryUserRepository } from '../../../../src/infrastructure/persisten
 import { RtorrentPort, ScgiPort } from '../../../../src/domain/user/Port.js';
 import { Username } from '../../../../src/domain/user/Username.js';
 import { UserBuilder } from '../../../builders/UserBuilder.js';
+import { Language } from '../../../../src/domain/portal/Language.js';
+import type { PortalCredentialsPort } from '../../../../src/domain/portal/ports.js';
 
 const NOW = '2026-08-15 10:00:00';
 const alice = Username.parse('alice');
@@ -76,6 +78,11 @@ class RecordingTransport implements FileTransferPort {
     return Promise.resolve(this.outcome);
   }
 }
+
+// alice chose English: these tests read the English mails
+const readsEnglish: Pick<PortalCredentialsPort, 'find'> = {
+  find: () => Promise.resolve({ username: alice, role: 'user', language: Language.en }),
+};
 
 const everythingIsAFile: LocalFileFactsPort = {
   isDirectory: () => Promise.resolve(false),
@@ -156,6 +163,7 @@ describe('SendPendingTransfers', () => {
     const outbox = new InMemoryMailOutbox();
     const useCase = new SendPendingTransfers({
       users,
+      credentials: readsEnglish,
       destinations,
       transfers,
       outbox,
@@ -259,6 +267,7 @@ describe('SendPendingTransfers', () => {
 
     await new SendPendingTransfers({
       users,
+      credentials: readsEnglish,
       destinations,
       transfers,
       outbox: new InMemoryMailOutbox(),
@@ -282,6 +291,7 @@ describe('SendPendingTransfers', () => {
 
     await new SendPendingTransfers({
       users,
+      credentials: readsEnglish,
       destinations,
       transfers,
       outbox: new InMemoryMailOutbox(),
@@ -308,6 +318,7 @@ describe('SendPendingTransfers', () => {
 
     await new SendPendingTransfers({
       users,
+      credentials: readsEnglish,
       destinations,
       transfers,
       outbox: new InMemoryMailOutbox(),

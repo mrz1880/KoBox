@@ -535,6 +535,8 @@ export function buildTorrentUseCases(deps: TorrentUseCaseDeps): TorrentUseCases 
 
 export interface SyncUseCaseDeps {
   readonly users: UserRepository;
+  // where each member's choice of language is kept, for the transfer mails
+  readonly credentials: Pick<PortalCredentialsPort, 'find'>;
   readonly instances: TorrentInstanceRepository;
   readonly destinations: SyncDestinationRepository;
   readonly transfers: SyncTransferRepository;
@@ -580,6 +582,7 @@ export function buildSyncUseCases(deps: SyncUseCaseDeps): SyncUseCases {
     }),
     sendPending: new SendPendingTransfers({
       users: deps.users,
+      credentials: deps.credentials,
       destinations: deps.destinations,
       transfers: deps.transfers,
       outbox: deps.outbox,

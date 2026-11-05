@@ -472,17 +472,8 @@ const FR: Readonly<Record<string, string>> = {
     'Rien pour l’instant. Dès qu’un dossier réglé pour envoyer termine un téléchargement, il apparaît ici.',
   State: 'État',
   'What happened': 'Ce qui s’est passé',
-  // why a transfer did not arrive, as the worker recorded it
-  'the machine refused the account, the password, or that folder':
-    'la machine a refusé le compte, le mot de passe ou ce dossier',
-  'the machine presented another identity than the one recorded for it, so nothing was sent: if you reinstalled it, test the connection again to accept its new identity, otherwise stop and check why':
-    'la machine s’est présentée avec une autre identité que celle enregistrée pour elle, donc rien n’a été envoyé : si vous l’avez réinstallée, testez à nouveau la connexion pour accepter sa nouvelle identité, sinon arrêtez-vous et cherchez pourquoi',
-  'the other machine has no room left': 'l’autre machine n’a plus de place',
-  'the connection dropped part way through: it will resume where it stopped':
-    'la connexion a coupé en cours de route : elle reprendra là où elle s’est arrêtée',
-  'the machine did not answer': 'la machine n’a pas répondu',
-  'the file is no longer on the box': 'le fichier n’est plus sur la box',
-  'it did not go through': 'il n’est pas passé',
+  // why a transfer did not arrive is worded in application/sync/transferFailureWords.ts,
+  // shared with the mails
   'Last change': 'Dernier changement',
   'waiting its turn': 'attend son tour',
   'on its way': 'en route',

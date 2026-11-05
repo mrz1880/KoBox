@@ -1,4 +1,6 @@
+import { failureInWords } from '../../../application/sync/transferFailureWords.js';
 import type { SyncTransfer, TransferState } from '../../../domain/sync/SyncTransfer.js';
+import type { TransferFailure } from '../../../domain/sync/TransferFailure.js';
 import { html, type RawHtml } from '../html.js';
 import type { Viewer } from './layout.js';
 
@@ -17,6 +19,14 @@ const AGAIN_LABELS: Readonly<Partial<Record<TransferState, string>>> = {
   sent: 'Send again',
 };
 
+// what happened in the member's words, then rsync's own when that is all there is
+function reason(failure: TransferFailure, viewer: Viewer): RawHtml {
+  const words = failureInWords(failure, viewer.language.value);
+  return words.rawDetail === undefined
+    ? html`${words.sentence}`
+    : html`${words.sentence}<br><span class="mono">${words.rawDetail}</span>`;
+}
+
 function row(transfer: SyncTransfer, viewer: Viewer): RawHtml {
   const words = STATE_WORDS[transfer.state] ?? { chip: '', text: transfer.state };
   const again = AGAIN_LABELS[transfer.state];
@@ -24,7 +34,7 @@ function row(transfer: SyncTransfer, viewer: Viewer): RawHtml {
   <td class="path">${transfer.name}</td>
   <td>${transfer.label.value}</td>
   <td><span class="chip ${words.chip}">${viewer.t(words.text)}</span></td>
-  <td class="reason">${transfer.failure === undefined ? '' : viewer.t(transfer.failure.record)}</td>
+  <td class="reason">${transfer.failure === undefined ? '' : reason(transfer.failure, viewer)}</td>
   <td class="when">${transfer.updatedAt}</td>
   <td>${
     again === undefined

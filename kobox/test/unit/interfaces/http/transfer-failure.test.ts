@@ -6,7 +6,7 @@ import { SyncTransfer } from '../../../../src/domain/sync/SyncTransfer.js';
 import { Label } from '../../../../src/domain/torrent/Label.js';
 import { Username } from '../../../../src/domain/user/Username.js';
 import type { Viewer } from '../../../../src/interfaces/http/views/layout.js';
-import { hasFrench, translatorFor } from '../../../../src/interfaces/http/views/messages.js';
+import { translatorFor } from '../../../../src/interfaces/http/views/messages.js';
 import { transferQueueSection } from '../../../../src/interfaces/http/views/transferQueueSection.js';
 
 const frenchMember: Viewer = {
@@ -43,11 +43,30 @@ describe('why a transfer did not arrive', () => {
     expect(section).toContain('l’autre machine n’a plus de place');
   });
 
-  // the page passes the recorded reason to the catalogue as it is: a reason
-  // with no French line would reach a French member in English, silently
-  it('should_have_a_french_line_for_every_reason_a_transfer_can_record', () => {
-    const reasons = Object.values(TRANSFER_FAILURE_REASONS);
+  it('should_tell_a_french_member_that_rsync_stopped_and_with_which_code', () => {
+    const section = transferQueueSection([failedWith(TransferFailure.stopped(12))], frenchMember).value;
 
-    expect(reasons.filter((reason) => !hasFrench(reason))).toEqual([]);
+    expect(section).toContain('rsync s’est arrêté avec le code 12');
+  });
+
+  // rsync's own words have no translation: a French sentence says what
+  // happened, and the words follow as they came, for whoever helps the member
+  it('should_lead_what_rsync_said_with_a_french_sentence_and_keep_its_words', () => {
+    const section = transferQueueSection(
+      [failedWith(TransferFailure.reported('rsync: [sender] write error: Broken pipe (32)'))],
+      frenchMember,
+    ).value;
+
+    expect(section).toContain('rsync s’est arrêté sur une erreur que KoBox ne sait pas expliquer');
+    expect(section).toContain('<span class="mono">rsync: [sender] write error: Broken pipe (32)</span>');
+  });
+
+  it('should_tell_an_english_member_in_english', () => {
+    const section = transferQueueSection([failedWith(TransferFailure.explained('no-room'))], {
+      ...frenchMember,
+      language: Language.en,
+    }).value;
+
+    expect(section).toContain(TRANSFER_FAILURE_REASONS['no-room']);
   });
 });

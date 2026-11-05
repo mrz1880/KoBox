@@ -10,11 +10,16 @@ import type {
   SyncTransferRepository,
 } from '../../domain/sync/ports.js';
 import type { MailOutboxPort } from '../maintenance/MailOutboxPort.js';
+import { mailLanguageOf } from '../portal/mailLanguage.js';
+import { transferMail } from './transferMail.js';
+import type { PortalCredentialsPort } from '../../domain/portal/ports.js';
 import type { UserRepository } from '../../domain/user/ports.js';
 import type { Username } from '../../domain/user/Username.js';
 
 interface Deps {
   readonly users: UserRepository;
+  // where a member's choice of language is kept, for the mails
+  readonly credentials: Pick<PortalCredentialsPort, 'find'>;
   readonly destinations: SyncDestinationRepository;
   readonly transfers: SyncTransferRepository;
   // what the member chose to hear about goes out through the mail queue
@@ -146,31 +151,16 @@ export class SendPendingTransfers {
       if (user === undefined) {
         return;
       }
+      const login = await this.deps.credentials.find(transfer.username);
       await this.deps.outbox.enqueue(
-        { recipient: user.email.value, ...transferMail(transfer) },
+        {
+          recipient: user.email.value,
+          ...transferMail(transfer, mailLanguageOf(login?.language)),
+        },
         this.deps.clock(),
       );
     } catch {
       return;
     }
   }
-}
-
-function transferMail(transfer: SyncTransfer): { subject: string; body: string } {
-  if (transfer.state === 'sent') {
-    return {
-      subject: `${transfer.name} arrived`,
-      body: `${transfer.name}, from your ${transfer.label.value} folder, has arrived on your own machine.\n`,
-    };
-  }
-  return {
-    subject: `${transfer.name} did not arrive`,
-    body: [
-      `${transfer.name}, from your ${transfer.label.value} folder, could not be sent to your own machine:`,
-      `${(transfer.failure ?? TransferFailure.explained('unexplained')).record}.`,
-      '',
-      'It stays under Folders on your seedbox, where you can try it again.',
-      '',
-    ].join('\n'),
-  };
 }
