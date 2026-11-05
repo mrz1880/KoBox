@@ -1,6 +1,4 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import type { Job } from '../../../../src/application/jobs/contract.js';
-import type { ClaimedJob, JobQueuePort } from '../../../../src/application/jobs/JobQueuePort.js';
 import { ImportFromMysb } from '../../../../src/application/migration/ImportFromMysb.js';
 import type {
   MysbAddress,
@@ -18,6 +16,7 @@ import type { PortAllocatorPort } from '../../../../src/domain/user/PortAllocato
 import { PortAlreadyClaimedError } from '../../../../src/domain/user/PortAllocatorPort.js';
 import { Username } from '../../../../src/domain/user/Username.js';
 import { InMemoryBlocklistRepository } from '../../../../src/infrastructure/persistence/InMemoryBlocklistRepository.js';
+import { InMemoryJobQueue } from '../../../../src/infrastructure/persistence/InMemoryJobQueue.js';
 import { InMemoryMailOutbox } from '../../../../src/infrastructure/persistence/InMemoryMailOutbox.js';
 import { InMemoryPortalCredentialsRepository } from '../../../../src/infrastructure/persistence/InMemoryPortalCredentialsRepository.js';
 import { InMemoryPortalSessionRepository } from '../../../../src/infrastructure/persistence/InMemoryPortalSessionRepository.js';
@@ -32,35 +31,6 @@ import { FakeServiceControl } from '../../../../src/infrastructure/system/fakes/
 import { FakePasswordHasher } from '../../../../src/infrastructure/system/fakes/FakePasswordHasher.js';
 import { FakeSftp } from '../../../../src/infrastructure/system/fakes/FakeSftp.js';
 import { FakeSystemAccounts } from '../../../../src/infrastructure/system/fakes/FakeSystemAccounts.js';
-
-class RecordingQueue implements JobQueuePort {
-  readonly jobs: Job[] = [];
-
-  enqueue(job: Job): Promise<number> {
-    this.jobs.push(job);
-    return Promise.resolve(this.jobs.length);
-  }
-
-  enqueueUnique(job: Job): Promise<number | undefined> {
-    return this.enqueue(job);
-  }
-
-  claimNextPending(): Promise<ClaimedJob | undefined> {
-    return Promise.resolve(undefined);
-  }
-
-  markDone(): Promise<void> {
-    return Promise.resolve();
-  }
-
-  markFailed(): Promise<void> {
-    return Promise.resolve();
-  }
-
-  recoverStale(): Promise<number> {
-    return Promise.resolve(0);
-  }
-}
 
 class SequentialPortAllocator implements PortAllocatorPort {
   private nextScgi = 51101;
@@ -202,7 +172,7 @@ function buildWorld(source: MysbSource) {
   const torrents = new InMemoryTorrentRepository();
   const addresses = new InMemoryUserAddressRepository();
   const outbox = new InMemoryMailOutbox();
-  const queue = new RecordingQueue();
+  const queue = new InMemoryJobQueue();
   const importer = new ImportFromMysb({
     source,
     users,
@@ -247,7 +217,7 @@ describe('ImportFromMysb', () => {
       expect(report.users.created).toEqual(['alice']);
       expect(await world.users.findByUsername(alice)).toBeUndefined();
       expect(await world.trackers.listAll()).toHaveLength(0);
-      expect(world.queue.jobs).toHaveLength(0);
+      expect(world.queue.pending()).toHaveLength(0);
       expect(await world.outbox.listRecent(10)).toHaveLength(0);
     });
   });
@@ -277,7 +247,7 @@ describe('ImportFromMysb', () => {
 
       await world.importer.execute({ apply: true });
 
-      const jobTypes = world.queue.jobs.map((job) => job.type);
+      const jobTypes = world.queue.pending().map((job) => job.type);
       expect(jobTypes).toContain('provision-rtorrent');
       expect(jobTypes).toContain('provision-vpn-user');
       expect(jobTypes).toContain('render-nfs-exports');
@@ -296,7 +266,7 @@ describe('ImportFromMysb', () => {
 
       await world.importer.execute({ apply: true });
 
-      const jobTypes = world.queue.jobs.map((job) => job.type);
+      const jobTypes = world.queue.pending().map((job) => job.type);
       expect(jobTypes).toContain('reserve-member-ports');
       expect(jobTypes.indexOf('reserve-member-ports')).toBeLessThan(
         jobTypes.indexOf('provision-rtorrent'),
@@ -358,7 +328,7 @@ describe('ImportFromMysb', () => {
 
       await world.importer.execute({ apply: true });
       const provisions = (): number =>
-        world.queue.jobs.filter((job) => job.type === 'provision-rtorrent').length;
+        world.queue.pending().filter((job) => job.type === 'provision-rtorrent').length;
       const firstProvisions = provisions();
       const firstMails = (await world.outbox.listRecent(50)).length;
 
@@ -396,11 +366,11 @@ describe('ImportFromMysb', () => {
     it('should_never_enqueue_anything_on_a_dry_run_over_an_already_imported_user', async () => {
       world = buildWorld(new FakeMysbSource({ users: [aliceDto] }));
       await world.importer.execute({ apply: true });
-      const jobsAfterApply = world.queue.jobs.length;
+      const jobsAfterApply = world.queue.pending().length;
 
       await world.importer.execute({ apply: false });
 
-      expect(world.queue.jobs).toHaveLength(jobsAfterApply);
+      expect(world.queue.pending()).toHaveLength(jobsAfterApply);
     });
 
     it('should_have_the_whitelist_and_the_firewall_rendered_after_an_apply', async () => {
@@ -408,7 +378,7 @@ describe('ImportFromMysb', () => {
 
       await world.importer.execute({ apply: true });
 
-      expect(world.queue.jobs.map((job) => job.type)).toEqual([
+      expect(world.queue.pending().map((job) => job.type)).toEqual([
         'render-whitelist',
         'apply-firewall',
       ]);
