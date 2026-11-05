@@ -276,7 +276,7 @@ export async function buildPortalWorld(
     sshKeys,
     destinations,
     transfers,
-    setDestination: new SetSyncDestination({ destinations, sealer: new FakeRemoteSealer() }),
+    setDestination: new SetSyncDestination({ destinations, sealer: new FakeRemoteSealer(), queue }),
     releases: new InMemoryReleaseRepository(),
     outbox,
     credentials,

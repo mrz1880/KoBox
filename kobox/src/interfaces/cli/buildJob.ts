@@ -89,7 +89,7 @@ export const buildJob = {
   }): Job {
     return parseJob('set-own-seed-rule', input);
   },
-  checkSyncDestination(input: { username: string }): Job {
+  checkSyncDestination(input: { username: string; trust?: string }): Job {
     return parseJob('check-sync-destination', input);
   },
   setCategorySyncMode(input: { username: string; label: string; mode: string }): Job {

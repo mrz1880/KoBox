@@ -3,6 +3,7 @@ import { ROLES } from '../../domain/portal/Role.js';
 import { AUTOMATIC_CLEANUPS } from '../../domain/space/AutomaticCleanup.js';
 import { CLEANUP_TRIGGERS } from '../../domain/space/CleanupReport.js';
 import { SEED_RULE_LIMITS } from '../../domain/space/SeedRule.js';
+import { HOST_KEY_TRUSTS } from '../../domain/sync/HostKeyTrust.js';
 import { IPV4_PATTERN } from '../../domain/shared/IpAddress.js';
 import { INFO_HASH_PATTERN } from '../../domain/torrent/InfoHash.js';
 import { LABEL_PATTERN } from '../../domain/torrent/Label.js';
@@ -215,7 +216,11 @@ export const jobPayloadSchemas = {
     label: labelField,
     to: labelField,
   }),
-  'check-sync-destination': z.strictObject({ username: usernameField }),
+  // a check that does not say may not accept a changed identity (see HostKeyTrust)
+  'check-sync-destination': z.strictObject({
+    username: usernameField,
+    trust: z.enum(HOST_KEY_TRUSTS).default('keep-recorded'),
+  }),
   // no username: the scheduled pass takes on whoever's hour has come. With one,
   // it is the "send it straight away" folders of that member.
   'send-pending-transfers': z.strictObject({ username: usernameField.optional() }),

@@ -4,6 +4,8 @@ import {
   NoDestinationToUpdateError,
   SetSyncDestination,
 } from '../../../../src/application/sync/SetSyncDestination.js';
+import type { HostKeyTrust } from '../../../../src/domain/sync/HostKeyTrust.js';
+import { HostKeyFingerprint } from '../../../../src/domain/sync/HostKeyFingerprint.js';
 import { LoneFilePlacement } from '../../../../src/domain/sync/LoneFilePlacement.js';
 import { RemoteAccount } from '../../../../src/domain/sync/RemoteAccount.js';
 import { RemoteHost } from '../../../../src/domain/sync/RemoteHost.js';
@@ -18,6 +20,7 @@ import type {
   RemotePasswordSealerPort,
   RemoteProbePort,
 } from '../../../../src/domain/sync/ports.js';
+import { InMemoryJobQueue } from '../../../../src/infrastructure/persistence/InMemoryJobQueue.js';
 import { InMemorySyncDestinationRepository } from '../../../../src/infrastructure/persistence/InMemorySyncDestinationRepository.js';
 import { Username } from '../../../../src/domain/user/Username.js';
 
@@ -45,11 +48,13 @@ class FakeOpener implements RemotePasswordOpenerPort {
 
 class RecordingProbe implements RemoteProbePort {
   readonly seen: string[] = [];
+  readonly trusts: HostKeyTrust[] = [];
 
   constructor(private readonly outcome: ProbeOutcome) {}
 
-  probe(_destination: unknown, password: RemotePassword): Promise<ProbeOutcome> {
+  probe(_destination: unknown, password: RemotePassword, trust: HostKeyTrust): Promise<ProbeOutcome> {
     this.seen.push(password.reveal());
+    this.trusts.push(trust);
     return Promise.resolve(this.outcome);
   }
 }
@@ -80,7 +85,7 @@ function aCommand(overrides: Partial<Command> = {}): Command {
 describe('SetSyncDestination', () => {
   it('should_store_the_password_sealed_and_never_in_the_clear', async () => {
     const destinations = new InMemorySyncDestinationRepository();
-    const useCase = new SetSyncDestination({ destinations, sealer: new FakeSealer() });
+    const useCase = new SetSyncDestination({ destinations, sealer: new FakeSealer(), queue: new InMemoryJobQueue() });
 
     await useCase.execute(aCommand());
 
@@ -93,7 +98,7 @@ describe('SetSyncDestination', () => {
 
   it('should_keep_the_stored_password_when_the_field_is_left_empty', async () => {
     const destinations = new InMemorySyncDestinationRepository();
-    const useCase = new SetSyncDestination({ destinations, sealer: new FakeSealer() });
+    const useCase = new SetSyncDestination({ destinations, sealer: new FakeSealer(), queue: new InMemoryJobQueue() });
     await useCase.execute(aCommand());
 
     await useCase.execute(withoutPassword({ path: RemotePath.parse('/volume2/torrents') }));
@@ -105,39 +110,75 @@ describe('SetSyncDestination', () => {
 
   it('should_refuse_a_first_destination_with_no_password_at_all', async () => {
     const destinations = new InMemorySyncDestinationRepository();
-    const useCase = new SetSyncDestination({ destinations, sealer: new FakeSealer() });
+    const useCase = new SetSyncDestination({ destinations, sealer: new FakeSealer(), queue: new InMemoryJobQueue() });
 
     // there is nothing stored to keep, so "leave it alone" has no meaning
     await expect(useCase.execute(withoutPassword())).rejects.toThrow(NoDestinationToUpdateError);
   });
 });
 
+// No mandatory "test it now" any more (2026-11-05): saving is when a member
+// wants to know whether it works
+describe('SetSyncDestination then the check', () => {
+  it('should_test_the_connection_once_the_destination_is_saved_without_accepting_a_new_identity', async () => {
+    const queue = new InMemoryJobQueue();
+    const useCase = new SetSyncDestination({
+      destinations: new InMemorySyncDestinationRepository(),
+      sealer: new FakeSealer(),
+      queue,
+    });
+
+    const check = await useCase.execute(aCommand());
+
+    const claimed = await queue.claimNextPending();
+    expect(claimed).toEqual({
+      id: check,
+      job: { type: 'check-sync-destination', payload: { username: 'alice', trust: 'keep-recorded' } },
+    });
+  });
+});
+
 describe('CheckSyncDestination', () => {
   async function withStoredDestination(): Promise<InMemorySyncDestinationRepository> {
     const destinations = new InMemorySyncDestinationRepository();
-    await new SetSyncDestination({ destinations, sealer: new FakeSealer() }).execute(aCommand());
+    await new SetSyncDestination({ destinations, sealer: new FakeSealer(), queue: new InMemoryJobQueue() }).execute(aCommand());
     return destinations;
   }
 
   it('should_hand_the_opened_password_to_the_probe_and_record_the_verdict', async () => {
     const destinations = await withStoredDestination();
-    const probe = new RecordingProbe({ ok: true, detail: 'it answered', fingerprint: 'SHA256:abc' });
+    const identity = HostKeyFingerprint.parse('SHA256:abc');
+    const probe = new RecordingProbe({ ok: true, detail: 'it answered', identity });
 
     await new CheckSyncDestination({
       destinations,
       opener: new FakeOpener(),
       probe,
       clock: () => NOW,
-    }).execute(alice);
+    }).execute(alice, 'keep-recorded');
 
     expect(probe.seen).toEqual(['hunter2000']);
     const stored = await destinations.findByUsername(alice);
-    expect(stored?.lastCheck).toEqual({
-      ok: true,
-      at: NOW,
-      detail: 'it answered',
-      fingerprint: 'SHA256:abc',
+    expect(stored?.lastCheck).toEqual({ ok: true, at: NOW, detail: 'it answered' });
+    expect(stored?.identity).toEqual(identity);
+  });
+
+  // only the member's own test may accept a machine's new identity: the check
+  // passes on what it was asked for, it does not decide
+  it('should_contact_the_machine_with_the_trust_it_was_asked_for', async () => {
+    const destinations = await withStoredDestination();
+    const probe = new RecordingProbe({ ok: true });
+    const check = new CheckSyncDestination({
+      destinations,
+      opener: new FakeOpener(),
+      probe,
+      clock: () => NOW,
     });
+
+    await check.execute(alice, 'accept-presented');
+    await check.execute(alice, 'keep-recorded');
+
+    expect(probe.trusts).toEqual(['accept-presented', 'keep-recorded']);
   });
 
   it('should_tell_the_member_to_retype_it_when_the_stored_password_cannot_be_opened', async () => {
@@ -154,7 +195,7 @@ describe('CheckSyncDestination', () => {
       opener: new FakeOpener(),
       probe: new RecordingProbe({ ok: true }),
       clock: () => NOW,
-    }).execute(alice);
+    }).execute(alice, 'keep-recorded');
 
     const after = await destinations.findByUsername(alice);
     expect(after?.lastCheck?.ok).toBe(false);
@@ -175,7 +216,7 @@ describe('CheckSyncDestination', () => {
       opener: new FakeOpener(),
       probe: brokenProbe,
       clock: () => NOW,
-    }).execute(alice);
+    }).execute(alice, 'keep-recorded');
 
     const after = await destinations.findByUsername(alice);
     expect(after?.lastCheck?.ok).toBe(false);
@@ -191,7 +232,7 @@ describe('CheckSyncDestination', () => {
       opener: new FakeOpener(),
       probe: new RecordingProbe({ ok: true }),
       clock: () => NOW,
-    }).execute(alice);
+    }).execute(alice, 'keep-recorded');
 
     expect(await destinations.findByUsername(alice)).toBeUndefined();
   });

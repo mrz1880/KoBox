@@ -272,6 +272,19 @@ describe('job contract', () => {
     ).toBe('set-allow-public-tracker');
   });
 
+  // a check queued before the trust choice existed, or one that does not say,
+  // never accepts a changed identity of the member's machine
+  it('should_parse_a_destination_check_that_keeps_the_recorded_identity_unless_told_otherwise', () => {
+    expect(parseJob('check-sync-destination', { username: 'alice' }).payload).toEqual({
+      username: 'alice',
+      trust: 'keep-recorded',
+    });
+    expect(
+      parseJob('check-sync-destination', { username: 'alice', trust: 'accept-presented' }).payload,
+    ).toEqual({ username: 'alice', trust: 'accept-presented' });
+    expect(() => parseJob('check-sync-destination', { username: 'alice', trust: 'any' })).toThrow();
+  });
+
   it('should_parse_a_cleanup_of_the_torrents_a_member_picked', () => {
     const infoHashes = ['A'.repeat(40), 'b'.repeat(40)];
 

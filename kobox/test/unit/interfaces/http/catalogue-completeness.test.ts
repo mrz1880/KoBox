@@ -11,6 +11,7 @@ import { Speedtest } from '../../../../src/domain/maintenance/speedtest.js';
 import { MediaFile, MediaPath } from '../../../../src/domain/media/MediaFile.js';
 import { Language } from '../../../../src/domain/portal/Language.js';
 import { IpAddress } from '../../../../src/domain/shared/IpAddress.js';
+import { HostKeyFingerprint } from '../../../../src/domain/sync/HostKeyFingerprint.js';
 import { LocalPath } from '../../../../src/domain/sync/LocalPath.js';
 import { LoneFilePlacement } from '../../../../src/domain/sync/LoneFilePlacement.js';
 import { RemoteAccount } from '../../../../src/domain/sync/RemoteAccount.js';
@@ -110,7 +111,7 @@ function media(path: string): MediaFile {
   return MediaFile.record({ username: alice, path: MediaPath.parse(path), sizeBytes: 1024 ** 3, indexedAt: NOW });
 }
 
-function destination(lastCheck?: SyncDestination['lastCheck']): SyncDestination {
+function destination(lastCheck?: SyncDestination['lastCheck'], identity?: HostKeyFingerprint): SyncDestination {
   return SyncDestination.restore({
     username: alice,
     host: RemoteHost.parse('nas.example.org'),
@@ -122,6 +123,7 @@ function destination(lastCheck?: SyncDestination['lastCheck']): SyncDestination 
     placement: LoneFilePlacement.besideTheOthers,
     sendHour: SendHour.default(),
     ...(lastCheck === undefined ? {} : { lastCheck }),
+    ...(identity === undefined ? {} : { identity }),
   });
 }
 
@@ -333,8 +335,7 @@ function keysSentToTheCatalogue(): ReadonlySet<string> {
       ok: true,
       at: NOW,
       detail: 'the machine answered, and the account can write in that folder',
-      fingerprint: 'SHA256:abc',
-    }),
+    }, HostKeyFingerprint.parse('SHA256:abc')),
     (['waiting', 'sending', 'sent', 'failed'] as const).map(transfer),
     member,
   );

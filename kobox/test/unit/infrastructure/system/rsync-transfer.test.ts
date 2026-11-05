@@ -2,6 +2,7 @@ import { mkdtempSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { HostKeyFingerprint } from '../../../../src/domain/sync/HostKeyFingerprint.js';
 import { LocalPath } from '../../../../src/domain/sync/LocalPath.js';
 import { LoneFilePlacement } from '../../../../src/domain/sync/LoneFilePlacement.js';
 import { RemoteAccount } from '../../../../src/domain/sync/RemoteAccount.js';
@@ -18,6 +19,7 @@ import type {
   CommandResult,
   CommandRunner,
 } from '../../../../src/infrastructure/system/CommandRunner.js';
+import type { TransferOutcome } from '../../../../src/domain/sync/ports.js';
 import { Username } from '../../../../src/domain/user/Username.js';
 
 class ScriptedRunner implements CommandRunner {
@@ -66,7 +68,7 @@ const source = LocalPath.parse('/home/alice/rtorrent/complete/Films/Some.Film.20
 function transfer(
   runner: CommandRunner,
   remoteFolder = '/volume1/torrents/Films',
-): Promise<{ ok: boolean; detail?: string }> {
+): Promise<TransferOutcome> {
   return new RsyncOverSshTransfer(runner, '/var/lib/kobox/sync').send({
     destination,
     password,
@@ -142,6 +144,46 @@ describe('RsyncOverSshTransfer', () => {
     expect(argv).toContain('UserKnownHostsFile=/var/lib/kobox/sync/alice.known_hosts');
     expect(argv).not.toContain('StrictHostKeyChecking=no');
     expect(argv).not.toContain('/dev/null');
+  });
+
+  // seen on 2026-11-05: a member who never ran the check had every transfer
+  // refused for five days, the machine having no recorded identity to match
+  it('should_accept_the_identity_of_a_machine_on_first_contact_and_refuse_a_change_afterwards', async () => {
+    const runner = new ScriptedRunner();
+
+    await transfer(runner);
+
+    expect(runner.calls[0]).toMatchObject({
+      command: 'mkdir',
+      args: ['-p', '-m', '0700', '/var/lib/kobox/sync'],
+    });
+    for (const call of runner.rsyncs()) {
+      expect(call.args.join(' ')).toContain('StrictHostKeyChecking=accept-new');
+    }
+  });
+
+  it('should_say_what_to_do_when_the_machine_presents_another_identity_than_the_recorded_one', async () => {
+    const runner = new ScriptedRunner();
+    runner.onCommand('rsync', {
+      exitCode: 255,
+      stderr: '@@@ WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED! @@@\nHost key verification failed.',
+    });
+
+    const outcome = await transfer(runner);
+
+    expect(outcome.detail).toBe(
+      'the machine presented another identity than the one recorded for it, so nothing was sent: if you reinstalled it, test the connection again to accept its new identity, otherwise stop and check why',
+    );
+  });
+
+  // the send pass records it, as the check does, so the page can show it
+  it('should_report_the_identity_recorded_for_the_machine_after_the_contact', async () => {
+    const runner = new ScriptedRunner();
+    runner.onCommand('ssh-keygen', { stdout: '[nas.example.org]:2222 ED25519 SHA256:abc\n' });
+
+    const outcome = await transfer(runner);
+
+    expect(outcome).toEqual({ ok: true, identity: HostKeyFingerprint.parse('SHA256:abc') });
   });
 
   it('should_report_what_rsync_said_when_it_could_not_finish', async () => {

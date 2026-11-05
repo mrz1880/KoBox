@@ -224,7 +224,7 @@ program
       // `ps` by every other member of the box
       const secret = (await readStdin()).trim();
       const c = container();
-      await c.setDestination.execute({
+      const check = await c.setDestination.execute({
         username: Username.parse(rawUser),
         host: RemoteHost.parse(rawHost),
         port: RemotePort.parse(Number(rawPort)),
@@ -236,7 +236,12 @@ program
         transferMails: parseTransferMails(options.transferMails),
         ...(secret !== '' && { password: RemotePassword.parse(secret) }),
       });
-      await done(c, `destination set for ${rawUser}`);
+      await done(
+        c,
+        check === undefined
+          ? `destination set for ${rawUser}, a check is already pending`
+          : `destination set for ${rawUser}, job ${String(check)} enqueued: check-sync-destination ${rawUser}`,
+      );
     },
   );
 
@@ -257,12 +262,17 @@ program
 program
   .command('check-sync-destination')
   .argument('<username>')
+  .option(
+    '--trust <trust>',
+    'keep-recorded | accept-presented (accept the identity the machine presents now)',
+    'keep-recorded',
+  )
   .description("test a member's destination from the root worker and record the verdict")
-  .action(async (rawUser: string) => {
+  .action(async (rawUser: string, options: { trust: string }) => {
     const { direct } = program.opts<GlobalOptions>();
     const username = Username.parse(rawUser);
     const c = container();
-    const job = buildJob.checkSyncDestination({ username: username.value });
+    const job = buildJob.checkSyncDestination({ username: username.value, trust: options.trust });
     if (direct) {
       await c.direct.run(job);
       await done(c, `destination checked for ${username.value}`);

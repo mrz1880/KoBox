@@ -917,10 +917,31 @@ describe('where a member sends their files', () => {
     // the portal holds the public half only: it cannot open the password, so it
     // cannot run the probe — it asks
     expect(response.statusCode).toBe(303);
+    // the member testing it is the one who may accept a reinstalled machine's
+    // new identity
     expect(world.queue.jobs[0]).toEqual({
       type: 'check-sync-destination',
-      payload: { username: 'alice' },
+      payload: { username: 'alice', trust: 'accept-presented' },
     });
+  });
+
+  // no mandatory "test it now" any more: saving tests it, and the page waits
+  // for the answer
+  it('should_test_the_connection_once_saved_and_show_what_it_found', async () => {
+    world.queue.workerLeavesJobs('running');
+
+    const response = await world.server.inject({
+      method: 'POST',
+      url: '/sync/destination',
+      headers: { cookie: user.cookie, 'content-type': 'application/x-www-form-urlencoded' },
+      payload: form({ _csrf: user.csrf, ...aForm }),
+    });
+
+    expect(world.queue.jobs).toEqual([
+      { type: 'check-sync-destination', payload: { username: 'alice', trust: 'keep-recorded' } },
+    ]);
+    // the page watches that check and reloads until it is over
+    expect(response.headers.location).toMatch(/[?&]job=1(&|$)/);
   });
 
   it('should_never_let_a_member_configure_another_members_destination', async () => {

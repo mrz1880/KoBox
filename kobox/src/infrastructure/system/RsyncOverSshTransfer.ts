@@ -1,12 +1,9 @@
 import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { LocalPath } from '../../domain/sync/LocalPath.js';
-import type { RemotePassword } from '../../domain/sync/RemotePassword.js';
-import type { SyncDestination } from '../../domain/sync/SyncDestination.js';
 import type { FileTransferPort, TransferOutcome } from '../../domain/sync/ports.js';
 import type { CommandResult, CommandRunner } from './CommandRunner.js';
-import { KNOWN_HOSTS_DIR } from './SshRemoteProbe.js';
+import { KNOWN_HOSTS_DIR, KnownHosts, presentsAnotherIdentity } from './KnownHosts.js';
 
 // Large files over a home link: generous, but never unbounded. A transfer that
 // hangs forever would hold the pass open behind it.
@@ -18,7 +15,7 @@ const TRANSFER_TIMEOUT_MS = 6 * 60 * 60 * 1000;
 export const TRANSFER_FAILURES = {
   refused: 'the machine refused the account, the password, or that folder',
   identityChanged:
-    'the machine answered with a different identity than the one you tested: nothing was sent',
+    'the machine presented another identity than the one recorded for it, so nothing was sent: if you reinstalled it, test the connection again to accept its new identity, otherwise stop and check why',
   noRoom: 'the other machine has no room left',
   dropped: 'the connection dropped part way through: it will resume where it stopped',
   noAnswer: 'the machine did not answer',
@@ -30,7 +27,7 @@ function explain(stderr: string, exitCode: number): string {
   if (text.includes('permission denied')) {
     return TRANSFER_FAILURES.refused;
   }
-  if (text.includes('host key verification failed') || text.includes('identification has changed')) {
+  if (presentsAnotherIdentity(stderr)) {
     return TRANSFER_FAILURES.identityChanged;
   }
   if (text.includes('no space left')) {
@@ -47,30 +44,36 @@ function explain(stderr: string, exitCode: number): string {
   return trimmed === '' ? `rsync stopped with code ${String(exitCode)}` : trimmed.split('\n')[0] ?? '';
 }
 
+type SendRequest = Parameters<FileTransferPort['send']>[0];
+
 export class RsyncOverSshTransfer implements FileTransferPort {
+  private readonly knownHosts: KnownHosts;
+
   constructor(
     private readonly runner: CommandRunner,
-    private readonly knownHostsDir: string = KNOWN_HOSTS_DIR,
+    knownHostsDir: string = KNOWN_HOSTS_DIR,
     private readonly scratchDir: string = tmpdir(),
-  ) {}
+  ) {
+    this.knownHosts = new KnownHosts(runner, knownHostsDir);
+  }
 
-  async send(request: {
-    destination: SyncDestination;
-    password: RemotePassword;
-    source: LocalPath;
-    remoteFolder: string;
-  }): Promise<TransferOutcome> {
+  async send(request: SendRequest): Promise<TransferOutcome> {
+    // A machine never contacted has its identity recorded by this transfer,
+    // as the check would have: a member who never tested the connection must
+    // not see every transfer refused. A transfer never replaces a recorded
+    // identity: only the member, testing the connection, can accept a new one.
+    await this.knownHosts.prepare();
+    const outcome = await this.carry(request);
+    const identity = await this.knownHosts.identityOf(request.destination);
+    return identity === undefined ? outcome : { ...outcome, identity };
+  }
+
+  private async carry(request: SendRequest): Promise<TransferOutcome> {
     const { destination, password, source, remoteFolder } = request;
-    // the same file the member pinned when they tested the connection: an
-    // identity change between the test and the transfer must stop the transfer
-    const knownHosts = `${this.knownHostsDir}/${destination.username.value}.known_hosts`;
     const sshOptions = [
       '-p',
       String(destination.port.value),
-      '-o',
-      'StrictHostKeyChecking=yes',
-      '-o',
-      `UserKnownHostsFile=${knownHosts}`,
+      ...this.knownHosts.sshOptions(destination.username),
       '-o',
       'PubkeyAuthentication=no',
       '-o',

@@ -1,3 +1,5 @@
+import { parseJob } from '../jobs/contract.js';
+import type { JobQueuePort } from '../jobs/JobQueuePort.js';
 import { LoneFilePlacement } from '../../domain/sync/LoneFilePlacement.js';
 import type { RemoteAccount } from '../../domain/sync/RemoteAccount.js';
 import type { RemoteHost } from '../../domain/sync/RemoteHost.js';
@@ -39,6 +41,8 @@ export interface SetSyncDestinationCommand {
 interface Deps {
   readonly destinations: SyncDestinationRepository;
   readonly sealer: RemotePasswordSealerPort;
+  // the check runs in the root worker, which can open the password
+  readonly queue: Pick<JobQueuePort, 'enqueueUnique'>;
 }
 
 // Runs in the PORTAL, not the worker: it only ever seals, which needs the
@@ -46,7 +50,11 @@ interface Deps {
 export class SetSyncDestination {
   constructor(private readonly deps: Deps) {}
 
-  async execute(command: SetSyncDestinationCommand): Promise<void> {
+  // Saving tests the connection: no member has to remember to. The check it
+  // queues keeps the recorded identity of the machine, since saving a form is
+  // not the member accepting a new one (see HostKeyTrust). Returns that check
+  // job, or undefined when an identical check was already waiting.
+  async execute(command: SetSyncDestinationCommand): Promise<number | undefined> {
     const existing = await this.deps.destinations.findByUsername(command.username);
     if (command.password === undefined && existing === undefined) {
       // there is nothing to keep: a first destination has to carry a password
@@ -74,6 +82,12 @@ export class SetSyncDestination {
         : this.applyTo(existing, command, sealedPassword);
 
     await this.deps.destinations.save(updated);
+    return this.deps.queue.enqueueUnique(
+      parseJob('check-sync-destination', {
+        username: command.username.value,
+        trust: 'keep-recorded',
+      }),
+    );
   }
 
   private applyTo(

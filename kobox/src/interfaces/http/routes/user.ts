@@ -950,10 +950,11 @@ export function registerUserRoutes(
       return reply.code(400).send();
     }
     const form = parsed.data;
+    let check: number | undefined;
     try {
       // every field becomes a value object before it can reach a command line:
       // a host starting with a dash would be an ssh option, not a host
-      await deps.setDestination.execute({
+      check = await deps.setDestination.execute({
         username: session.username,
         host: RemoteHost.parse(form.host),
         port: RemotePort.parse(form.port),
@@ -972,7 +973,11 @@ export function registerUserRoutes(
       }
       throw error;
     }
-    return redirectWithFlash(reply, '/sync', 'Saved. Test it before you rely on it.');
+    // saving tests the connection: the page waits for what it found
+    if (check === undefined) {
+      return redirectWithFlash(reply, '/sync', 'Saved. A test is already running.');
+    }
+    return redirectOnceApplied(reply, deps.awaitJob, check, '/sync', 'Saved, and the connection tested.');
   });
 
   server.post('/sync/destination/test', async (request, reply) => {
@@ -982,8 +987,10 @@ export function registerUserRoutes(
     }
     // the portal cannot open the sealed password, so it cannot run this itself:
     // it asks the root worker, which holds the private half of the host key
+    // the member testing it may accept a reinstalled machine's new identity:
+    // the one place that ever does (see HostKeyTrust)
     const id = await deps.queue.enqueueUnique(
-      buildJob.checkSyncDestination({ username: session.username.value }),
+      buildJob.checkSyncDestination({ username: session.username.value, trust: 'accept-presented' }),
     );
     return redirectWithFlash(
       reply,

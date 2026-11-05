@@ -1,3 +1,4 @@
+import type { HostKeyFingerprint } from '../../domain/sync/HostKeyFingerprint.js';
 import type { SyncDestination } from '../../domain/sync/SyncDestination.js';
 import type { SyncTransfer } from '../../domain/sync/SyncTransfer.js';
 import type {
@@ -73,16 +74,34 @@ export class SendPendingTransfers {
       return;
     }
     const password = await this.deps.opener.open(destination.sealedPassword);
+    let identity: HostKeyFingerprint | undefined;
     for (const transfer of waiting) {
-      await this.sendOne(transfer, destination, password);
+      identity = (await this.sendOne(transfer, destination, password)) ?? identity;
+    }
+    if (identity !== undefined) {
+      await this.recordIdentity(destination, identity);
     }
   }
 
+  // The machine's identity, as this pass met it, goes where the check puts it.
+  // Read again first: the member may have saved their destination while the
+  // files went out, and that save must not be undone.
+  private async recordIdentity(
+    contacted: SyncDestination,
+    identity: HostKeyFingerprint,
+  ): Promise<void> {
+    const current = await this.deps.destinations.findByUsername(contacted.username);
+    if (current !== undefined) {
+      await this.deps.destinations.save(current.recognise(identity, contacted));
+    }
+  }
+
+  // what the machine presented itself as, when the transfer reached it
   private async sendOne(
     transfer: SyncTransfer,
     destination: SyncDestination,
     password: Awaited<ReturnType<RemotePasswordOpenerPort['open']>>,
-  ): Promise<void> {
+  ): Promise<HostKeyFingerprint | undefined> {
     // the attempt is recorded before the copy starts: a pass killed mid-transfer
     // must still leave a trace that it tried
     const sending = transfer.start(this.deps.clock());
@@ -94,7 +113,7 @@ export class SendPendingTransfers {
         sending.fail(SEND_FAILURES.sourceGone, this.deps.clock()),
         destination,
       );
-      return;
+      return undefined;
     }
     const remoteFolder = (await this.deps.facts.isDirectory(transfer.source))
       ? destination.folderFor(transfer.label.value)
@@ -112,6 +131,7 @@ export class SendPendingTransfers {
         : sending.fail(outcome.detail ?? SEND_FAILURES.unexplained, this.deps.clock()),
       destination,
     );
+    return outcome.identity;
   }
 
   private async finish(transfer: SyncTransfer, destination: SyncDestination): Promise<void> {
