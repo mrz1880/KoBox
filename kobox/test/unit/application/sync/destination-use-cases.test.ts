@@ -62,7 +62,7 @@ class RecordingProbe implements RemoteProbePort {
 type Command = Parameters<SetSyncDestination['execute']>[0];
 
 // exactOptionalPropertyTypes: "no password" means the key is ABSENT, not
-// present and undefined — which is exactly the distinction the use case makes.
+// present and undefined, which is exactly the distinction the use case makes.
 function withoutPassword(overrides: Partial<Command> = {}): Command {
   return {
     username: alice,
