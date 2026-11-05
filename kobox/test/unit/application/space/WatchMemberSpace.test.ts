@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import type { Job } from '../../../../src/application/jobs/contract.js';
-import type { JobQueuePort } from '../../../../src/application/jobs/JobQueuePort.js';
+import { InMemoryJobQueue } from '../../../../src/infrastructure/persistence/InMemoryJobQueue.js';
 import { WatchMemberSpace } from '../../../../src/application/space/WatchMemberSpace.js';
 import { CleanupCandidate, type CleanupReason } from '../../../../src/domain/space/CleanupCandidate.js';
 import { SeedRule } from '../../../../src/domain/space/SeedRule.js';
@@ -14,15 +13,6 @@ import { InMemoryPortalCredentialsRepository } from '../../../../src/infrastruct
 import { InMemorySpacePreferenceRepository } from '../../../../src/infrastructure/persistence/InMemorySpacePreferenceRepository.js';
 import { InMemoryUserRepository } from '../../../../src/infrastructure/persistence/InMemoryUserRepository.js';
 import { aUser } from '../../../builders/UserBuilder.js';
-
-class RecordingQueue implements Pick<JobQueuePort, 'enqueue'> {
-  readonly jobs: Job[] = [];
-
-  enqueue(job: Job): Promise<number> {
-    this.jobs.push(job);
-    return Promise.resolve(this.jobs.length);
-  }
-}
 
 const BASE = 'https://box.example.org';
 // the worker's clock: a stamp, UTC to the second
@@ -49,7 +39,7 @@ let preferences: InMemorySpacePreferenceRepository;
 let snapshots: InMemoryCleanupSnapshotRepository;
 let outbox: InMemoryMailOutbox;
 let credentials: InMemoryPortalCredentialsRepository;
-let queue: RecordingQueue;
+let queue: InMemoryJobQueue;
 let watch: WatchMemberSpace;
 
 beforeEach(async () => {
@@ -60,7 +50,7 @@ beforeEach(async () => {
   snapshots = new InMemoryCleanupSnapshotRepository();
   outbox = new InMemoryMailOutbox();
   credentials = new InMemoryPortalCredentialsRepository();
-  queue = new RecordingQueue();
+  queue = new InMemoryJobQueue();
   watch = new WatchMemberSpace({
     preferences,
     snapshots,
@@ -86,7 +76,7 @@ describe('WatchMemberSpace', () => {
     expect(mails[0]?.body).toContain('95 %');
     expect(mails[0]?.body).toContain('20,0 Gio');
     expect(mails[0]?.body).toContain(`${BASE}/space/cleanup`);
-    expect(queue.jobs).toEqual([]);
+    expect(queue.pending()).toEqual([]);
   });
 
   it('should_not_mail_again_while_the_member_stays_past_the_line', async () => {
@@ -120,7 +110,7 @@ describe('WatchMemberSpace', () => {
 
     await watch.execute({ user: alice, used: PAST_CRITICAL }, AT);
 
-    expect(queue.jobs).toEqual([
+    expect(queue.pending()).toEqual([
       {
         type: 'clean-up-space',
         payload: { username: 'alice', infoHashes: ['A'.repeat(40)], trigger: 'automatic' },
@@ -141,7 +131,7 @@ describe('WatchMemberSpace', () => {
 
     await watch.execute({ user: alice, used: PAST_CRITICAL }, AT);
 
-    expect(queue.jobs).toEqual([]);
+    expect(queue.pending()).toEqual([]);
     expect(await outbox.listRecent(10)).toHaveLength(1);
   });
 
@@ -152,7 +142,7 @@ describe('WatchMemberSpace', () => {
 
     await watch.execute({ user: alice, used: PAST_CRITICAL }, AT);
 
-    expect(queue.jobs).toEqual([]);
+    expect(queue.pending()).toEqual([]);
     const [mail] = await outbox.listRecent(10);
     expect(mail?.body).toContain('20,0 Gio');
   });
@@ -166,7 +156,7 @@ describe('WatchMemberSpace', () => {
 
     await watch.execute({ user: alice, used: Quota.gib(94) }, LATER);
 
-    expect(queue.jobs).toHaveLength(1);
+    expect(queue.pending()).toHaveLength(1);
     expect(await outbox.listRecent(10)).toEqual([]);
   });
 
@@ -179,7 +169,7 @@ describe('WatchMemberSpace', () => {
 
     await watch.execute({ user: alice, used: PAST_CRITICAL }, LATER);
 
-    expect(queue.jobs.map((job) => job.payload)).toEqual([
+    expect(queue.pending().map((job) => job.payload)).toEqual([
       { username: 'alice', infoHashes: ['A'.repeat(40)], trigger: 'automatic' },
       { username: 'alice', infoHashes: ['C'.repeat(40)], trigger: 'automatic' },
     ]);
