@@ -2,6 +2,7 @@ import { DomainError } from '../shared/DomainError.js';
 import type { Label } from '../torrent/Label.js';
 import type { Username } from '../user/Username.js';
 import type { LocalPath } from './LocalPath.js';
+import type { TransferFailure } from './TransferFailure.js';
 
 export class TransferAlreadyOnItsWayError extends DomainError {
   constructor() {
@@ -18,7 +19,7 @@ interface SyncTransferProps {
   readonly source: LocalPath;
   readonly state: TransferState;
   readonly attempts: number;
-  readonly lastError?: string;
+  readonly failure?: TransferFailure;
   readonly queuedAt: string;
   readonly updatedAt: string;
 }
@@ -37,7 +38,8 @@ export class SyncTransfer {
   readonly source: LocalPath;
   readonly state: TransferState;
   readonly attempts: number;
-  readonly lastError?: string;
+  // why the last attempt did not arrive; only ever on a failed transfer
+  readonly failure?: TransferFailure;
   readonly queuedAt: string;
   readonly updatedAt: string;
 
@@ -50,8 +52,8 @@ export class SyncTransfer {
     this.source = props.source;
     this.state = props.state;
     this.attempts = props.attempts;
-    if (props.lastError !== undefined) {
-      this.lastError = props.lastError;
+    if (props.failure !== undefined) {
+      this.failure = props.failure;
     }
     this.queuedAt = props.queuedAt;
     this.updatedAt = props.updatedAt;
@@ -92,8 +94,8 @@ export class SyncTransfer {
     return this.next({ state: 'sent', updatedAt: at });
   }
 
-  fail(reason: string, at: string): SyncTransfer {
-    return this.next({ state: 'failed', lastError: reason, updatedAt: at });
+  fail(failure: TransferFailure, at: string): SyncTransfer {
+    return this.next({ state: 'failed', failure, updatedAt: at });
   }
 
   // a failed transfer tried again, or one that arrived sent home once more
@@ -112,8 +114,8 @@ export class SyncTransfer {
       attempts: this.attempts,
       queuedAt: this.queuedAt,
       updatedAt: this.updatedAt,
-      // lastError is deliberately NOT carried over: every transition states its
-      // own outcome, so a stale reason cannot outlive the failure it described
+      // the failure is deliberately NOT carried over: every transition states
+      // its own outcome, so a stale reason cannot outlive the failure it described
       ...changes,
     };
     return new SyncTransfer(base);

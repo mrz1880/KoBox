@@ -1,6 +1,7 @@
 import type { HostKeyFingerprint } from '../../domain/sync/HostKeyFingerprint.js';
 import type { SyncDestination } from '../../domain/sync/SyncDestination.js';
 import type { SyncTransfer } from '../../domain/sync/SyncTransfer.js';
+import { TransferFailure } from '../../domain/sync/TransferFailure.js';
 import type {
   FileTransferPort,
   LocalFileFactsPort,
@@ -11,13 +12,6 @@ import type {
 import type { MailOutboxPort } from '../maintenance/MailOutboxPort.js';
 import type { UserRepository } from '../../domain/user/ports.js';
 import type { Username } from '../../domain/user/Username.js';
-
-// What this pass records on a transfer that did not arrive, when the transport
-// did not say why. Shown through the French catalogue, like the transport's own.
-export const SEND_FAILURES = {
-  sourceGone: 'the file is no longer on the box',
-  unexplained: 'it did not go through',
-} as const;
 
 interface Deps {
   readonly users: UserRepository;
@@ -110,7 +104,7 @@ export class SendPendingTransfers {
     if (!(await this.deps.facts.exists(transfer.source))) {
       // the member deleted it between the download finishing and the pass
       await this.finish(
-        sending.fail(SEND_FAILURES.sourceGone, this.deps.clock()),
+        sending.fail(TransferFailure.explained('source-gone'), this.deps.clock()),
         destination,
       );
       return undefined;
@@ -128,7 +122,10 @@ export class SendPendingTransfers {
     await this.finish(
       outcome.ok
         ? sending.succeed(this.deps.clock())
-        : sending.fail(outcome.detail ?? SEND_FAILURES.unexplained, this.deps.clock()),
+        : sending.fail(
+            outcome.failure ?? TransferFailure.explained('unexplained'),
+            this.deps.clock(),
+          ),
       destination,
     );
     return outcome.identity;
@@ -170,7 +167,7 @@ function transferMail(transfer: SyncTransfer): { subject: string; body: string }
     subject: `${transfer.name} did not arrive`,
     body: [
       `${transfer.name}, from your ${transfer.label.value} folder, could not be sent to your own machine:`,
-      `${transfer.lastError ?? SEND_FAILURES.unexplained}.`,
+      `${(transfer.failure ?? TransferFailure.explained('unexplained')).record}.`,
       '',
       'It stays under Folders on your seedbox, where you can try it again.',
       '',

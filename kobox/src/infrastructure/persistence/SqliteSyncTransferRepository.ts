@@ -1,6 +1,7 @@
 import { and, desc, eq, ne } from 'drizzle-orm';
 import { LocalPath } from '../../domain/sync/LocalPath.js';
 import { SyncTransfer, type TransferState } from '../../domain/sync/SyncTransfer.js';
+import { TransferFailure } from '../../domain/sync/TransferFailure.js';
 import type { SyncTransferRepository } from '../../domain/sync/ports.js';
 import { Label } from '../../domain/torrent/Label.js';
 import { Username } from '../../domain/user/Username.js';
@@ -17,7 +18,8 @@ function toDomain(row: TransferRow): SyncTransfer {
     source: LocalPath.parse(row.source),
     state: row.state,
     attempts: row.attempts,
-    ...(row.lastError !== null && { lastError: row.lastError }),
+    // the column keeps the failure's record: its sentence, or rsync's words
+    ...(row.lastError !== null && { failure: TransferFailure.fromRecord(row.lastError) }),
     queuedAt: row.queuedAt,
     updatedAt: row.updatedAt,
   });
@@ -38,7 +40,7 @@ export class SqliteSyncTransferRepository implements SyncTransferRepository {
         source: transfer.source.value,
         state: transfer.state,
         attempts: transfer.attempts,
-        lastError: transfer.lastError ?? null,
+        lastError: transfer.failure?.record ?? null,
         queuedAt: transfer.queuedAt,
         updatedAt: transfer.updatedAt,
       })
@@ -60,7 +62,7 @@ export class SqliteSyncTransferRepository implements SyncTransferRepository {
       .set({
         state: transfer.state,
         attempts: transfer.attempts,
-        lastError: transfer.lastError ?? null,
+        lastError: transfer.failure?.record ?? null,
         updatedAt: transfer.updatedAt,
       })
       .where(eq(syncTransfers.id, transfer.id))

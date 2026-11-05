@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { TransferFailure } from '../../../src/domain/sync/TransferFailure.js';
 import { parseJob, type Job } from '../../../src/application/jobs/contract.js';
 import type { BackupHostPort } from '../../../src/application/maintenance/BackupHostPort.js';
 import type { MailDelivery } from '../../../src/application/maintenance/MailTransportPort.js';
@@ -598,7 +599,7 @@ async function aFailedTransferInFilms(mode: 'scheduled' | 'immediate'): Promise<
     throw new Error('the fixture failed to queue a transfer');
   }
   await world.syncTransfers.save(
-    queued.start('2026-11-04 09:01:00').fail('permission denied', '2026-11-04 09:02:00'),
+    queued.start('2026-11-04 09:01:00').fail(TransferFailure.explained('refused'), '2026-11-04 09:02:00'),
   );
   return queued.id;
 }

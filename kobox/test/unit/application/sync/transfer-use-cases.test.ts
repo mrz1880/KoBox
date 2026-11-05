@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { TransferFailure } from '../../../../src/domain/sync/TransferFailure.js';
 import { QueueFinishedDownload } from '../../../../src/application/sync/QueueFinishedDownload.js';
 import { QueueFolderBacklog } from '../../../../src/application/sync/QueueFolderBacklog.js';
 import { InfoHash } from '../../../../src/domain/torrent/InfoHash.js';
@@ -190,7 +191,7 @@ describe('SendPendingTransfers', () => {
       await useCase.execute();
       return (await outbox.listDue(NOW, 10)).map((mail) => `${mail.recipient}: ${mail.subject}`);
     };
-    const failed: TransferOutcome = { ok: false, detail: 'no room left' };
+    const failed: TransferOutcome = { ok: false, failure: TransferFailure.explained('no-room') };
 
     expect(await mailsFor('never', failed)).toEqual([]);
     expect(await mailsFor('failures', { ok: true })).toEqual([]);
@@ -285,7 +286,7 @@ describe('SendPendingTransfers', () => {
       transfers,
       outbox: new InMemoryMailOutbox(),
       opener: { open: () => Promise.resolve(RemotePassword.parse('opened')) },
-      transport: new RecordingTransport({ ok: false, detail: 'the other machine has no room left' }),
+      transport: new RecordingTransport({ ok: false, failure: TransferFailure.explained('no-room') }),
       facts: everythingIsAFile,
       clock: () => NOW,
       hour: () => 2,
@@ -293,7 +294,7 @@ describe('SendPendingTransfers', () => {
 
     const recent = await transfers.listRecent(alice, 10);
     expect(recent[0]?.state).toBe('failed');
-    expect(recent[0]?.lastError).toBe('the other machine has no room left');
+    expect(recent[0]?.failure).toEqual(TransferFailure.explained('no-room'));
   });
 
   it('should_say_so_when_the_file_is_gone_rather_than_blaming_the_connection', async () => {
@@ -318,7 +319,7 @@ describe('SendPendingTransfers', () => {
     }).execute();
 
     const recent = await transfers.listRecent(alice, 10);
-    expect(recent[0]?.lastError).toContain('no longer on the box');
+    expect(recent[0]?.failure).toEqual(TransferFailure.explained('source-gone'));
     expect(transport.sent).toHaveLength(0);
   });
 });
@@ -340,7 +341,7 @@ describe('RequeueTransfer', () => {
     if (queued?.id === undefined) {
       throw new Error('the fixture failed to queue a transfer');
     }
-    await transfers.save(queued.start(NOW).fail('it did not go through', NOW));
+    await transfers.save(queued.start(NOW).fail(TransferFailure.explained('unexplained'), NOW));
     return { transfers, id: queued.id };
   }
 
