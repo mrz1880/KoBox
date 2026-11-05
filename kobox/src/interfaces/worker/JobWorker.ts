@@ -1,5 +1,10 @@
 import { messageOf } from '../../domain/shared/errorMessage.js';
-import { parseJob, type Job } from '../../application/jobs/contract.js';
+import type { Job } from '../../application/jobs/contract.js';
+import {
+  followUpsOf,
+  type CompletedJob,
+  type FollowUp,
+} from '../../application/jobs/FollowUps.js';
 import type { JobQueuePort } from '../../application/jobs/JobQueuePort.js';
 import { LoggableService, ManagedService } from '../../domain/maintenance/ManagedService.js';
 import { parseRole } from '../../domain/portal/Role.js';
@@ -32,24 +37,6 @@ import type {
   UseCases,
 } from '../useCases.js';
 
-// What a completed job asks the worker to enqueue next. Use cases stay
-// queue-agnostic: they return reports, the worker turns them into jobs.
-interface ChainHints {
-  readonly fetchCertHost?: string;
-  readonly whitelistDirty?: boolean;
-  readonly blocklistsUpdated?: boolean;
-  readonly blocklistsDue?: boolean;
-  readonly firewallDirty?: boolean;
-  readonly fail2banDirty?: boolean;
-  readonly openVpnDirty?: boolean;
-  readonly nfsDirty?: boolean;
-  // a member asked this folder, or a transfer put back from it, to go out
-  // straight away rather than at their hour
-  readonly sendNowFor?: string;
-  // a member's rTorrent config changed: render it (and restart) once per burst
-  readonly renderConfigFor?: string;
-}
-
 function nowStamp(): string {
   return stampOf(new Date());
 }
@@ -80,9 +67,9 @@ export class JobWorker {
     if (!claimed) {
       return false;
     }
-    let hints: ChainHints | undefined;
+    let completed: CompletedJob;
     try {
-      hints = await this.execute(claimed.job);
+      completed = await this.execute(claimed.job);
       await this.deps.queue.markDone(claimed.id);
     } catch (error) {
       await this.deps.queue.markFailed(
@@ -91,10 +78,12 @@ export class JobWorker {
       );
       return true;
     }
-    // Chaining runs only after the job is durably marked done, and outside the
-    // try above: a failure to enqueue the follow-up must not re-fail a job
+    // Follow-ups are queued only after the job is durably marked done, and
+    // outside the try above: a failure to queue one must not re-fail a job
     // whose real work already succeeded.
-    await this.chainAfter(claimed.job, hints);
+    for (const followUp of followUpsOf(completed)) {
+      await this.enqueueFollowUp(followUp);
+    }
     return true;
   }
 
@@ -106,96 +95,20 @@ export class JobWorker {
     return count;
   }
 
-  // Cross-context coupling lives HERE, as chained jobs: User Management ->
-  // Torrent Lifecycle, and Torrent/Tracker reports -> cert/whitelist/filters.
-  private async chainAfter(job: Job, hints: ChainHints | undefined): Promise<void> {
-    // the ledger just gained or lost a member's ports: the kernel must keep
-    // exactly those, and has them before the new member's rtorrent first binds
-    if (job.type === 'create-user' || job.type === 'delete-user') {
-      await this.deps.queue.enqueueUnique(parseJob('reserve-member-ports', {}));
-    }
-    if (job.type === 'create-user') {
-      await this.deps.queue.enqueue(
-        parseJob('provision-rtorrent', { username: job.payload.username }),
-      );
-      // Phase 3 debt #2: client cert issuance rides the same seam
-      await this.deps.queue.enqueue(
-        parseJob('provision-vpn-user', { username: job.payload.username }),
-      );
-    }
-    if (job.type === 'delete-user') {
-      await this.deps.queue.enqueue(
-        parseJob('deprovision-rtorrent', { username: job.payload.username }),
-      );
-      await this.deps.queue.enqueue(
-        parseJob('deprovision-vpn-user', { username: job.payload.username }),
-      );
-    }
-    // a user's home appears/disappears with the account: re-render NFS exports
-    if (job.type === 'create-user' || job.type === 'delete-user') {
-      await this.deps.queue.enqueue(parseJob('render-nfs-exports', {}));
-    }
-    // legacy parity: a fresh instance gets its blocklist filter immediately,
-    // not at the next update-blocklists run
-    if (job.type === 'provision-rtorrent') {
-      await this.deps.queue.enqueue(
-        parseJob('render-blocklist-filters', { username: job.payload.username }),
-      );
-    }
-    // the firewall names uids and rtorrent ports: reconcile it whenever the
-    // provisioned population changes
-    if (job.type === 'provision-rtorrent' || job.type === 'deprovision-rtorrent') {
-      await this.deps.queue.enqueue(parseJob('apply-firewall', {}));
-      // and the per-user nginx /RPC-<USER> SCGI mounts (Phase 6)
-      await this.deps.queue.enqueue(parseJob('render-rutorrent-users', {}));
-    }
-    // what landed on disk just changed: refresh the media listing
-    if (job.type === 'torrent-event') {
-      await this.deps.queue.enqueueUnique(parseJob('index-media', {}));
-    }
-    if (hints?.sendNowFor !== undefined) {
-      // enqueueUnique: several downloads finishing at once must not stack
-      // several passes over the same queue
-      await this.deps.queue.enqueueUnique(
-        parseJob('send-pending-transfers', { username: hints.sendNowFor }),
-      );
-    }
-    if (hints?.fetchCertHost !== undefined) {
-      await this.deps.queue.enqueue(parseJob('fetch-tracker-cert', { host: hints.fetchCertHost }));
-    }
-    if (hints?.whitelistDirty === true) {
-      await this.deps.queue.enqueue(parseJob('render-whitelist', {}));
-    }
-    if (hints?.blocklistsDue === true) {
-      await this.deps.queue.enqueue(parseJob('update-blocklists', {}));
-    }
-    if (hints?.blocklistsUpdated === true) {
-      await this.deps.queue.enqueue(parseJob('render-blocklist-filters', {}));
-      // fresh merged ranges reach the kernel set too (pgl successor)
-      await this.deps.queue.enqueue(parseJob('apply-ipset', {}));
-    }
-    if (hints?.firewallDirty === true) {
-      await this.deps.queue.enqueue(parseJob('apply-firewall', {}));
-    }
-    if (hints?.fail2banDirty === true) {
-      await this.deps.queue.enqueue(parseJob('render-fail2ban', {}));
-    }
-    if (hints?.openVpnDirty === true) {
-      await this.deps.queue.enqueue(parseJob('render-openvpn', {}));
-    }
-    if (hints?.nfsDirty === true) {
-      await this.deps.queue.enqueue(parseJob('render-nfs-exports', {}));
-    }
-    // unique while pending: the folders queued behind this one join the same
-    // render, so a burst of them restarts rTorrent once
-    if (hints?.renderConfigFor !== undefined) {
-      await this.deps.queue.enqueueUnique(
-        parseJob('render-rtorrent-config', { username: hints.renderConfigFor }),
-      );
+  // What follows which job is the follow-up policy's; how it enters the
+  // queue is the worker's.
+  private async enqueueFollowUp(followUp: FollowUp): Promise<void> {
+    switch (followUp.ifAlreadyPending) {
+      case 'join':
+        await this.deps.queue.enqueueUnique(followUp.job);
+        return;
+      case 'queue-another':
+        await this.deps.queue.enqueue(followUp.job);
+        return;
     }
   }
 
-  private async execute(job: Job): Promise<ChainHints | undefined> {
+  private async execute(job: Job): Promise<CompletedJob> {
     switch (job.type) {
       case 'create-user':
         await this.deps.useCases.createUser.execute({
@@ -208,100 +121,100 @@ export class JobWorker {
           }),
           role: parseRole(job.payload.role),
         });
-        return;
+        return job;
       case 'delete-user':
         await this.deps.useCases.deleteUser.execute({
           username: Username.parse(job.payload.username),
         });
-        return;
+        return job;
       case 'change-password':
         await this.deps.useCases.changePassword.execute({
           username: Username.parse(job.payload.username),
           password: await this.deps.passwords.open(job.payload.sealedPassword),
         });
-        return;
+        return job;
       case 'set-user-quota':
         await this.deps.useCases.setUserQuota.execute({
           username: Username.parse(job.payload.username),
           quota: Quota.gib(job.payload.quotaGib),
         });
-        return;
+        return job;
       case 'set-user-role':
         await this.deps.useCases.changeRole.execute({
           username: Username.parse(job.payload.username),
           role: parseRole(job.payload.role),
         });
-        return;
+        return job;
       case 'apply-mail-relay':
         await this.deps.maintenance.applyMailRelay.execute();
-        return;
+        return job;
       case 'set-ssh-key':
         await this.deps.useCases.setSshKey.execute({
           username: Username.parse(job.payload.username),
           key: job.payload.key,
         });
-        return;
+        return job;
       case 'remove-ssh-key':
         await this.deps.useCases.removeSshKey.execute({
           username: Username.parse(job.payload.username),
         });
-        return;
+        return job;
       case 'sample-disk-usage': {
         const pass = await this.deps.useCases.sampleDiskUsage.execute();
         for (const warning of diskUsagePassWarnings(pass)) {
           this.deps.logger.warn(warning.context, warning.message);
         }
-        return;
+        return job;
       }
       case 'suspend-user':
         await this.deps.useCases.suspendUser.execute({
           username: Username.parse(job.payload.username),
         });
-        return;
+        return job;
       case 'resume-user':
         await this.deps.useCases.resumeUser.execute({
           username: Username.parse(job.payload.username),
         });
-        return;
+        return job;
       case 'restart-rtorrent':
         await this.deps.torrents.restart.execute({
           username: Username.parse(job.payload.username),
         });
-        return;
+        return job;
       case 'provision-rtorrent':
         await this.deps.torrents.provision.execute({
           username: Username.parse(job.payload.username),
         });
-        return;
+        return job;
       case 'deprovision-rtorrent':
         await this.deps.torrents.deprovision.execute({
           username: Username.parse(job.payload.username),
         });
-        return;
+        return job;
       case 'render-rtorrent-config':
         await this.deps.torrents.render.execute({ username: Username.parse(job.payload.username) });
-        return;
+        return job;
       case 'add-watch-dir': {
-        const { added } = await this.deps.torrents.addWatchDir.execute({
+        const report = await this.deps.torrents.addWatchDir.execute({
           username: Username.parse(job.payload.username),
           label: Label.parse(job.payload.label),
         });
-        return added ? { renderConfigFor: job.payload.username } : undefined;
+        return { ...job, report };
       }
       case 'remove-watch-dir': {
-        const { changed } = await this.deps.torrents.removeWatchDir.execute({
+        const report = await this.deps.torrents.removeWatchDir.execute({
           username: Username.parse(job.payload.username),
           label: Label.parse(job.payload.label),
         });
-        return changed ? { renderConfigFor: job.payload.username } : undefined;
+        return { ...job, report };
       }
       case 'rename-watch-dir': {
-        const { changed } = await this.deps.torrents.renameWatchDir.execute({
+        const report = await this.deps.torrents.renameWatchDir.execute({
           username: Username.parse(job.payload.username),
           label: Label.parse(job.payload.label),
           to: Label.parse(job.payload.to),
         });
-        return changed ? { renderConfigFor: job.payload.username } : undefined;
+        return { ...job, report };
       }
       case 'send-pending-transfers':
         await this.deps.sync.sendPending.execute(
@@ -309,52 +222,52 @@ export class JobWorker {
             ? undefined
             : Username.parse(job.payload.username),
         );
-        return;
+        return job;
       case 'queue-folder-backlog': {
         const report = await this.deps.sync.queueBacklog.execute({
           username: Username.parse(job.payload.username),
           label: Label.parse(job.payload.label),
         });
-        return report.sendNow ? { sendNowFor: job.payload.username } : undefined;
+        return { ...job, report };
       }
       case 'requeue-transfer': {
-        const outcome = await this.deps.sync.requeue.execute(
+        const report = await this.deps.sync.requeue.execute(
           Username.parse(job.payload.username),
           job.payload.id,
         );
-        return outcome === 'straight-away' ? { sendNowFor: job.payload.username } : undefined;
+        return { ...job, report };
       }
       case 'check-sync-destination':
         await this.deps.sync.checkDestination.execute(
           Username.parse(job.payload.username),
           job.payload.trust,
         );
-        return;
+        return job;
       case 'set-category-sync-mode':
         await this.deps.torrents.setCategorySyncMode.execute({
           username: Username.parse(job.payload.username),
           label: Label.parse(job.payload.label),
           mode: SyncMode.parse(job.payload.mode),
         });
-        return;
+        return job;
       case 'set-sync-disabled':
         await this.deps.torrents.setSyncDisabled.execute({
           username: Username.parse(job.payload.username),
           disabled: job.payload.disabled,
         });
-        return;
+        return job;
       case 'set-recycling':
         await this.deps.torrents.setRecycling.execute({
           username: Username.parse(job.payload.username),
           mode: RecyclingMode.parse(job.payload.mode),
         });
-        return;
+        return job;
       case 'set-allow-public-tracker':
         await this.deps.torrents.setAllowPublicTracker.execute({
           username: Username.parse(job.payload.username),
           allowed: job.payload.allowed,
         });
-        return;
+        return job;
       case 'torrent-event':
         await this.deps.torrents.handleEvent.execute({
           username: Username.parse(job.payload.username),
@@ -376,51 +289,45 @@ export class JobWorker {
             label: Label.parse(job.payload.label),
             source: job.payload.basePath ?? job.payload.directory ?? '',
           });
-          if (verdict.sendNow) {
-            return { sendNowFor: job.payload.username };
-          }
+          return { ...job, report: verdict };
         }
-        return;
+        return { ...job, report: undefined };
       case 'discover-tracker': {
         const report = await this.deps.trackers.discover.execute({
           url: job.payload.url,
           privacy: job.payload.privacy,
           today: nowStamp().slice(0, 10),
         });
-        return {
-          ...(report.certCheckWanted &&
-            report.host !== undefined && { fetchCertHost: report.host }),
-          whitelistDirty: report.whitelistDirty,
-        };
+        return { ...job, report };
       }
       case 'fetch-tracker-cert': {
         const report = await this.deps.trackers.fetchCert.execute({
           host: TrackerHost.parse(job.payload.host),
           now: nowStamp(),
         });
-        return { whitelistDirty: report.whitelistDirty };
+        return { ...job, report };
       }
       case 'renew-tracker-certs': {
         const report = await this.deps.trackers.renewCerts.execute({
           today: job.payload.today,
           now: nowStamp(),
         });
-        return { whitelistDirty: report.promoted > 0 };
+        return { ...job, report };
       }
       case 'mark-tracker-dead': {
         const report = await this.deps.trackers.markDead.execute({
           host: TrackerHost.parse(job.payload.host),
         });
-        return { whitelistDirty: report.whitelistDirty };
+        return { ...job, report };
       }
       // the import enables lists; without a download right after, the kernel
       // set stays empty until the next scheduled update, hours later
       case 'import-blocklist-catalog':
         await this.deps.trackers.importCatalog.execute();
-        return { blocklistsDue: true };
+        return job;
       case 'update-blocklists': {
         const report = await this.deps.trackers.updateBlocklists.execute({ now: nowStamp() });
-        return { blocklistsUpdated: report.ranges !== undefined };
+        return { ...job, report };
       }
       // the toggle is only half the job: without the re-render the filter file
       // keeps the old set until the next scheduled pass, which is exactly the
@@ -438,52 +345,57 @@ export class JobWorker {
         // operator reported.
         await this.deps.trackers.rebuildBlocklistCache.execute();
         await this.deps.trackers.renderBlocklistFilters.execute({});
-        return;
+        return job;
       case 'render-whitelist':
         await this.deps.trackers.renderWhitelist.execute();
-        return;
+        return job;
       case 'render-blocklist-filters':
         await this.deps.trackers.renderBlocklistFilters.execute({
           ...(job.payload.username !== undefined && {
             username: Username.parse(job.payload.username),
           }),
         });
-        return;
+        return job;
       case 'apply-firewall':
         await this.deps.security.applyFirewall.execute();
-        return;
+        return job;
       case 'render-fail2ban':
         await this.deps.security.renderFail2ban.execute();
-        return;
+        return job;
       case 'add-user-hostname':
       case 'remove-user-hostname':
-        return await this.deps.security.manageUserHostname.execute({
-          action: job.type === 'add-user-hostname' ? 'add' : 'remove',
-          username: Username.parse(job.payload.username),
-          host: DynDnsHost.parse(job.payload.hostname),
-        });
+        return {
+          ...job,
+          report: await this.deps.security.manageUserHostname.execute({
+            action: job.type === 'add-user-hostname' ? 'add' : 'remove',
+            username: Username.parse(job.payload.username),
+            host: DynDnsHost.parse(job.payload.hostname),
+          }),
+        };
       case 'resolve-dyndns': {
         const report = await this.deps.security.resolveDynDns.execute();
-        return {
-          whitelistDirty: report.whitelistDirty,
-          firewallDirty: report.firewallDirty,
-          fail2banDirty: report.fail2banDirty,
-        };
+        return { ...job, report };
       }
       case 'render-openvpn':
         await this.deps.security.renderOpenVpn.execute();
-        return;
+        return job;
       case 'provision-vpn-user':
-        return await this.deps.security.provisionVpnUser.execute({
-          username: Username.parse(job.payload.username),
-        });
+        return {
+          ...job,
+          report: await this.deps.security.provisionVpnUser.execute({
+            username: Username.parse(job.payload.username),
+          }),
+        };
       case 'deprovision-vpn-user':
-        return await this.deps.security.deprovisionVpnUser.execute({
-          username: Username.parse(job.payload.username),
-        });
+        return {
+          ...job,
+          report: await this.deps.security.deprovisionVpnUser.execute({
+            username: Username.parse(job.payload.username),
+          }),
+        };
       case 'evaluate-fair-use':
         await this.deps.security.evaluateFairUse.execute({ now: nowStamp() });
-        return;
+        return job;
       case 'set-fair-use-override':
         await this.deps.security.setFairUseOverride.execute({
           username: Username.parse(job.payload.username),
@@ -498,52 +410,52 @@ export class JobWorker {
           }),
           now: nowStamp(),
         });
-        return;
+        return job;
       case 'send-mails':
         await this.deps.maintenance.sendMails.execute({ now: nowStamp() });
-        return;
+        return job;
       case 'index-media':
         await this.deps.torrents.indexMedia.execute();
-        return;
+        return job;
       case 'restart-service':
         await this.deps.maintenance.restartService.execute({
           service: ManagedService.parse(job.payload.service),
         });
-        return;
+        return job;
       case 'capture-service-log':
         await this.deps.maintenance.captureServiceLog.execute(
           LoggableService.parse(job.payload.service),
         );
-        return;
+        return job;
       case 'check-package-updates':
         await this.deps.maintenance.checkPackageUpdates.execute();
-        return;
+        return job;
       case 'apply-package-updates':
         await this.deps.maintenance.applyPackageUpdates.execute();
-        return;
+        return job;
       case 'run-speedtest':
         await this.deps.maintenance.runSpeedtest.execute();
-        return;
+        return job;
       case 'run-backup': {
         const report = await this.deps.maintenance.runBackup.execute({ now: nowStamp() });
         // the rest of the backup went through: a warning, not a failed job
         for (const failure of report.failedMembers) {
           this.deps.logger.warn(failure, 'backup: restart kit not archived');
         }
-        return;
+        return job;
       }
       case 'apply-ipset':
         await this.deps.trackers.applyIpset.execute();
-        return;
+        return job;
       case 'render-rutorrent-users':
         await this.deps.torrents.renderRutorrentUsers.execute();
-        return;
+        return job;
       case 'render-nfs-exports':
         await this.deps.security.renderNfsExports.execute();
-        return;
+        return job;
       case 'reserve-member-ports':
         await this.deps.useCases.reserveMemberPorts.execute();
-        return;
+        return job;
       case 'clean-up-space': {
         const username = Username.parse(job.payload.username);
         const report = await this.deps.space.cleanUpSpace.execute({
@@ -559,17 +471,17 @@ export class JobWorker {
             'space cleanup: torrent not removed',
           );
         }
-        return;
+        return job;
       }
       case 'set-automatic-cleanup':
         await this.deps.space.setAutomaticCleanup.execute({
           username: Username.parse(job.payload.username),
           automatic: parseAutomaticCleanup(job.payload.scope),
         });
-        return;
+        return job;
       case 'set-seed-rule':
         await this.deps.space.setSeedRule.execute(SeedRule.of(job.payload));
-        return;
+        return job;
       case 'set-own-seed-rule': {
         const { rule } = job.payload;
         await this.deps.space.setOwnSeedRule.execute({
@@ -583,7 +495,7 @@ export class JobWorker {
                   rule: SeedRule.of({ ratio: rule.ratio ?? undefined, days: rule.days }),
                 },
         });
-        return;
+        return job;
       }
       case 'add-user-address':
       case 'remove-user-address': {
@@ -592,14 +504,7 @@ export class JobWorker {
           username: Username.parse(job.payload.username),
           ip: IpAddress.parse(job.payload.ipv4),
         });
-        // a member address is rendered in four places: the whitelist, the
-        // firewall trusted rules, fail2ban ignoreip and the NFS home exports
-        return {
-          whitelistDirty: report.whitelistDirty,
-          firewallDirty: report.whitelistDirty,
-          fail2banDirty: report.whitelistDirty,
-          nfsDirty: true,
-        };
+        return { ...job, report };
       }
     }
     // every case returns: a job type added to the contract without one does

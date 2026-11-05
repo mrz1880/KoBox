@@ -6,7 +6,8 @@ export type DirectJobRunnerDeps = Omit<JobWorkerDeps, 'queue'>;
 
 // What `kobox --direct` runs: the job and everything the worker would chain
 // after it, here and now. It is the worker itself over a queue of its own, so
-// "what follows job X" keeps one definition, the worker's.
+// "what follows job X" keeps one definition, followUpsOf, which the worker
+// consults after every job, and the dedupe stays the queue's.
 export class DirectJobRunner {
   constructor(private readonly deps: DirectJobRunnerDeps) {}
 
