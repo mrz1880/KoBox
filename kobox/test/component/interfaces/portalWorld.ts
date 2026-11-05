@@ -25,6 +25,7 @@ import { SetSyncDestination } from '../../../src/application/sync/SetSyncDestina
 import { FakePasswordHasher } from '../../../src/infrastructure/system/fakes/FakePasswordHasher.js';
 import { FakePasswordCipher } from '../../../src/infrastructure/system/fakes/FakePasswordCipher.js';
 import { FakeHealthProbe } from '../../../src/infrastructure/system/fakes/FakeHealthProbe.js';
+import { InMemoryJobQueue } from '../../../src/infrastructure/persistence/InMemoryJobQueue.js';
 import { InMemoryBlocklistRepository } from '../../../src/infrastructure/persistence/InMemoryBlocklistRepository.js';
 import { InMemoryFairUseRepository } from '../../../src/infrastructure/persistence/InMemoryFairUseRepository.js';
 import { InMemoryComponentRegistry } from '../../../src/infrastructure/persistence/InMemoryComponentRegistry.js';
@@ -103,28 +104,31 @@ class NoProfiles implements VpnProfileStorePort {
 
 export const TEST_PASSWORD = '8chars!!';
 
-// Records enqueued jobs; the portal never consumes them, so claiming is out.
-// The worker's side is played by one state every job is left in: done unless
-// a test says otherwise, as if the worker were instant.
+// The production in-memory queue, plus a record of every job the portal asked
+// for, in order. The portal never consumes jobs, so claiming is out. The
+// worker's side is played by one state every queued job is left in: done
+// unless a test says otherwise, as if the worker were instant.
 export class RecordingQueue implements JobQueuePort, JobProgressPort {
   readonly jobs: Job[] = [];
+  private readonly queue = new InMemoryJobQueue();
   private workerState: JobState = 'done';
 
   workerLeavesJobs(state: JobState): void {
     this.workerState = state;
   }
 
-  stateOf(id: number): Promise<JobState | undefined> {
-    return Promise.resolve(id >= 1 && id <= this.jobs.length ? this.workerState : undefined);
+  async stateOf(id: number): Promise<JobState | undefined> {
+    return (await this.queue.stateOf(id)) === undefined ? undefined : this.workerState;
   }
 
   enqueue(job: Job): Promise<number> {
     this.jobs.push(job);
-    return Promise.resolve(this.jobs.length);
+    return this.queue.enqueue(job);
   }
 
   enqueueUnique(job: Job): Promise<number | undefined> {
-    return this.enqueue(job);
+    this.jobs.push(job);
+    return this.queue.enqueueUnique(job);
   }
 
   claimNextPending(): Promise<ClaimedJob | undefined> {
