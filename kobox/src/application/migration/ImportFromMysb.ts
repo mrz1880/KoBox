@@ -1,5 +1,7 @@
 import { messageOf } from '../../domain/shared/errorMessage.js';
 import { parseJob } from '../jobs/contract.js';
+import { followUpsOfNewMember } from '../jobs/FollowUps.js';
+import { queueFollowUps } from '../jobs/queueFollowUps.js';
 import type { JobQueuePort } from '../jobs/JobQueuePort.js';
 import type { MailOutboxPort } from '../maintenance/MailOutboxPort.js';
 import type { DynDnsBindingRepository } from '../../domain/security/ports.js';
@@ -68,9 +70,10 @@ interface Deps {
 }
 
 // Imports a frozen MySB dump into KoBox. Idempotent and re-entrant: a user that
-// already exists is skipped (no second account, mail or provisioning), and every
-// catalogue write is an upsert, so a re-run converges. Dry-run by default — the
-// caller passes apply:true only after reviewing the diff. Desired-state: import
+// already exists gets no second account or mail, only its idempotent
+// provisioning queued again, and every catalogue write is an upsert, so a re-run
+// converges. Dry-run by default: the caller passes apply:true only after
+// reviewing the diff. Desired-state: import
 // the DATA, then let KoBox regenerate every file from it.
 export class ImportFromMysb {
   constructor(private readonly deps: Deps) {}
@@ -182,16 +185,13 @@ export class ImportFromMysb {
     }
   }
 
-  // The same provisioning fan-out the worker's create-user chain does, minus its
-  // generic (passwordless) welcome mail. Every job here is idempotent, so it is
-  // safe to re-enqueue on a repair re-run.
+  // What follows any new member, as the worker queues it after a create-user
+  // job: the ports kept from MySB may lie anywhere, so their reservation comes
+  // first. That chain sends no mail; the temporary password mail is the
+  // import's own, sent once by importUser. Every job here is idempotent, so it
+  // is safe to queue again on a repair re-run.
   private async enqueueProvisioning(username: string): Promise<void> {
-    // the ports kept from MySB may lie anywhere: the kernel must hold them back
-    // before rtorrent first binds them (unique: one render covers every member)
-    await this.deps.queue.enqueueUnique(parseJob('reserve-member-ports', {}));
-    await this.deps.queue.enqueue(parseJob('provision-rtorrent', { username }));
-    await this.deps.queue.enqueue(parseJob('provision-vpn-user', { username }));
-    await this.deps.queue.enqueue(parseJob('render-nfs-exports', {}));
+    await queueFollowUps(this.deps.queue, followUpsOfNewMember(username));
   }
 
   private async importTrackers(apply: boolean): Promise<CategoryReport> {

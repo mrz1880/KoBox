@@ -1,10 +1,7 @@
 import { messageOf } from '../../domain/shared/errorMessage.js';
 import type { Job } from '../../application/jobs/contract.js';
-import {
-  followUpsOf,
-  type CompletedJob,
-  type FollowUp,
-} from '../../application/jobs/FollowUps.js';
+import { followUpsOf, type CompletedJob } from '../../application/jobs/FollowUps.js';
+import { queueFollowUps } from '../../application/jobs/queueFollowUps.js';
 import type { JobQueuePort } from '../../application/jobs/JobQueuePort.js';
 import { LoggableService, ManagedService } from '../../domain/maintenance/ManagedService.js';
 import { parseRole } from '../../domain/portal/Role.js';
@@ -81,9 +78,7 @@ export class JobWorker {
     // Follow-ups are queued only after the job is durably marked done, and
     // outside the try above: a failure to queue one must not re-fail a job
     // whose real work already succeeded.
-    for (const followUp of followUpsOf(completed)) {
-      await this.enqueueFollowUp(followUp);
-    }
+    await queueFollowUps(this.deps.queue, followUpsOf(completed));
     return true;
   }
 
@@ -93,19 +88,6 @@ export class JobWorker {
       count += 1;
     }
     return count;
-  }
-
-  // What follows which job is the follow-up policy's; how it enters the
-  // queue is the worker's.
-  private async enqueueFollowUp(followUp: FollowUp): Promise<void> {
-    switch (followUp.ifAlreadyPending) {
-      case 'join':
-        await this.deps.queue.enqueueUnique(followUp.job);
-        return;
-      case 'queue-another':
-        await this.deps.queue.enqueue(followUp.job);
-        return;
-    }
   }
 
   private async execute(job: Job): Promise<CompletedJob> {

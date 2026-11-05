@@ -104,6 +104,26 @@ function addressRenders(report: HostnameDirtyReport): readonly FollowUp[] {
 }
 
 /**
+ * What follows a member's account once it exists, whoever created it (the
+ * create-user job, or the MySB import): the ledger just gained their ports,
+ * which the kernel must keep before their rtorrent first binds them, then
+ * their rtorrent, their VPN client certificate (Phase 3 debt #2 rides the
+ * same seam) and the NFS exports, since a home appears with the account.
+ *
+ * @param username the member whose account was just created
+ * @returns the follow-ups, in the order they are to be queued
+ * @throws ZodError when the username is one the job contract refuses
+ */
+export function followUpsOfNewMember(username: string): readonly FollowUp[] {
+  return [
+    join(parseJob('reserve-member-ports', {})),
+    queueAnother(parseJob('provision-rtorrent', { username })),
+    queueAnother(parseJob('provision-vpn-user', { username })),
+    queueAnother(parseJob('render-nfs-exports', {})),
+  ];
+}
+
+/**
  * What follows a job its use case ran to the end: the jobs that carry its
  * consequences into the other contexts (a member's account into their rTorrent,
  * a tracker into the whitelist, a list into the kernel set). Pure: the caller
@@ -115,17 +135,10 @@ function addressRenders(report: HostnameDirtyReport): readonly FollowUp[] {
  */
 export function followUpsOf(completed: CompletedJob): readonly FollowUp[] {
   switch (completed.type) {
-    // the ledger just gained or lost a member's ports: the kernel must keep
-    // exactly those, and has them before the new member's rtorrent first binds;
-    // a user's home appears with the account, so NFS exports follow
     case 'create-user':
-      return [
-        join(parseJob('reserve-member-ports', {})),
-        queueAnother(parseJob('provision-rtorrent', { username: completed.payload.username })),
-        // Phase 3 debt #2: client cert issuance rides the same seam
-        queueAnother(parseJob('provision-vpn-user', { username: completed.payload.username })),
-        queueAnother(parseJob('render-nfs-exports', {})),
-      ];
+      return followUpsOfNewMember(completed.payload.username);
+    // the ledger just lost a member's ports: the kernel must keep exactly the
+    // others; their home leaves with the account, so NFS exports follow
     case 'delete-user':
       return [
         join(parseJob('reserve-member-ports', {})),
