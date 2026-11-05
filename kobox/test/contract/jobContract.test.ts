@@ -156,7 +156,7 @@ describe('job contract', () => {
   it('should_reject_hostnames_that_are_ip_literals_or_unsafe', () => {
     expect(() =>
       parseJob('add-user-hostname', { username: 'alice', hostname: '203.0.113.9' }),
-    ).toThrow();
+    ).toThrow('IPv4 literal, use add-user-address instead');
     expect(() =>
       parseJob('add-user-hostname', { username: 'alice', hostname: 'dyn.example.org;id' }),
     ).toThrow();

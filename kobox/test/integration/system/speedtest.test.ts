@@ -65,7 +65,7 @@ describe('LibrespeedAdapter', () => {
     const runner = new ScriptedRunner(new Error('spawn ENOENT'));
 
     await expect(new LibrespeedAdapter(runner).measure(NOW)).rejects.toThrow(
-      /is not installed — pin the speedtest component/,
+      /is not installed: pin the speedtest component and re-run kobox install$/,
     );
   });
 

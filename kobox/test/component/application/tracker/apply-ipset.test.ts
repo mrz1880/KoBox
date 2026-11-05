@@ -47,7 +47,9 @@ describe('ApplyIpset', () => {
     const report = await applyIpset().execute();
 
     expect(report).toMatchObject({ applied: false, entries: 1, rejected: 1 });
-    expect(report.reason).toMatch(/^ipset unavailable \(no binary or kernel ip_set support\)/);
+    expect(report.reason).toBe(
+      'ipset unavailable (no binary or kernel ip_set support), file rendered only',
+    );
     // the boot oneshot replays the file once the module is there
     expect(files.contentAt(IPSET_FILE)).toContain('add kobox-bl-next 192.0.2.0/24\n');
     expect(ipset.restored).toEqual([]);

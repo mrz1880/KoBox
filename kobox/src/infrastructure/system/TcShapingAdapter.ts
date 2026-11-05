@@ -17,7 +17,7 @@ function assertClassidFits(uid: number): void {
   if (uid > MAX_CLASSID_UID) {
     // a silent 16-bit wrap would throttle the WRONG user — refuse loudly
     throw new Error(
-      `uid ${String(uid)} exceeds the tc 16-bit classid space (max 65534) — cannot shape this user`,
+      `uid ${String(uid)} exceeds the tc 16-bit classid space (max 65534): cannot shape this user`,
     );
   }
 }

@@ -143,7 +143,7 @@ const dynDnsHostField = z
   .max(253)
   .regex(new RegExp(`^${TRACKER_HOST_LABEL}(\\.${TRACKER_HOST_LABEL})+$`, 'i'))
   .refine((raw) => !/^\d+\.\d+\.\d+\.\d+$/.test(raw), {
-    message: 'IPv4 literal — use add-user-address instead',
+    message: 'IPv4 literal, use add-user-address instead',
   });
 const userHostnamePayload = z.strictObject({ username: usernameField, hostname: dynDnsHostField });
 

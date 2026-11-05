@@ -36,7 +36,7 @@ export class ApplyIpset {
         applied: false,
         entries,
         rejected,
-        reason: 'ipset unavailable (no binary or kernel ip_set support) — file rendered only',
+        reason: 'ipset unavailable (no binary or kernel ip_set support), file rendered only',
       };
     }
     await ipset.restore(file.path);
