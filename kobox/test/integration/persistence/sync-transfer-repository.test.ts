@@ -57,6 +57,19 @@ describe('SqliteSyncTransferRepository', () => {
     ]);
   });
 
+  // a queue that serves the newest first starves what waited since last night
+  it('should_list_only_what_waits_and_only_theirs_oldest_first', async () => {
+    await queued(alice, '/home/alice/rtorrent/complete/Films/Example Show');
+    const sent = await queued(alice, '/home/alice/rtorrent/complete/Films/Example Film');
+    await repo.save(sent.start(AT).succeed(AT));
+    await queued(bob, '/home/bob/rtorrent/complete/Films/Example Film');
+    await queued(alice, '/home/alice/rtorrent/complete/Films/Example Clip');
+
+    const waiting = await repo.listWaiting(alice);
+
+    expect(waiting.map((transfer) => transfer.name)).toEqual(['Example Show', 'Example Clip']);
+  });
+
   it('should_list_only_what_reached_the_members_machine_and_only_theirs', async () => {
     const sent = await queued(alice, '/home/alice/rtorrent/complete/Films/Example Film');
     await repo.save(sent.start(AT).succeed(AT));
