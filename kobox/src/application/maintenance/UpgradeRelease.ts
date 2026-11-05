@@ -73,13 +73,13 @@ export class UpgradeRelease {
     }
     if (!(await git.refExists(settings.repoDir, input.to))) {
       throw new UpgradeError(
-        `ref ${JSON.stringify(input.to)} not found in ${settings.repoDir} — push the tag to the remote or check the spelling`,
+        `ref ${JSON.stringify(input.to)} not found in ${settings.repoDir}: push the tag to the remote or check the spelling`,
       );
     }
     const staged = await releases.findByState('staged');
     if (staged) {
       throw new UpgradeError(
-        `a staged release already exists (${staged.ref} at ${staged.path}) — a previous upgrade crashed; remove the worktree and mark the row failed before retrying`,
+        `a staged release already exists (${staged.ref} at ${staged.path}): a previous upgrade crashed; remove the worktree and mark the row failed before retrying`,
       );
     }
     const sha = await git.resolveRef(settings.repoDir, input.to);
@@ -137,8 +137,8 @@ export class UpgradeRelease {
     await releases.setState(releaseId, 'failed', input.now);
     throw new UpgradeError(
       revertOk
-        ? `worker did not come up on ${input.to} — reverted to the previous release (DB backup at ${backupReport.created})`
-        : `worker did not come up on ${input.to} AND the revert restart failed too — inspect journalctl -u kobox-worker NOW (DB backup at ${backupReport.created})`,
+        ? `worker did not come up on ${input.to}, reverted to the previous release (DB backup at ${backupReport.created})`
+        : `worker did not come up on ${input.to} AND the revert restart failed too: inspect journalctl -u kobox-worker NOW (DB backup at ${backupReport.created})`,
     );
   }
 
@@ -150,7 +150,7 @@ export class UpgradeRelease {
     const { releases, host, settings } = this.deps;
     const previous = await releases.findByState('previous');
     if (!previous) {
-      throw new UpgradeError('no previous release recorded — nothing to roll back to');
+      throw new UpgradeError('no previous release recorded: nothing to roll back to');
     }
     const current = await releases.findByState('current');
     await host.switchCurrent(settings.currentLink, this.packageDir(previous.path));

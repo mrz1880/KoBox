@@ -146,7 +146,7 @@ export interface ComponentInstaller {
 
 export class InstallGuardError extends Error {
   constructor(component: string, detail: string) {
-    super(`${component}: config check failed, changes rolled back — ${detail}`);
+    super(`${component}: config check failed, changes rolled back: ${detail}`);
     this.name = 'InstallGuardError';
   }
 }
@@ -476,7 +476,7 @@ class RutorrentInstaller implements ComponentInstaller {
       return {
         state: 'skipped',
         reason:
-          'no ruTorrent release pinned — set KOBOX_RUTORRENT_URL and KOBOX_RUTORRENT_SHA256, then re-run kobox install',
+          'no ruTorrent release pinned: set KOBOX_RUTORRENT_URL and KOBOX_RUTORRENT_SHA256, then re-run kobox install',
       };
     }
     await packages.ensureInstalled(['php-fpm', 'php-cli', 'unzip', ...RUTORRENT_PLUGIN_TOOLS]);
@@ -869,7 +869,7 @@ class IpsetInstaller implements ComponentInstaller {
       return {
         state: 'skipped',
         reason:
-          'kernel lacks ip_set support (container?) — rtorrent ipv4_filter enforcement continues; re-run kobox install on a host with the module',
+          'kernel lacks ip_set support (container?), rtorrent ipv4_filter enforcement continues; re-run kobox install on a host with the module',
       };
     }
     return installed(await packages.installedVersion('ipset'));
@@ -991,7 +991,7 @@ class OpenVpnInstaller implements ComponentInstaller {
     }
     return installed(
       await packages.installedVersion('openvpn'),
-      'no /dev/net/tun here — units enabled, tunnels validated on the VM',
+      'no /dev/net/tun here: units enabled, tunnels validated on the VM',
     );
   }
 
@@ -1125,7 +1125,7 @@ class NanomonInstaller implements ComponentInstaller {
       return {
         state: 'skipped',
         reason:
-          'no NanoMon release pinned — set KOBOX_NANOMON_URL and KOBOX_NANOMON_SHA256, then re-run kobox install',
+          'no NanoMon release pinned: set KOBOX_NANOMON_URL and KOBOX_NANOMON_SHA256, then re-run kobox install',
       };
     }
     await host.ensureServiceAccount('nanomon');
@@ -1174,7 +1174,7 @@ class SpeedtestInstaller implements ComponentInstaller {
     if (install.speedtestUrl === undefined || install.speedtestSha256 === undefined) {
       return {
         state: 'skipped',
-        reason: 'no speedtest binary pinned — set KOBOX_SPEEDTEST_URL and KOBOX_SPEEDTEST_SHA256',
+        reason: 'no speedtest binary pinned: set KOBOX_SPEEDTEST_URL and KOBOX_SPEEDTEST_SHA256',
       };
     }
     const marker = await host.readFile(SPEEDTEST_MARKER);

@@ -171,7 +171,7 @@ export class ImportFromMysb {
     await this.deps.outbox.enqueue(
       {
         recipient: mapped.email.value,
-        subject: 'Your KoBox seedbox is ready — set your password',
+        subject: 'Your KoBox seedbox is ready: set your password',
         body: welcomeBody(mapped.username.value, tempPassword),
       },
       this.deps.clock(),

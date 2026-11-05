@@ -429,7 +429,7 @@ describe('ImportFromMysb', () => {
       await world.importer.execute({ apply: true });
 
       const [mail] = await world.outbox.listRecent(1);
-      expect(mail?.subject).toMatch(/^Your KoBox seedbox is ready\b.*set your password$/);
+      expect(mail?.subject).toBe('Your KoBox seedbox is ready: set your password');
       expect(mail?.body).toBe(
         [
           'Hello alice,',

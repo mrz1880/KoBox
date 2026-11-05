@@ -309,7 +309,11 @@ describe('UpgradeRelease', () => {
     const w = world();
     await w.releases.record('v1.5.0', '/opt/kobox/releases/old', NOW);
 
-    await expect(w.upgrade.execute({ to: 'v2.0.0', now: NOW })).rejects.toThrow(/staged/);
+    await expect(w.upgrade.execute({ to: 'v2.0.0', now: NOW })).rejects.toThrow(
+      new UpgradeError(
+        'a staged release already exists (v1.5.0 at /opt/kobox/releases/old): a previous upgrade crashed; remove the worktree and mark the row failed before retrying',
+      ),
+    );
   });
 
   it('should_rollback_to_the_previous_release', async () => {
@@ -349,7 +353,9 @@ describe('UpgradeRelease', () => {
   it('should_refuse_rollback_without_a_previous_release', async () => {
     const w = world();
 
-    await expect(w.upgrade.rollback({ now: NOW })).rejects.toThrow(/previous/);
+    await expect(w.upgrade.rollback({ now: NOW })).rejects.toThrow(
+      new UpgradeError('no previous release recorded: nothing to roll back to'),
+    );
   });
 });
 
@@ -407,7 +413,9 @@ describe('UpgradeRelease edges', () => {
     w.git.refExists = () => Promise.resolve(false);
 
     await expect(w.upgrade.execute({ to: 'v9.9.9', now: NOW })).rejects.toThrow(
-      'ref "v9.9.9" not found in /opt/KoBox',
+      new UpgradeError(
+        'ref "v9.9.9" not found in /opt/KoBox: push the tag to the remote or check the spelling',
+      ),
     );
     expect(w.host.built).toEqual([]);
   });
@@ -434,7 +442,11 @@ describe('UpgradeRelease edges', () => {
 
     await expect(
       w.upgrade.execute({ to: 'v3.0.0', now: '2026-07-25 11:00:00' }),
-    ).rejects.toThrow(/^worker did not come up on v3\.0\.0 .* reverted to the previous release \(DB backup at \/var\/backups\/kobox\/x\)$/);
+    ).rejects.toThrow(
+      new UpgradeError(
+        'worker did not come up on v3.0.0, reverted to the previous release (DB backup at /var/backups/kobox/x)',
+      ),
+    );
     expect((await w.releases.findByState('current'))?.ref).toBe('v2.0.0');
     expect(await w.releases.findByState('previous')).toBeUndefined();
   });
@@ -444,7 +456,9 @@ describe('UpgradeRelease edges', () => {
     w.host.failVerifyAlways = true;
 
     await expect(w.upgrade.execute({ to: 'v2.0.0', now: NOW })).rejects.toThrow(
-      'worker did not come up on v2.0.0 AND the revert restart failed too',
+      new UpgradeError(
+        'worker did not come up on v2.0.0 AND the revert restart failed too: inspect journalctl -u kobox-worker NOW (DB backup at /var/backups/kobox/x)',
+      ),
     );
     expect(w.host.current).toBe('/opt/KoBox/kobox');
     expect(w.host.portalRestarts).toHaveLength(1);
