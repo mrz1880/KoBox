@@ -944,6 +944,27 @@ describe('where a member sends their files', () => {
     expect(response.headers.location).toMatch(/[?&]job=1(&|$)/);
   });
 
+  // like saving: the member asked a question, the page waits for its answer
+  // rather than leaving them to reload it
+  it('should_wait_for_the_test_the_member_asked_for_and_show_what_it_found', async () => {
+    await world.server.inject({
+      method: 'POST',
+      url: '/sync/destination',
+      headers: { cookie: user.cookie, 'content-type': 'application/x-www-form-urlencoded' },
+      payload: form({ _csrf: user.csrf, ...aForm }),
+    });
+    world.queue.workerLeavesJobs('running');
+
+    const response = await world.server.inject({
+      method: 'POST',
+      url: '/sync/destination/test',
+      headers: { cookie: user.cookie, 'content-type': 'application/x-www-form-urlencoded' },
+      payload: form({ _csrf: user.csrf }),
+    });
+
+    expect(response.headers.location).toMatch(/[?&]job=\d+(&|$)/);
+  });
+
   it('should_never_let_a_member_configure_another_members_destination', async () => {
     await world.server.inject({
       method: 'POST',
