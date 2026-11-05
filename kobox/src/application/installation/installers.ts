@@ -50,6 +50,7 @@ import {
   renderSmbConf,
   renderSshdDropin,
   renderSysctlTweaks,
+  SSHD_DROPIN_PATH,
   KERNEL_TUNING_PATH,
   MEMBER_PORT_RESERVATION_PATH,
   renderWorkerEnv,
@@ -199,7 +200,6 @@ const WORKER_UNIT = '/etc/systemd/system/kobox-worker.service';
 const FIREWALL_UNIT = '/etc/systemd/system/kobox-firewall.service';
 const WORKER_ENV = '/etc/kobox/worker.env';
 const PORTAL_ENV = '/etc/kobox/portal.env';
-const SSHD_DROPIN = '/etc/ssh/sshd_config.d/90-kobox.conf';
 const NGINX_VHOST = '/etc/nginx/conf.d/kobox.conf';
 const HTPASSWD = '/etc/nginx/kobox.htpasswd';
 const NEXTCLOUD_DIR = '/var/www/nextcloud';
@@ -344,7 +344,7 @@ class SshdInstaller implements ComponentInstaller {
   }
 
   async uninstall(): Promise<void> {
-    await this.ctx.host.removeFile(SSHD_DROPIN);
+    await this.ctx.host.removeFile(SSHD_DROPIN_PATH);
     await this.ctx.systemd.reloadOrRestart('ssh');
   }
 }

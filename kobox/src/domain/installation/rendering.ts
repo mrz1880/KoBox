@@ -256,12 +256,14 @@ export function renderPortalEnv(vars: ReadonlyMap<string, string>): RenderedFile
   };
 }
 
+export const SSHD_DROPIN_PATH = '/etc/ssh/sshd_config.d/90-kobox.conf';
+
 // Hardening that can NEVER lock anyone out: root keeps key access, users keep
 // passwords (SFTP chroot parity with the legacy). A Port line is emitted only
 // when the operator moved SSH — the drop-in must not fight the stock config.
 export function renderSshdDropin(sshPort: number): RenderedFile {
   return {
-    path: '/etc/ssh/sshd_config.d/90-kobox.conf',
+    path: SSHD_DROPIN_PATH,
     content: [
       MANAGED_HEADER,
       ...(sshPort === 22 ? [] : [`Port ${String(sshPort)}`]),
