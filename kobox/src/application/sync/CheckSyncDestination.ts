@@ -40,7 +40,7 @@ export class CheckSyncDestination {
     destination: SyncDestination,
     trust: HostKeyTrust,
   ): Promise<ProbeOutcome> {
-    // Two failures, two different things to do about them — so two catches. One
+    // Two failures, two different things to do about them, so two catches. One
     // catch around both would tell a member to retype a password that is
     // perfectly fine, and send them chasing the wrong thing.
     let password: RemotePassword;
