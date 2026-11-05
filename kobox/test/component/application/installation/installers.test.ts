@@ -12,6 +12,10 @@ import {
   type InstallerContext,
 } from '../../../../src/application/installation/installers.js';
 import type { CertbotRequest } from '../../../../src/application/maintenance/CertbotPort.js';
+import { RenderFail2ban } from '../../../../src/application/security/RenderFail2ban.js';
+import type { SecuritySettings } from '../../../../src/application/security/settings.js';
+import { InMemoryUserAddressRepository } from '../../../../src/infrastructure/persistence/InMemoryUserAddressRepository.js';
+import { FakeNetworkServices } from '../../../../src/infrastructure/system/fakes/FakeNetworkServices.js';
 import type { SystemFacts } from '../../../../src/domain/installation/ports.js';
 import { Cidr } from '../../../../src/domain/security/Cidr.js';
 import type { HostKeyPairPort } from '../../../../src/domain/security/ports.js';
@@ -43,6 +47,7 @@ interface World {
   readonly hostKeys: FakeHostKeyPair;
   readonly certbot: FakeCertbot;
   readonly nextcloud: RecordingNextcloud;
+  readonly security: SecuritySettings;
   readonly installers: ReadonlyMap<string, ComponentInstaller>;
 }
 
@@ -181,6 +186,7 @@ function buildWorld(overrides?: {
   };
   return {
     packages, host, systemd, checks, pki, ipset, hostKeys, certbot, nextcloud,
+    security: ctx.security,
     installers: buildInstallers(ctx),
   };
 }
@@ -1864,6 +1870,7 @@ describe('fail2ban installer: outcome and uninstall', () => {
       '/etc/fail2ban/jail.d/kobox.local',
       '/etc/fail2ban/filter.d/kobox-publickey-flood.conf',
       '/etc/fail2ban/filter.d/kobox-portal.conf',
+      '/etc/fail2ban/filter.d/kobox-nextcloud.conf',
     ];
     await world.host.apply(
       managed.map((path) => ({ path, content: '[x]', mode: '0644', owner: 'root', group: 'root' })),
@@ -1875,6 +1882,22 @@ describe('fail2ban installer: outcome and uninstall', () => {
     for (const path of managed) {
       expect(world.host.contentAt(path), path).toBeUndefined();
     }
+  });
+
+  it('should_leave_none_of_the_files_the_fail2ban_render_wrote_after_uninstall', async () => {
+    // the real render-fail2ban job writes onto the same host the installer cleans
+    const render = new RenderFail2ban({
+      addresses: new InMemoryUserAddressRepository(),
+      files: world.host,
+      reload: new FakeNetworkServices(),
+      settings: world.security,
+    });
+    const { changedFiles } = await render.execute();
+
+    await installer(world, 'fail2ban').uninstall();
+
+    const leftBehind = changedFiles.filter((path) => world.host.contentAt(path) !== undefined);
+    expect(leftBehind).toEqual([]);
   });
 });
 
