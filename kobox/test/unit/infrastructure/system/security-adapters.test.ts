@@ -21,6 +21,7 @@ import { FakeHealthProbe } from '../../../../src/infrastructure/system/fakes/Fak
 import { Bandwidth } from '../../../../src/domain/security/Bandwidth.js';
 import { NetworkServiceAdapter } from '../../../../src/infrastructure/system/NetworkServiceAdapter.js';
 import { Username } from '../../../../src/domain/user/Username.js';
+import { pino } from 'pino';
 import { createLogger } from '../../../../src/infrastructure/logging/logger.js';
 
 process.env.KOBOX_LOG_LEVEL = 'silent';
@@ -242,6 +243,18 @@ describe('NetworkServiceAdapter', () => {
     expect(reloadCalls).toEqual([]);
   });
 
+  it('should_log_each_absent_unit_it_skips', async () => {
+    const lines: string[] = [];
+    const capturing = pino({ name: 'test' }, { write: (line: string) => lines.push(line) });
+    const adapter = new NetworkServiceAdapter(new PrefixRunner(), capturing);
+
+    await adapter.reloadFail2ban();
+
+    expect(lines.map((line) => JSON.parse(line) as { unit: string; msg: string })).toEqual([
+      expect.objectContaining({ unit: 'fail2ban', msg: 'unit not installed, reload skipped' }),
+    ]);
+  });
+
   it('should_escalate_when_systemctl_itself_fails_rather_than_treat_it_as_absent', async () => {
     // absence is the ONE tolerated case; a dbus failure is not absence
     const runner = new PrefixRunner();
@@ -373,7 +386,9 @@ describe('TcShapingAdapter', () => {
     const runner = new PrefixRunner();
     const shaper = new TcShapingAdapter(runner, 'eth0');
 
-    await expect(shaper.throttle(alice, 70000, Bandwidth.mbit(5))).rejects.toThrow('65534');
+    await expect(shaper.throttle(alice, 70000, Bandwidth.mbit(5))).rejects.toThrow(
+      'uid 70000 exceeds the tc 16-bit classid space (max 65534): cannot shape this user',
+    );
     expect(runner.commandLines()).toEqual([]);
   });
 

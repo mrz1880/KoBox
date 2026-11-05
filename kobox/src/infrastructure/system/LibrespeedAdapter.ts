@@ -36,7 +36,7 @@ export class LibrespeedAdapter implements SpeedtestPort {
       // way the operator needs one actionable line, not a spawn stack
       throw new SpeedtestUnavailableError(
         error instanceof Error && error.message.includes('ENOENT')
-          ? `${this.binary} is not installed — pin the speedtest component and re-run kobox install`
+          ? `${this.binary} is not installed: pin the speedtest component and re-run kobox install`
           : 'the measurement did not complete',
       );
     }

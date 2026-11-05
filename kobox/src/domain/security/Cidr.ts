@@ -45,7 +45,7 @@ export class Cidr {
     const mask = maskOf(prefix);
     const network = ipToInt(address);
     if (((network & mask) >>> 0) !== network) {
-      throw new InvalidCidrError(raw, 'host bits set — not a canonical network address');
+      throw new InvalidCidrError(raw, 'host bits set, not a canonical network address');
     }
     return new Cidr(`${address}/${String(prefix)}`, network, mask);
   }

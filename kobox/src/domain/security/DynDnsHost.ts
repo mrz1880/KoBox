@@ -26,7 +26,7 @@ export class DynDnsHost {
       throw new InvalidDynDnsHostError(raw, 'contains characters unsafe for a shell');
     }
     if (/^\d+\.\d+\.\d+\.\d+$/.test(normalized)) {
-      throw new InvalidDynDnsHostError(raw, 'IPv4 literal — use a static address instead');
+      throw new InvalidDynDnsHostError(raw, 'IPv4 literal, use a static address instead');
     }
     const labels = normalized.split('.');
     if (labels.length < 2) {

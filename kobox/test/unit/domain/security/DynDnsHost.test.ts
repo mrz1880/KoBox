@@ -29,6 +29,9 @@ describe('DynDnsHost', () => {
 
   it('should_reject_ipv4_literals_a_dyndns_entry_must_be_a_name', () => {
     expect(() => DynDnsHost.parse('192.0.2.10')).toThrow(InvalidDynDnsHostError);
+    expect(() => DynDnsHost.parse('192.0.2.10')).toThrow(
+      'invalid dyndns host "192.0.2.10": IPv4 literal, use a static address instead',
+    );
   });
 
   it('should_reject_single_label_hosts', () => {

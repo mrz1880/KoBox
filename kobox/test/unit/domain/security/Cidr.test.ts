@@ -29,6 +29,9 @@ describe('Cidr', () => {
   it('should_reject_non_canonical_cidrs_with_host_bits_set', () => {
     expect(() => Cidr.parse('192.0.2.1/24')).toThrow(InvalidCidrError);
     expect(() => Cidr.parse('10.0.0.1/8')).toThrow(InvalidCidrError);
+    expect(() => Cidr.parse('192.0.2.1/24')).toThrow(
+      'invalid CIDR "192.0.2.1/24": host bits set, not a canonical network address',
+    );
   });
 
   it('should_reject_malformed_prefixes_and_addresses', () => {

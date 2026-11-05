@@ -88,7 +88,7 @@ export class NetworkServiceAdapter implements NetworkServicePort, NetworkService
           `strict services mode: unit ${unit} is not installed on a box kobox install provisioned`,
         );
       }
-      this.logger.warn({ unit }, 'unit not installed — reload skipped');
+      this.logger.warn({ unit }, 'unit not installed, reload skipped');
     }
     return exists;
   }
