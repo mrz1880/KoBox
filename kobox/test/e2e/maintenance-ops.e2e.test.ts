@@ -51,21 +51,42 @@ function openDb(): KoboxDatabase {
   return KoboxDatabase.open(env.KOBOX_DB ?? '');
 }
 
-function jobCounts(): Map<string, { pending: number; failed: number; done: number }> {
+function jobCounts(): Map<string, { pending: number; done: number }> {
   const db = openDb();
   const rows = db.raw
     .prepare('SELECT type, status, COUNT(*) AS n FROM jobs GROUP BY type, status')
     .all() as { type: string; status: string; n: number }[];
   db.close();
-  const counts = new Map<string, { pending: number; failed: number; done: number }>();
+  const counts = new Map<string, { pending: number; done: number }>();
   for (const row of rows) {
-    const entry = counts.get(row.type) ?? { pending: 0, failed: 0, done: 0 };
+    const entry = counts.get(row.type) ?? { pending: 0, done: 0 };
     if (row.status === 'pending') entry.pending += row.n;
-    if (row.status === 'failed') entry.failed += row.n;
     if (row.status === 'done') entry.done += row.n;
     counts.set(row.type, entry);
   }
   return counts;
+}
+
+interface FailedJob {
+  readonly id: number;
+  readonly type: string;
+  readonly error: string | null;
+}
+
+// The failed jobs with the error the worker stored, so a red run says which
+// job broke and why instead of a bare count.
+function failedJobs(): FailedJob[] {
+  const db = openDb();
+  const rows = db.raw
+    .prepare("SELECT id, type, error FROM jobs WHERE status = 'failed' ORDER BY id")
+    .all() as FailedJob[];
+  db.close();
+  return rows;
+}
+
+function describeFailedJobs(failed: readonly FailedJob[]): string {
+  const lines = failed.map((job) => `#${job.id} ${job.type}: ${job.error ?? '(no error stored)'}`);
+  return `failed jobs:\n${lines.join('\n')}`;
 }
 
 async function waitFor(what: string, check: () => boolean, timeoutMs = 120_000): Promise<void> {
@@ -274,9 +295,8 @@ describe.skipIf(!onDebianAsRoot)('E2E: maintenance keeps the installed box alive
         const after = jobCounts();
         return [...after.values()].every((entry) => entry.pending === 0);
       }, 180_000);
-      for (const [type, entry] of jobCounts()) {
-        expect(entry.failed, `${type} failed`).toBe(0);
-      }
+      const failed = failedJobs();
+      expect(failed, describeFailedJobs(failed)).toEqual([]);
     },
     300_000,
   );
