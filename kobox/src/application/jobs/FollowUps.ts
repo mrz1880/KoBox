@@ -1,6 +1,7 @@
 import type { HostnameDirtyReport } from '../security/ManageUserHostname.js';
 import type { VpnUserReport } from '../security/ProvisionVpnUser.js';
 import type { ResolveDynDnsReport } from '../security/ResolveDynDns.js';
+import type { Departure } from '../../domain/sync/Departure.js';
 import type { CheckReport } from '../sync/CheckSyncDestination.js';
 import type { QueueVerdict } from '../sync/QueueFinishedDownload.js';
 import type { QueueFolderBacklogReport } from '../sync/QueueFolderBacklog.js';
@@ -24,6 +25,8 @@ interface JobReports {
   readonly 'queue-folder-backlog': QueueFolderBacklogReport;
   readonly 'requeue-transfer': RequeueOutcome;
   readonly 'check-sync-destination': CheckReport;
+  // when what already waits in the folder leaves under its new mode
+  readonly 'set-category-sync-mode': Departure;
   // the verdict on a finished download in a folder; none for any other event
   readonly 'torrent-event': QueueVerdict | undefined;
   readonly 'discover-tracker': DiscoveryReport;
@@ -182,6 +185,12 @@ export function followUpsOf(completed: CompletedJob): readonly FollowUp[] {
         completed.report === 'straight-away',
         sendTransfersOf(completed.payload.username),
       );
+    // what waited for the hour in a folder now sending straight away leaves now
+    case 'set-category-sync-mode':
+      return onlyIf(
+        completed.report === 'straight-away',
+        sendTransfersOf(completed.payload.username),
+      );
     // a working check put back what failed for want of it
     case 'check-sync-destination':
       return onlyIf(completed.report.sendNow, sendTransfersOf(completed.payload.username));
@@ -253,7 +262,6 @@ export function followUpsOf(completed: CompletedJob): readonly FollowUp[] {
     case 'resume-user':
     case 'restart-rtorrent':
     case 'render-rtorrent-config':
-    case 'set-category-sync-mode':
     case 'send-pending-transfers':
     case 'set-sync-disabled':
     case 'set-allow-public-tracker':

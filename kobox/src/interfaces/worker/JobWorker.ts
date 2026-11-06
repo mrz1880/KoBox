@@ -227,13 +227,14 @@ export class JobWorker {
         );
         return { ...job, report };
       }
-      case 'set-category-sync-mode':
-        await this.deps.torrents.setCategorySyncMode.execute({
+      case 'set-category-sync-mode': {
+        const report = await this.deps.torrents.setCategorySyncMode.execute({
           username: Username.parse(job.payload.username),
           label: Label.parse(job.payload.label),
           mode: SyncMode.parse(job.payload.mode),
         });
-        return job;
+        return { ...job, report };
+      }
       case 'set-sync-disabled':
         await this.deps.torrents.setSyncDisabled.execute({
           username: Username.parse(job.payload.username),
