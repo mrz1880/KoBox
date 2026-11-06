@@ -528,7 +528,8 @@ and a **Try again** button that puts it back in the queue.
   hour; the hour is still theirs, and nothing writes into anybody's crontab.
 - **"Send it straight away"** does not wait for that: a download finishing in
   such a folder, the member sending what one already holds, a **Try again** on
-  one of its transfers, or a working connection check putting one back chains a
+  one of its transfers, a working connection check putting one back, or a folder
+  switched to it (what already waited there for the hour leaves now) chains a
   pass for that member alone, deduplicated so several downloads finishing at once
   do not stack several passes over the same queue. That pass carries only the
   transfers of folders that send straight away: what a "bit later" folder holds

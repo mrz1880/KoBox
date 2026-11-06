@@ -937,6 +937,34 @@ describe('CLI enqueue -> root worker loop (the privilege seam)', () => {
     expect((await world.syncTransfers.findById(episode))?.state).toBe('waiting');
   });
 
+  // a member switching a folder to "straight away" expects what already waits
+  // there to leave now, not at their send hour
+  it('should_send_what_waits_in_a_folder_switched_to_straight_away', async () => {
+    await enqueueCreateAlice();
+    await world.worker.drain();
+    await world.queue.enqueue(parseJob('add-watch-dir', { username: 'alice', label: 'Films' }));
+    await world.queue.enqueue(
+      parseJob('set-category-sync-mode', { username: 'alice', label: 'Films', mode: 'scheduled' }),
+    );
+    await world.worker.drain();
+    const waiting = await world.syncTransfers.queue(
+      SyncTransfer.queue({
+        username: alice,
+        label: Label.parse('Films'),
+        source: LocalPath.parse('/home/alice/rtorrent/complete/Films/Some.Film.mkv'),
+        queuedAt: '2026-11-04 09:00:00',
+      }),
+    );
+    await world.syncDestinations.save(aliceDestination());
+    await world.queue.enqueue(
+      parseJob('set-category-sync-mode', { username: 'alice', label: 'Films', mode: 'immediate' }),
+    );
+
+    await world.worker.drain();
+
+    expect((await world.syncTransfers.findById(waiting?.id ?? -1))?.state).toBe('sent');
+  });
+
   it('should_suspend_then_resume_via_jobs', async () => {
     await enqueueCreateAlice();
     await world.queue.enqueue(buildJob.suspendUser({ username: 'alice' }));

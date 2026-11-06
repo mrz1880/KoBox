@@ -125,6 +125,24 @@ const cases: readonly (readonly [string, CompletedJob, readonly FollowUp[]])[] =
     [],
   ],
   [
+    'a folder switched to straight away: what waits there is sent at once',
+    {
+      type: 'set-category-sync-mode',
+      payload: { ...films, mode: 'immediate' },
+      report: 'straight-away',
+    },
+    [sendAlicesTransfers],
+  ],
+  [
+    'a folder switched to a bit later: left to the member hour',
+    {
+      type: 'set-category-sync-mode',
+      payload: { ...films, mode: 'scheduled' },
+      report: 'at-send-hour',
+    },
+    [],
+  ],
+  [
     'a working check that put back a straight-away transfer: sent at once',
     {
       type: 'check-sync-destination',
