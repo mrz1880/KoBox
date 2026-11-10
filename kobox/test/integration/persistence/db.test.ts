@@ -183,8 +183,8 @@ describe('KoboxDatabase', () => {
     const after = await preferences.find(alice);
     db.close();
 
-    expect(before).toEqual({ automatic: 'off', warned: false });
-    expect(after).toEqual({ automatic: 'sentOnly', warned: false });
+    expect(before).toEqual({ automatic: 'off', timing: 'whenSpaceRunsShort', warned: false });
+    expect(after).toEqual({ automatic: 'sentOnly', timing: 'whenSpaceRunsShort', warned: false });
   });
 
   it('should_keep_every_member_of_a_box_from_before_own_seed_rules_on_the_box_rule', async () => {
@@ -208,7 +208,26 @@ describe('KoboxDatabase', () => {
     db.close();
 
     expect(rule).toEqual({ kind: 'box' });
-    expect(kept).toEqual({ automatic: 'sentOnly', warned: true });
+    expect(kept).toEqual({ automatic: 'sentOnly', timing: 'whenSpaceRunsShort', warned: true });
+  });
+
+  it('should_clean_only_when_space_runs_short_for_a_member_from_before_the_choice_of_when', async () => {
+    const old = boxBefore('0042_cleanup-timing');
+    old
+      .prepare(
+        "INSERT INTO users (username, email, quota_bytes, scgi_port, rtorrent_port, proxy_port, status) VALUES ('alice', 'alice@example.org', 1, 51101, 45000, 8080, 'active')",
+      )
+      .run();
+    old
+      .prepare("INSERT INTO space_preferences (username, automatic, warned) VALUES ('alice', 'sentOrSeeded', 0)")
+      .run();
+    old.close();
+
+    const db = KoboxDatabase.open(join(dir, 'kobox.db'));
+    const kept = await new SqliteSpacePreferenceRepository(db).find(Username.parse('alice'));
+    db.close();
+
+    expect(kept).toEqual({ automatic: 'sentOrSeeded', timing: 'whenSpaceRunsShort', warned: false });
   });
 
   it('should_keep_the_report_of_a_box_from_before_one_report_per_trigger', async () => {

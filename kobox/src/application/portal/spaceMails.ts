@@ -120,7 +120,9 @@ const AUTOMATIC_CLEANUP: Record<MailLanguage, CleanupMailText> = {
     lines: ({ username, report, url }, language) => [
       `Bonjour ${username},`,
       '',
-      'Ta seedbox avait dépassé 90 % de ton espace.',
+      report.trigger === 'ruleMet'
+        ? 'Des torrents remplissaient ta règle de nettoyage.'
+        : 'Ta seedbox avait dépassé 90 % de ton espace.',
       ...(report.deleted.length === 0
         ? [
             "Comme tu l'as choisi, KoBox devait faire de la place, mais n'a finalement rien supprimé :",
@@ -146,7 +148,9 @@ const AUTOMATIC_CLEANUP: Record<MailLanguage, CleanupMailText> = {
     lines: ({ username, report, url }, language) => [
       `Hello ${username},`,
       '',
-      'Your seedbox went past 90 % of your space.',
+      report.trigger === 'ruleMet'
+        ? 'Some torrents met your cleanup rule.'
+        : 'Your seedbox went past 90 % of your space.',
       ...(report.deleted.length === 0
         ? [
             'As you chose, KoBox was to make room, but deleted nothing in the end:',

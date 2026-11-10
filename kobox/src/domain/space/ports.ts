@@ -1,4 +1,5 @@
 import type { AutomaticCleanup } from './AutomaticCleanup.js';
+import type { CleanupTiming } from './CleanupTiming.js';
 import type { CleanupCandidate } from './CleanupCandidate.js';
 import type { CleanupReport, CleanupTrigger } from './CleanupReport.js';
 import type { FinishedTorrent } from './FinishedTorrent.js';
@@ -62,20 +63,23 @@ export interface CleanupReportRepository {
 }
 
 // What a member chose for their space and where the critical-line mail stands:
-// whether KoBox may clean on its own, and whether the member was already
+// what KoBox may clean on its own and when, and whether the member was already
 // warned during the climb they are in.
 export interface SpacePreferences {
   readonly automatic: AutomaticCleanup;
+  readonly timing: CleanupTiming;
   readonly warned: boolean;
 }
 
 // Each member's space preferences. A member who never chose anything has
-// automatic cleanup off, was never warned, and keeps the box's seed rule. Each
+// automatic cleanup off (and, once on, only when space runs short), was never
+// warned, and keeps the box's seed rule. Each
 // is written apart, leaving the others as they were: the member makes the
 // choices, the hourly pass records the warning.
 export interface SpacePreferenceRepository {
   find(username: Username): Promise<SpacePreferences>;
   chooseAutomatic(username: Username, automatic: AutomaticCleanup): Promise<void>;
+  chooseTiming(username: Username, timing: CleanupTiming): Promise<void>;
   recordWarned(username: Username, warned: boolean): Promise<void>;
   findSeedRule(username: Username): Promise<SeedRuleChoice>;
   chooseSeedRule(username: Username, choice: SeedRuleChoice): Promise<void>;

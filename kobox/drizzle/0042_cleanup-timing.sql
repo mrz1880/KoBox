@@ -1,0 +1,1 @@
+ALTER TABLE `space_preferences` ADD `automatic_timing` text DEFAULT 'whenSpaceRunsShort' NOT NULL;

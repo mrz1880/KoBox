@@ -97,9 +97,10 @@ export class CleanUpSpace {
       deleted.push({ name: candidate.name, size: candidate.size });
     }
     const report = CleanupReport.of({ deleted, skipped, at, trigger: command.trigger });
-    await this.deps.reports.save(command.username, report);
-    // the member did not click anything: they are told what went
-    if (command.trigger === 'automatic') {
+    if (report.isWorthKeeping) {
+      await this.deps.reports.save(command.username, report);
+    }
+    if (report.isMailedToTheMember) {
       await this.mailer.automaticCleanup(command.username, report);
     }
     const used = await this.deps.quota.getUsage(command.username);

@@ -1,5 +1,6 @@
 import { eq } from 'drizzle-orm';
 import { parseAutomaticCleanup, type AutomaticCleanup } from '../../domain/space/AutomaticCleanup.js';
+import { parseCleanupTiming, type CleanupTiming } from '../../domain/space/CleanupTiming.js';
 import type { SpacePreferenceRepository, SpacePreferences } from '../../domain/space/ports.js';
 import { SeedRule } from '../../domain/space/SeedRule.js';
 import type { SeedRuleChoice } from '../../domain/space/SeedRuleChoice.js';
@@ -9,7 +10,11 @@ import { fromRatioMilli, toRatioMilli } from './ratioMilli.js';
 import { spacePreferences } from './schema.js';
 
 // A member with no row yet: the column defaults say the same.
-const UNTOUCHED: SpacePreferences = { automatic: 'off', warned: false };
+const UNTOUCHED: SpacePreferences = {
+  automatic: 'off',
+  timing: 'whenSpaceRunsShort',
+  warned: false,
+};
 
 // The own-rule columns as the choice reads them: no days is the box's rule.
 interface OwnRuleColumns {
@@ -49,12 +54,20 @@ export class SqliteSpacePreferenceRepository implements SpacePreferenceRepositor
     return Promise.resolve(
       row === undefined
         ? UNTOUCHED
-        : { automatic: parseAutomaticCleanup(row.automatic), warned: row.warned === 1 },
+        : {
+            automatic: parseAutomaticCleanup(row.automatic),
+            timing: parseCleanupTiming(row.automaticTiming),
+            warned: row.warned === 1,
+          },
     );
   }
 
   chooseAutomatic(username: Username, automatic: AutomaticCleanup): Promise<void> {
     return this.upsert(username, { automatic });
+  }
+
+  chooseTiming(username: Username, timing: CleanupTiming): Promise<void> {
+    return this.upsert(username, { automaticTiming: timing });
   }
 
   recordWarned(username: Username, warned: boolean): Promise<void> {
@@ -82,6 +95,7 @@ export class SqliteSpacePreferenceRepository implements SpacePreferenceRepositor
     username: Username,
     set:
       | { readonly automatic: AutomaticCleanup }
+      | { readonly automaticTiming: CleanupTiming }
       | { readonly warned: number }
       | OwnRuleColumns,
   ): Promise<void> {

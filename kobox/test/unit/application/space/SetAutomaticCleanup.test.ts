@@ -26,6 +26,10 @@ describe('SetAutomaticCleanup', () => {
 
     await setAutomatic.execute({ username: alice, automatic: 'sentOrSeeded' });
 
-    expect(await preferences.find(alice)).toEqual({ automatic: 'sentOrSeeded', warned: false });
+    expect(await preferences.find(alice)).toEqual({
+      automatic: 'sentOrSeeded',
+      timing: 'whenSpaceRunsShort',
+      warned: false,
+    });
   });
 });

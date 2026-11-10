@@ -1,9 +1,14 @@
 import type { AutomaticCleanup } from '../../domain/space/AutomaticCleanup.js';
+import type { CleanupTiming } from '../../domain/space/CleanupTiming.js';
 import type { SpacePreferenceRepository, SpacePreferences } from '../../domain/space/ports.js';
 import type { SeedRuleChoice } from '../../domain/space/SeedRuleChoice.js';
 import type { Username } from '../../domain/user/Username.js';
 
-const UNTOUCHED: SpacePreferences = { automatic: 'off', warned: false };
+const UNTOUCHED: SpacePreferences = {
+  automatic: 'off',
+  timing: 'whenSpaceRunsShort',
+  warned: false,
+};
 
 export class InMemorySpacePreferenceRepository implements SpacePreferenceRepository {
   private readonly preferences = new Map<string, SpacePreferences>();
@@ -15,6 +20,10 @@ export class InMemorySpacePreferenceRepository implements SpacePreferenceReposit
 
   async chooseAutomatic(username: Username, automatic: AutomaticCleanup): Promise<void> {
     this.preferences.set(username.value, { ...(await this.find(username)), automatic });
+  }
+
+  async chooseTiming(username: Username, timing: CleanupTiming): Promise<void> {
+    this.preferences.set(username.value, { ...(await this.find(username)), timing });
   }
 
   async recordWarned(username: Username, warned: boolean): Promise<void> {
