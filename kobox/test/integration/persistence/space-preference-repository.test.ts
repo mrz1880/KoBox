@@ -27,14 +27,14 @@ afterEach(() => {
 
 describe('SqliteSpacePreferenceRepository', () => {
   it('should_leave_automatic_cleanup_off_and_the_member_unwarned_until_anything_is_saved', async () => {
-    expect(await repo.find(alice)).toEqual({ automatic: 'off', warned: false });
+    expect(await repo.find(alice)).toEqual({ automatic: 'off', timing: 'whenSpaceRunsShort', warned: false });
   });
 
   it('should_remember_the_choice_a_member_made_for_them_alone', async () => {
     await repo.chooseAutomatic(alice, 'sentOrSeeded');
 
-    expect(await repo.find(alice)).toEqual({ automatic: 'sentOrSeeded', warned: false });
-    expect(await repo.find(bob)).toEqual({ automatic: 'off', warned: false });
+    expect(await repo.find(alice)).toEqual({ automatic: 'sentOrSeeded', timing: 'whenSpaceRunsShort', warned: false });
+    expect(await repo.find(bob)).toEqual({ automatic: 'off', timing: 'whenSpaceRunsShort', warned: false });
   });
 
   it('should_keep_the_choice_when_the_member_is_warned_and_the_warning_when_they_choose', async () => {
@@ -42,14 +42,26 @@ describe('SqliteSpacePreferenceRepository', () => {
     await repo.recordWarned(alice, true);
     await repo.chooseAutomatic(alice, 'off');
 
-    expect(await repo.find(alice)).toEqual({ automatic: 'off', warned: true });
+    expect(await repo.find(alice)).toEqual({ automatic: 'off', timing: 'whenSpaceRunsShort', warned: true });
+  });
+
+  it('should_remember_when_a_member_lets_kobox_clean_apart_from_what', async () => {
+    await repo.chooseAutomatic(alice, 'sentOnly');
+    await repo.chooseTiming(alice, 'onceRuleMet');
+    await repo.chooseAutomatic(alice, 'sentOrSeeded');
+
+    expect(await repo.find(alice)).toEqual({
+      automatic: 'sentOrSeeded',
+      timing: 'onceRuleMet',
+      warned: false,
+    });
   });
 
   it('should_forget_the_warning_once_the_member_went_back_under_the_line', async () => {
     await repo.recordWarned(alice, true);
     await repo.recordWarned(alice, false);
 
-    expect(await repo.find(alice)).toEqual({ automatic: 'off', warned: false });
+    expect(await repo.find(alice)).toEqual({ automatic: 'off', timing: 'whenSpaceRunsShort', warned: false });
   });
 
   it('should_judge_a_member_by_the_box_rule_until_they_set_their_own', async () => {
@@ -83,7 +95,7 @@ describe('SqliteSpacePreferenceRepository', () => {
     await repo.chooseSeedRule(alice, { kind: 'own', rule: SeedRule.of({ days: 14 }) });
     await repo.chooseAutomatic(alice, 'sentOrSeeded');
 
-    expect(await repo.find(alice)).toEqual({ automatic: 'sentOrSeeded', warned: true });
+    expect(await repo.find(alice)).toEqual({ automatic: 'sentOrSeeded', timing: 'whenSpaceRunsShort', warned: true });
     expect(await repo.findSeedRule(alice)).toEqual({ kind: 'own', rule: SeedRule.of({ days: 14 }) });
   });
 });

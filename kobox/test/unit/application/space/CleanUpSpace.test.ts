@@ -276,6 +276,32 @@ describe('CleanUpSpace', () => {
     expect(mails[0]?.body).toContain('13,0 Gio');
   });
 
+  // the member's space never ran short: the mail says why things went
+  it('should_mail_what_a_cleanup_by_the_members_rule_deleted_without_speaking_of_space', async () => {
+    world.torrents.holds(aliceScgi, [seededFilm()]);
+
+    await world.cleanUp.execute({ username: alice, infoHashes: [FILM], trigger: 'ruleMet' });
+
+    const [mail] = await world.outbox.listRecent(10);
+    expect(mail?.body).toContain('Example Film');
+    expect(mail?.body).toContain('règle de nettoyage');
+    expect(mail?.body).not.toContain('90 %');
+  });
+
+  // tried again every hour, a cleanup that deleted nothing would mail as
+  // often, and hide what the last one deleted
+  it('should_neither_mail_nor_keep_a_cleanup_by_the_members_rule_that_deleted_nothing', async () => {
+    world.torrents.holds(aliceScgi, [seededFilm()]);
+    await world.cleanUp.execute({ username: alice, infoHashes: [FILM], trigger: 'ruleMet' });
+    world.torrents.holds(aliceScgi, [freshFilm()]);
+
+    await world.cleanUp.execute({ username: alice, infoHashes: [FILM], trigger: 'ruleMet' });
+
+    const kept = await world.reports.findTriggeredBy(alice, 'ruleMet');
+    expect(kept?.deleted.map((line) => line.name)).toEqual(['Example Film']);
+    expect(await world.outbox.listRecent(10)).toHaveLength(1);
+  });
+
   // its files are never removed under a torrent rTorrent still holds
   it('should_leave_the_files_of_a_torrent_rtorrent_refused_to_drop_and_go_on', async () => {
     world.torrents.holds(aliceScgi, [seededFilm(), seededAlbum()]);

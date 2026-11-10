@@ -3,6 +3,7 @@ import { index, integer, sqliteTable, text, unique } from 'drizzle-orm/sqlite-co
 import { DEFAULT_TRANSFER_MAILS } from '../../domain/sync/TransferMails.js';
 import { AUTOMATIC_CLEANUPS } from '../../domain/space/AutomaticCleanup.js';
 import { CLEANUP_TRIGGERS } from '../../domain/space/CleanupReport.js';
+import { CLEANUP_TIMINGS } from '../../domain/space/CleanupTiming.js';
 
 export const users = sqliteTable('users', {
   id: integer('id').primaryKey({ autoIncrement: true }),
@@ -519,6 +520,9 @@ export const cleanupReports = sqliteTable(
 export const spacePreferences = sqliteTable('space_preferences', {
   username: text('username').primaryKey(),
   automatic: text('automatic', { enum: AUTOMATIC_CLEANUPS }).notNull().default('off'),
+  automaticTiming: text('automatic_timing', { enum: CLEANUP_TIMINGS })
+    .notNull()
+    .default('whenSpaceRunsShort'),
   warned: integer('warned').notNull().default(0),
   // the member's own seed rule: no days means the box's rule, no ratio with
   // days means only the days count

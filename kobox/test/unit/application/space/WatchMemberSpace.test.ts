@@ -21,6 +21,7 @@ const AT = '2026-11-20 12:00:00';
 const LATER = '2026-11-20 13:00:00';
 const ALLOWANCE = Quota.gib(100);
 const PAST_CRITICAL = Quota.gib(95);
+const RELAXED = Quota.gib(50);
 
 function candidate(hashChar: string, reason: CleanupReason, size: Quota): CleanupCandidate {
   return CleanupCandidate.restore({
@@ -173,6 +174,46 @@ describe('WatchMemberSpace', () => {
       { username: 'alice', infoHashes: ['A'.repeat(40)], trigger: 'automatic' },
       { username: 'alice', infoHashes: ['C'.repeat(40)], trigger: 'automatic' },
     ]);
+  });
+
+  // seen on 2026-11-10: a member with a 14-day rule kept torrents of 15 days,
+  // their space being far from the line
+  it('should_clean_up_what_the_rule_allows_at_once_for_a_member_who_chose_so', async () => {
+    await preferences.chooseAutomatic(alice.username, 'sentOrSeeded');
+    await preferences.chooseTiming(alice.username, 'onceRuleMet');
+    await snapshots.replace(
+      alice.username,
+      [candidate('A', 'alreadySent', Quota.gib(10)), candidate('B', 'seeded', Quota.gib(20))],
+      AT,
+      SeedRule.DEFAULT,
+    );
+
+    await watch.execute({ user: alice, used: RELAXED }, AT);
+
+    expect(queue.pending()).toEqual([
+      {
+        type: 'clean-up-space',
+        payload: {
+          username: 'alice',
+          infoHashes: ['B'.repeat(40), 'A'.repeat(40)],
+          trigger: 'ruleMet',
+        },
+      },
+    ]);
+    expect(await outbox.listRecent(10)).toEqual([]);
+  });
+
+  it('should_not_clean_up_twice_past_the_line_for_a_member_whose_rule_already_cleans', async () => {
+    await preferences.chooseAutomatic(alice.username, 'sentOnly');
+    await preferences.chooseTiming(alice.username, 'onceRuleMet');
+    await snapshots.replace(alice.username, [candidate('A', 'alreadySent', Quota.gib(10))], AT, SeedRule.DEFAULT);
+
+    await watch.execute({ user: alice, used: PAST_CRITICAL }, AT);
+
+    expect(queue.pending().map((job) => job.payload)).toEqual([
+      { username: 'alice', infoHashes: ['A'.repeat(40)], trigger: 'ruleMet' },
+    ]);
+    expect(await outbox.listRecent(10)).toEqual([]);
   });
 
   it('should_write_to_a_member_who_chose_english_in_english', async () => {

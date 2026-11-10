@@ -23,8 +23,9 @@ const IS_A_FAILURE: Readonly<Record<SkipReason, boolean>> = {
 };
 
 // Who started a cleanup: the member on their page, or the hourly pass on its
-// own for a member who turned automatic cleanup on.
-export const CLEANUP_TRIGGERS = ['member', 'automatic'] as const;
+// own for a member who turned automatic cleanup on, once their space ran short
+// (automatic) or as soon as torrents met their rule (ruleMet).
+export const CLEANUP_TRIGGERS = ['member', 'automatic', 'ruleMet'] as const;
 export type CleanupTrigger = (typeof CLEANUP_TRIGGERS)[number];
 
 // How long the home page shows what an automatic cleanup deleted: the member
@@ -66,6 +67,19 @@ export class CleanupReport {
     return (
       this.trigger === 'automatic' && now < shiftStamp(this.at, REPORT_SHOWN_FOR_DAYS * DAY_MS)
     );
+  }
+
+  // Whether it replaces the last report of its trigger. A cleanup by the
+  // member's rule is tried again every hour: one that deleted nothing would
+  // hide what the last one deleted.
+  get isWorthKeeping(): boolean {
+    return this.trigger !== 'ruleMet' || this.deleted.length > 0;
+  }
+
+  // Whether the member hears of it by mail: not of what they did on their
+  // page, of what KoBox did on its own whenever it is worth keeping.
+  get isMailedToTheMember(): boolean {
+    return this.trigger !== 'member' && this.isWorthKeeping;
   }
 
   // what the box could not remove: the member is told, and so is whoever
