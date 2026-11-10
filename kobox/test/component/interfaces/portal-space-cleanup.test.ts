@@ -443,6 +443,25 @@ describe('the home says what an automatic cleanup deleted', () => {
     expect(body).toContain('<td class="path">Old.Release</td>\n  <td class="num">50 GiB</td>');
   });
 
+  // the member's rule deleted more since: the home shows the latest
+  it('should_show_the_latest_of_what_kobox_deleted_on_its_own', async () => {
+    await world.cleanupReports.save(alice, automaticReport('2026-07-19 10:00:00'));
+    await world.cleanupReports.save(
+      alice,
+      CleanupReport.of({
+        deleted: [{ name: 'Ruled.Release', size: Quota.gib(5) }],
+        skipped: [],
+        at: '2026-07-24 10:00:00',
+        trigger: 'ruleMet',
+      }),
+    );
+
+    const body = await homeOf(member);
+
+    expect(body).toContain('<td class="path">Ruled.Release</td>');
+    expect(body).not.toContain('Old.Release');
+  });
+
   it('should_stop_showing_it_after_a_week', async () => {
     await world.cleanupReports.save(alice, automaticReport('2026-07-18 10:00:00'));
 
@@ -519,6 +538,26 @@ describe('automatic cleanup in My account', () => {
     expect(choiceOf(body)).toBe('off');
   });
 
+  function timingOf(body: string): string | undefined {
+    return /name="timing" value="(\w+)" checked/.exec(body)?.[1];
+  }
+
+  it('should_offer_when_kobox_cleans_only_once_space_runs_short_until_the_member_chooses', async () => {
+    const body = await accountOf(member);
+
+    expect([...body.matchAll(/name="timing" value="(\w+)"/g)].map(([, value]) => value)).toEqual([
+      'whenSpaceRunsShort',
+      'onceRuleMet',
+    ]);
+    expect(timingOf(body)).toBe('whenSpaceRunsShort');
+  });
+
+  it('should_tick_when_the_member_lets_kobox_clean', async () => {
+    await world.spacePreferences.chooseTiming(alice, 'onceRuleMet');
+
+    expect(timingOf(await accountOf(member))).toBe('onceRuleMet');
+  });
+
   it('should_tick_the_choice_the_member_made', async () => {
     await world.spacePreferences.chooseAutomatic(alice, 'sentOrSeeded');
 
@@ -533,13 +572,29 @@ describe('automatic cleanup in My account', () => {
   });
 
   it('should_hand_the_choice_to_the_worker_for_the_session_member', async () => {
-    const sent = await submit('/access/automatic-cleanup', `_csrf=${member.csrf}&automatic=sentOnly`);
+    const sent = await submit(
+      '/access/automatic-cleanup',
+      `_csrf=${member.csrf}&automatic=sentOnly&timing=onceRuleMet`,
+    );
 
     expect(sent.status).toBe(303);
     expect(sent.location).toBe(`/access?flash=${encodeURIComponent('Saved.')}`);
     expect(world.queue.jobs).toEqual([
-      { type: 'set-automatic-cleanup', payload: { username: 'alice', scope: 'sentOnly' } },
+      {
+        type: 'set-automatic-cleanup',
+        payload: { username: 'alice', scope: 'sentOnly', timing: 'onceRuleMet' },
+      },
     ]);
+  });
+
+  it('should_refuse_a_timing_the_page_does_not_offer_without_enqueueing', async () => {
+    const sent = await submit(
+      '/access/automatic-cleanup',
+      `_csrf=${member.csrf}&automatic=sentOnly&timing=weekly`,
+    );
+
+    expect(sent.status).toBe(400);
+    expect(world.queue.jobs).toEqual([]);
   });
 
   it('should_refuse_a_choice_the_page_does_not_offer_without_enqueueing', async () => {

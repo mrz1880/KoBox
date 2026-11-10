@@ -23,7 +23,8 @@ import type {
   SeedRuleRepository,
   SpacePreferenceRepository,
 } from '../../../domain/space/ports.js';
-import { AUTOMATIC_CLEANUPS } from '../../../domain/space/AutomaticCleanup.js';
+import { AUTOMATIC_CLEANUPS, type AutomaticCleanup } from '../../../domain/space/AutomaticCleanup.js';
+import { CLEANUP_TIMINGS, type CleanupTiming } from '../../../domain/space/CleanupTiming.js';
 import type { CleanupReport } from '../../../domain/space/CleanupReport.js';
 import { SEED_RULE_LIMITS } from '../../../domain/space/SeedRule.js';
 import { typedSeedRule } from '../typedSeedRule.js';
@@ -241,13 +242,30 @@ async function signalRowFor(
   };
 }
 
-// What KoBox deleted on its own for the member, while the home still shows it.
+// The latest of what KoBox deleted on its own for the member, once their space
+// ran short or as their rule allowed, while the home still shows it.
 async function automaticReportOf(
   deps: Pick<UserRoutesDeps, 'cleanupReports' | 'now'>,
   username: Username,
 ): Promise<CleanupReport | undefined> {
-  const report = await deps.cleanupReports.findTriggeredBy(username, 'automatic');
-  return report?.isShownOnHome(deps.now()) === true ? report : undefined;
+  const reports = await Promise.all([
+    deps.cleanupReports.findTriggeredBy(username, 'automatic'),
+    deps.cleanupReports.findTriggeredBy(username, 'ruleMet'),
+  ]);
+  // stamps compare as strings in time
+  const [latest] = reports
+    .filter((report) => report !== undefined)
+    .sort((a, b) => b.at.localeCompare(a.at));
+  return latest?.isShownOnHome(deps.now()) === true ? latest : undefined;
+}
+
+// What the member lets KoBox delete on its own, and when.
+async function automaticCleanupFacts(
+  deps: Pick<UserRoutesDeps, 'spacePreferences'>,
+  username: Username,
+): Promise<{ readonly automaticCleanup: AutomaticCleanup; readonly cleanupTiming: CleanupTiming }> {
+  const { automatic, timing } = await deps.spacePreferences.find(username);
+  return { automaticCleanup: automatic, cleanupTiming: timing };
 }
 
 // The rule a member's torrents answer to, and the box's they may keep.
@@ -1100,7 +1118,10 @@ export function registerUserRoutes(
     return redirectWithFlash(reply, '/access', 'Saved.');
   });
 
-  const automaticCleanupSchema = z.object({ automatic: z.enum(AUTOMATIC_CLEANUPS) });
+  const automaticCleanupSchema = z.object({
+    automatic: z.enum(AUTOMATIC_CLEANUPS),
+    timing: z.enum(CLEANUP_TIMINGS),
+  });
 
   // The username comes from the session: a member only ever chooses for
   // themselves. The worker writes it, the portal only reads it back.
@@ -1117,6 +1138,7 @@ export function registerUserRoutes(
       buildJob.setAutomaticCleanup({
         username: session.username.value,
         scope: parsed.data.automatic,
+        timing: parsed.data.timing,
       }),
     );
     return redirectOnceApplied(reply, deps.awaitJob, job, '/access', 'Saved.');
@@ -1200,7 +1222,7 @@ export function registerUserRoutes(
         ...(await addressFacts(session.username, request.ip)),
         hasTwoStep: session.hasTwoStep,
         ...(session.chosenLanguage !== undefined && { chosenLanguage: session.chosenLanguage }),
-        automaticCleanup: (await deps.spacePreferences.find(session.username)).automatic,
+        ...(await automaticCleanupFacts(deps, session.username)),
         seedRule: await seedRuleFacts(deps, session.username),
       }, flashOf(request)),
     );
@@ -1233,7 +1255,7 @@ export function registerUserRoutes(
         ...(await addressFacts(session.username, request.ip)),
         hasTwoStep: session.hasTwoStep,
         ...(session.chosenLanguage !== undefined && { chosenLanguage: session.chosenLanguage }),
-        automaticCleanup: (await deps.spacePreferences.find(session.username)).automatic,
+        ...(await automaticCleanupFacts(deps, session.username)),
         seedRule: await seedRuleFacts(deps, session.username),
       }),
     );

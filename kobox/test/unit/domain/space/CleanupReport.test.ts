@@ -44,6 +44,7 @@ describe('CleanupReport', () => {
     ['automatic', '2026-11-21 12:00:00', true],
     ['automatic', '2026-11-27 11:59:59', true],
     ['automatic', '2026-11-27 12:00:00', false],
+    ['ruleMet', '2026-11-27 11:59:59', true],
     ['member', '2026-11-20 12:00:01', false],
   ])('should_show_a_%s_cleanup_on_the_home_at_%s_%s', (trigger, now, shown) => {
     const report = CleanupReport.of({ deleted: [], skipped: [], at: '2026-11-20 12:00:00', trigger });

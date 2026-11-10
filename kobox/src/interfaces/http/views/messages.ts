@@ -207,8 +207,13 @@ const FR: Readonly<Record<string, string>> = {
   'KoBox cleaned up for you': 'KoBox a fait de la place pour vous',
   'See the details': 'Voir le détail',
   'Automatic cleanup': 'Nettoyage automatique',
-  'Past 90 % of your space, KoBox can delete for you, down under 80 %, and mail you what went.':
-    'Au-delà de 90 % de votre espace, KoBox peut supprimer à votre place, jusqu’à repasser sous 80 %, et vous écrire ce qui est parti.',
+  'KoBox can delete for you, and mail you what went.':
+    'KoBox peut supprimer à votre place, et vous écrire ce qui est parti.',
+  'What KoBox may delete': 'Ce que KoBox peut supprimer',
+  'Once my space passes 90 %, down under 80 %':
+    'Quand mon espace dépasse 90 %, jusqu’à repasser sous 80 %',
+  'As soon as a torrent meets my cleanup rule, whatever my space':
+    'Dès qu’un torrent remplit ma règle de nettoyage, quel que soit mon espace',
   'Off: KoBox only mails me': 'Désactivé : KoBox m’écrit seulement',
   'What KoBox already sent to my machine': 'Ce que KoBox a déjà envoyé sur ma machine',
   'What KoBox sent, or what seeded enough': 'Ce que KoBox a envoyé, ou ce qui a assez partagé',

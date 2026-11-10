@@ -12,6 +12,7 @@ import { cleanupHint, memberSpace, type MeasuredSpace } from './space.js';
 import { automaticCleanupNotice } from './spaceCleanupPage.js';
 import type { CleanupReport } from '../../../domain/space/CleanupReport.js';
 import { AUTOMATIC_CLEANUPS, type AutomaticCleanup } from '../../../domain/space/AutomaticCleanup.js';
+import { CLEANUP_TIMINGS, type CleanupTiming } from '../../../domain/space/CleanupTiming.js';
 import { SEED_RULE_LIMITS, type BoxSeedRule } from '../../../domain/space/SeedRule.js';
 import type { SeedRuleChoice } from '../../../domain/space/SeedRuleChoice.js';
 import { seedRuleSummary } from './seedRule.js';
@@ -329,6 +330,7 @@ export interface AccessFacts {
   // absent while the member lets their browser decide
   readonly chosenLanguage?: Language;
   readonly automaticCleanup: AutomaticCleanup;
+  readonly cleanupTiming: CleanupTiming;
   // the rule the member's torrents answer to, and the box's they may keep
   readonly seedRule: { readonly box: BoxSeedRule; readonly choice: SeedRuleChoice };
 }
@@ -597,17 +599,31 @@ const AUTOMATIC_CLEANUP_CHOICES: Readonly<Record<AutomaticCleanup, string>> = {
   sentOrSeeded: 'What KoBox sent, or what seeded enough',
 };
 
+const CLEANUP_TIMING_CHOICES: Readonly<Record<CleanupTiming, string>> = {
+  whenSpaceRunsShort: 'Once my space passes 90 %, down under 80 %',
+  onceRuleMet: 'As soon as a torrent meets my cleanup rule, whatever my space',
+};
+
 function automaticCleanupSection(viewer: Viewer, facts: AccessFacts): RawHtml {
   const ticked = (value: AutomaticCleanup): RawHtml =>
     value === facts.automaticCleanup ? html`checked` : html``;
+  const timed = (value: CleanupTiming): RawHtml =>
+    value === facts.cleanupTiming ? html`checked` : html``;
   return html`<h2 id="automatic-cleanup">${viewer.t('Automatic cleanup')}</h2>
-<p class="muted">${viewer.t('Past 90 % of your space, KoBox can delete for you, down under 80 %, and mail you what went.')}</p>
+<p class="muted">${viewer.t('KoBox can delete for you, and mail you what went.')}</p>
 <form class="card" method="post" action="/access/automatic-cleanup">
   <input type="hidden" name="_csrf" value="${viewer.csrfToken}">
+  <p>${viewer.t('What KoBox may delete')}</p>
   ${AUTOMATIC_CLEANUPS.map(
     (value) => html`<label class="check">
     <input type="radio" name="automatic" value="${value}" ${ticked(value)}>
     ${viewer.t(AUTOMATIC_CLEANUP_CHOICES[value])}</label>`,
+  )}
+  <p>${viewer.t('When')}</p>
+  ${CLEANUP_TIMINGS.map(
+    (value) => html`<label class="check">
+    <input type="radio" name="timing" value="${value}" ${timed(value)}>
+    ${viewer.t(CLEANUP_TIMING_CHOICES[value])}</label>`,
   )}
   <p class="flash warn">${viewer.t('KoBox only knows what its own sync sent. With the last choice, files you fetched another way, or never fetched, can be deleted for good.')}</p>
   <button type="submit">${viewer.t('Save automatic cleanup')}</button>

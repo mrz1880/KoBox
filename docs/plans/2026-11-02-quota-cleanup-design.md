@@ -150,3 +150,20 @@ member deletes after two weeks whatever the ratio.
 - No floor set by the admin: a low ratio can cost a member a private tracker
   account, but it is their account, and they can already delete by hand.
 - "Already sent" is unchanged.
+
+## Addendum, 2026-11-10: when automatic cleanup runs
+
+The member who deletes after two weeks kept torrents of 15 days: their space
+was at half its allowance, and automatic cleanup only ran past 90 %. The rule
+said what may go; nothing said it should go before the space ran short.
+
+- Automatic cleanup gains a second choice beside what it may delete: when.
+  "Once my space passes 90 %" stays the default and behaves as before. "As
+  soon as a torrent meets my cleanup rule" deletes, at every hourly pass,
+  everything the first choice covers, whatever space is left.
+- Past the line, a member whose rule already cleans is not cleaned for twice
+  nor mailed: what their rule allowed is already on its way out.
+- That cleanup is tried again every hour, so one that deleted nothing is
+  neither mailed nor kept: it would hide what the last one deleted. The mail of
+  one that deleted speaks of the rule, not of the 90 %.
+- The home shows the latest of what KoBox deleted on its own, either way.

@@ -25,6 +25,7 @@ export function accessFacts(overrides: Partial<AccessFacts> = {}): AccessFacts {
     hostnames: [],
     hasTwoStep: false,
     automaticCleanup: 'off',
+    cleanupTiming: 'whenSpaceRunsShort',
     seedRule: { box: SeedRule.DEFAULT, choice: { kind: 'box' } },
     ...overrides,
   };
