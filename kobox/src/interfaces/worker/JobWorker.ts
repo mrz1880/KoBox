@@ -462,6 +462,7 @@ export class JobWorker {
         await this.deps.space.setAutomaticCleanup.execute({
           username: Username.parse(job.payload.username),
           automatic: parseAutomaticCleanup(job.payload.scope),
+          timing: job.payload.timing,
         });
         return job;
       case 'set-seed-rule':

@@ -15,16 +15,26 @@ beforeEach(() => {
 
 describe('SetAutomaticCleanup', () => {
   it('should_keep_what_the_member_lets_kobox_delete_on_its_own', async () => {
-    await setAutomatic.execute({ username: alice, automatic: 'sentOnly' });
+    await setAutomatic.execute({ username: alice, automatic: 'sentOnly', timing: 'whenSpaceRunsShort' });
 
     expect((await preferences.find(alice)).automatic).toBe('sentOnly');
+  });
+
+  it('should_keep_when_the_member_lets_kobox_delete_on_its_own', async () => {
+    await setAutomatic.execute({ username: alice, automatic: 'sentOrSeeded', timing: 'onceRuleMet' });
+
+    expect((await preferences.find(alice)).timing).toBe('onceRuleMet');
   });
 
   // mailed past the line, the member turns it on: the next pass cleans
   it('should_let_the_next_pass_clean_for_a_member_already_warned_who_turns_it_on', async () => {
     await preferences.recordWarned(alice, true);
 
-    await setAutomatic.execute({ username: alice, automatic: 'sentOrSeeded' });
+    await setAutomatic.execute({
+      username: alice,
+      automatic: 'sentOrSeeded',
+      timing: 'whenSpaceRunsShort',
+    });
 
     expect(await preferences.find(alice)).toEqual({
       automatic: 'sentOrSeeded',

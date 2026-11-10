@@ -75,7 +75,7 @@ export const buildJob = {
     return parseJob('clean-up-space', input);
   },
   // what a member lets KoBox delete on its own past 90 %
-  setAutomaticCleanup(input: { username: string; scope: string }): Job {
+  setAutomaticCleanup(input: { username: string; scope: string; timing: string }): Job {
     return parseJob('set-automatic-cleanup', input);
   },
   // what a torrent must give back before it may go, for the whole box

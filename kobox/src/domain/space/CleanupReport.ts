@@ -65,7 +65,7 @@ export class CleanupReport {
   // stamps, which compare as strings in time.
   isShownOnHome(now: string): boolean {
     return (
-      this.trigger === 'automatic' && now < shiftStamp(this.at, REPORT_SHOWN_FOR_DAYS * DAY_MS)
+      this.trigger !== 'member' && now < shiftStamp(this.at, REPORT_SHOWN_FOR_DAYS * DAY_MS)
     );
   }
 

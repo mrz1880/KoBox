@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { ROLES } from '../../domain/portal/Role.js';
 import { AUTOMATIC_CLEANUPS } from '../../domain/space/AutomaticCleanup.js';
 import { CLEANUP_TRIGGERS } from '../../domain/space/CleanupReport.js';
+import { CLEANUP_TIMINGS } from '../../domain/space/CleanupTiming.js';
 import { SEED_RULE_LIMITS } from '../../domain/space/SeedRule.js';
 import { HOST_KEY_TRUSTS } from '../../domain/sync/HostKeyTrust.js';
 import { IPV4_PATTERN } from '../../domain/shared/IpAddress.js';
@@ -310,10 +311,13 @@ export const jobPayloadSchemas = {
     // absent from a job queued before automatic cleanup: the member asked
     trigger: z.enum(CLEANUP_TRIGGERS).default('member'),
   }),
-  // what KoBox may delete on its own once the member passes 90 %
+  // what KoBox may delete on its own, and when: once the member passes 90 %,
+  // or as soon as their rule allows
   'set-automatic-cleanup': z.strictObject({
     username: usernameField,
     scope: z.enum(AUTOMATIC_CLEANUPS),
+    // absent from a job queued before the member could choose when
+    timing: z.enum(CLEANUP_TIMINGS).default('whenSpaceRunsShort'),
   }),
   // the box-wide rule an admin set: what a torrent gives back, over how long
   'set-seed-rule': z.strictObject({ ratio: seedRuleRatio, days: seedRuleDays }),

@@ -321,9 +321,19 @@ describe('job contract', () => {
   it('should_parse_a_members_automatic_cleanup_choice_and_refuse_one_the_page_does_not_offer', () => {
     expect(
       parseJob('set-automatic-cleanup', { username: 'alice', scope: 'sentOrSeeded' }).payload,
-    ).toEqual({ username: 'alice', scope: 'sentOrSeeded' });
+    ).toEqual({ username: 'alice', scope: 'sentOrSeeded', timing: 'whenSpaceRunsShort' });
     expect(() =>
       parseJob('set-automatic-cleanup', { username: 'alice', scope: 'everything' }),
+    ).toThrow();
+  });
+
+  it('should_parse_when_a_member_lets_kobox_clean_and_refuse_a_timing_the_page_does_not_offer', () => {
+    expect(
+      parseJob('set-automatic-cleanup', { username: 'alice', scope: 'sentOnly', timing: 'onceRuleMet' })
+        .payload,
+    ).toEqual({ username: 'alice', scope: 'sentOnly', timing: 'onceRuleMet' });
+    expect(() =>
+      parseJob('set-automatic-cleanup', { username: 'alice', scope: 'sentOnly', timing: 'weekly' }),
     ).toThrow();
   });
 
