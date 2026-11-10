@@ -203,6 +203,33 @@ describe('WatchMemberSpace', () => {
     expect(await outbox.listRecent(10)).toEqual([]);
   });
 
+  // sent to the member's machine yesterday: their rule keeps it two weeks
+  it('should_keep_a_torrent_already_sent_until_it_meets_the_rule_for_a_member_who_cleans_by_it', async () => {
+    await preferences.chooseAutomatic(alice.username, 'sentOrSeeded');
+    await preferences.chooseTiming(alice.username, 'onceRuleMet');
+    const sentYesterday = CleanupCandidate.restore({
+      infoHash: InfoHash.parse('D'.repeat(40)),
+      name: 'Sent yesterday',
+      size: Quota.gib(5),
+      ratio: 0.2,
+      finishedAt: '2026-11-19T12:00:00.000Z',
+      path: '/home/alice/rtorrent/complete/Sent yesterday',
+      reason: 'alreadySent',
+    });
+    await snapshots.replace(
+      alice.username,
+      [sentYesterday, candidate('A', 'alreadySent', Quota.gib(10))],
+      AT,
+      SeedRule.of({ days: 14 }),
+    );
+
+    await watch.execute({ user: alice, used: RELAXED }, AT);
+
+    expect(queue.pending().map((job) => job.payload)).toEqual([
+      { username: 'alice', infoHashes: ['A'.repeat(40)], trigger: 'ruleMet' },
+    ]);
+  });
+
   it('should_not_clean_up_twice_past_the_line_for_a_member_whose_rule_already_cleans', async () => {
     await preferences.chooseAutomatic(alice.username, 'sentOnly');
     await preferences.chooseTiming(alice.username, 'onceRuleMet');
