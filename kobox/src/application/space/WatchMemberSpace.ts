@@ -9,7 +9,7 @@ import type {
 } from '../../domain/space/ports.js';
 import { QuotaPressure } from '../../domain/space/QuotaPressure.js';
 import { SpaceWarning } from '../../domain/space/SpaceWarning.js';
-import { shiftStamp } from '../../domain/shared/stamp.js';
+import { instantOf, shiftStamp } from '../../domain/shared/stamp.js';
 import type { Quota } from '../../domain/user/Quota.js';
 import type { SeedboxUser } from '../../domain/user/SeedboxUser.js';
 import { CLEANUP_MAX_TORRENTS, parseJob } from '../jobs/contract.js';
@@ -81,11 +81,16 @@ export class WatchMemberSpace {
     snapshot: CleanupSnapshot | undefined,
     at: string,
   ): Promise<boolean> {
-    if (preferences.timing !== 'onceRuleMet') {
+    if (preferences.timing !== 'onceRuleMet' || snapshot === undefined) {
       return false;
     }
-    const allowed = allowedFrom(preferences, snapshot, at);
-    const every = proposalFor(member, allowed).lines.map((line) => line.candidate);
+    // a copy already sent to the member's machine still seeds until the rule
+    // lets it go: that is what the member asked for
+    const now = instantOf(at);
+    const due = allowedFrom(preferences, snapshot, at).filter((candidate) =>
+      snapshot.judgedBy.isMetBy(candidate, now),
+    );
+    const every = proposalFor(member, due).lines.map((line) => line.candidate);
     return this.queueCleanup(member, every, 'ruleMet');
   }
 
