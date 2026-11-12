@@ -409,6 +409,45 @@ describe('ScgiRtorrentControlAdapter', () => {
     expect(received[0]).toContain(`<string>${hash.value}</string>`);
   });
 
+  it('should_restart_a_download_with_d_stop_then_d_start', async () => {
+    const adapter = new ScgiRtorrentControlAdapter();
+    const hash = InfoHash.parse('a1b2c3d4e5f6a7b8c9d0a1b2c3d4e5f6a7b8c9d0');
+
+    await adapter.restart(ScgiPort.parse(port), hash);
+
+    expect(received.map((call) => /<methodName>([^<]+)</.exec(call)?.[1])).toEqual([
+      'd.stop',
+      'd.start',
+    ]);
+    expect(received[1]).toContain(`<string>${hash.value}</string>`);
+  });
+
+  // d.hashing is not 0 while a download sits in the hash queue, the one being
+  // checked included
+  it('should_read_which_downloads_wait_in_the_hash_queue_and_which_is_checked', async () => {
+    const value = (inner: string): string => `<value>${inner}</value>`;
+    const row = (hash: string, hashing: number, checking: number): string =>
+      value(
+        `<array><data>${value(`<string>${hash}</string>`)}${value(`<i8>${String(hashing)}</i8>`)}${value(`<i8>${String(checking)}</i8>`)}</data></array>`,
+      );
+    reply =
+      'Status: 200 OK\r\nContent-Type: text/xml\r\n\r\n' +
+      '<?xml version="1.0"?><methodResponse><params><param>' +
+      value(`<array><data>${row('A'.repeat(40), 1, 1)}${row('B'.repeat(40), 1, 0)}${row('C'.repeat(40), 0, 0)}${row('not-a-hash', 1, 0)}</data></array>`) +
+      '</param></params></methodResponse>';
+    const adapter = new ScgiRtorrentControlAdapter();
+
+    const entries = await adapter.read(ScgiPort.parse(port));
+
+    expect(received[0]).toContain('<string>main</string>');
+    expect(received[0]).toContain('<string>d.hashing=</string>');
+    expect(entries).toEqual([
+      { infoHash: InfoHash.parse('A'.repeat(40)), inQueue: true, checking: true },
+      { infoHash: InfoHash.parse('B'.repeat(40)), inQueue: true, checking: false },
+      { infoHash: InfoHash.parse('C'.repeat(40)), inQueue: false, checking: false },
+    ]);
+  });
+
   describe('listFinished', () => {
     const firstHash = 'A1B2C3D4E5F6A7B8C9D0A1B2C3D4E5F6A7B8C9D0';
     const secondHash = 'B1B2C3D4E5F6A7B8C9D0A1B2C3D4E5F6A7B8C9D0';
