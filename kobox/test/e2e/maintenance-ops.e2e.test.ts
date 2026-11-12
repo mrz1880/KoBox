@@ -285,6 +285,7 @@ describe.skipIf(!onDebianAsRoot)('E2E: maintenance keeps the installed box alive
         'index-media',
         'check-package-updates',
         'send-pending-transfers',
+        'restart-stalled-hash-checks',
       ]) {
         expect(counts.get(type)?.pending, type).toBe(1);
       }

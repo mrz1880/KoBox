@@ -224,6 +224,10 @@ export const buildJob = {
   indexMedia(): Job {
     return parseJob('index-media', {});
   },
+
+  restartStalledHashChecks(): Job {
+    return parseJob('restart-stalled-hash-checks', {});
+  },
   captureServiceLog(input: { service: string }): Job {
     return parseJob('capture-service-log', input);
   },

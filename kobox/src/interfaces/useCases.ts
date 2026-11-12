@@ -84,6 +84,7 @@ import { SampleDiskUsage } from '../application/user/SampleDiskUsage.js';
 import { CleanUpSpace } from '../application/space/CleanUpSpace.js';
 import { TakeCleanupSnapshot } from '../application/space/TakeCleanupSnapshot.js';
 import type { SpaceMailerDeps } from '../application/space/SpaceMailer.js';
+import { RestartStalledHashChecks } from '../application/torrent/RestartStalledHashChecks.js';
 import { WatchMemberSpace } from '../application/space/WatchMemberSpace.js';
 import { SetAutomaticCleanup } from '../application/space/SetAutomaticCleanup.js';
 import { SetOwnSeedRule } from '../application/space/SetOwnSeedRule.js';
@@ -111,7 +112,9 @@ import { SuspendUser } from '../application/user/SuspendUser.js';
 import type {
   AnnouncerSink,
   RtorrentConfigPort,
+  HashQueuePort,
   RtorrentControlPort,
+  StalledHashCheckRepository,
   TorrentInstanceRepository,
   TorrentMetainfoPort,
   TorrentRepository,
@@ -374,6 +377,8 @@ export interface TorrentUseCaseDeps {
   readonly services: ServiceControlPort;
   readonly metainfo: TorrentMetainfoPort;
   readonly control: RtorrentControlPort;
+  readonly hashQueue: HashQueuePort;
+  readonly stalledHashChecks: StalledHashCheckRepository;
   readonly scripts: UserScriptRunnerPort;
   readonly outbox: MailOutboxPort;
   readonly recycler: ContentRecyclerPort;
@@ -399,6 +404,7 @@ export interface TorrentUseCases {
   readonly renderRutorrentUsers: RenderRutorrentUsers;
   readonly restart: RestartRtorrentInstance;
   readonly indexMedia: IndexUserMedia;
+  readonly restartStalledHashChecks: RestartStalledHashChecks;
 }
 
 export interface TrackerUseCaseDeps {
@@ -530,6 +536,12 @@ export function buildTorrentUseCases(deps: TorrentUseCaseDeps): TorrentUseCases 
       scanner: deps.mediaScanner,
       repo: deps.media,
       clock: deps.clock,
+    }),
+    restartStalledHashChecks: new RestartStalledHashChecks({
+      users: deps.users,
+      instances: deps.instances,
+      hashQueue: deps.hashQueue,
+      stalls: deps.stalledHashChecks,
     }),
   };
 }

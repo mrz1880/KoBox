@@ -43,6 +43,9 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
   // MySB wrote a cron line into every member's own crontab to give them that
   // choice; the choice survives, the crontab writing does not.
   entry('5 * * * *', 'send-pending-transfers'),
+  // rTorrent 0.9.8 can leave a download waiting in a hash queue where nothing
+  // is checked; the second pass that still sees it there restarts it
+  entry('*/10 * * * *', 'restart-stalled-hash-checks'),
 ];
 
 // When a subcommand runs, as the table above has it.

@@ -33,7 +33,7 @@ describe('maintenance rendering', () => {
     const entries = file.content
       .split('\n')
       .filter((line) => line !== '' && !line.startsWith('#') && !/^[A-Z]+=/.test(line));
-    expect(entries).toHaveLength(10);
+    expect(entries).toHaveLength(11);
     for (const line of entries) {
       expect(line).toMatch(
         / root systemd-cat -t kobox-cron --stderr-priority=warning \/usr\/local\/bin\/kobox [a-z0-9-]+$/,

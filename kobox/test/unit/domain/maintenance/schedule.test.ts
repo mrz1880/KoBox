@@ -29,7 +29,10 @@ describe('SCHEDULED_JOBS', () => {
     expect(bySubcommand.get('sample-disk-usage')?.schedule.value).toBe('20 * * * *');
     // files also come and go over SFTP, outside any KoBox event
     expect(bySubcommand.get('index-media')?.schedule.value).toBe('*/15 * * * *');
-    expect(await scheduledJobs()).toHaveLength(10);
+    // rTorrent 0.9.8 can leave a download in a stalled hash queue: restarted
+    // at the second pass that sees it, so within twenty minutes
+    expect(bySubcommand.get('restart-stalled-hash-checks')?.schedule.value).toBe('*/10 * * * *');
+    expect(await scheduledJobs()).toHaveLength(11);
   });
 
   it('should_only_reference_shell_safe_kobox_subcommands', async () => {

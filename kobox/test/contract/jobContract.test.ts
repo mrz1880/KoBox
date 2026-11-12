@@ -63,6 +63,7 @@ describe('job contract', () => {
     'check-package-updates',
     'apply-package-updates',
     'index-media',
+    'restart-stalled-hash-checks',
       'apply-ipset',
       'set-fair-use-override',
       'render-rutorrent-users',

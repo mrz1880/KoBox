@@ -660,6 +660,20 @@ program
   });
 
 program
+  .command('restart-stalled-hash-checks')
+  .description('restart what a member rTorrent left in a stalled hash queue (cron entry point)')
+  .action(async () => {
+    const c = container();
+    const id = await c.queue.enqueueUnique(buildJob.restartStalledHashChecks());
+    await done(
+      c,
+      id === undefined
+        ? 'restart-stalled-hash-checks already pending'
+        : `job ${String(id)} enqueued: restart-stalled-hash-checks`,
+    );
+  });
+
+program
   .command('run-speedtest')
   .description('measure what the link can carry (saturates it: an admin action, never scheduled)')
   .action(async () => {

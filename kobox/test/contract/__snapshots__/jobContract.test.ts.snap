@@ -615,6 +615,12 @@ exports[`job contract > should_keep_the_wire_contract_stable 1`] = `
     ],
     "type": "object",
   },
+  "restart-stalled-hash-checks": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {},
+    "type": "object",
+  },
   "resume-user": {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "additionalProperties": false,
