@@ -60,6 +60,13 @@ async function rtorrentState(infoHash: string): Promise<number | undefined> {
   return value === undefined ? undefined : Number(value);
 }
 
+// a numeric field of one download, as rtorrent reports it
+async function rtorrentNumber(method: string, infoHash: string): Promise<number | undefined> {
+  const response = await scgiCall(SCGI_PORT, method, [infoHash]);
+  const value = /<(?:i4|i8|int)>(-?\d+)<\//.exec(response)?.[1];
+  return value === undefined ? undefined : Number(value);
+}
+
 async function eventually(assertion: () => Promise<void>, timeoutMs: number): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
@@ -565,6 +572,57 @@ describe.skipIf(!onDebianAsRoot)('E2E: torrent lifecycle with a real rtorrent', 
     expect(existsSync(join(HOME, 'rtorrent/torrents/films/dropped-linux.iso.torrent'))).toBe(true);
     expect(existsSync(dropped)).toBe(false);
   }, 60_000);
+
+  // seen on 2026-11-11: of two downloads dropped together, one sat "Queued"
+  // in ruTorrent (in rTorrent's hash queue) for a day, until started by hand
+  it('should_start_every_torrent_dropped_together_into_a_watch_folder', async () => {
+    drainQueue({ KOBOX_SPOOL: DEFAULT_SPOOL_DIR });
+    // the first holds real data, so rTorrent is still checking it when the
+    // others ask to start
+    const content = Buffer.alloc(512 * 1024 ** 2, 7);
+    writeFileSync(join(HOME, 'rtorrent/complete/films/burst-1.mkv'), content);
+    sh('chown', [`${USER}:${USER}`, join(HOME, 'rtorrent/complete/films/burst-1.mkv')]);
+    const fixtures = [1, 2, 3, 4, 5, 6].map((n) =>
+      aTorrentFile({
+        name: `burst-${String(n)}.mkv`,
+        isPrivate: true,
+        ...(n === 1 ? { content } : { claimedBytes: 4 * 1024 ** 3 }),
+      }),
+    );
+    fixtures.forEach((fixture, n) => {
+      const dropped = join(HOME, `rtorrent/watch/films/burst-${String(n + 1)}.mkv.torrent`);
+      writeFileSync(dropped, fixture.data);
+      sh('chown', [`${USER}:kobox-users`, dropped]);
+    });
+
+    await eventually(async () => {
+      drainQueue({ KOBOX_SPOOL: DEFAULT_SPOOL_DIR });
+      for (const fixture of fixtures) {
+        expect(await rtorrentState(fixture.infoHash)).toBe(1);
+      }
+    }, 30_000);
+    // what ruTorrent shows as "Queued": waiting in the hash queue
+    await eventually(async () => {
+      for (const fixture of fixtures) {
+        expect(await rtorrentNumber('d.hashing', fixture.infoHash)).toBe(0);
+      }
+    }, 30_000);
+
+    // the safety net reads the real queue and leaves healthy downloads alone
+    for (const pass of [1, 2]) {
+      kobox(['restart-stalled-hash-checks']);
+      drainQueue({ KOBOX_SPOOL: DEFAULT_SPOOL_DIR });
+      expect(pass).toBeGreaterThan(0);
+    }
+    expect(
+      dbRow(
+        "SELECT status, error FROM jobs WHERE type = 'restart-stalled-hash-checks' ORDER BY id DESC",
+      ),
+    ).toEqual({ status: 'done', error: null });
+    for (const fixture of fixtures) {
+      expect(await rtorrentState(fixture.infoHash)).toBe(1);
+    }
+  }, 90_000);
 
   it('should_early_exit_on_an_inserted_event_without_torrent_file', () => {
     const hash = 'B1B2C3D4E5F6A7B8C9D0A1B2C3D4E5F6A7B8C9D0';
