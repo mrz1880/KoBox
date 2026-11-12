@@ -2,6 +2,7 @@ import type { ManagedFilesPort } from '../shared/files.js';
 import type { ScgiPort } from '../user/Port.js';
 import type { Username } from '../user/Username.js';
 import type { Announcer } from './Announcer.js';
+import type { HashQueueEntry } from './HashQueue.js';
 import type { InfoHash } from './InfoHash.js';
 import type { RecyclingMode } from './RecyclingMode.js';
 import type { Torrent } from './Torrent.js';
@@ -79,6 +80,20 @@ export interface TorrentMetainfo {
 // for XMLRPC adds without a .torrent file).
 export interface TorrentMetainfoPort {
   read(path: string): Promise<TorrentMetainfo | undefined>;
+}
+
+// A member's rTorrent hash queue: what waits in it and what is being checked,
+// and a way to restart a download that waits there (stopped, then started).
+export interface HashQueuePort {
+  read(scgiPort: ScgiPort): Promise<readonly HashQueueEntry[]>;
+  restart(scgiPort: ScgiPort, infoHash: InfoHash): Promise<void>;
+}
+
+// What each member's hash queue held stalled at the previous pass, so a
+// download is restarted only once seen stalled twice in a row.
+export interface StalledHashCheckRepository {
+  find(username: Username): Promise<readonly InfoHash[]>;
+  replace(username: Username, stalled: readonly InfoHash[]): Promise<void>;
 }
 
 export interface RtorrentControlPort {
