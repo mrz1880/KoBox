@@ -277,6 +277,7 @@ export function followUpsOf(completed: CompletedJob): readonly FollowUp[] {
     case 'set-fair-use-override':
     case 'send-mails':
     case 'index-media':
+    case 'restart-stalled-hash-checks':
     case 'restart-service':
     case 'capture-service-log':
     case 'check-package-updates':

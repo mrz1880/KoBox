@@ -71,6 +71,7 @@ export const JOB_TYPES = [
   'check-package-updates',
   'apply-package-updates',
   'index-media',
+  'restart-stalled-hash-checks',
   'apply-ipset',
   'set-fair-use-override',
   'render-rutorrent-users',
@@ -288,6 +289,8 @@ export const jobPayloadSchemas = {
   'apply-package-updates': z.strictObject({}),
   // refresh what each user has in their completed downloads
   'index-media': z.strictObject({}),
+  // restart what each member's rTorrent left in a stalled hash queue
+  'restart-stalled-hash-checks': z.strictObject({}),
   'apply-ipset': z.strictObject({}),
   // per-user fair-use budget override: absent = untouched, null = clear,
   // number = set (bits/s for the bandwidth fields)

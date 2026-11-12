@@ -161,6 +161,7 @@ import { ProcessSocketHealthProbe } from '../infrastructure/system/ProcessSocket
 import { NoopQuotaAdapter, QuotaAdapter } from '../infrastructure/system/QuotaAdapter.js';
 import { RtorrentConfigAdapter } from '../infrastructure/system/RtorrentConfigAdapter.js';
 import { SysctlAdapter } from '../infrastructure/system/SysctlAdapter.js';
+import { SqliteStalledHashCheckRepository } from '../infrastructure/persistence/SqliteStalledHashCheckRepository.js';
 import { ScgiRtorrentControlAdapter } from '../infrastructure/system/ScgiRtorrentControlAdapter.js';
 import { SftpAdapter } from '../infrastructure/system/SftpAdapter.js';
 import { SystemAccountAdapter } from '../infrastructure/system/SystemAccountAdapter.js';
@@ -855,6 +856,8 @@ export function buildContainer(name: string): Container {
     services,
     metainfo: new BencodeMetainfoAdapter(),
     control: rtorrentControl,
+    hashQueue: rtorrentControl,
+    stalledHashChecks: new SqliteStalledHashCheckRepository(db),
     scripts: new UserScriptRunnerAdapter(runner),
     announcers: new EnqueueAnnouncerSink(queue),
     templates: loadRtorrentTemplates(),

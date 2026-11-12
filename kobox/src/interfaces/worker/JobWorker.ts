@@ -22,6 +22,7 @@ import { BlocklistSource } from '../../domain/tracker/BlocklistSource.js';
 import { Quota } from '../../domain/user/Quota.js';
 import type { PasswordOpenerPort } from '../../domain/user/ports.js';
 import type { Logger } from '../../infrastructure/logging/logger.js';
+import { stalledHashCheckWarnings } from '../stalledHashCheckWarnings.js';
 import { diskUsagePassWarnings } from '../diskUsagePassWarnings.js';
 import { Username } from '../../domain/user/Username.js';
 import { immediatePassFor, SCHEDULED_PASS } from '../../domain/sync/SendPass.js';
@@ -402,6 +403,13 @@ export class JobWorker {
       case 'index-media':
         await this.deps.torrents.indexMedia.execute();
         return job;
+      case 'restart-stalled-hash-checks': {
+        const pass = await this.deps.torrents.restartStalledHashChecks.execute();
+        for (const warning of stalledHashCheckWarnings(pass)) {
+          this.deps.logger.warn(warning.context, warning.message);
+        }
+        return job;
+      }
       case 'restart-service':
         await this.deps.maintenance.restartService.execute({
           service: ManagedService.parse(job.payload.service),

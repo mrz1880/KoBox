@@ -72,6 +72,8 @@ import { SyncDestination } from '../../../src/domain/sync/SyncDestination.js';
 import { TransferBatchSize } from '../../../src/domain/sync/TransferBatchSize.js';
 import { FakeRtorrentConfig } from '../../../src/infrastructure/system/fakes/FakeRtorrentConfig.js';
 import { FakeRtorrentControl } from '../../../src/infrastructure/system/fakes/FakeRtorrentControl.js';
+import { FakeHashQueue } from '../../../src/infrastructure/system/fakes/FakeHashQueue.js';
+import { InMemoryStalledHashCheckRepository } from '../../../src/infrastructure/persistence/InMemoryStalledHashCheckRepository.js';
 import { FakeServiceControl } from '../../../src/infrastructure/system/fakes/FakeServiceControl.js';
 import { FakeSftp } from '../../../src/infrastructure/system/fakes/FakeSftp.js';
 import { FakeSystemAccounts } from '../../../src/infrastructure/system/fakes/FakeSystemAccounts.js';
@@ -201,6 +203,7 @@ interface World {
   syncDestinations: InMemorySyncDestinationRepository;
   syncTransfers: InMemorySyncTransferRepository;
   memberTorrents: FakeMemberTorrents;
+  hashQueue: FakeHashQueue;
   cleanupReports: InMemoryCleanupReportRepository;
   spacePreferences: InMemorySpacePreferenceRepository;
   seedRule: InMemorySeedRuleRepository;
@@ -372,6 +375,7 @@ beforeEach(() => {
   const torrents = new InMemoryTorrentRepository();
   const scripts = new FakeUserScriptRunner();
   const rutorrentFiles = new FakeRtorrentConfig();
+  const hashQueue = new FakeHashQueue();
   const torrentUseCases = buildTorrentUseCases({
     users: repo,
     outbox: new InMemoryMailOutbox(),
@@ -385,6 +389,8 @@ beforeEach(() => {
     services,
     metainfo: new FakeTorrentMetainfo(),
     control: new FakeRtorrentControl(),
+    hashQueue,
+    stalledHashChecks: new InMemoryStalledHashCheckRepository(),
     scripts,
     announcers: new FakeAnnouncerSink(),
     templates: loadRtorrentTemplates(),
@@ -561,6 +567,7 @@ beforeEach(() => {
     syncDestinations,
     syncTransfers,
     memberTorrents,
+    hashQueue,
     cleanupReports,
     spacePreferences,
     seedRule,
@@ -1377,6 +1384,33 @@ describe('diagnostics jobs', () => {
 
 describe('space jobs', () => {
   // the member only sees an older list; whoever looks after the box reads why
+  // a download left in a stalled hash queue is restarted, and the operator
+  // told, once seen stalled at two passes in a row
+  it('should_restart_and_log_a_download_left_in_a_stalled_hash_queue', async () => {
+    await enqueueCreateAlice();
+    await world.worker.drain();
+    const instance = await world.instances.findByUsername(alice);
+    if (instance === undefined) {
+      throw new Error('alice was not given an rTorrent');
+    }
+    const stuck = InfoHash.parse('e'.repeat(40));
+    world.hashQueue.holds(instance.scgiPort.value, [{ infoHash: stuck, inQueue: true, checking: false }]);
+    await world.queue.enqueue(parseJob('restart-stalled-hash-checks', {}));
+    await world.queue.enqueue(parseJob('restart-stalled-hash-checks', {}));
+
+    await world.worker.drain();
+
+    expect(world.hashQueue.restarted).toEqual([
+      { scgiPort: instance.scgiPort.value, infoHash: stuck.value },
+    ]);
+    expect(world.warnings).toEqual([
+      {
+        context: { username: 'alice', infoHash: stuck.value },
+        message: 'hash queue stalled: download restarted',
+      },
+    ]);
+  });
+
   it('should_log_a_member_whose_cleanup_list_could_not_be_refreshed', async () => {
     await enqueueCreateAlice();
     await world.worker.drain();
