@@ -57,13 +57,18 @@ export function aTorrentFile(options: {
   readonly isPrivate: boolean;
   readonly announce?: string;
   readonly content?: Buffer;
+  // without content, how many bytes it claims to hold: its pieces still match nothing
+  readonly claimedBytes?: number;
 }): TorrentFixture {
+  const claimed = options.claimedBytes ?? PLACEHOLDER_LENGTH;
   const info: Record<string, Bencodable> = {
     name: options.name,
     'piece length': PIECE_LENGTH,
     pieces:
-      options.content === undefined ? Buffer.alloc(SHA1_LENGTH) : pieceHashes(options.content),
-    length: options.content?.length ?? PLACEHOLDER_LENGTH,
+      options.content === undefined
+        ? Buffer.alloc(SHA1_LENGTH * Math.ceil(claimed / PIECE_LENGTH))
+        : pieceHashes(options.content),
+    length: options.content?.length ?? claimed,
     ...(options.isPrivate && { private: 1 }),
   };
   const data = bencode({
