@@ -9,7 +9,10 @@ Neutral examples throughout — substitute your own hostnames.
 `kobox install` renders `/etc/cron.d/kobox` (component `scheduler`). Every entry
 **enqueues** a typed job (duplicate-free: a stopped worker never accumulates a
 backlog); the worker executes at its own pace and a missed tick converges at the
-next one.
+next one. The table below describes `SCHEDULED_JOBS` in
+`kobox/src/domain/maintenance/schedule.ts`, which is authoritative; the cron file
+golden test (`test/golden/maintenance/cron-kobox.golden`) shows the rendered
+result.
 
 | Schedule | Entry | Replaces (legacy) |
 |---|---|---|
@@ -19,6 +22,11 @@ next one.
 | `0 */6` | `kobox update-blocklists` | BlocklistsRTorrent + PeerGuardian update |
 | `10 0` | `kobox renew-tracker-certs` | GetTrackersCert |
 | `30 5` | `kobox run-backup` | Backup-Manager |
+| `*/15` | `kobox index-media` | (new: files also arrive over SFTP) |
+| `20 *` | `kobox sample-disk-usage` | (new: the portal cannot read quotas) |
+| `40 5` | `kobox check-package-updates` | (new: the check only, never the upgrade) |
+| `5 *` | `kobox send-pending-transfers` | each member's sync crontab line |
+| `*/10` | `kobox restart-stalled-hash-checks` | (new: see "A download stuck Queued") |
 
 Gone by design: the `MySB_jobs_check` watchdog (systemd `Restart=` supervises
 cron and the worker), per-user rtorrent status loops (systemd units), LetsEncrypt
@@ -406,6 +414,23 @@ If neither is available (an old shim that has not been re-rendered), the torrent
 is skipped rather than judged. Deciding either way would be a guess about
 somebody's tracker. `kobox install` re-renders the shims, so this resolves
 itself.
+
+### A download stuck "Queued"
+
+A `.torrent` dropped into a watch folder is loaded stopped, the worker vets its
+tracker, then starts it. rTorrent then checks the data it already holds, one
+download at a time, in its hash queue; ruTorrent shows a download waiting there
+as **Queued**. Seen on 2026-11-11 with rTorrent 0.9.8: of two downloads dropped
+together, one waited a day in a queue where nothing was being checked, until its
+member started it by hand. The cause did not reproduce in the E2E container.
+
+`kobox restart-stalled-hash-checks` (every ten minutes) looks at each member's
+queue. A queue where downloads wait and none is checked has stalled; a download
+seen there at two passes in a row is restarted (`d.stop`, `d.start`), what a
+member does from ruTorrent. The worker logs each one as
+`hash queue stalled: download restarted` with the member and the info hash:
+every line is a clue to the cause, so look for them before deciding the net can
+go.
 
 ### Connecting an app (Sonarr, Radarr, a script)
 
