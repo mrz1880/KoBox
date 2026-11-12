@@ -529,3 +529,14 @@ export const spacePreferences = sqliteTable('space_preferences', {
   ownRuleRatioMilli: integer('own_rule_ratio_milli'),
   ownRuleDays: integer('own_rule_days'),
 });
+
+// The downloads each member's hash queue held stalled at the last pass,
+// replaced as a whole by every pass: one seen stalled twice is restarted.
+export const stalledHashChecks = sqliteTable(
+  'stalled_hash_checks',
+  {
+    username: text('username').notNull(),
+    infoHash: text('info_hash').notNull(),
+  },
+  (table) => [unique().on(table.username, table.infoHash)],
+);
